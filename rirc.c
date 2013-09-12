@@ -1,25 +1,39 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <signal.h>
 
 /* init_ui(), cleaup() */
 /* move ui stuff to its own .c later */
 #include <termios.h>
 #include <string.h> /* memcpy */
+#include <sys/ioctl.h>
+struct winsize w;
 struct termios oterm, nterm;
 
 #define CLR "\033[H\033[J"
 
 void fatal(char *e) { perror(e); exit(1); }
+void resize(int);
 void init_ui(void);
 void cleanup(void);
+void gui_loop(void);
 
 int
 main(int argc, char **argv)
 {
 	init_ui();
-	/* mainloop*/
+	gui_loop();
 	cleanup();
 	return 0;
+}
+
+void
+resize(int sig)
+{
+	ioctl(0, TIOCGWINSZ, &w);
+	/* ~ redraw */
+	if (signal(SIGWINCH, resize) == SIG_ERR)
+		fatal("signal handler: SIGWINCH");
 }
 
 void
@@ -27,6 +41,7 @@ init_ui(void)
 {
 	printf(CLR);
 
+	/* set terminal to raw mode */
 	tcgetattr(0, &oterm);
 	memcpy(&nterm, &oterm, sizeof(struct termios));
 	nterm.c_lflag &= ~(ECHO | ICANON | ISIG);
@@ -34,6 +49,9 @@ init_ui(void)
 	nterm.c_cc[VTIME] = 0;
 	if (tcsetattr(0, TCSADRAIN, &nterm) < 0)
 		fatal("tcsetattr");
+
+	/* get terminal dimensions */
+	resize(SIGWINCH);
 }
 
 void
@@ -41,4 +59,16 @@ cleanup(void)
 {
 	tcsetattr(0, TCSADRAIN, &oterm);
 	printf(CLR);
+}
+
+void
+gui_loop(void)
+{
+	char c;
+	for (;;) {
+		if ((c = getchar()) == 'q')
+			break;
+		else
+			putchar(c);
+	}
 }
