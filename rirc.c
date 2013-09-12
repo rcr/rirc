@@ -24,6 +24,9 @@ int
 main(int argc, char **argv)
 {
 	init_ui();
+	/* testing */
+	int soc = connect_irc("localhost");
+	printf("%d\n", soc);
 	gui_loop();
 	cleanup();
 	return 0;
