@@ -2,6 +2,8 @@
 #include <stdlib.h>
 #include <signal.h>
 
+#include "net.c"
+
 /* init_ui(), cleaup() */
 /* move ui stuff to its own .c later */
 #include <termios.h>
