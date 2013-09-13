@@ -1,2 +1,2 @@
 all:
-	cc -std=c11 -Wall -pedantic rirc.c -o run
+	cc -std=c99 -pedantic -Wall -Os rirc.c -o run

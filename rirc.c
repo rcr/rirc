@@ -31,7 +31,7 @@ main(int argc, char **argv)
 }
 
 void
-resize(int sig)
+resize(int unused)
 {
 	ioctl(0, TIOCGWINSZ, &w);
 	/* ~ redraw */
@@ -54,7 +54,7 @@ init_ui(void)
 		fatal("tcsetattr");
 
 	/* get terminal dimensions */
-	resize(SIGWINCH);
+	resize(0);
 }
 
 void
@@ -68,7 +68,7 @@ void
 gui_loop(void)
 {
 	char c;
-	int socket;
+	int socket = -1;
 	for (;;) {
 		if ((c = getchar()) == 'q')
 			break;
