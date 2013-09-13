@@ -1,9 +1,11 @@
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 #include <netdb.h>
 #include <arpa/inet.h>
 
 int connect_irc(char*);
+void diconnect_irc(int);
 struct in_addr resolve(char*);
 
 extern void fatal(char*);
@@ -26,6 +28,13 @@ connect_irc(char *hostname)
 		fatal("connect");
 
 	return soc;
+}
+
+void
+disconnect_irc(int soc)
+{
+	/* TODO: send:   QUIT :<quit message> */
+	close(soc);
 }
 
 struct in_addr

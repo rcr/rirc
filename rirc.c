@@ -25,8 +25,6 @@ main(int argc, char **argv)
 {
 	init_ui();
 	/* testing */
-	int soc = connect_irc("localhost");
-	printf("%d\n", soc);
 	gui_loop();
 	cleanup();
 	return 0;
@@ -70,9 +68,17 @@ void
 gui_loop(void)
 {
 	char c;
+	int socket;
 	for (;;) {
 		if ((c = getchar()) == 'q')
 			break;
+
+		/* testing */
+		else if (c == 'c')
+			socket = connect_irc("localhost");
+		else if (c == 'd')
+			disconnect_irc(socket);
+
 		else
 			putchar(c);
 	}
