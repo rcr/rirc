@@ -14,10 +14,10 @@ struct termios oterm, nterm;
 
 #define CLR "\033[H\033[J"
 
-void fatal(char *e) { perror(e); exit(1); }
+void fatal(char *e) { perror(e); cleanup(0); exit(1); }
 void resize(int);
 void init_ui(void);
-void cleanup(void);
+void cleanup(int);
 void gui_loop(void);
 
 int
@@ -26,7 +26,7 @@ main(int argc, char **argv)
 	init_ui();
 	/* testing */
 	gui_loop();
-	cleanup();
+	cleanup(1);
 	return 0;
 }
 
@@ -58,10 +58,11 @@ init_ui(void)
 }
 
 void
-cleanup(void)
+cleanup(int clear)
 {
 	tcsetattr(0, TCSADRAIN, &oterm);
-	printf(CLR);
+	if (clear)
+		printf(CLR);
 }
 
 void
