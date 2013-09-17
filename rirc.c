@@ -76,6 +76,14 @@ gui_loop(void)
 
 	soc = connect_irc("localhost");
 
+	/* testing server connection */
+	char buf1[] = ":guest!~guest@localhost.localdomain NICK Guest\r\n";
+	send(soc, buf1, strlen(buf1), 0);
+	char buf2[] = ":guest!~guest@localhost.localdomain USER guest irc.testnet.net bla :TestName\r\n";
+	send(soc, buf2, strlen(buf2), 0);
+	char buf3[] = ":guest!~guest@localhost.localdomain JOIN #test\r\n";
+	send(soc, buf3, strlen(buf3), 0);
+
 	for (;;) {
 
 		fds[0].fd = 0; /* stdin */
