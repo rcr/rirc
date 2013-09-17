@@ -7,6 +7,7 @@
 /* init_ui(), cleaup() */
 /* move ui stuff to its own .c later */
 #include <poll.h>
+#include <ctype.h>  /* isprint */
 #include <termios.h>
 #include <string.h> /* memcpy */
 #include <sys/ioctl.h>
@@ -44,6 +45,8 @@ resize(int unused)
 void
 init_ui(void)
 {
+	setbuf(stdout, NULL);
+
 	printf(CLR);
 
 	/* set terminal to raw mode */
@@ -70,8 +73,8 @@ cleanup(int clear)
 void
 gui_loop(void)
 {
-	char buf[BUFFSIZE];
-	int soc, count, ret, time = 200;
+	char *ptr, buf[BUFFSIZE], input[BUFFSIZE];
+	int soc, ret, count = 0, time = 200;
 	struct pollfd fds[2];
 
 	soc = connect_irc("localhost");
@@ -84,6 +87,8 @@ gui_loop(void)
 	char buf3[] = ":guest!~guest@localhost.localdomain JOIN #test\r\n";
 	send(soc, buf3, strlen(buf3), 0);
 
+	ptr = input;
+
 	for (;;) {
 
 		fds[0].fd = 0; /* stdin */
@@ -95,16 +100,36 @@ gui_loop(void)
 		ret = poll(fds, 2, time);
 
 		if (ret == 0) { /* timed out check input buffer */
+			if (count == 1) {
+				char c = buf[0];
+				if (c == 'q')
+					break;
+				else if (c == 0x1B) /* escape */
+					putchar('E');
+				else if (isprint(c)) {
+					*ptr++ = c; /* this should check size */
+					putchar(c);
+				} else if (c == '\n') {
+					strcpy(ptr, "\r\n\0");
+					putchar('\n');
+					/* testing send */
+					char sendbuf[BUFFSIZE] = "PRIVMSG #test :";
+					strcat(sendbuf, input);
+					send(soc, sendbuf, strlen(sendbuf), 0);
+					ptr = input;
+				}
+			} else if (count > 0) { /* escape sequence or paste */
+				putchar('~');
+			}
+			count = 0;
 			time = 200;
 		} else if (fds[0].revents & POLLIN) {
 			count = read(0, buf, BUFFSIZE);
 			time = 0;
-			if (buf[0] == 'q')
-				break;
 		} else if (fds[1].revents & POLLIN) {
 			count = read(soc, buf, BUFFSIZE);
 			printf("%.*s", count, buf);
-			time = 0;
+			time = count = 0;
 		}
 	}
 }
