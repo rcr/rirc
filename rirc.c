@@ -119,7 +119,7 @@ gui_loop(void)
 			time = 0;
 		} else if (fds[1].revents & POLLIN) {
 			count = read(soc, buf, BUFFSIZE);
-			printf("%.*s", count, buf);
+			recv_msg(buf, count);
 			time = count = 0;
 		}
 	}

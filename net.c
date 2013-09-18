@@ -82,3 +82,49 @@ resolve(char *hostname)
 	h_addr.s_addr = *((unsigned long *) host->h_addr_list[0]);
 	return h_addr;
 }
+
+void
+send_msg(char *msg, int count)
+{
+	/* 512 bytes: Max IRC msg length */
+	if (*msg == '/') {
+		while (++*msg != ' ') {
+			/* Copy the command, save msg ptr for more parsing */
+			;
+		}
+		/*
+		--- On Connect ---
+		USER
+		--- High Priority ---
+		QUIT
+		JOIN
+		MSG -> PRIVMSG target: nick
+		NICK
+		PART
+		--- Med Priority ---
+		CONNECT
+		DISCONNECT
+		--- Low Priority ---
+		MODE
+		TOPIC
+		NAMES
+		LIST
+		INVITE
+		KICK
+		--- Not Implementing ---
+		PASS
+		*/
+	} else {
+		/*
+		PRIVMSG target: current_channel
+		*/
+	}
+	/* send to cur_channel on server->socket */
+}
+
+void
+recv_msg(char *msg, int count)
+{
+	/* Parse incoming messages, send to chan */
+	printf("%.*s", count, msg);
+}
