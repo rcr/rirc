@@ -73,12 +73,14 @@ cleanup(int clear)
 void
 gui_loop(void)
 {
-	char *ptr, buf[BUFFSIZE], input[BUFFSIZE];
+	char buf[BUFFSIZE];
 	int soc, ret, count = 0, time = 200;
+	/* FIXME: [stdin + num_servers] */
 	struct pollfd fds[2];
 
-	soc = connect_irc("localhost");
+	soc = con_server("localhost");
 
+#if 0
 	/* testing server connection */
 	char buf1[] = ":guest!~guest@localhost.localdomain NICK Guest\r\n";
 	send(soc, buf1, strlen(buf1), 0);
@@ -86,8 +88,7 @@ gui_loop(void)
 	send(soc, buf2, strlen(buf2), 0);
 	char buf3[] = ":guest!~guest@localhost.localdomain JOIN #test\r\n";
 	send(soc, buf3, strlen(buf3), 0);
-
-	ptr = input;
+#endif
 
 	for (;;) {
 
@@ -104,19 +105,9 @@ gui_loop(void)
 				char c = buf[0];
 				if (c == 'q')
 					break;
-				else if (c == 0x1B) /* escape */
-					putchar('E');
-				else if (isprint(c)) {
-					*ptr++ = c; /* this should check size */
-					putchar(c);
-				} else if (c == '\n') {
-					strcpy(ptr, "\r\n\0");
-					putchar('\n');
-					/* testing send */
-					char sendbuf[BUFFSIZE] = "PRIVMSG #test :";
-					strcat(sendbuf, input);
-					send(soc, sendbuf, strlen(sendbuf), 0);
-					ptr = input;
+				if (c == 'd') {
+					puts("disconnecting");
+					dis_server();
 				}
 			} else if (count > 0) { /* escape sequence or paste */
 				putchar('~');

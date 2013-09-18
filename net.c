@@ -4,14 +4,38 @@
 #include <netdb.h>
 #include <arpa/inet.h>
 
-int connect_irc(char*);
-void diconnect_irc(int);
+#define MAXCHANS 10
+
+int con_server(char*);
+void dis_server(void);
+void send_msg(char*, int);
+void recv_msg(char*, int);
 struct in_addr resolve(char*);
 
 extern void fatal(char*);
 
+struct channel
+{
+	char name[50];
+	/* TODO:
+	nicklist
+	channel history
+	*/
+};
+
+/* For now, limit to one server connection */
+struct server
+{
+	int socket;
+	int cur_chan;
+	int chan_count;
+	struct channel chan_list[MAXCHANS];
+};
+
+struct server *s = NULL;
+
 int
-connect_irc(char *hostname)
+con_server(char *hostname)
 {
 	struct in_addr iadr = resolve(hostname);
 
@@ -27,14 +51,25 @@ connect_irc(char *hostname)
 	if (connect(soc, (struct sockaddr *) &server, sizeof(server)) < 0)
 		fatal("connect");
 
+	s = malloc(sizeof(server));
+	s->socket = soc;
+	s->chan_count = 0;
+
 	return soc;
 }
 
 void
-disconnect_irc(int soc)
+dis_server(void)
 {
-	/* TODO: send:   QUIT :<quit message> */
-	close(soc);
+	if (s == NULL) {
+		puts("Not connected");
+	} else {
+		char quit_msg[] = "QUIT :Quitting!\r\n";
+		send(s->socket, quit_msg, strlen(quit_msg), 0);
+		close(s->socket);
+		free(s);
+		s = NULL;
+	}
 }
 
 struct in_addr
