@@ -14,7 +14,7 @@
 struct winsize w;
 struct termios oterm, nterm;
 
-#define BUFFSIZE 512
+#define MAXSERVER 1 /* will be used later */
 #define CLR "\033[H\033[J"
 
 void resize(int);
@@ -74,21 +74,8 @@ void
 gui_loop(void)
 {
 	char buf[BUFFSIZE];
-	int soc, ret, count = 0, time = 200;
-	/* FIXME: [stdin + num_servers] */
-	struct pollfd fds[2];
-
-	soc = con_server("localhost");
-
-#if 0
-	/* testing server connection */
-	char buf1[] = ":guest!~guest@localhost.localdomain NICK Guest\r\n";
-	send(soc, buf1, strlen(buf1), 0);
-	char buf2[] = ":guest!~guest@localhost.localdomain USER guest irc.testnet.net bla :TestName\r\n";
-	send(soc, buf2, strlen(buf2), 0);
-	char buf3[] = ":guest!~guest@localhost.localdomain JOIN #test\r\n";
-	send(soc, buf3, strlen(buf3), 0);
-#endif
+	int ret, soc = -1, count = 0, time = 200;
+	struct pollfd fds[1 + MAXSERVER];
 
 	for (;;) {
 
@@ -98,13 +85,16 @@ gui_loop(void)
 		fds[1].fd = soc;
 		fds[1].events = POLLIN;
 
-		ret = poll(fds, 2, time);
+		ret = poll(fds, 1 + num_server, time);
 
 		if (ret == 0) { /* timed out check input buffer */
 			if (count == 1) {
 				char c = buf[0];
 				if (c == 'q')
 					break;
+				if (c == 'c') {
+					soc = con_server("localhost");
+				}
 				if (c == 'd') {
 					puts("disconnecting");
 					dis_server();

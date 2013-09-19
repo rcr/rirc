@@ -4,6 +4,7 @@
 #include <netdb.h>
 #include <arpa/inet.h>
 
+#define BUFFSIZE 512
 #define MAXCHANS 10
 
 int con_server(char*);
@@ -12,7 +13,14 @@ void send_msg(char*, int);
 void recv_msg(char*, int);
 struct in_addr resolve(char*);
 
+char sendbuff[BUFFSIZE];
 extern void fatal(char*);
+
+
+/* Config Stuff */
+char nick[] = "test";
+char user[] = "rcr";
+char realname[] = "Richard Robbins";
 
 struct channel
 {
@@ -32,11 +40,15 @@ struct server
 	struct channel chan_list[MAXCHANS];
 };
 
+int num_server = 0;
 struct server *s = NULL;
 
 int
 con_server(char *hostname)
 {
+	if (s != NULL)
+		return -1;
+
 	struct in_addr iadr = resolve(hostname);
 
 	int soc;
@@ -50,10 +62,22 @@ con_server(char *hostname)
 	server.sin_port = htons(6667);
 	if (connect(soc, (struct sockaddr *) &server, sizeof(server)) < 0)
 		fatal("connect");
+	else {
+		/* see NOTES in printf(3) about characters after final %arg */
+		snprintf(sendbuff, BUFFSIZE, "NICK %s\r\n", nick);
+		send(soc, sendbuff, strlen(sendbuff), 0);
+
+		snprintf(sendbuff, BUFFSIZE, "USER %s 8 * :%s\r\n", user, realname);
+		send(soc, sendbuff, strlen(sendbuff), 0);
+
+		char buf3[] = "JOIN #test\r\n";
+		send(soc, buf3, strlen(buf3), 0);
+	}
 
 	s = malloc(sizeof(server));
 	s->socket = soc;
 	s->chan_count = 0;
+	num_server++;
 
 	return soc;
 }
@@ -66,9 +90,10 @@ dis_server(void)
 	} else {
 		char quit_msg[] = "QUIT :Quitting!\r\n";
 		send(s->socket, quit_msg, strlen(quit_msg), 0);
-		close(s->socket);
+		close(s->socket); /* wait for reply before closing? */
 		free(s);
 		s = NULL;
+		num_server--;
 	}
 }
 
