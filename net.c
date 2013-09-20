@@ -2,6 +2,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <netdb.h>
+#include <ctype.h>
 #include <arpa/inet.h>
 
 #define BUFFSIZE 512
@@ -12,6 +13,7 @@ void dis_server(void);
 void send_msg(char*, int);
 void recv_msg(char*, int);
 struct in_addr resolve(char*);
+char* cmdcasecmp(char*, char*);
 
 char sendbuff[BUFFSIZE];
 extern void fatal(char*);
@@ -64,14 +66,15 @@ con_server(char *hostname)
 		fatal("connect");
 	else {
 		/* see NOTES in printf(3) about characters after final %arg */
-		snprintf(sendbuff, BUFFSIZE, "NICK %s\r\n", nick);
+		int c = snprintf(sendbuff, BUFFSIZE, "NICK %s\r\n", nick);
+		printf("::::  %d\n", c); /* this is returning 11... thats how many chars are in it without the '\0' */
 		send(soc, sendbuff, strlen(sendbuff), 0);
 
 		snprintf(sendbuff, BUFFSIZE, "USER %s 8 * :%s\r\n", user, realname);
 		send(soc, sendbuff, strlen(sendbuff), 0);
-
-		char buf3[] = "JOIN #test\r\n";
-		send(soc, buf3, strlen(buf3), 0);
+		/* ident is not required to be unique */
+		/* TODO: "user sets your ident...." what does that mean */
+		/* http://en.wikipedia.org/wiki/Ident_protocol */
 	}
 
 	s = malloc(sizeof(server));
@@ -108,15 +111,78 @@ resolve(char *hostname)
 	return h_addr;
 }
 
+/* utils */
+char*
+cmdcasecmp(char *cmd, char *inp)
+{
+	char *tmp = inp;
+	while (tolower(*cmd++) == tolower(*tmp++))
+		if (*cmd == '\0') return tmp;
+	return 0;
+}
+
+char*
+getarg(char *inp)
+{
+	char *ptr = inp;
+
+	/* eat whitespace */
+	while (*ptr == ' ')
+		ptr++;
+
+	/* get at least 1 character */
+	if (*ptr == '\0')
+		return 0;
+
+	/* get null or whitespace */
+	while (*ptr != ' ' && *ptr != '\0')
+		ptr++;
+	
+	return ptr;
+}
+
 void
 send_msg(char *msg, int count)
 {
+	/* tested for 0, 1 and 2 args */
+	
 	/* 512 bytes: Max IRC msg length */
 	if (*msg == '/') {
-		while (++*msg != ' ') {
-			/* Copy the command, save msg ptr for more parsing */
-			;
+		msg++;
+		char *ptr;
+		if ((ptr = cmdcasecmp("JOIN", msg))) {
+			if (*ptr != ' ' && *ptr != '\0')
+				goto cmderr;
+			if ((ptr = getarg(ptr))) {
+				puts("GOT JOIN");
+			}
+			else {
+				goto argerr;
+			}
+		} else if ((ptr = cmdcasecmp("QUIT", msg))) {
+			if (*ptr != '\0') {/* no args */
+				/* FIXME: remove this print */
+				puts("fail silent");
+				return;
+			}
+			puts("GOT QUIT");
+		} else if ((ptr = cmdcasecmp("MSG", msg))) {
+			if (!(ptr = getarg(ptr))) {
+				goto argerr;
+			}
+			if (!(ptr = getarg(ptr))) {
+				goto argerr;
+			}
+			puts("GOT MSG");
+		} else {
+			goto cmderr;
 		}
+
+
+
+
+
+
 		/*
 		--- On Connect ---
 		USER
@@ -144,7 +210,17 @@ send_msg(char *msg, int count)
 		PRIVMSG target: current_channel
 		*/
 	}
+	return;
 	/* send to cur_channel on server->socket */
+		/* TODO: print unknown error: with first 25 or so chars, + "..." if longer */
+
+	cmderr:
+		puts("unknown cmd");
+		return;
+
+	argerr:
+		puts("insufficient args");
+		return;
 }
 
 void
