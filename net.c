@@ -116,7 +116,7 @@ char*
 cmdcasecmp(char *cmd, char *inp)
 {
 	char *tmp = inp;
-	while (tolower(*cmd++) == tolower(*tmp++))
+	while (*cmd++ == toupper(*tmp++))
 		if (*cmd == '\0') return tmp;
 	return 0;
 }
@@ -150,15 +150,11 @@ send_msg(char *msg, int count)
 	if (*msg == '/') {
 		msg++;
 		char *ptr;
-		if ((ptr = cmdcasecmp("JOIN", msg))) {
-			if (*ptr != ' ' && *ptr != '\0')
-				goto cmderr;
-			if ((ptr = getarg(ptr))) {
+		if ((ptr = cmdcasecmp("JOIN ", msg))) {
+			if ((ptr = getarg(ptr)))
 				puts("GOT JOIN");
-			}
-			else {
+			else
 				goto argerr;
-			}
 		} else if ((ptr = cmdcasecmp("QUIT", msg))) {
 			if (*ptr != '\0') {/* no args */
 				/* FIXME: remove this print */
@@ -166,7 +162,7 @@ send_msg(char *msg, int count)
 				return;
 			}
 			puts("GOT QUIT");
-		} else if ((ptr = cmdcasecmp("MSG", msg))) {
+		} else if ((ptr = cmdcasecmp("MSG ", msg))) {
 			if (!(ptr = getarg(ptr))) {
 				goto argerr;
 			}
