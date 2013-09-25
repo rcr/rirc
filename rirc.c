@@ -3,6 +3,7 @@
 #include <signal.h>
 
 #include "net.c"
+#include "input.c"
 
 /* init_ui(), cleaup() */
 /* move ui stuff to its own .c later */
@@ -88,19 +89,12 @@ gui_loop(void)
 		ret = poll(fds, 1 + num_server, time);
 
 		if (ret == 0) { /* timed out check input buffer */
-			if (count == 1) {
-				char c = buf[0];
-				if (c == 'q')
+			if (count > 0) {
+				input(buf, count);
+
+				/* FIXME: */
+				if (buf[0] == 'q')
 					break;
-				if (c == 'c') {
-					soc = con_server("localhost");
-				}
-				if (c == 'd') {
-					puts("disconnecting");
-					dis_server();
-				}
-			} else if (count > 0) { /* escape sequence or paste */
-				putchar('~');
 			}
 			count = 0;
 			time = 200;
