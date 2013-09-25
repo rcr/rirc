@@ -1,8 +1,9 @@
 #include <ctype.h>
 
-#define MAXINPUT 30
+#define MAXINPUT 200
+#define SENDBUFF MAXINPUT+3 /* Allow room for \r\n\0 */
 
-char text[MAXINPUT];
+char text[SENDBUFF];
 int ptr1 = 0;
 int ptr2 = MAXINPUT-1;
 
@@ -53,6 +54,22 @@ esccmp(char *esc, char *inp)
 }
 
 void
+ready_send() /* copy from pt2 -> end, add \r\n\0 */
+{
+	char *p1 = &text[ptr1];
+	char *p2 = &text[ptr2];
+	while (p2 < &text[MAXINPUT]) {
+		*p1++ = *p2++;
+	}
+	*p1++ = '\r', *p1++ = '\n', *p1 = '\0';
+
+	/* TODO: send the text before reseting */
+
+	ptr1 = 0;
+	ptr2 = MAXINPUT-1;
+}
+
+void
 input(char *inp, int count)
 {
 	if (count == 1) {
@@ -61,6 +78,8 @@ input(char *inp, int count)
 			ins_char(c);
 		else if (c == 0x7F) /* backspace */
 			del_char(1);
+		else if (c == 0x0D || c == 0x0A) /* CR || NL */
+			ready_send();
 	} else if (count > 0 && *inp++ == 0x1B) { /* escape sequence */
 		if (esccmp("[A", inp)) /* arrow up */
 			;
