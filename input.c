@@ -1,7 +1,7 @@
 #include <ctype.h>
 
 /* maximum input size */
-#define MAXINPUT 10
+#define MAXINPUT 30
 
 #define CURFORW printf("\033[C")
 #define CURBACK printf("\033[D")
@@ -18,10 +18,12 @@ ins_char(char c)
 }
 
 void
-del_char()
+del_char(int left)
 {
-	if (ptr1 > 0)
+	if (left && ptr1 > 0)
 		ptr1--;
+	else if (!left && ptr2 < MAXINPUT-1)
+		ptr2++;
 }
 
 void
@@ -29,11 +31,11 @@ cur_lr(int left)
 {
 	if (left) {
 		if (ptr1 > 0) {
-			text[ptr2--] = text[--ptr1];
+			text[--ptr2] = text[--ptr1];
 		}
 	} else {
-		if (ptr2 < MAXINPUT) {
-			text[ptr1++] = text[++ptr2];
+		if (ptr2 < MAXINPUT-1) {
+			text[++ptr1] = text[++ptr2];
 		}
 	}
 }
@@ -41,36 +43,14 @@ cur_lr(int left)
 void
 print_line()
 {
-	printf("\033[2K\033[1;1H  >>> "); /* | >>> | <   > */
-	int p = 0;
-
-#if 0
-	/* test print1 */
-	while (p < ptr1)
-		putchar(text[p++]);
-	while (p < ptr2) {
-		putchar('.');
-		p++;
-	}
-	while (p < MAXINPUT)
-		putchar(text[p++]);
-
-	/* test print2 */
-	text[MAXINPUT-1] = '\0';
-	printf("\n%s\n", text);
-
-	printf("%d: %c   %d: %c\n\n", ptr1, text[ptr1], ptr2, text[ptr2]);
-
-	/* actual print */
-	printf("\033[2K"); /* 0: clear from cursor to end, 2: clear whole line*/
-#endif
-
-
-
+	/* 0: clear from cursor to end, 2: clear whole line*/
+	printf("\033[2K\033[1;1H  >>> ");
+	int p;
 	for (p = 0; p < ptr1; p++)
 		putchar(text[p]);
 	for (p = ptr2; p < MAXINPUT-1; p++)
 		putchar(text[p]);
+	printf("\033[1;%dH", ptr1 + 7);
 }
 
 int
@@ -89,16 +69,19 @@ input(char *inp, int count)
 		if (isprint(c))
 			ins_char(c);
 		else if (c == 0x7F) /* backspace */
-			del_char();
+			del_char(1);
 	} else if (count > 0 && *inp++ == 0x1B) { /* escape sequence */
-		if (esccmp("[A", inp))
-			puts("UP");
-		if (esccmp("[B", inp))
-			puts("DOWN");
-		if (esccmp("[C", inp))
+		if (esccmp("[A", inp)) /* arrow up */
+			;
+		if (esccmp("[B", inp)) /* arrow down */
+			;
+		if (esccmp("[C", inp)) /* arrow right */
 			cur_lr(0);
-		if (esccmp("[D", inp))
+		if (esccmp("[D", inp)) /* arrow left */
 			cur_lr(1);
+		if (esccmp("[3~", inp)) /* delete */
+			del_char(0);
+		//printf("\n\n\n\nGot: %s\n", inp);
 	}
 	print_line();
 }
