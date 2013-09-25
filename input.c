@@ -1,10 +1,6 @@
 #include <ctype.h>
 
-/* maximum input size */
 #define MAXINPUT 30
-
-#define CURFORW printf("\033[C")
-#define CURBACK printf("\033[D")
 
 char text[MAXINPUT];
 int ptr1 = 0;
@@ -29,23 +25,18 @@ del_char(int left)
 void
 cur_lr(int left)
 {
-	if (left) {
-		if (ptr1 > 0) {
-			text[--ptr2] = text[--ptr1];
-		}
-	} else {
-		if (ptr2 < MAXINPUT-1) {
-			text[++ptr1] = text[++ptr2];
-		}
-	}
+	if (left && ptr1 > 0)
+		text[--ptr2] = text[--ptr1];
+	else if (!left && ptr2 < MAXINPUT-1)
+		text[++ptr1] = text[++ptr2];
 }
 
+/* belongs in ui.c */
 void
 print_line()
 {
-	/* 0: clear from cursor to end, 2: clear whole line*/
-	printf("\033[2K\033[1;1H  >>> ");
 	int p;
+	printf("\033[2K\033[1;1H  >>> ");
 	for (p = 0; p < ptr1; p++)
 		putchar(text[p]);
 	for (p = ptr2; p < MAXINPUT-1; p++)
@@ -82,6 +73,8 @@ input(char *inp, int count)
 		if (esccmp("[3~", inp)) /* delete */
 			del_char(0);
 		//printf("\n\n\n\nGot: %s\n", inp);
-	}
+	} /* else {
+		paste
+	} */
 	print_line();
 }
