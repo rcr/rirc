@@ -78,7 +78,7 @@ input(char *inp, int count)
 			ins_char(c);
 		else if (c == 0x7F) /* backspace */
 			del_char(1);
-		else if (c == 0x0D || c == 0x0A) /* CR || NL */
+		else if (c == 0x0A) /* LF */
 			ready_send();
 	} else if (count > 0 && *inp++ == 0x1B) { /* escape sequence */
 		if (esccmp("[A", inp)) /* arrow up */

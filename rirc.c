@@ -54,6 +54,7 @@ init_ui(void)
 	tcgetattr(0, &oterm);
 	memcpy(&nterm, &oterm, sizeof(struct termios));
 	nterm.c_lflag &= ~(ECHO | ICANON | ISIG);
+	nterm.c_iflag &= ICRNL;
 	nterm.c_cc[VMIN] = 1;
 	nterm.c_cc[VTIME] = 0;
 	if (tcsetattr(0, TCSADRAIN, &nterm) < 0)
