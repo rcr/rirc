@@ -117,7 +117,7 @@ cmdcasecmp(char *cmd, char *inp)
 {
 	char *tmp = inp;
 	while (*cmd++ == toupper(*tmp++))
-		if (*cmd == '\0') return tmp;
+		if (*cmd == '\0' && (*tmp == '\0' || *tmp == ' ')) return tmp;
 	return 0;
 }
 
@@ -130,93 +130,102 @@ getarg(char *inp)
 	while (*ptr == ' ')
 		ptr++;
 
-	/* get at least 1 character */
-	if (*ptr == '\0')
-		return 0;
+	if (*ptr != '\0')
+		return ptr;
+	else
+		return NULL;
+}
 
-	/* get null or whitespace */
-	while (*ptr != ' ' && *ptr != '\0')
-		ptr++;
+int
+send_conn(char *ptr, int count)
+{
+	/*
+	if (!(ptr = getarg(ptr)))
+		return 1;
+	printf("%s\n", ptr);
+	con_server(ptr);
+	*/
 	
-	return ptr;
+	return 0;
+}
+
+int
+send_join(char *ptr, int count)
+{
+	/*
+	if (!(ptr = getarg(ptr)))
+		return 1;
+	strcpy(sendbuff, "JOIN ");
+	strcat(sendbuff, ptr);
+	FIXME
+	sendbuff[count] = '\r';
+	sendbuff[count+1] = '\n';
+	sendbuff[count+2] = '\0';
+	printf("\n\n%s\n",sendbuff);
+	send(s->socket, sendbuff, strlen(sendbuff), 0);
+	*/
+
+	return 0;
 }
 
 void
 send_msg(char *msg, int count)
 {
-	/* tested for 0, 1 and 2 args */
-	
+	char *ptr;
+	int err = 0;
 	/* 512 bytes: Max IRC msg length */
-	if (*msg == '/') {
-		msg++;
-		char *ptr;
-		if ((ptr = cmdcasecmp("JOIN ", msg))) {
-			if ((ptr = getarg(ptr)))
-				puts("GOT JOIN");
-			else
-				goto argerr;
-		} else if ((ptr = cmdcasecmp("QUIT", msg))) {
-			if (*ptr != '\0') {/* no args */
-				/* FIXME: remove this print */
-				puts("fail silent");
-				return;
-			}
-			puts("GOT QUIT");
-		} else if ((ptr = cmdcasecmp("MSG ", msg))) {
-			if (!(ptr = getarg(ptr))) {
-				goto argerr;
-			}
-			if (!(ptr = getarg(ptr))) {
-				goto argerr;
-			}
-			puts("GOT MSG");
-		} else {
-			goto cmderr;
-		}
-
-
-
-
-
-
-		/*
-		--- On Connect ---
-		USER
-		--- High Priority ---
-		QUIT
-		JOIN
-		MSG -> PRIVMSG target: nick
-		NICK
-		PART
-		--- Med Priority ---
-		CONNECT
-		DISCONNECT
-		--- Low Priority ---
-		MODE
-		TOPIC
-		NAMES
-		LIST
-		INVITE
-		KICK
-		--- Not Implementing ---
-		PASS
-		*/
-	} else {
+	if (*msg != '/') {
 		/*
 		PRIVMSG target: current_channel
 		*/
+	} else if ((ptr = cmdcasecmp("JOIN", ++msg))) {
+		err = send_join(ptr, count);
+	} else if ((ptr = cmdcasecmp("CONNECT", msg))) {
+		err = send_conn(ptr, count);
+	} else if ((ptr = cmdcasecmp("QUIT", msg))) {
+		puts("GOT QUIT");
 	}
-	return;
-	/* send to cur_channel on server->socket */
-		/* TODO: print unknown error: with first 25 or so chars, + "..." if longer */
+		/*
+	} else if ((ptr = cmdcasecmp("MSG", msg))) {
+		if (!(ptr = getarg(ptr))) {
+			goto argerr;
+		}
+		if (!(ptr = getarg(ptr))) {
+			goto argerr;
+		}
+		puts("GOT MSG");
+		*/
 
-	cmderr:
-		puts("unknown cmd");
+	/*
+	--- On Connect ---
+	USER
+	--- High Priority ---
+	QUIT
+	JOIN
+	MSG -> PRIVMSG target: nick
+	NICK
+	PART
+	--- Med Priority ---
+	CONNECT
+	DISCONNECT
+	--- Low Priority ---
+	MODE
+	TOPIC
+	NAMES
+	LIST
+	INVITE
+	KICK
+	--- Not Implementing ---
+	PASS
+	*/
+	else {
+		printf("\nUnknown command: %.*s%s\n", 15, msg, count > 15 ? "..." : "");
 		return;
-
-	argerr:
-		puts("insufficient args");
-		return;
+	}
+	if (err == 1)
+		puts("Insufficient arguments");
+	if (err == 2)
+		puts("Inconrrect arguments");
 }
 
 void

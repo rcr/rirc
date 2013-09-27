@@ -56,15 +56,9 @@ esccmp(char *esc, char *inp)
 void
 ready_send() /* copy from pt2 -> end, add \r\n\0 */
 {
-	char *p1 = &text[ptr1];
-	char *p2 = &text[ptr2];
-	while (p2 < &text[MAXINPUT]) {
-		*p1++ = *p2++;
-	}
-	*p1++ = '\r', *p1++ = '\n', *p1 = '\0';
-
-	/* TODO: send the text before reseting */
-
+	while (ptr2 < MAXINPUT-1)
+		text[ptr1++] = text[ptr2++];
+	send_msg(text, ptr1-1);
 	ptr1 = 0;
 	ptr2 = MAXINPUT-1;
 }
