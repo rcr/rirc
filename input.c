@@ -32,19 +32,6 @@ cur_lr(int left)
 		text[++ptr1] = text[++ptr2];
 }
 
-/* belongs in ui.c */
-void
-print_line()
-{
-	int p;
-	printf("\033[2K\033[1;1H  >>> ");
-	for (p = 0; p < ptr1; p++)
-		putchar(text[p]);
-	for (p = ptr2; p < MAXINPUT-1; p++)
-		putchar(text[p]);
-	printf("\033[1;%dH", ptr1 + 7);
-}
-
 int
 esccmp(char *esc, char *inp)
 {
@@ -89,5 +76,5 @@ input(char *inp, int count)
 	} /* else {
 		paste
 	} */
-	print_line();
+	print_line(text, ptr1, ptr2);
 }

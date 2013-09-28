@@ -2,8 +2,6 @@
 #include <stdlib.h>
 #include <signal.h>
 
-#include "net.c"
-#include "input.c"
 
 /* init_ui(), cleaup() */
 /* move ui stuff to its own .c later */
@@ -14,6 +12,10 @@
 #include <sys/ioctl.h>
 struct winsize w;
 struct termios oterm, nterm;
+
+#include "ui.c"
+#include "net.c"
+#include "input.c"
 
 #define MAXSERVER 1 /* will be used later */
 #define CLR "\033[H\033[J"
@@ -48,13 +50,10 @@ init_ui(void)
 {
 	setbuf(stdout, NULL);
 
-	printf(CLR);
-
 	/* set terminal to raw mode */
 	tcgetattr(0, &oterm);
 	memcpy(&nterm, &oterm, sizeof(struct termios));
 	nterm.c_lflag &= ~(ECHO | ICANON | ISIG);
-	nterm.c_iflag &= ICRNL;
 	nterm.c_cc[VMIN] = 1;
 	nterm.c_cc[VTIME] = 0;
 	if (tcsetattr(0, TCSADRAIN, &nterm) < 0)
@@ -62,6 +61,8 @@ init_ui(void)
 
 	/* get terminal dimensions */
 	resize(0);
+
+	init_draw();
 }
 
 void
