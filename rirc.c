@@ -1,34 +1,27 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <signal.h>
-
-
-/* init_ui(), cleaup() */
-/* move ui stuff to its own .c later */
 #include <poll.h>
-#include <ctype.h>  /* isprint */
 #include <termios.h>
-#include <string.h> /* memcpy */
 struct termios oterm, nterm;
+
+int soc = -1;
 
 #include "ui.c"
 #include "net.c"
 #include "input.c"
 
-#define MAXSERVER 1 /* will be used later */
-#define CLR "\033[H\033[J"
-
 void init_ui(void);
 void cleanup(int);
-void gui_loop(void);
+void main_loop(void);
 void fatal(char *e) { perror(e); cleanup(0); exit(1); }
 
 int
 main(int argc, char **argv)
 {
 	init_ui();
-	/* testing */
-	gui_loop();
+	main_loop();
 	cleanup(1);
 	return 0;
 }
@@ -63,26 +56,24 @@ void
 cleanup(int clear)
 {
 	tcsetattr(0, TCSADRAIN, &oterm);
-	if (clear)
-		printf(CLR);
+	if (clear) printf("\033[H\033[J");
 }
 
 void
-gui_loop(void)
+main_loop(void)
 {
 	char buf[BUFFSIZE];
-	int ret, soc = -1, count = 0, time = 200;
-	struct pollfd fds[1 + MAXSERVER];
+	int ret, count = 0, time = 200;
+	struct pollfd fds[2];
+
+	fds[0].fd = 0; /* stdin */
+	fds[0].events = POLLIN;
+	fds[1].events = POLLIN;
 
 	for (;;) {
 
-		fds[0].fd = 0; /* stdin */
-		fds[0].events = POLLIN;
-
 		fds[1].fd = soc;
-		fds[1].events = POLLIN;
-
-		ret = poll(fds, 1 + num_server, time);
+		ret = poll(fds, 1 + connected, time);
 
 		if (ret == 0) { /* timed out check input buffer */
 			if (count > 0) {

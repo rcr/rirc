@@ -18,31 +18,34 @@ char* cmdcasecmp(char*, char*);
 char sendbuff[BUFFSIZE];
 extern void fatal(char*);
 
+extern int soc;
+
 
 /* Config Stuff */
 char nick[] = "test";
 char user[] = "rcr";
 char realname[] = "Richard Robbins";
 
+#define SCROLLBACK 10 /* Number of lines to keep */
 struct channel
 {
+	int cur_line;
 	char name[50];
+	char *chat[SCROLLBACK];
 	/* TODO:
 	nicklist
-	channel history
 	*/
 };
 
 /* For now, limit to one server connection */
 struct server
 {
-	int socket;
 	int cur_chan;
 	int chan_count;
 	struct channel chan_list[MAXCHANS];
 };
 
-int num_server = 0;
+int connected = 0;
 struct server *s = NULL;
 
 int
@@ -53,7 +56,6 @@ con_server(char *hostname)
 
 	struct in_addr iadr = resolve(hostname);
 
-	int soc;
 	struct sockaddr_in server;
 	if ((soc = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0)
 		fatal("socket");
@@ -66,21 +68,16 @@ con_server(char *hostname)
 		fatal("connect");
 	else {
 		/* see NOTES in printf(3) about characters after final %arg */
-		int c = snprintf(sendbuff, BUFFSIZE, "NICK %s\r\n", nick);
-		printf("::::  %d\n", c); /* this is returning 11... thats how many chars are in it without the '\0' */
+		snprintf(sendbuff, BUFFSIZE, "NICK %s\r\n", nick);
 		send(soc, sendbuff, strlen(sendbuff), 0);
 
 		snprintf(sendbuff, BUFFSIZE, "USER %s 8 * :%s\r\n", user, realname);
 		send(soc, sendbuff, strlen(sendbuff), 0);
-		/* ident is not required to be unique */
-		/* TODO: "user sets your ident...." what does that mean */
-		/* http://en.wikipedia.org/wiki/Ident_protocol */
 	}
 
 	s = malloc(sizeof(server));
-	s->socket = soc;
 	s->chan_count = 0;
-	num_server++;
+	connected = 1;
 
 	return soc;
 }
@@ -92,11 +89,11 @@ dis_server(void)
 		puts("Not connected");
 	} else {
 		char quit_msg[] = "QUIT :Quitting!\r\n";
-		send(s->socket, quit_msg, strlen(quit_msg), 0);
-		close(s->socket); /* wait for reply before closing? */
+		send(soc, quit_msg, strlen(quit_msg), 0);
+		close(soc); /* wait for reply before closing? */
 		free(s);
 		s = NULL;
-		num_server--;
+		connected = 0;
 	}
 }
 
@@ -122,11 +119,8 @@ cmdcasecmp(char *cmd, char *inp)
 }
 
 char*
-getarg(char *inp)
+getarg(char *ptr)
 {
-	char *ptr = inp;
-
-	/* eat whitespace */
 	while (*ptr == ' ')
 		ptr++;
 
@@ -136,35 +130,31 @@ getarg(char *inp)
 		return NULL;
 }
 
+void
+send_priv(char *ptr, int count)
+{
+	;
+}
+
 int
 send_conn(char *ptr, int count)
 {
-	/*
 	if (!(ptr = getarg(ptr)))
 		return 1;
-	printf("%s\n", ptr);
 	con_server(ptr);
-	*/
-	
 	return 0;
 }
 
 int
 send_join(char *ptr, int count)
 {
-	/*
 	if (!(ptr = getarg(ptr)))
 		return 1;
 	strcpy(sendbuff, "JOIN ");
 	strcat(sendbuff, ptr);
-	FIXME
-	sendbuff[count] = '\r';
-	sendbuff[count+1] = '\n';
-	sendbuff[count+2] = '\0';
+	strcpy(&sendbuff[count], "\r\n\0");
 	printf("\n\n%s\n",sendbuff);
-	send(s->socket, sendbuff, strlen(sendbuff), 0);
-	*/
-
+	send(soc, sendbuff, strlen(sendbuff), 0);
 	return 0;
 }
 
@@ -175,9 +165,7 @@ send_msg(char *msg, int count)
 	int err = 0;
 	/* 512 bytes: Max IRC msg length */
 	if (*msg != '/') {
-		/*
-		PRIVMSG target: current_channel
-		*/
+		send_priv(ptr, count);
 	} else if ((ptr = cmdcasecmp("JOIN", ++msg))) {
 		err = send_join(ptr, count);
 	} else if ((ptr = cmdcasecmp("CONNECT", msg))) {
@@ -232,5 +220,6 @@ void
 recv_msg(char *msg, int count)
 {
 	/* Parse incoming messages, send to chan */
+	printf("\033[3;1H\033[2K");
 	printf("%.*s", count, msg);
 }
