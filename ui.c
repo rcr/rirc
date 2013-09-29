@@ -1,4 +1,11 @@
-extern struct winsize w;
+#include <sys/ioctl.h>
+struct winsize w;
+
+void resize(void);
+void draw_full(void);
+void draw_chans(void);
+void draw_chat(void);
+void print_line(char*, int, int);
 
 #define MAXINPUT 200
 
@@ -33,7 +40,23 @@ draw_chans()
 }
 
 void
-init_draw()
+resize()
+{
+	ioctl(0, TIOCGWINSZ, &w);
+	draw_full();
+}
+
+void
+draw_chat()
+{
+	/* for current channel */
+	/* has to adjust ~ seperator for widest name... */
+	/* how to store text.... need a timestamp, username and the text */
+	;
+}
+
+void
+draw_full()
 {
 	int i;
 	printf("\033[H\033[J"); /* Clear */
@@ -45,6 +68,7 @@ init_draw()
 		printf("―");
 	printf("\033[%d;1H\033[2K >>> \033[0m", w.ws_row);
 
+#if 0
 	/* FIXME: simulate some channels to test drawing stuff */
 	struct chan chan1 = { .name = "#chantesting1", .active=0 }; chan_list[1] = chan1;
 	struct chan chan2 = { .name = "#chantesting2", .active=1 }; chan_list[2] = chan2;
@@ -56,6 +80,7 @@ init_draw()
 	struct chan chan8 = { .name = "#chantesting8", .active=1 }; chan_list[8] = chan8;
 	struct chan chan9 = { .name = "#chantesting9", .active=0 }; chan_list[9] = chan9;
 	draw_chans();
+#endif
 }
 
 void

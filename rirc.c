@@ -9,8 +9,6 @@
 #include <ctype.h>  /* isprint */
 #include <termios.h>
 #include <string.h> /* memcpy */
-#include <sys/ioctl.h>
-struct winsize w;
 struct termios oterm, nterm;
 
 #include "ui.c"
@@ -20,7 +18,6 @@ struct termios oterm, nterm;
 #define MAXSERVER 1 /* will be used later */
 #define CLR "\033[H\033[J"
 
-void resize(int);
 void init_ui(void);
 void cleanup(int);
 void gui_loop(void);
@@ -37,11 +34,10 @@ main(int argc, char **argv)
 }
 
 void
-resize(int unused)
+signal_sigwinch(int unused)
 {
-	ioctl(0, TIOCGWINSZ, &w);
-	/* ~ redraw */
-	if (signal(SIGWINCH, resize) == SIG_ERR)
+	resize();
+	if (signal(SIGWINCH, signal_sigwinch) == SIG_ERR)
 		fatal("signal handler: SIGWINCH");
 }
 
@@ -59,10 +55,8 @@ init_ui(void)
 	if (tcsetattr(0, TCSADRAIN, &nterm) < 0)
 		fatal("tcsetattr");
 
-	/* get terminal dimensions */
-	resize(0);
-
-	init_draw();
+	/* Set sigwinch, init draw */
+	signal_sigwinch(0);
 }
 
 void
