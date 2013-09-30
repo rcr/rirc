@@ -12,7 +12,6 @@ int con_server(char*);
 void dis_server(void);
 void send_msg(char*, int);
 void recv_msg(char*, int);
-struct in_addr resolve(char*);
 char* cmdcasecmp(char*, char*);
 
 char sendbuff[BUFFSIZE];
@@ -54,7 +53,11 @@ con_server(char *hostname)
 	if (s != NULL)
 		return -1;
 
-	struct in_addr iadr = resolve(hostname);
+	struct hostent *host;
+	struct in_addr h_addr;
+	if ((host = gethostbyname(hostname)) == NULL)
+		fatal("nslookup");
+	h_addr.s_addr = *((unsigned long *) host->h_addr_list[0]);
 
 	struct sockaddr_in server;
 	if ((soc = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0)
@@ -62,7 +65,7 @@ con_server(char *hostname)
 
 	memset(&server, 0, sizeof(server));
 	server.sin_family = AF_INET;
-	server.sin_addr.s_addr = inet_addr(inet_ntoa(iadr));
+	server.sin_addr.s_addr = inet_addr(inet_ntoa(h_addr));
 	server.sin_port = htons(6667);
 	if (connect(soc, (struct sockaddr *) &server, sizeof(server)) < 0)
 		fatal("connect");
@@ -95,17 +98,6 @@ dis_server(void)
 		s = NULL;
 		connected = 0;
 	}
-}
-
-struct in_addr
-resolve(char *hostname)
-{
-	struct hostent *host;
-	struct in_addr h_addr;
-	if ((host = gethostbyname(hostname)) == NULL)
-		fatal("nslookup");
-	h_addr.s_addr = *((unsigned long *) host->h_addr_list[0]);
-	return h_addr;
 }
 
 /* utils */
