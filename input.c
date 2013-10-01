@@ -41,10 +41,11 @@ esccmp(char *esc, char *inp)
 }
 
 void
-ready_send() /* copy from pt2 -> end, add \r\n\0 */
+ready_send()
 {
 	while (ptr2 < MAXINPUT-1)
 		text[ptr1++] = text[ptr2++];
+	text[ptr1] = '\0';
 	send_msg(text, ptr1-1);
 	ptr1 = 0;
 	ptr2 = MAXINPUT-1;
