@@ -6,9 +6,7 @@
 #include <termios.h>
 struct termios oterm, nterm;
 
-int soc = -1;
-
-#include "ui.c"
+#include "ui.h"
 #include "net.c"
 #include "input.c"
 
