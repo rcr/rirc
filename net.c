@@ -17,40 +17,30 @@ char* cmdcasecmp(char*, char*);
 char sendbuff[BUFFSIZE];
 extern void fatal(char*);
 
-extern int soc;
-
+int soc;
 
 /* Config Stuff */
 char nick[] = "test";
 char user[] = "rcr";
 char realname[] = "Richard Robbins";
 
-#define SCROLLBACK 10 /* Number of lines to keep */
+#define SCROLLBACK 10
 struct channel
 {
 	int cur_line;
 	char name[50];
 	char *chat[SCROLLBACK];
-	/* TODO:
-	nicklist
-	*/
 };
 
-/* For now, limit to one server connection */
-struct server
-{
-	int cur_chan;
-	int chan_count;
-	struct channel chan_list[MAXCHANS];
-};
-
+int cur_chan;
+int chan_count;
 int connected = 0;
-struct server *s = NULL;
+struct channel chan_list[MAXCHANS];
 
 int
 con_server(char *hostname)
 {
-	if (s != NULL)
+	if (connected)
 		return -1;
 
 	struct hostent *host;
@@ -77,25 +67,19 @@ con_server(char *hostname)
 		snprintf(sendbuff, BUFFSIZE, "USER %s 8 * :%s\r\n", user, realname);
 		send(soc, sendbuff, strlen(sendbuff), 0);
 	}
-
-	s = malloc(sizeof(server));
-	s->chan_count = 0;
 	connected = 1;
-
 	return soc;
 }
 
 void
 dis_server(void)
 {
-	if (s == NULL) {
+	if (!connected) {
 		puts("Not connected");
 	} else {
 		char quit_msg[] = "QUIT :Quitting!\r\n";
 		send(soc, quit_msg, strlen(quit_msg), 0);
 		close(soc); /* wait for reply before closing? */
-		free(s);
-		s = NULL;
 		connected = 0;
 	}
 }
