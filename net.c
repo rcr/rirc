@@ -10,8 +10,8 @@
 
 #define MAXCHANS 10
 
-int con_server(char*);
 void dis_server(void);
+void con_server(char*);
 void send_msg(char*, int);
 void recv_msg(char*, int);
 char* cmdcasecmp(char*, char*);
@@ -30,11 +30,11 @@ int current_chan = 0;
 /* Treat server as 'default' channel */
 struct channel chan_list[MAXCHANS] = {{0, 0, "rirc", NULL},};
 
-int
+void
 con_server(char *hostname)
 {
 	if (connected)
-		return -1;
+		return;
 
 	struct hostent *host;
 	struct in_addr h_addr;
@@ -60,8 +60,9 @@ con_server(char *hostname)
 		snprintf(sendbuff, BUFFSIZE, "USER %s 8 * :%s\r\n", user, realname);
 		send(soc, sendbuff, strlen(sendbuff), 0);
 	}
+	strncpy(chan_list[0].name, hostname, 50), draw_chans();
 	connected = 1;
-	return soc;
+	return;
 }
 
 void
@@ -73,6 +74,7 @@ dis_server(void)
 		char quit_msg[] = "QUIT :Quitting!\r\n";
 		send(soc, quit_msg, strlen(quit_msg), 0);
 		close(soc); /* wait for reply before closing? */
+		strcpy(chan_list[0].name, "rirc"), draw_chans();
 		connected = 0;
 	}
 }
@@ -122,7 +124,6 @@ send_join(char *ptr, int count)
 	strcpy(sendbuff, "JOIN ");
 	strcat(sendbuff, ptr);
 	strcpy(&sendbuff[count], "\r\n\0");
-	printf("\n\n%s\n",sendbuff);
 	send(soc, sendbuff, strlen(sendbuff), 0);
 	return 0;
 }
@@ -139,6 +140,8 @@ send_msg(char *msg, int count)
 		err = send_join(ptr, count);
 	} else if ((ptr = cmdcasecmp("CONNECT", msg))) {
 		err = send_conn(ptr, count);
+	} else if ((ptr = cmdcasecmp("DISCONNECT", msg))) {
+		dis_server();
 	} else if ((ptr = cmdcasecmp("QUIT", msg))) {
 		puts("GOT QUIT");
 	}

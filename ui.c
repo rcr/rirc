@@ -29,14 +29,15 @@ void
 draw_full()
 {
 	int i;
-	printf("\033[H\033[J"); /* Clear */
-	printf("\033[%d;1H\033[2K\033[30m", 2);
-	for (i = 0; i < w.ws_col; i++)
+	printf("\033[H\033[J");/* Clear */
+	draw_chans();
+	printf("\033[2;1H\033[2K\033[30m");
+	for (i = 0; i < w.ws_col; i++) /* Upper separator */
 		printf("―");
 	printf("\033[%d;1H\033[2K", w.ws_row-1);
-	for (i = 0; i < w.ws_col; i++)
+	for (i = 0; i < w.ws_col; i++) /* Lower separator */
 		printf("―");
-	printf("\033[%d;1H\033[2K >>> \033[0m", w.ws_row);
+	printf("\033[%d;1H\033[2K >>> \033[0m", w.ws_row); /* bottom bar */
 }
 
 void
@@ -50,7 +51,7 @@ draw_chans()
 {
 	printf("\033[H\033[K");
 	int i, len, width = 0;
-	for (i = 0; i < 1; i++) {
+	for (i = 0; i < chan_count; i++) {
 		len = strlen(chan_list[i].name);
 		if (width + len + 4 < w.ws_col) {
 			int color;
