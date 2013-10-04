@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
@@ -5,7 +6,8 @@
 #include <ctype.h>
 #include <arpa/inet.h>
 
-#define BUFFSIZE 512
+#include "common.h"
+
 #define MAXCHANS 10
 
 int con_server(char*);
@@ -15,27 +17,18 @@ void recv_msg(char*, int);
 char* cmdcasecmp(char*, char*);
 
 char sendbuff[BUFFSIZE];
-extern void fatal(char*);
-
-int soc;
 
 /* Config Stuff */
 char nick[] = "test";
 char user[] = "rcr";
 char realname[] = "Richard Robbins";
 
-#define SCROLLBACK 10
-struct channel
-{
-	int cur_line;
-	char name[50];
-	char *chat[SCROLLBACK];
-};
-
-int cur_chan;
-int chan_count;
+int soc;
 int connected = 0;
-struct channel chan_list[MAXCHANS];
+int chan_count = 1;
+int current_chan = 0;
+/* Treat server as 'default' channel */
+struct channel chan_list[MAXCHANS] = {{0, 0, "rirc", NULL},};
 
 int
 con_server(char *hostname)

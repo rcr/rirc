@@ -1,6 +1,7 @@
 #include <ctype.h>
 
-#define MAXINPUT 200
+#include "common.h"
+
 #define SENDBUFF MAXINPUT+3 /* Allow room for \r\n\0 */
 
 char text[SENDBUFF];

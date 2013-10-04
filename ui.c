@@ -1,3 +1,23 @@
+#include <stdio.h>
+#include <string.h>
+#include <sys/ioctl.h>
+
+#include "common.h"
+
+#define MAXINPUT 200
+
+void resize(void);
+void draw_full(void);
+void draw_chat(void);
+void draw_chans(void);
+void print_line(char*, int, int);
+
+struct winsize w;
+
+extern int chan_count;
+extern int current_chan;
+extern struct channel chan_list[];
+
 void
 resize()
 {

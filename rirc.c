@@ -4,16 +4,18 @@
 #include <signal.h>
 #include <poll.h>
 #include <termios.h>
-struct termios oterm, nterm;
 
-#include "ui.h"
-#include "net.c"
-#include "input.c"
+#include "common.h"
 
 void init_ui(void);
 void cleanup(int);
 void main_loop(void);
 void fatal(char *e) { perror(e); cleanup(0); exit(1); }
+
+struct termios oterm, nterm;
+
+extern int soc;
+extern int connected;
 
 int
 main(int argc, char **argv)
