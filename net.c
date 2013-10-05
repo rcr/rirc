@@ -19,7 +19,7 @@ char* cmdcasecmp(char*, char*);
 char sendbuff[BUFFSIZE];
 
 /* Config Stuff */
-char nick[] = "test";
+char nick[] = "rcr";
 char user[] = "rcr";
 char realname[] = "Richard Robbins";
 
@@ -182,9 +182,21 @@ send_msg(char *msg, int count)
 }
 
 void
-recv_msg(char *msg, int count)
+recv_msg(char *buf, int count)
 {
-	/* Parse incoming messages, send to chan, or take action */
+	char message[BUFFSIZE];
+	/* parse out individual messages from socket buffer */
+	int i = 0, j = 1;
+	while ( j++ < count) {
+		if (buf[j - 1] == '\r' && buf[j] == '\n') {
+			strncpy(message, &buf[i], j - i + 1);
+			/* strncpy does not null terminate if there is no \0 in src */
+			message[j - i] = '\0';
+			i = j + 1;
+		}
+	}
+	/* TODO: detect if message is complete or not, store partial messages
+	 * and append on new message... */
 
 	/* /join #test    ::: reply:
 	:test!~rcr@localhost.localdomain JOIN :#test
@@ -192,6 +204,4 @@ recv_msg(char *msg, int count)
 	:irc.example.net 366 test #test :End of NAMES list
 	*/
 
-	printf("\033[3;1H\033[2K");
-	printf("%.*s", count, msg);
 }
