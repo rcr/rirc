@@ -62,7 +62,6 @@ con_server(char *hostname)
 	}
 	strncpy(chan_list[0].name, hostname, 50), draw_chans();
 	connected = 1;
-	return;
 }
 
 void
@@ -143,7 +142,8 @@ send_msg(char *msg, int count)
 	} else if ((ptr = cmdcasecmp("DISCONNECT", msg))) {
 		dis_server();
 	} else if ((ptr = cmdcasecmp("QUIT", msg))) {
-		puts("GOT QUIT");
+		dis_server();
+		run = 0;
 	}
 		/*
 	} else if ((ptr = cmdcasecmp("MSG", msg))) {
@@ -157,17 +157,10 @@ send_msg(char *msg, int count)
 		*/
 
 	/*
-	--- On Connect ---
-	USER
 	--- High Priority ---
-	QUIT
-	JOIN
 	MSG -> PRIVMSG target: nick
 	NICK
 	PART
-	--- Med Priority ---
-	CONNECT
-	DISCONNECT
 	--- Low Priority ---
 	MODE
 	TOPIC
@@ -191,7 +184,14 @@ send_msg(char *msg, int count)
 void
 recv_msg(char *msg, int count)
 {
-	/* Parse incoming messages, send to chan */
+	/* Parse incoming messages, send to chan, or take action */
+
+	/* /join #test    ::: reply:
+	:test!~rcr@localhost.localdomain JOIN :#test
+	:irc.example.net 353 test = #test :@test
+	:irc.example.net 366 test #test :End of NAMES list
+	*/
+
 	printf("\033[3;1H\033[2K");
 	printf("%.*s", count, msg);
 }

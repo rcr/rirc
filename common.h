@@ -2,6 +2,8 @@
 #define MAXINPUT 200
 #define SCROLLBACK 10
 
+int run;
+
 struct channel
 {
 	int active;

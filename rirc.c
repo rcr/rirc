@@ -70,19 +70,16 @@ main_loop(void)
 	fds[0].events = POLLIN;
 	fds[1].events = POLLIN;
 
-	for (;;) {
+	run = 1;
+	while (run) {
 
 		fds[1].fd = soc;
 		ret = poll(fds, 1 + connected, time);
 
 		if (ret == 0) { /* timed out check input buffer */
-			if (count > 0) {
+			if (count > 0)
 				input(buf, count);
 
-				/* FIXME: */
-				if (buf[0] == 'q')
-					break;
-			}
 			count = 0;
 			time = 200;
 		} else if (fds[0].revents & POLLIN) {
