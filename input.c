@@ -8,6 +8,12 @@ char text[SENDBUFF];
 int ptr1 = 0;
 int ptr2 = MAXINPUT-1;
 
+void cur_lr(int);
+void del_char(int);
+void ins_char(char);
+void ready_send(void);
+int esccmp(char*, char*);
+
 void
 ins_char(char c)
 {

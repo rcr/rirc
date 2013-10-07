@@ -12,8 +12,6 @@
 
 void dis_server(void);
 void con_server(char*);
-void send_msg(char*, int);
-void recv_msg(char*, int);
 char* cmdcasecmp(char*, char*);
 
 char sendbuff[BUFFSIZE];
@@ -134,7 +132,7 @@ send_msg(char *msg, int count)
 	int err = 0;
 	/* 512 bytes: Max IRC msg length */
 	if (*msg != '/') {
-		send_priv(ptr, count);
+		send_priv(msg, count);
 	} else if ((ptr = cmdcasecmp("JOIN", ++msg))) {
 		err = send_join(ptr, count);
 	} else if ((ptr = cmdcasecmp("CONNECT", msg))) {

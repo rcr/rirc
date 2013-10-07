@@ -5,16 +5,16 @@ rirc : $(objects)
 	cc $(cflags) -o rirc $(objects)
 
 rirc.o : rirc.c common.h
-	cc -c rirc.c
+	cc $(cflags) -c rirc.c
 
 net.o : net.c common.h
-	cc -c net.c
+	cc $(cflags) -c net.c
 
 ui.o : ui.c common.h
-	cc -c ui.c
+	cc $(cflags) -c ui.c
 
 input.o : input.c common.h
-	cc -c input.c
+	cc $(cflags) -c input.c
 
 .PHONY : clean
 clean :

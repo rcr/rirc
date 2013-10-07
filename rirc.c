@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <signal.h>
+#include <unistd.h>
 #include <poll.h>
 #include <termios.h>
 
@@ -10,7 +11,6 @@
 void init_ui(void);
 void cleanup(int);
 void main_loop(void);
-void fatal(char *e) { perror(e); cleanup(0); exit(1); }
 
 struct termios oterm, nterm;
 
@@ -24,6 +24,14 @@ main(int argc, char **argv)
 	main_loop();
 	cleanup(1);
 	return 0;
+}
+
+void
+fatal(char *e)
+{
+	perror(e);
+	cleanup(0);
+	exit(1);
 }
 
 void
