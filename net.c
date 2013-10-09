@@ -179,27 +179,38 @@ send_msg(char *msg, int count)
 		puts("Inconrrect arguments");
 }
 
+int buff_limit = 0;
+char recv_buff[BUFFSIZE];
+char *recv_i = recv_buff;
+
 void
-recv_msg(char *buf, int count)
+doprint()
 {
-	char message[BUFFSIZE];
-	/* parse out individual messages from socket buffer */
-	int i = 0, j = 1;
-	while ( j++ < count) {
-		if (buf[j - 1] == '\r' && buf[j] == '\n') {
-			strncpy(message, &buf[i], j - i + 1);
-			/* strncpy does not null terminate if there is no \0 in src */
-			message[j - i] = '\0';
-			i = j + 1;
-		}
-	}
-	/* TODO: detect if message is complete or not, store partial messages
-	 * and append on new message... */
-
-	/* /join #test    ::: reply:
-	:test!~rcr@localhost.localdomain JOIN :#test
-	:irc.example.net 353 test = #test :@test
-	:irc.example.net 366 test #test :End of NAMES list
-	*/
-
+	printf("%s%s\n", recv_buff, buff_limit ? " (MSG LIM)" : "");
+	buff_limit = 0;
 }
+
+void
+recv_msg(char *input, int count)
+{
+	while (count--) {
+
+		if (recv_i < recv_buff + BUFFSIZE)
+			*recv_i = *input;
+		else
+			buff_limit = 1;
+
+		if (*input++ == '\r' && *input++ == '\n' ) {
+			*++recv_i = '\0';
+
+			doprint();
+
+			recv_i = recv_buff;
+			count--;
+		} else
+			recv_i++;
+	}
+}
+
+
+
