@@ -80,9 +80,8 @@ dis_server(void)
 char*
 cmdcasecmp(char *cmd, char *inp)
 {
-	char *tmp = inp;
-	while (*cmd++ == toupper(*tmp++))
-		if (*cmd == '\0' && (*tmp == '\0' || *tmp == ' ')) return tmp;
+	while (*cmd++ == toupper(*inp++))
+		if (*cmd == '\0' && (*inp == '\0' || *inp == ' ')) return inp;
 	return 0;
 }
 
