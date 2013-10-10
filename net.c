@@ -196,19 +196,18 @@ recv_msg(char *input, int count)
 	while (count--) {
 
 		if (recv_i < recv_buff + BUFFSIZE)
-			*recv_i = *input;
+			*recv_i++ = *input;
 		else
 			buff_limit = 1;
 
-		if (*input++ == '\r' && *input++ == '\n' ) {
-			*++recv_i = '\0';
+		if (*input++ == '\r' && *input++ == '\n') {
+			*recv_i = '\0';
 
 			doprint();
 
 			recv_i = recv_buff;
 			count--;
-		} else
-			recv_i++;
+		}
 	}
 }
 
