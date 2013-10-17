@@ -12,6 +12,7 @@
 
 void dis_server(void);
 void con_server(char*);
+char* cmdcmp(char*, char*);
 char* cmdcasecmp(char*, char*);
 
 char sendbuff[BUFFSIZE];
@@ -26,7 +27,16 @@ int connected = 0;
 int chan_count = 1;
 int current_chan = 0;
 /* Treat server as 'default' channel */
-struct channel chan_list[MAXCHANS] = {{0, 0, "rirc", NULL},};
+struct channel chan_list[MAXCHANS];// = {{0, 0, "rirc", NULL},};
+
+void
+init_net()
+{
+	chan_list[0].active = 0;
+	chan_list[0].cur_line = 0;
+	chan_list[0].chat[0] = NULL;
+	strcpy(chan_list[0].name, "rirc");
+}
 
 void
 con_server(char *hostname)
@@ -82,6 +92,14 @@ cmdcasecmp(char *cmd, char *inp)
 {
 	while (*cmd++ == toupper(*inp++))
 		if (*cmd == '\0' && (*inp == '\0' || *inp == ' ')) return inp;
+	return 0;
+}
+
+char*
+cmdcmp(char *cmd, char *inp)
+{
+	while (*cmd++ == *inp++)
+		if (*cmd == '\0' && *inp == ' ') return inp;
 	return 0;
 }
 
@@ -183,8 +201,26 @@ char recv_buff[BUFFSIZE];
 char *recv_i = recv_buff;
 
 void
-doprint()
+do_recv()
 {
+	char *cmd, *ptr = recv_buff;
+	/* check for prefix, then get code and switch */
+	if (*ptr == ':') { /* prefix */
+		while (*ptr++ != ' ');
+	}
+
+	if (isdigit(*ptr)) { /* code */
+		puts("GOT CODE");
+	} else if ((cmd = cmdcmp("JOIN", ptr))) {
+		puts("GOT JOIN");
+		; /* TODO: create a channel */
+	} else if ((cmd = cmdcmp("PING", ptr))) {
+		puts("GOT PING");
+		; /* TODO: send pong */
+	} else {
+		; /* TODO: unknown server message */
+	}
+
 	printf("%s%s\n", recv_buff, buff_limit ? " (MSG LIM)" : "");
 	buff_limit = 0;
 }
@@ -201,9 +237,7 @@ recv_msg(char *input, int count)
 
 		if (*input++ == '\r' && *input++ == '\n') {
 			*recv_i = '\0';
-
-			doprint();
-
+			do_recv();
 			recv_i = recv_buff;
 			count--;
 		}
