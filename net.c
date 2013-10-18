@@ -14,6 +14,7 @@ void dis_server(void);
 void con_server(char*);
 char* cmdcmp(char*, char*);
 char* cmdcasecmp(char*, char*);
+int get_numeric_code(char*)
 
 char sendbuff[BUFFSIZE];
 
@@ -101,6 +102,22 @@ cmdcmp(char *cmd, char *inp)
 	while (*cmd++ == *inp++)
 		if (*cmd == '\0' && *inp == ' ') return inp;
 	return 0;
+}
+
+int
+get_numeric_code(char *code)
+{
+	/* Codes are always three digits */
+	int sum = 0, factor = 100;
+	do {
+		sum += factor * (*code - '0');
+		factor = factor / 10;
+	} while (isdigit(*++code) && factor > 0);
+
+	if (*code != ' ' || factor > 0)
+		return 0;
+	else
+		return sum;
 }
 
 char*
