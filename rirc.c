@@ -58,6 +58,9 @@ init_ui(void)
 
 	/* Set sigwinch, init draw */
 	signal_sigwinch(0);
+
+	/* FIXME */
+	init_net();
 }
 
 void
@@ -79,6 +82,9 @@ main_loop(void)
 	fds[1].events = POLLIN;
 
 	run = 1;
+
+	send_conn("localhost", strlen("localhost")); /* FIXME */
+
 	while (run) {
 
 		fds[1].fd = soc;
@@ -87,9 +93,10 @@ main_loop(void)
 		if (ret == 0) { /* timed out check input buffer */
 			if (count > 0)
 				input(buf, count);
-
 			count = 0;
 			time = 200;
+			if (buf[0] == 'q') /* FIXME */
+				fatal(""); /* FIXME */
 		} else if (fds[0].revents & POLLIN) {
 			count = read(0, buf, BUFFSIZE);
 			time = 0;
