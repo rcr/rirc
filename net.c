@@ -229,12 +229,12 @@ ins_line(char *inp, char *from, int chan)
 {
 	line *l = &chan_list[chan].chat[chan_list[chan].cur_line];
 
-//	if (l->len)
-//		free(l->text);
+	if (l->len)
+		free(l->text);
 
-	l->len = strlen(inp);
-	l->text = malloc(l->len + 1);
-	strcpy(l->text, inp);
+	l->len = strlen(inp) + 1;
+	l->text = malloc(l->len);
+	memcpy(l->text, inp, l->len);
 
 	time(&raw_t);
 	t = localtime(&raw_t);
@@ -245,8 +245,7 @@ ins_line(char *inp, char *from, int chan)
 		strncpy(l->from, from, 20);
 
 	/* testing */
-	/* time should be 01 - 24, leading 0 */
-	printf("%d:%d  %s  ~  %s\n", t->tm_hour, t->tm_min, l->from, l->text);
+	printf("%02d:%02d  %s  ~  %s\n", t->tm_hour, t->tm_min, l->from, l->text);
 
 	chan_list[chan].cur_line++;
 	chan_list[chan].cur_line %= SCROLLBACK;
@@ -278,7 +277,9 @@ do_recv()
 	} else if ((cmd = cmdcmp("PING", ptr))) {
 		send_pong(cmd);
 	} else {
-		; /* TODO: unknown server message */
+		char errbuff[BUFFSIZE];
+		snprintf(errbuff, BUFFSIZE-1, "ERROR ~ %s", recv_buff);
+		ins_line(errbuff, 0, 0);
 	}
 //	printf("%s%s\n", ptr, buff_limit ? " (MSG LIM)" : "");
 	buff_limit = 0;
