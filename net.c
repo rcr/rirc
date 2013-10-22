@@ -60,10 +60,8 @@ con_server(char *hostname)
 	if (connect(soc, (struct sockaddr *) &server, sizeof(server)) < 0)
 		fatal("connect");
 	else {
-		/* see NOTES in printf(3) about characters after final %arg */
 		snprintf(sendbuff, BUFFSIZE, "NICK %s\r\n", nick);
 		send(soc, sendbuff, strlen(sendbuff), 0);
-
 		snprintf(sendbuff, BUFFSIZE, "USER %s 8 * :%s\r\n", user, realname);
 		send(soc, sendbuff, strlen(sendbuff), 0);
 	}
@@ -140,7 +138,8 @@ send_priv(char *ptr, int count)
 void
 send_pong(char *server)
 {
-	send(soc, "PONG\r\n", 7, 0);
+	snprintf(sendbuff, BUFFSIZE, "PONG%s\r\n", server);
+	send(soc, sendbuff, strlen(sendbuff), 0);
 }
 
 int
@@ -159,7 +158,7 @@ send_join(char *ptr, int count)
 		return 1;
 	strcpy(sendbuff, "JOIN ");
 	strcat(sendbuff, ptr);
-	strcpy(&sendbuff[count], "\r\n\0");
+	strcpy(&sendbuff[count], "\r\n");
 	send(soc, sendbuff, strlen(sendbuff), 0);
 	return 0;
 }
@@ -277,7 +276,7 @@ do_recv()
 		puts("GOT JOIN");
 		; /* TODO: create a channel */
 	} else if ((cmd = cmdcmp("PING", ptr))) {
-		send_pong(ptr);
+		send_pong(cmd);
 	} else {
 		; /* TODO: unknown server message */
 	}
