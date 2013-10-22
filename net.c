@@ -10,6 +10,7 @@
 
 #define MAXCHANS 10
 
+void send_pong(char*);
 void dis_server(void);
 void con_server(char*);
 char* cmdcmp(char*, char*);
@@ -133,6 +134,12 @@ send_priv(char *ptr, int count)
 	;
 }
 
+void
+send_pong(char *server)
+{
+	send(soc, "PONG\r\n", 7, 0);
+}
+
 int
 send_conn(char *ptr, int count)
 {
@@ -227,8 +234,7 @@ do_recv()
 		puts("GOT JOIN");
 		; /* TODO: create a channel */
 	} else if ((cmd = cmdcmp("PING", ptr))) {
-		puts("GOT PING");
-		; /* TODO: send pong */
+		send_pong(ptr);
 	} else {
 		; /* TODO: unknown server message */
 	}
