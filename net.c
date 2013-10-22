@@ -15,7 +15,7 @@ void dis_server(void);
 void con_server(char*);
 char* cmdcmp(char*, char*);
 char* cmdcasecmp(char*, char*);
-int get_numeric_code(char*)
+int get_numeric_code(char*);
 
 char sendbuff[BUFFSIZE];
 
@@ -65,7 +65,7 @@ con_server(char *hostname)
 		snprintf(sendbuff, BUFFSIZE, "USER %s 8 * :%s\r\n", user, realname);
 		send(soc, sendbuff, strlen(sendbuff), 0);
 	}
-	strncpy(chan_list[0].name, hostname, 50), draw_chans();
+	strncpy(chan_list[0].name, hostname, 20), draw_chans();
 	connected = 1;
 }
 
@@ -96,7 +96,7 @@ char*
 cmdcmp(char *cmd, char *inp)
 {
 	while (*cmd++ == *inp++)
-		if (*cmd == '\0' && *inp == ' ') return inp;
+		if (*cmd == '\0' && (*inp == '\0' || *inp == ' ')) return inp;
 	return 0;
 }
 
@@ -127,6 +127,7 @@ getarg(char *ptr)
 	else
 		return NULL;
 }
+/* end utils */
 
 void
 send_priv(char *ptr, int count)
@@ -223,13 +224,21 @@ void
 do_recv()
 {
 	char *cmd, *ptr = recv_buff;
-	/* check for prefix, then get code and switch */
-	if (*ptr == ':') { /* prefix */
+
+	if (*ptr == ':') /* ignore prefix */
 		while (*ptr++ != ' ');
-	}
 
 	if (isdigit(*ptr)) { /* code */
-		puts("GOT CODE");
+		int code = get_numeric_code(ptr);
+		if (!code) {
+			; /* CODE ERROR */
+		} else {
+			ptr += 4;
+			while (*ptr++ != ' ');
+			if (*ptr == ':') /* nick arg */
+				ptr++;
+			/* now we have our suffix/message */
+		}
 	} else if ((cmd = cmdcmp("JOIN", ptr))) {
 		puts("GOT JOIN");
 		; /* TODO: create a channel */
@@ -238,29 +247,27 @@ do_recv()
 	} else {
 		; /* TODO: unknown server message */
 	}
-
-	printf("%s%s\n", recv_buff, buff_limit ? " (MSG LIM)" : "");
 	buff_limit = 0;
 }
 
 void
 recv_msg(char *input, int count)
 {
-	while (count--) {
+	while (count-- > 0) {
 
 		if (recv_i < recv_buff + BUFFSIZE)
 			*recv_i++ = *input;
 		else
 			buff_limit = 1;
 
-		if (*input++ == '\r' && *input++ == '\n') {
+		input++;
+
+		if (*input == '\r' && *(input + 1) == '\n') {
 			*recv_i = '\0';
+			input += 2;
+			count -= 2;
 			do_recv();
 			recv_i = recv_buff;
-			count--;
 		}
 	}
 }
-
-
-

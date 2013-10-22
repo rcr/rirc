@@ -1,6 +1,6 @@
 #define BUFFSIZE 512
 #define MAXINPUT 200
-#define SCROLLBACK 10
+#define SCROLLBACK 300
 
 /* rirc.c */
 void fatal(char*);
@@ -19,10 +19,18 @@ void print_line(char*, int, int);
 
 int run;
 
-struct channel
+typedef struct line
+{
+	int len;
+	int time;
+	char from[20];
+	char *text;
+} line;
+
+typedef struct channel
 {
 	int active;
 	int cur_line;
-	char name[50];
-	char *chat[SCROLLBACK];
-};
+	char name[20];
+	line chat[SCROLLBACK];
+} channel;
