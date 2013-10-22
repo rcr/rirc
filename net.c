@@ -27,17 +27,12 @@ int soc;
 int connected = 0;
 int chan_count = 1;
 int current_chan = 0;
-/* Treat server as 'default' channel */
-struct channel chan_list[MAXCHANS];// = {{0, 0, "rirc", NULL},};
-
-void
-init_net()
-{
-	chan_list[0].active = 0;
-	chan_list[0].cur_line = 0;
-	chan_list[0].chat[0] = NULL;
-	strcpy(chan_list[0].name, "rirc");
-}
+channel chan_list[MAXCHANS] = {{
+	.active = 0,
+	.cur_line = 0,
+	.name = "rirc",
+	.chat = {{0}}}
+};
 
 void
 con_server(char *hostname)

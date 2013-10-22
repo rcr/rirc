@@ -58,9 +58,6 @@ init_ui(void)
 
 	/* Set sigwinch, init draw */
 	signal_sigwinch(0);
-
-	/* FIXME */
-	init_net();
 }
 
 void
