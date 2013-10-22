@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include <netdb.h>
 #include <ctype.h>
+#include <time.h>
 #include <arpa/inet.h>
 
 #include "common.h"
@@ -13,6 +14,7 @@
 void send_pong(char*);
 void dis_server(void);
 void con_server(char*);
+void ins_line(char*, char*, int);
 char* cmdcmp(char*, char*);
 char* cmdcasecmp(char*, char*);
 int get_numeric_code(char*);
@@ -220,6 +222,37 @@ int buff_limit = 0;
 char recv_buff[BUFFSIZE];
 char *recv_i = recv_buff;
 
+time_t raw_t;
+struct tm *t;
+
+void
+ins_line(char *inp, char *from, int chan)
+{
+	line *l = &chan_list[chan].chat[chan_list[chan].cur_line];
+
+//	if (l->len)
+//		free(l->text);
+
+	l->len = strlen(inp);
+	l->text = malloc(l->len + 1);
+	strcpy(l->text, inp);
+
+	time(&raw_t);
+	t = localtime(&raw_t);
+
+	if (!from) /* Server message */
+		strncpy(l->from, chan_list[0].name, 20);
+	else
+		strncpy(l->from, from, 20);
+
+	/* testing */
+	/* time should be 01 - 24, leading 0 */
+	printf("%d:%d  %s  ~  %s\n", t->tm_hour, t->tm_min, l->from, l->text);
+
+	chan_list[chan].cur_line++;
+	chan_list[chan].cur_line %= SCROLLBACK;
+}
+
 void
 do_recv()
 {
@@ -238,6 +271,7 @@ do_recv()
 			if (*ptr == ':') /* nick arg */
 				ptr++;
 			/* now we have our suffix/message */
+			ins_line(ptr, 0, 0);
 		}
 	} else if ((cmd = cmdcmp("JOIN", ptr))) {
 		puts("GOT JOIN");
@@ -247,6 +281,7 @@ do_recv()
 	} else {
 		; /* TODO: unknown server message */
 	}
+//	printf("%s%s\n", ptr, buff_limit ? " (MSG LIM)" : "");
 	buff_limit = 0;
 }
 
