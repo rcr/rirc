@@ -11,6 +11,7 @@ void recv_msg(char*, int);
 
 /* ui.c */
 void resize(void);
+void draw_chat(void);
 void draw_chans(void);
 
 /* input.c */
@@ -22,7 +23,8 @@ int run;
 typedef struct line
 {
 	int len;
-	int time;
+	int time_h;
+	int time_m;
 	char from[20];
 	char *text;
 } line;
@@ -31,6 +33,7 @@ typedef struct channel
 {
 	int active;
 	int cur_line;
+	int nick_pad;
 	char name[20];
 	line chat[SCROLLBACK];
 } channel;

@@ -7,7 +7,6 @@
 #define MAXINPUT 200
 
 void draw_full(void);
-void draw_chat(void);
 
 struct winsize w;
 
@@ -31,10 +30,12 @@ draw_full()
 	printf("\033[2;1H\033[2K\033[30m");
 	for (i = 0; i < w.ws_col; i++) /* Upper separator */
 		printf("―");
+	draw_chat();
 	printf("\033[%d;1H\033[2K", w.ws_row-1);
 	for (i = 0; i < w.ws_col; i++) /* Lower separator */
 		printf("―");
 	printf("\033[%d;1H\033[2K >>> \033[0m", w.ws_row); /* bottom bar */
+	/* TODO: redraw input bar */
 }
 
 void
@@ -46,6 +47,7 @@ draw_chat()
 void
 draw_chans()
 {
+	printf("\033[s"); /* save cursor location */
 	printf("\033[H\033[K");
 	int i, len, width = 0;
 	for (i = 0; i < chan_count; i++) {
@@ -61,13 +63,14 @@ draw_chans()
 		}
 		else break;
 	}
+	printf("\033[u"); /* restore cursor location */
 }
 
 void
 print_line(char *text, int ptr1, int ptr2)
 {
 	int p;
-	printf("\033[30m\033[%d;1H\033[2K >>> \033[0m", w.ws_row);
+	printf("\033[30m\033[%d;6H\033[K\033[0m", w.ws_row);
 	for (p = 0; p < ptr1; p++)
 		putchar(text[p]);
 	for (p = ptr2; p < MAXINPUT-1; p++)

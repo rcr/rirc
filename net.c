@@ -33,6 +33,7 @@ int current_chan = 0;
 channel chan_list[MAXCHANS] = {{
 	.active = 0,
 	.cur_line = 0,
+	.nick_pad = 0,
 	.name = "rirc",
 	.chat = {{0}}}
 };
@@ -238,17 +239,24 @@ ins_line(char *inp, char *from, int chan)
 
 	time(&raw_t);
 	t = localtime(&raw_t);
+	l->time_h = t->tm_hour;
+	l->time_m = t->tm_min;
 
 	if (!from) /* Server message */
 		strncpy(l->from, chan_list[0].name, 20);
 	else
 		strncpy(l->from, from, 20);
 
-	/* testing */
-	printf("%02d:%02d  %s  ~  %s\n", t->tm_hour, t->tm_min, l->from, l->text);
+	int len;
+	if ((len = strlen(l->from)) > chan_list[chan].nick_pad)
+		chan_list[chan].nick_pad = len;
 
 	chan_list[chan].cur_line++;
 	chan_list[chan].cur_line %= SCROLLBACK;
+
+	if (chan == current_chan) {
+		draw_chat();
+	}
 }
 
 void
