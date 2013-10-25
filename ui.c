@@ -41,7 +41,28 @@ draw_full()
 void
 draw_chat()
 {
-	;
+	int tw, n;
+	printf("\033[s"); /* save cursor location */
+	printf("\033[3;1H\033[0m");
+
+	channel *c = &chan_list[current_chan];
+	tw = w.ws_col - c->nick_pad - 11;
+
+	line *l = c->chat;
+	while (l->len > 0) {
+		char *ptr = l->text;
+		n = l->len - 1;
+		printf(" %02d:%02d  %s ", l->time_h, l->time_m, l->from);
+		printf("~ %.*s\n", tw, ptr);
+		while (n > tw) {
+			ptr += tw;
+			char *wh = (ptr + tw - 1);
+			printf("%*s~ %.*s\n", c->nick_pad + 9, " ", tw, ptr);
+			n -= tw;
+		}
+		l++;
+	}
+	printf("\033[u"); /* restore cursor location */
 }
 
 void
