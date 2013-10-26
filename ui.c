@@ -4,6 +4,7 @@
 
 #include "common.h"
 
+#define C(x) "\x1b[38;5;"#x"m"
 #define MAXINPUT 200
 
 void draw_full(void);
@@ -27,14 +28,14 @@ draw_full()
 	int i;
 	printf("\033[H\033[J");/* Clear */
 	draw_chans();
-	printf("\033[2;1H\033[2K\033[30m");
+	printf("\033[2;1H\033[2K"C(239));
 	for (i = 0; i < w.ws_col; i++) /* Upper separator */
 		printf("―");
 	draw_chat();
 	printf("\033[%d;1H\033[2K", w.ws_row-1);
 	for (i = 0; i < w.ws_col; i++) /* Lower separator */
 		printf("―");
-	printf("\033[%d;1H\033[2K >>> \033[0m", w.ws_row); /* bottom bar */
+	printf("\033[%d;1H\033[2K >>> "C(250), w.ws_row); /* bottom bar */
 	/* TODO: redraw input bar */
 }
 
@@ -42,13 +43,13 @@ void
 draw_chat()
 {
 	printf("\033[s"); /* save cursor location */
-	printf("\033[3;1H\033[0m");
+	printf("\033[3;1H"C(250));
 	channel *c = &chan_list[current_chan];
 	int tw = w.ws_col - c->nick_pad - 15;
 	line *l = c->chat;
 	while (l->len > 0) {
 		int n = l->len;
-		printf(" %02d:%02d  %s ~ ", l->time_h, l->time_m, l->from);
+		printf(C(239)" %02d:%02d  "C(250)"%s ~ ", l->time_h, l->time_m, l->from);
 		char *end = l->text + l->len - 2;
 		if (n > tw) {
 			char *ptr1 = l->text;
@@ -106,7 +107,7 @@ void
 print_line(char *text, int ptr1, int ptr2)
 {
 	int p;
-	printf("\033[30m\033[%d;6H\033[K\033[0m", w.ws_row);
+	printf(C(239)"\033[%d;6H\033[K"C(250), w.ws_row);
 	for (p = 0; p < ptr1; p++)
 		putchar(text[p]);
 	for (p = ptr2; p < MAXINPUT-1; p++)
