@@ -44,7 +44,7 @@ draw_chat()
 	printf("\033[s"); /* save cursor location */
 	printf("\033[3;1H\033[0m");
 	channel *c = &chan_list[current_chan];
-	int tw = w.ws_col - c->nick_pad - 12;
+	int tw = w.ws_col - c->nick_pad - 15;
 	line *l = c->chat;
 	while (l->len > 0) {
 		int n = l->len;
@@ -67,7 +67,7 @@ draw_chat()
 					printf("\n                  ~ ");
 				else
 					break;
-				ptr1 = ptr2;
+				ptr1 = ptr2 + 1;
 				while (*ptr1 == ' ')
 					ptr1++;
 			}
