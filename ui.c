@@ -41,24 +41,39 @@ draw_full()
 void
 draw_chat()
 {
-	int tw, n;
 	printf("\033[s"); /* save cursor location */
 	printf("\033[3;1H\033[0m");
-
 	channel *c = &chan_list[current_chan];
-	tw = w.ws_col - c->nick_pad - 11;
-
+	int tw = w.ws_col - c->nick_pad - 12;
 	line *l = c->chat;
 	while (l->len > 0) {
-		char *ptr = l->text;
-		n = l->len - 1;
-		printf(" %02d:%02d  %s ", l->time_h, l->time_m, l->from);
-		printf("~ %.*s\n", tw, ptr);
-		while (n > tw) {
-			ptr += tw;
-			char *wh = (ptr + tw - 1);
-			printf("%*s~ %.*s\n", c->nick_pad + 9, " ", tw, ptr);
-			n -= tw;
+		int n = l->len;
+		printf(" %02d:%02d  %s ~ ", l->time_h, l->time_m, l->from);
+		char *end = l->text + l->len - 2;
+		if (n > tw) {
+			char *ptr1 = l->text;
+			for (;;) {
+				char *ptr2 = ptr1 + tw;
+				if (ptr2 > end)
+					ptr2 = end;
+				else
+					while (*ptr2 != ' ' && ptr2 > ptr1)
+						ptr2--;
+				if (ptr2 == ptr1)
+					ptr2 += tw;
+				while (ptr1 <= ptr2)
+					putchar(*ptr1++);
+				if (ptr2 < end)
+					printf("\n                  ~ ");
+				else
+					break;
+				ptr1 = ptr2;
+				while (*ptr1 == ' ')
+					ptr1++;
+			}
+			printf("\n");
+		} else {
+			printf("%s\n", l->text);
 		}
 		l++;
 	}
