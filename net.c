@@ -74,7 +74,7 @@ void
 dis_server(void)
 {
 	if (!connected) {
-		puts("Not connected");
+		ins_line("Not connected", 0, 0);
 	} else {
 		sendf("QUIT :Quitting!\r\n");
 		close(soc); /* wait for reply before closing? */
@@ -214,13 +214,16 @@ send_msg(char *msg, int count)
 	PASS
 	*/
 	else {
-		printf("\nUnknown command: %.*s%s\n", 15, msg, count > 15 ? "..." : "");
+		char errbuff[BUFFSIZE];
+		snprintf(errbuff, BUFFSIZE-1, "Unknown command: %.*s%s",
+				15, msg, count > 15 ? "..." : "");
+		ins_line(errbuff, 0, 0);
 		return;
 	}
 	if (err == 1)
-		puts("Insufficient arguments");
+		ins_line("Insufficient arguments", 0, 0);
 	if (err == 2)
-		puts("Inconrrect arguments");
+		ins_line("Incorrect arguments", 0, 0);
 }
 
 int buff_limit = 0;
@@ -293,7 +296,6 @@ do_recv()
 		snprintf(errbuff, BUFFSIZE-1, "ERROR ~ %s", recv_buff);
 		ins_line(errbuff, 0, 0);
 	}
-//	printf("%s%s\n", ptr, buff_limit ? " (MSG LIM)" : "");
 	buff_limit = 0;
 }
 

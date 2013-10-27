@@ -51,7 +51,7 @@ draw_chat()
 		int n = l->len;
 		printf(C(239)" %02d:%02d  "C(%d)"%*s%s "C(239)"~"C(250)" ",
 				l->time_h, l->time_m, nick_col(l->from),
-				c->nick_pad - strlen(l->from), "", l->from);
+				(int)(c->nick_pad - strlen(l->from)), "", l->from);
 		char *end = l->text + l->len - 2;
 		if (n > tw) {
 			char *ptr1 = l->text;
