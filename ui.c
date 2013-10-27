@@ -43,13 +43,15 @@ void
 draw_chat()
 {
 	printf("\033[s"); /* save cursor location */
-	printf("\033[3;1H"C(250));
+	printf("\033[3;1H");
 	channel *c = &chan_list[current_chan];
 	int tw = w.ws_col - c->nick_pad - 15;
 	line *l = c->chat;
 	while (l->len > 0) {
 		int n = l->len;
-		printf(C(239)" %02d:%02d  "C(250)"%s ~ ", l->time_h, l->time_m, l->from);
+		printf(C(239)" %02d:%02d  "C(%d)"%*s%s "C(239)"~"C(250)" ",
+				l->time_h, l->time_m, nick_col(l->from),
+				c->nick_pad - strlen(l->from), "", l->from);
 		char *end = l->text + l->len - 2;
 		if (n > tw) {
 			char *ptr1 = l->text;
@@ -65,7 +67,7 @@ draw_chat()
 				while (ptr1 <= ptr2)
 					putchar(*ptr1++);
 				if (ptr2 < end)
-					printf("\n                  ~ ");
+					printf("\n                  "C(239)"~"C(250)" ");
 				else
 					break;
 				ptr1 = ptr2 + 1;
