@@ -5,12 +5,14 @@
 #include <netdb.h>
 #include <ctype.h>
 #include <time.h>
+#include <stdarg.h>
 #include <arpa/inet.h>
 
 #include "common.h"
 
 #define MAXCHANS 10
 
+void sendf(const char*, ...);
 void send_pong(char*);
 void dis_server(void);
 void con_server(char*);
@@ -61,10 +63,8 @@ con_server(char *hostname)
 	if (connect(soc, (struct sockaddr *) &server, sizeof(server)) < 0)
 		fatal("connect");
 	else {
-		snprintf(sendbuff, BUFFSIZE, "NICK %s\r\n", nick);
-		send(soc, sendbuff, strlen(sendbuff), 0);
-		snprintf(sendbuff, BUFFSIZE, "USER %s 8 * :%s\r\n", user, realname);
-		send(soc, sendbuff, strlen(sendbuff), 0);
+		sendf("NICK %s\r\n", nick);
+		sendf("USER %s 8 * :%s\r\n", user, realname);
 	}
 	strncpy(chan_list[0].name, hostname, 20), draw_chans();
 	connected = 1;
@@ -76,8 +76,7 @@ dis_server(void)
 	if (!connected) {
 		puts("Not connected");
 	} else {
-		char quit_msg[] = "QUIT :Quitting!\r\n";
-		send(soc, quit_msg, strlen(quit_msg), 0);
+		sendf("QUIT :Quitting!\r\n");
 		close(soc); /* wait for reply before closing? */
 		strcpy(chan_list[0].name, "rirc"), draw_chans();
 		connected = 0;
@@ -85,6 +84,16 @@ dis_server(void)
 }
 
 /* utils */
+void
+sendf(const char *fmt, ...)
+{
+	va_list args;
+	va_start(args, fmt);
+	vsnprintf(sendbuff, BUFFSIZE - 1, fmt, args);
+	send(soc, sendbuff, strlen(sendbuff), 0);
+	va_end(args);
+}
+
 char*
 cmdcasecmp(char *cmd, char *inp)
 {
@@ -139,8 +148,7 @@ send_priv(char *ptr, int count)
 void
 send_pong(char *server)
 {
-	snprintf(sendbuff, BUFFSIZE, "PONG%s\r\n", server);
-	send(soc, sendbuff, strlen(sendbuff), 0);
+	sendf("PONG%s\r\n", server);
 }
 
 int
@@ -157,10 +165,7 @@ send_join(char *ptr, int count)
 {
 	if (!(ptr = getarg(ptr)))
 		return 1;
-	strcpy(sendbuff, "JOIN ");
-	strcat(sendbuff, ptr);
-	strcpy(&sendbuff[count], "\r\n");
-	send(soc, sendbuff, strlen(sendbuff), 0);
+	sendf("JOIN %s\r\n", ptr);
 	return 0;
 }
 
@@ -280,7 +285,6 @@ do_recv()
 			ins_line(ptr, 0, 0);
 		}
 	} else if ((cmd = cmdcmp("JOIN", ptr))) {
-		puts("GOT JOIN");
 		; /* TODO: create a channel */
 	} else if ((cmd = cmdcmp("PING", ptr))) {
 		send_pong(cmd);
