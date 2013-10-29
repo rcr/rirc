@@ -41,6 +41,18 @@ channel chan_list[MAXCHANS] = {{
 };
 
 void
+channel_sw(int next)
+{
+	if (next) {
+		current_chan = (current_chan + 1) % chan_count;
+	} else {
+		current_chan = (current_chan - 1 + chan_count) % chan_count;
+	}
+	draw_full();
+}
+
+
+void
 con_server(char *hostname)
 {
 	if (connected)

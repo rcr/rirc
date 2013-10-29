@@ -71,9 +71,9 @@ input(char *inp, int count)
 			ready_send();
 	} else if (count > 0 && *inp++ == 0x1B) { /* escape sequence */
 		if (esccmp("[A", inp)) /* arrow up */
-			;
+			channel_sw(0); /* FIXME: testing channel switching */
 		if (esccmp("[B", inp)) /* arrow down */
-			;
+			channel_sw(1);
 		if (esccmp("[C", inp)) /* arrow right */
 			cur_lr(0);
 		if (esccmp("[D", inp)) /* arrow left */

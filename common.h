@@ -6,11 +6,13 @@
 void fatal(char*);
 
 /* net.c */
+void channel_sw(int);
 void send_msg(char*, int);
 void recv_msg(char*, int);
 
 /* ui.c */
 void resize(void);
+void draw_full(void);
 void draw_chat(void);
 void draw_chans(void);
 
