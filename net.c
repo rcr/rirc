@@ -151,10 +151,17 @@ getarg(char *ptr)
 }
 /* end utils */
 
-void
+int
 send_priv(char *ptr, int count)
 {
-	;
+	/* TODO: - /msg (target) or if target non-blank*/
+	if (current_chan > 0) {
+		ins_line(ptr, nick, current_chan);
+		sendf("PRIVMSG %s :%s\r\n", chan_list[current_chan].name, ptr);
+	} else {
+		ins_line("This is not a channel!", 0, 0);
+	}
+	return 0;
 }
 
 void
@@ -175,9 +182,13 @@ send_conn(char *ptr, int count)
 int
 send_join(char *ptr, int count)
 {
-	if (!(ptr = getarg(ptr)))
-		return 1;
-	sendf("JOIN %s\r\n", ptr);
+	if (chan_count < MAXCHANS) {
+		if (!(ptr = getarg(ptr)))
+			return 1;
+		sendf("JOIN %s\r\n", ptr);
+	} else {
+		ins_line("ERROR: Max Channels", 0, 0);
+	}
 	return 0;
 }
 
@@ -188,7 +199,7 @@ send_msg(char *msg, int count)
 	int err = 0;
 	/* 512 bytes: Max IRC msg length */
 	if (*msg != '/') {
-		send_priv(msg, count);
+		err = send_priv(msg, count);
 	} else if ((ptr = cmdcasecmp("JOIN", ++msg))) {
 		err = send_join(ptr, count);
 	} else if ((ptr = cmdcasecmp("CONNECT", msg))) {
@@ -198,6 +209,8 @@ send_msg(char *msg, int count)
 	} else if ((ptr = cmdcasecmp("QUIT", msg))) {
 		dis_server();
 		run = 0;
+	} else if ((ptr = cmdcasecmp("MSG", msg))) {
+		err = send_priv(ptr, count);
 	}
 		/*
 	} else if ((ptr = cmdcasecmp("MSG", msg))) {
@@ -280,6 +293,31 @@ ins_line(char *inp, char *from, int chan)
 }
 
 void
+recv_priv(char *msg)
+{
+	/* create priv channel, or show in correct channel */
+	ins_line("GOT PRIV", 0, 0);
+}
+
+void
+recv_join(char *msg)
+{
+	/* TODO on user join: */
+	/* :user!~user@localhost.localdomain JOIN :#testing */
+	while (*msg == ' ' || *msg == ':')
+		msg++;
+	channel c = {
+		.active = 0,
+		.cur_line = 0,
+		.nick_pad = 0,
+		.chat = {{0}}
+	};
+	strncpy(c.name, msg, 20);
+	chan_list[chan_count++] = c;
+	draw_chans();
+}
+
+void
 do_recv()
 {
 	char *cmd, *ptr = recv_buff;
@@ -299,8 +337,10 @@ do_recv()
 			/* now we have our suffix/message */
 			ins_line(ptr, 0, 0);
 		}
+	} else if ((cmd = cmdcmp("PRIVMSG", ptr))) {
+		recv_priv(cmd);
 	} else if ((cmd = cmdcmp("JOIN", ptr))) {
-		; /* TODO: create a channel */
+		recv_join(cmd);
 	} else if ((cmd = cmdcmp("PING", ptr))) {
 		send_pong(cmd);
 	} else {
