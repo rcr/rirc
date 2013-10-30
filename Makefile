@@ -9,7 +9,7 @@ OBJS = $(patsubst %,$(ODIR)/%,$(_OBJS))
 rirc : $(OBJS)
 	cc $(CFLAGS) -o $@ $^
 
-$(ODIR)/%.o: $(SDIR)/%.c $(SDIR)/common.h
+$(ODIR)/%.o : $(SDIR)/%.c $(SDIR)/common.h
 	cc $(CFLAGS) -c -o $@ $<
 
 .PHONY : clean
