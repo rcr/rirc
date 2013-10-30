@@ -1,21 +1,17 @@
-cflags = -std=c99 -Wall -pedantic
-objects = rirc.o net.o ui.o input.o
+ODIR = bld
+SDIR = src
+CFLAGS = -std=c99 -Wall -pedantic -g
 
-rirc : $(objects)
-	cc $(cflags) -o rirc $(objects)
+_OBJS = rirc.o input.o net.o ui.o
 
-rirc.o : rirc.c common.h
-	cc $(cflags) -c rirc.c
+OBJS = $(patsubst %,$(ODIR)/%,$(_OBJS))
 
-net.o : net.c common.h
-	cc $(cflags) -c net.c
+rirc : $(OBJS)
+	cc $(CFLAGS) -o $@ $^
 
-ui.o : ui.c common.h
-	cc $(cflags) -c ui.c
-
-input.o : input.c common.h
-	cc $(cflags) -c input.c
+$(ODIR)/%.o: $(SDIR)/%.c $(SDIR)/common.h
+	cc $(CFLAGS) -c -o $@ $<
 
 .PHONY : clean
-clean :
-	-@rm -rf rirc $(objects)
+clean:
+	-@rm -f rirc $(ODIR)/*.o
