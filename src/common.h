@@ -2,6 +2,8 @@
 #define MAXINPUT 200
 #define SCROLLBACK 300
 
+char errbuff[BUFFSIZE];
+
 /* rirc.c */
 void fatal(char*);
 

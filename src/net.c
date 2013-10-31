@@ -266,61 +266,110 @@ ins_line(char *inp, char *from, int chan)
 }
 
 void
-recv_priv(char *msg)
+recv_priv(char *pfx, char *msg)
 {
+	/* get username from pfx */
 	/* create priv channel, or show in correct channel */
 	ins_line("GOT PRIV", 0, 0);
 }
 
 void
-recv_join(char *msg)
+recv_join(char *pfx, char *msg)
 {
-	/* TODO on user join: */
 	/* :user!~user@localhost.localdomain JOIN :#testing */
+
+	while (*pfx == ' ' || *pfx == ':')
+		pfx++;
 	while (*msg == ' ' || *msg == ':')
 		msg++;
-	channel c = {
-		.active = 0,
-		.cur_line = 0,
-		.nick_pad = 0,
-		.chat = {{0}}
-	};
-	strncpy(c.name, msg, 20);
-	chan_list[chan_count++] = c;
-	draw_chans();
+	
+	/* compare to nick */
+	char *p = pfx;
+	char *n = nick;
+	int isme = 0;
+	while (*p++ == *n++) {
+		if (*p == '!')
+			isme = 1;
+	}
+
+	if (isme) {
+		channel c = {
+			.active = 0,
+			.cur_line = 0,
+			.nick_pad = 0,
+			.chat = {{0}}
+		};
+		strncpy(c.name, msg, 20);
+
+		chan_list[chan_count++] = c;
+		ins_line(pfx, 0, chan_count -1);
+		ins_line(msg, 0, chan_count -1);
+
+		draw_chans();
+	} else {
+		/* get channel... */
+		int c;
+		for (c = 0; c < chan_count; c++) {
+
+			int thischan = 0;
+			char *p = msg;
+			char *n = chan_list[c].name;
+
+			while (*p++ == *n++) {
+				if (*n == '\0')
+					thischan = 1;
+			}
+
+			if (thischan) {
+				ins_line(pfx, 0, c);
+				ins_line(msg, 0, c);
+				break;
+			}
+		}
+		if (c == chan_count) {
+			ins_line("NO CHANNEL FOUND", 0 ,0);
+		}
+	}
 }
 
 void
 do_recv()
 {
-	char *cmd, *ptr = recv_buff;
+	char *args, *pfx = 0, *ptr = recv_buff;
 
-	if (*ptr == ':') /* ignore prefix */
-		while (*ptr++ != ' ');
+	if (*ptr == ':') {
+		pfx = ptr;
+		while (*ptr++ != ' ' && *ptr != '\0');
+	}
 
 	if (isdigit(*ptr)) { /* code */
-		int code = get_numeric_code(ptr);
+		int code = get_numeric_code(&ptr);
 		if (!code) {
-			; /* CODE ERROR */
+			goto rpl_error;
+		} else if (code < 200) {
+			;
+		} else if (code < 400) {
+			;
+		} else if (code < 600) {
+			;
 		} else {
-			ptr += 4;
-			while (*ptr++ != ' ');
-			if (*ptr == ':') /* nick arg */
-				ptr++;
-			/* now we have our suffix/message */
-			ins_line(ptr, 0, 0);
+			;
 		}
-	} else if ((cmd = cmdcmp("PRIVMSG", ptr))) {
-		recv_priv(cmd);
-	} else if ((cmd = cmdcmp("JOIN", ptr))) {
-		recv_join(cmd);
-	} else if ((cmd = cmdcmp("PING", ptr))) {
-		send_pong(cmd);
+		//ins_line(ptr, 0, 0);
+	} else if ((args = cmdcmp("PRIVMSG", ptr))) {
+		recv_priv(pfx, args);
+	} else if ((args = cmdcmp("JOIN", ptr))) {
+		recv_join(pfx, args);
+	} else if ((args = cmdcmp("PING", ptr))) {
+		send_pong(args);
 	} else {
-		char errbuff[BUFFSIZE];
-		snprintf(errbuff, BUFFSIZE-1, "ERROR ~ %s", recv_buff);
-		ins_line(errbuff, 0, 0);
+		goto rpl_error;
 	}
+	return;
+
+rpl_error:
+	snprintf(errbuff, BUFFSIZE-1, "RPL ERROR: %s", recv_buff);
+	ins_line(errbuff, 0, 0);
 }
 
 void
