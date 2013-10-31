@@ -19,7 +19,7 @@ void con_server(char*);
 void ins_line(char*, char*, int);
 char* cmdcmp(char*, char*);
 char* cmdcasecmp(char*, char*);
-int get_numeric_code(char*);
+int get_numeric_code(char**);
 
 char sendbuff[BUFFSIZE];
 
@@ -123,9 +123,10 @@ cmdcmp(char *cmd, char *inp)
 }
 
 int
-get_numeric_code(char *code)
+get_numeric_code(char **c)
 {
 	/* Codes are always three digits */
+	char *code = *c;
 	int sum = 0, factor = 100;
 	do {
 		sum += factor * (*code - '0');
@@ -134,8 +135,9 @@ get_numeric_code(char *code)
 
 	if (*code != ' ' || factor > 0)
 		return 0;
-	else
-		return sum;
+
+	*c = code + 1;
+	return sum;
 }
 
 char*
@@ -211,35 +213,7 @@ send_msg(char *msg, int count)
 		run = 0;
 	} else if ((ptr = cmdcasecmp("MSG", msg))) {
 		err = send_priv(ptr, count);
-	}
-		/*
-	} else if ((ptr = cmdcasecmp("MSG", msg))) {
-		if (!(ptr = getarg(ptr))) {
-			goto argerr;
-		}
-		if (!(ptr = getarg(ptr))) {
-			goto argerr;
-		}
-		puts("GOT MSG");
-		*/
-
-	/*
-	--- High Priority ---
-	MSG -> PRIVMSG target: nick
-	NICK
-	PART
-	--- Low Priority ---
-	MODE
-	TOPIC
-	NAMES
-	LIST
-	INVITE
-	KICK
-	--- Not Implementing ---
-	PASS
-	*/
-	else {
-		char errbuff[BUFFSIZE];
+	} else {
 		snprintf(errbuff, BUFFSIZE-1, "Unknown command: %.*s%s",
 				15, msg, count > 15 ? "..." : "");
 		ins_line(errbuff, 0, 0);
@@ -251,7 +225,6 @@ send_msg(char *msg, int count)
 		ins_line("Incorrect arguments", 0, 0);
 }
 
-int buff_limit = 0;
 char recv_buff[BUFFSIZE];
 char *recv_i = recv_buff;
 
@@ -348,7 +321,6 @@ do_recv()
 		snprintf(errbuff, BUFFSIZE-1, "ERROR ~ %s", recv_buff);
 		ins_line(errbuff, 0, 0);
 	}
-	buff_limit = 0;
 }
 
 void
@@ -358,11 +330,8 @@ recv_msg(char *input, int count)
 
 		if (recv_i < recv_buff + BUFFSIZE)
 			*recv_i++ = *input;
-		else
-			buff_limit = 1;
 
 		input++;
-
 		if (*input == '\r' && *(input + 1) == '\n') {
 			*recv_i = '\0';
 			input += 2;

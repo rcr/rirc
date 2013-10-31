@@ -39,6 +39,13 @@ draw_full()
 	/* TODO: redraw input bar */
 }
 
+int
+nick_col(char *nick)
+{
+	/* temp */
+	return 1;
+}
+
 void
 draw_chat()
 {
