@@ -47,6 +47,8 @@ init_ui(void)
 {
 	setbuf(stdout, NULL);
 
+	init_chans();
+
 	/* set terminal to raw mode */
 	tcgetattr(0, &oterm);
 	memcpy(&nterm, &oterm, sizeof(struct termios));

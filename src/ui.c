@@ -11,9 +11,13 @@ void draw_full(void);
 
 struct winsize w;
 
-extern int chan_count;
-extern int current_chan;
-extern struct channel chan_list[];
+//extern int chan_count;
+//extern int current_chan;
+//extern struct channel chan_list[];
+
+extern channel rirc;
+extern channel *ccur;
+channel *rircp = &rirc;
 
 void
 resize()
@@ -51,7 +55,8 @@ draw_chat()
 {
 	printf("\033[s"); /* save cursor location */
 	printf("\033[3;1H");
-	channel *c = &chan_list[current_chan];
+
+	channel *c = ccur;
 	int tw = w.ws_col - c->nick_pad - 15;
 	line *l = c->chat;
 	while (l->len > 0) {
@@ -95,20 +100,22 @@ draw_chans()
 {
 	printf("\033[s"); /* save cursor location */
 	printf("\033[H\033[K");
-	int i, len, width = 0;
-	for (i = 0; i < chan_count; i++) {
-		len = strlen(chan_list[i].name);
+	int len, width = 0;
+	channel *c = rircp;
+	do {
+		len = strlen(c->name);
 		if (width + len + 4 < w.ws_col) {
 			int color;
-			if (i == current_chan)
+			if (c == ccur)
 				color = 255;
 			else
-				color = chan_list[i].active ? 245 : 239;
-			printf("\033[38;5;%dm  %s  ", color, chan_list[i].name);
+				color = c->active ? 245 : 239;
+			printf("\033[38;5;%dm  %s  ", color, c->name);
 			width += len + 4;
+			c = c->next;
 		}
 		else break;
-	}
+	} while (c != rircp);
 	printf("\033[u"); /* restore cursor location */
 }
 

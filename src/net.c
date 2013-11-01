@@ -16,7 +16,7 @@ void sendf(const char*, ...);
 void send_pong(char*);
 void dis_server(void);
 void con_server(char*);
-void ins_line(char*, char*, int);
+void ins_line(char*, char*, channel*);
 char* cmdcmp(char*, char*);
 char* cmdcasecmp(char*, char*);
 int get_numeric_code(char**);
@@ -30,25 +30,35 @@ char realname[] = "Richard Robbins";
 
 int soc;
 int connected = 0;
-int chan_count = 1;
-int current_chan = 0;
-channel chan_list[MAXCHANS] = {{
+
+channel *ccur;
+channel rirc = {
 	.active = 0,
 	.cur_line = 0,
 	.nick_pad = 0,
 	.name = "rirc",
-	.chat = {{0}}}
+	.chat = {{0}}
 };
+
+void
+init_chans()
+{
+	ccur = &rirc;
+	ccur->next = &rirc;
+	ccur->prev = &rirc;
+}
 
 void
 channel_sw(int next)
 {
+	channel *tmp = ccur;
 	if (next) {
-		current_chan = (current_chan + 1) % chan_count;
+		ccur = ccur->next;
 	} else {
-		current_chan = (current_chan - 1 + chan_count) % chan_count;
+		ccur = ccur->prev;
 	}
-	draw_full();
+	if (tmp != ccur)
+		draw_full();
 }
 
 
@@ -78,7 +88,7 @@ con_server(char *hostname)
 		sendf("NICK %s\r\n", nick);
 		sendf("USER %s 8 * :%s\r\n", user, realname);
 	}
-	strncpy(chan_list[0].name, hostname, 20), draw_chans();
+	strncpy(rirc.name, hostname, 20), draw_chans();
 	connected = 1;
 }
 
@@ -86,11 +96,11 @@ void
 dis_server(void)
 {
 	if (!connected) {
-		ins_line("Not connected", 0, 0);
+		ins_line("Not connected", 0, ccur);
 	} else {
 		sendf("QUIT :Quitting!\r\n");
 		close(soc); /* wait for reply before closing? */
-		strcpy(chan_list[0].name, "rirc"), draw_chans();
+		strcpy(rirc.name, "rirc"), draw_chans();
 		connected = 0;
 	}
 }
@@ -157,11 +167,11 @@ int
 send_priv(char *ptr, int count)
 {
 	/* TODO: - /msg (target) or if target non-blank*/
-	if (current_chan > 0) {
-		ins_line(ptr, nick, current_chan);
-		sendf("PRIVMSG %s :%s\r\n", chan_list[current_chan].name, ptr);
-	} else {
+	if (ccur == &rirc) {
 		ins_line("This is not a channel!", 0, 0);
+	} else {
+		ins_line(ptr, nick, ccur);
+		sendf("PRIVMSG %s :%s\r\n", ccur->name, ptr);
 	}
 	return 0;
 }
@@ -184,13 +194,9 @@ send_conn(char *ptr, int count)
 int
 send_join(char *ptr, int count)
 {
-	if (chan_count < MAXCHANS) {
-		if (!(ptr = getarg(ptr)))
-			return 1;
-		sendf("JOIN %s\r\n", ptr);
-	} else {
-		ins_line("ERROR: Max Channels", 0, 0);
-	}
+	if (!(ptr = getarg(ptr)))
+		return 1;
+	sendf("JOIN %s\r\n", ptr);
 	return 0;
 }
 
@@ -232,9 +238,13 @@ time_t raw_t;
 struct tm *t;
 
 void
-ins_line(char *inp, char *from, int chan)
+ins_line(char *inp, char *from, channel *chan)
 {
-	line *l = &chan_list[chan].chat[chan_list[chan].cur_line];
+	if (chan == 0)
+		chan = &rirc;
+
+	struct line *l;
+	l = &chan->chat[chan->cur_line];
 
 	if (l->len)
 		free(l->text);
@@ -249,18 +259,18 @@ ins_line(char *inp, char *from, int chan)
 	l->time_m = t->tm_min;
 
 	if (!from) /* Server message */
-		strncpy(l->from, chan_list[0].name, 20);
+		strncpy(l->from, ccur->name, 20);
 	else
 		strncpy(l->from, from, 20);
 
 	int len;
-	if ((len = strlen(l->from)) > chan_list[chan].nick_pad)
-		chan_list[chan].nick_pad = len;
+	if ((len = strlen(l->from)) > ccur->nick_pad)
+		ccur->nick_pad = len;
 
-	chan_list[chan].cur_line++;
-	chan_list[chan].cur_line %= SCROLLBACK;
+	ccur->cur_line++;
+	ccur->cur_line %= SCROLLBACK;
 
-	if (chan == current_chan) {
+	if (chan == ccur) {
 		draw_chat();
 	}
 }
@@ -269,7 +279,7 @@ void
 recv_priv(char *pfx, char *msg)
 {
 	/* get username from pfx */
-	/* create priv channel, or show in correct channel */
+	/* TODO create priv channel, or show in correct channel */
 	ins_line("GOT PRIV", 0, 0);
 }
 
@@ -293,40 +303,44 @@ recv_join(char *pfx, char *msg)
 	}
 
 	if (isme) {
-		channel c = {
-			.active = 0,
-			.cur_line = 0,
-			.nick_pad = 0,
-			.chat = {{0}}
-		};
-		strncpy(c.name, msg, 20);
+		channel *c = malloc(sizeof(channel));
+		c->active = 0,
+		c->cur_line = 0,
+		c->nick_pad = 0,
+		memset(c->chat, 0, sizeof(c->chat));
+		strncpy(c->name, msg, 20);
 
-		chan_list[chan_count++] = c;
-		ins_line(pfx, 0, chan_count -1);
-		ins_line(msg, 0, chan_count -1);
 
+		c->next = ccur->next;
+		c->prev = ccur;
+		ccur->next->prev = c;
+		ccur->next = c;
+
+		ccur = c;
+		ins_line(pfx, 0, c);
+		ins_line(msg, 0, c);
+
+		draw_chat();
 		draw_chans();
 	} else {
-		/* get channel... */
-		int c;
-		for (c = 0; c < chan_count; c++) {
-
-			int thischan = 0;
+		int found = 0, thischan = 0;
+		channel *c = &rirc;
+		do {
 			char *p = msg;
-			char *n = chan_list[c].name;
-
+			char *n = c->name;
 			while (*p++ == *n++) {
 				if (*n == '\0')
 					thischan = 1;
 			}
-
 			if (thischan) {
 				ins_line(pfx, 0, c);
 				ins_line(msg, 0, c);
+				found = 1;
 				break;
 			}
-		}
-		if (c == chan_count) {
+			c = c->next;
+		} while (c != &rirc);
+		if (!found) {
 			ins_line("NO CHANNEL FOUND", 0 ,0);
 		}
 	}

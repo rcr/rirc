@@ -9,6 +9,7 @@ void fatal(char*);
 
 /* net.c */
 void channel_sw(int);
+void init_chans(void);
 void send_msg(char*, int);
 void recv_msg(char*, int);
 
@@ -40,4 +41,6 @@ typedef struct channel
 	int nick_pad;
 	char name[20];
 	line chat[SCROLLBACK];
+	struct channel *prev;
+	struct channel *next;
 } channel;
