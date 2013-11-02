@@ -96,7 +96,7 @@ void
 dis_server(void)
 {
 	if (!connected) {
-		ins_line("Not connected", 0, ccur);
+		ins_line("Not connected", "-!!-", ccur);
 	} else {
 		sendf("QUIT :Quitting!\r\n");
 		close(soc); /* wait for reply before closing? */
@@ -161,6 +161,17 @@ getarg(char *ptr)
 	else
 		return NULL;
 }
+
+channel*
+get_channel(char *chan)
+{
+	channel *c = &rirc;
+	do {
+		if (strcmp(c->name, chan))
+			return c;
+	} while (c->next != &rirc);
+	return NULL;
+}
 /* end utils */
 
 int
@@ -168,7 +179,7 @@ send_priv(char *ptr, int count)
 {
 	/* TODO: - /msg (target) or if target non-blank*/
 	if (ccur == &rirc) {
-		ins_line("This is not a channel!", 0, 0);
+		ins_line("This is not a channel!", "-!!-", 0);
 	} else {
 		ins_line(ptr, nick, ccur);
 		sendf("PRIVMSG %s :%s\r\n", ccur->name, ptr);
@@ -200,6 +211,37 @@ send_join(char *ptr, int count)
 	return 0;
 }
 
+void send_part(char*);
+void close_channel(char*);
+
+void
+close_channel(char *ptr)
+{
+	if (ccur == &rirc)
+		ins_line("Cannot execute 'close' on server buffer", 0, 0);
+	else {
+		sendf("PART %s\r\n", ccur->name);
+		channel *c = ccur;
+		c->next->prev = c->prev;
+		c->prev->next = c->next;
+		ccur = c->next;
+		free(c);
+		draw_full();
+	}
+}
+
+void
+send_part(char *ptr)
+{
+	if (ccur == &rirc)
+		ins_line("Cannot execute 'part' on server buffer", 0, 0);
+	else {
+		ins_line("(disconnected)", "", ccur);
+		ccur->connected = 0;
+		sendf("PART %s\r\n", ccur->name);
+	}
+}
+
 void
 send_msg(char *msg, int count)
 {
@@ -214,6 +256,10 @@ send_msg(char *msg, int count)
 		err = send_conn(ptr, count);
 	} else if ((ptr = cmdcasecmp("DISCONNECT", msg))) {
 		dis_server();
+	} else if ((ptr = cmdcasecmp("CLOSE", msg))) {
+		close_channel(msg);
+	} else if ((ptr = cmdcasecmp("PART", msg))) {
+		send_part(msg);
 	} else if ((ptr = cmdcasecmp("QUIT", msg))) {
 		dis_server();
 		run = 0;
@@ -280,7 +326,7 @@ recv_priv(char *pfx, char *msg)
 {
 	/* get username from pfx */
 	/* TODO create priv channel, or show in correct channel */
-	ins_line("GOT PRIV", 0, 0);
+	//ins_line("GOT PRIV", 0, 0);
 }
 
 void
@@ -304,12 +350,12 @@ recv_join(char *pfx, char *msg)
 
 	if (isme) {
 		channel *c = malloc(sizeof(channel));
-		c->active = 0,
-		c->cur_line = 0,
-		c->nick_pad = 0,
+		c->active = 0;
+		c->cur_line = 0;
+		c->nick_pad = 0;
+		c->connected = 1;
 		memset(c->chat, 0, sizeof(c->chat));
 		strncpy(c->name, msg, 20);
-
 
 		c->next = ccur->next;
 		c->prev = ccur;
@@ -320,30 +366,22 @@ recv_join(char *pfx, char *msg)
 		ins_line(pfx, 0, c);
 		ins_line(msg, 0, c);
 
-		draw_chat();
-		draw_chans();
+		draw_full();
 	} else {
-		int found = 0, thischan = 0;
-		channel *c = &rirc;
-		do {
-			char *p = msg;
-			char *n = c->name;
-			while (*p++ == *n++) {
-				if (*n == '\0')
-					thischan = 1;
-			}
-			if (thischan) {
-				ins_line(pfx, 0, c);
-				ins_line(msg, 0, c);
-				found = 1;
-				break;
-			}
-			c = c->next;
-		} while (c != &rirc);
-		if (!found) {
+		channel *c;
+		if ((c = get_channel(msg))!= NULL) {
+			ins_line(pfx, 0, c);
+			ins_line(msg, 0, c);
+		} else {
 			ins_line("NO CHANNEL FOUND", 0 ,0);
 		}
 	}
+}
+
+void
+recv_part(char *pfx, char *msg)
+{
+	;
 }
 
 void
@@ -369,11 +407,12 @@ do_recv()
 		} else {
 			;
 		}
-		//ins_line(ptr, 0, 0);
 	} else if ((args = cmdcmp("PRIVMSG", ptr))) {
 		recv_priv(pfx, args);
 	} else if ((args = cmdcmp("JOIN", ptr))) {
 		recv_join(pfx, args);
+	} else if ((args = cmdcmp("PART", ptr))) {
+		recv_part(pfx, args);
 	} else if ((args = cmdcmp("PING", ptr))) {
 		send_pong(args);
 	} else {
@@ -383,7 +422,7 @@ do_recv()
 
 rpl_error:
 	snprintf(errbuff, BUFFSIZE-1, "RPL ERROR: %s", recv_buff);
-	ins_line(errbuff, 0, 0);
+	ins_line(errbuff, 0, &rirc);
 }
 
 void

@@ -84,5 +84,5 @@ input(char *inp, int count)
 	} /* else {
 		paste
 	} */
-	print_line(text, ptr1, ptr2);
+	draw_input(text, ptr1, ptr2);
 }

@@ -21,7 +21,7 @@ void draw_chans(void);
 
 /* input.c */
 void input(char*, int);
-void print_line(char*, int, int);
+void draw_input(char*, int, int);
 
 int run;
 
@@ -39,6 +39,7 @@ typedef struct channel
 	int active;
 	int cur_line;
 	int nick_pad;
+	int connected;
 	char name[20];
 	line chat[SCROLLBACK];
 	struct channel *prev;
