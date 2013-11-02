@@ -11,10 +11,6 @@ void draw_full(void);
 
 struct winsize w;
 
-//extern int chan_count;
-//extern int current_chan;
-//extern struct channel chan_list[];
-
 extern channel rirc;
 extern channel *ccur;
 channel *rircp = &rirc;
@@ -23,23 +19,26 @@ void
 resize()
 {
 	ioctl(0, TIOCGWINSZ, &w);
+
+	printf("\033[H\033[J");/* Clear */
+
+	int i;
+	printf("\033[2;1H\033[2K"C(239));
+	for (i = 0; i < w.ws_col; i++) /* Upper separator */
+		printf("―");
+
+	printf("\033[%d;1H\033[2K", w.ws_row-1);
+	for (i = 0; i < w.ws_col; i++) /* Lower separator */
+		printf("―");
+	printf("\033[%d;1H\033[2K >>> "C(250), w.ws_row); /* bottom bar */
 	draw_full();
 }
 
 void
 draw_full()
 {
-	int i;
-	printf("\033[H\033[J");/* Clear */
 	draw_chans();
-	printf("\033[2;1H\033[2K"C(239));
-	for (i = 0; i < w.ws_col; i++) /* Upper separator */
-		printf("―");
 	draw_chat();
-	printf("\033[%d;1H\033[2K", w.ws_row-1);
-	for (i = 0; i < w.ws_col; i++) /* Lower separator */
-		printf("―");
-	printf("\033[%d;1H\033[2K >>> "C(250), w.ws_row); /* bottom bar */
 	/* TODO: redraw input bar */
 }
 
@@ -53,46 +52,46 @@ nick_col(char *nick)
 void
 draw_chat()
 {
-	printf("\033[s"); /* save cursor location */
-	printf("\033[3;1H");
-
-	channel *c = ccur;
-	int tw = w.ws_col - c->nick_pad - 15;
-	line *l = c->chat;
-	while (l->len > 0) {
-		int n = l->len;
-		printf(C(239)" %02d:%02d  "C(%d)"%*s%s "C(239)"~"C(250)" ",
-				l->time_h, l->time_m, nick_col(l->from),
-				(int)(c->nick_pad - strlen(l->from)), "", l->from);
-		char *end = l->text + l->len - 2;
-		if (n > tw) {
-			char *ptr1 = l->text;
-			for (;;) {
-				char *ptr2 = ptr1 + tw;
-				if (ptr2 > end)
-					ptr2 = end;
-				else
-					while (*ptr2 != ' ' && ptr2 > ptr1)
-						ptr2--;
-				if (ptr2 == ptr1)
-					ptr2 += tw;
-				while (ptr1 <= ptr2)
-					putchar(*ptr1++);
-				if (ptr2 < end)
-					printf("\n                  "C(239)"~"C(250)" ");
-				else
-					break;
-				ptr1 = ptr2 + 1;
-				while (*ptr1 == ' ')
-					ptr1++;
+	printf("\x1b[s"); /* save cursor location */
+	line *l = ccur->chat;
+	int i, h, tw = w.ws_col - ccur->nick_pad - 15;
+	for (i = 3, h = w.ws_row - 1; i < h; i++)
+	{
+		printf("\x1b[%d;1H\x1b[2K", i);
+		if (l->len > 0) {
+			int n = l->len;
+			printf(C(239)" %02d:%02d  "C(%d)"%*s%s "C(239)"~"C(250)" ",
+					l->time_h, l->time_m, nick_col(l->from),
+					(int)(ccur->nick_pad - strlen(l->from)), "", l->from);
+			char *end = l->text + l->len - 2;
+			if (n > tw) {
+				char *ptr1 = l->text;
+				for (;;) {
+					char *ptr2 = ptr1 + tw;
+					if (ptr2 > end)
+						ptr2 = end;
+					else
+						while (*ptr2 != ' ' && ptr2 > ptr1)
+							ptr2--;
+					if (ptr2 == ptr1)
+						ptr2 += tw;
+					while (ptr1 <= ptr2)
+						putchar(*ptr1++);
+					if (ptr2 < end)
+						printf("\x1b[%d;%dH\x1b[2K"C(239)"~"C(250)" ", ++i, ccur->nick_pad + 10);
+					else
+						break;
+					ptr1 = ptr2 + 1;
+					while (*ptr1 == ' ')
+						ptr1++;
+				}
+			} else {
+				printf("%s", l->text);
 			}
-			printf("\n");
-		} else {
-			printf("%s\n", l->text);
 		}
 		l++;
 	}
-	printf("\033[u"); /* restore cursor location */
+	printf("\x1b[u"); /* restore cursor location */
 }
 
 void
@@ -120,7 +119,7 @@ draw_chans()
 }
 
 void
-print_line(char *text, int ptr1, int ptr2)
+draw_input(char *text, int ptr1, int ptr2)
 {
 	int p;
 	printf(C(239)"\033[%d;6H\033[K"C(250), w.ws_row);
