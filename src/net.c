@@ -310,16 +310,16 @@ ins_line(char *inp, char *from, channel *chan)
 	l->time_m = t->tm_min;
 
 	if (!from) /* Server message */
-		strncpy(l->from, ccur->name, 20);
+		strncpy(l->from, chan->name, 20);
 	else
 		strncpy(l->from, from, 20);
 
 	int len;
-	if ((len = strlen(l->from)) > ccur->nick_pad)
-		ccur->nick_pad = len;
+	if ((len = strlen(l->from)) > chan->nick_pad)
+		chan->nick_pad = len;
 
-	ccur->cur_line++;
-	ccur->cur_line %= SCROLLBACK;
+	chan->cur_line++;
+	chan->cur_line %= SCROLLBACK;
 
 	if (chan == ccur) {
 		draw_chat();
