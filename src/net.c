@@ -101,6 +101,11 @@ dis_server(void)
 		sendf("QUIT :Quitting!\r\n");
 		close(soc); /* wait for reply before closing? */
 		strcpy(rirc.name, "rirc"), draw_chans();
+		channel *c = &rirc;
+		do {
+			ins_line("(disconnected)", "-!!-", c);
+			c = c->next;
+		} while (c != &rirc);
 		connected = 0;
 	}
 }
