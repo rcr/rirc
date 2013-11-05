@@ -88,7 +88,7 @@ con_server(char *hostname)
 		sendf("NICK %s\r\n", nick);
 		sendf("USER %s 8 * :%s\r\n", user, realname);
 	}
-	strncpy(rirc.name, hostname, 20), draw_chans();
+	strncpy(rirc.name, hostname, 50), draw_chans();
 	connected = 1;
 }
 
@@ -172,9 +172,10 @@ get_channel(char *chan)
 {
 	channel *c = &rirc;
 	do {
-		if (strcmp(c->name, chan))
+		if (!strcmp(c->name, chan))
 			return c;
-	} while (c->next != &rirc);
+		c = c->next;
+	} while (c != &rirc);
 	return NULL;
 }
 /* end utils */
@@ -223,7 +224,7 @@ void
 close_channel(char *ptr)
 {
 	if (ccur == &rirc)
-		ins_line("Cannot execute 'close' on server buffer", 0, 0);
+		ins_line("Cannot execute 'close' on server buffer", "-!!-", &rirc);
 	else {
 		sendf("PART %s\r\n", ccur->name);
 		channel *c = ccur;
@@ -239,7 +240,7 @@ void
 send_part(char *ptr)
 {
 	if (ccur == &rirc)
-		ins_line("Cannot execute 'part' on server buffer", 0, 0);
+		ins_line("Cannot execute 'part' on server buffer", "-!!-", &rirc);
 	else {
 		ins_line("(disconnected)", "", ccur);
 		ccur->connected = 0;
@@ -291,6 +292,11 @@ struct tm *t;
 void
 ins_line(char *inp, char *from, channel *chan)
 {
+	if (!connected) {
+		from = "-!!-";
+		inp = "You are not connected to a server";
+	}
+
 	if (chan == 0)
 		chan = &rirc;
 
@@ -310,9 +316,9 @@ ins_line(char *inp, char *from, channel *chan)
 	l->time_m = t->tm_min;
 
 	if (!from) /* Server message */
-		strncpy(l->from, chan->name, 20);
+		strncpy(l->from, chan->name, 50);
 	else
-		strncpy(l->from, from, 20);
+		strncpy(l->from, from, 50);
 
 	int len;
 	if ((len = strlen(l->from)) > chan->nick_pad)
@@ -360,7 +366,7 @@ recv_join(char *pfx, char *msg)
 		c->nick_pad = 0;
 		c->connected = 1;
 		memset(c->chat, 0, sizeof(c->chat));
-		strncpy(c->name, msg, 20);
+		strncpy(c->name, msg, 50);
 
 		c->next = ccur->next;
 		c->prev = ccur;
@@ -368,15 +374,13 @@ recv_join(char *pfx, char *msg)
 		ccur->next = c;
 
 		ccur = c;
-		ins_line(pfx, 0, c);
-		ins_line(msg, 0, c);
+		ins_line(buff, ">", c);
 
 		draw_full();
 	} else {
 		channel *c;
-		if ((c = get_channel(msg))!= NULL) {
-			ins_line(pfx, 0, c);
-			ins_line(msg, 0, c);
+		if ((c = get_channel(msg)) != NULL) {
+			ins_line(buff, ">", c);
 		} else {
 			ins_line("NO CHANNEL FOUND", 0 ,0);
 		}
@@ -400,6 +404,9 @@ do_recv()
 	}
 
 	if (isdigit(*ptr)) { /* code */
+
+		goto rpl_error;
+
 		int code = get_numeric_code(&ptr);
 		if (!code) {
 			goto rpl_error;
@@ -410,7 +417,7 @@ do_recv()
 		} else if (code < 600) {
 			;
 		} else {
-			;
+			goto rpl_error;
 		}
 	} else if ((args = cmdcmp("PRIVMSG", ptr))) {
 		recv_priv(pfx, args);

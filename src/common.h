@@ -30,7 +30,7 @@ typedef struct line
 	int len;
 	int time_h;
 	int time_m;
-	char from[20];
+	char from[50];
 	char *text;
 } line;
 
@@ -40,7 +40,7 @@ typedef struct channel
 	int cur_line;
 	int nick_pad;
 	int connected;
-	char name[20];
+	char name[50];
 	line chat[SCROLLBACK];
 	struct channel *prev;
 	struct channel *next;
