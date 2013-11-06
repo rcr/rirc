@@ -410,7 +410,31 @@ recv_join(char *pfx, char *msg)
 void
 recv_part(char *pfx, char *msg)
 {
-	;
+	//TODO: if no part message, display none
+	while (*pfx == ' ' || *pfx == ':')
+		pfx++;
+	while (*msg == ' ' || *msg == ':')
+		msg++;
+
+	char *nick = pfx;
+	char *chan = msg;
+	while (*pfx++ != '!');
+	*pfx = '\0';
+	while (*msg != ' ')
+		msg++;
+	*msg++ = '\0';
+	while (*msg++ != ':');
+
+	char buff[BUFFSIZE];
+	snprintf(buff, BUFFSIZE-1, "%s has left %s ~ (%s)", nick, chan, msg);
+
+	channel *c;
+	ins_line(chan, "test", 0);
+	if ((c = get_channel(chan)) != NULL) {
+		ins_line(buff, "<", c);
+	} else {
+		ins_line("NO CHANNEL FOUND", 0 ,0);
+	}
 }
 
 void
