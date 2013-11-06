@@ -335,9 +335,29 @@ ins_line(char *inp, char *from, channel *chan)
 void
 recv_priv(char *pfx, char *msg)
 {
-	/* get username from pfx */
 	/* TODO create priv channel, or show in correct channel */
-	//ins_line("GOT PRIV", 0, 0);
+	while (*pfx == ' ' || *pfx == ':')
+		pfx++;
+	char *from = pfx;
+	while (*pfx != '!')
+		pfx++;
+	*pfx = '\0';
+
+	while (*msg == ' ')
+		msg++;
+	char *dest = msg;
+	while (*msg != ' ')
+		msg++;
+	*msg++ = '\0';
+	while (*msg == ' ' || *msg == ':')
+		msg++;
+	
+	channel *c;
+	if ((c = get_channel(dest)) != NULL) {
+		ins_line(msg, from, c);
+	} else {
+		ins_line("NO CHANNEL FOUND", 0, 0);
+	}
 }
 
 void
