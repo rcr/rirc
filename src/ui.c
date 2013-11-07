@@ -45,8 +45,10 @@ draw_full()
 int
 nick_col(char *nick)
 {
-	/* temp */
-	return 1;
+	int col = 0;
+	while (*nick++ != '\0')
+		col += *nick % 8;
+	return (col % 8);
 }
 
 void
