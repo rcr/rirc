@@ -52,10 +52,35 @@ nick_col(char *nick)
 }
 
 int
+print_more(char *s, char *e, int j)
+{
+	int tw = w.ws_col - ccur->nick_pad - 15;
+	char *end;
+	if ((s + tw) < e) {
+		end = s + tw;
+		while (*end != ' ' && end > s)
+			end--;
+		if (end == s)
+			end = s + tw;
+		j = print_more(end, e, j);
+		s = end;
+	} else {
+		end = e;
+	}
+
+	if (j > 2) { 
+		printf("\x1b[%d;%dH\x1b[2K"C(239)"~"C(250)" %d~~", j, ccur->nick_pad + 10, j);
+		while (s < end)
+			putchar(*s++);
+	}
+	return j+1;
+}
+
+int
 print_line(int rows, int i)
 {
 	line *l = ccur->chat + ((i - 1 + 200) % 200);
-	if (l->len > 0) { 
+	if (l->len > 0) {
 		if ( rows > w.ws_row - 1) {
 			return 3;
 		}
