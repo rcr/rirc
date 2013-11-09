@@ -47,14 +47,52 @@ nick_col(char *nick)
 {
 	int col = 0;
 	while (*nick++ != '\0')
-		col += *nick % 8;
+		col += *nick;
 	return (col % 8);
 }
 
 int
 print_line(int rows, int i)
 {
-	;
+	line *l = ccur->chat + ((i - 1 + 200) % 200);
+	if (l->len > 0) { 
+		if ( rows > w.ws_row - 1) {
+			return 3;
+		}
+		int tw = w.ws_col - ccur->nick_pad - 15;
+		int count = 1;
+		char *ptr1, *ptr2, *end;
+		ptr1 = l->text;
+		ptr2 = l->text + l->len - 1;
+		int j = print_line(rows + count, i - 1);
+		if ((ptr1 + tw) < ptr2) {
+			end = ptr1 + tw;
+			while (*end != ' ' && end > ptr1)
+				end--;
+			if (end == ptr1)
+				end = ptr1 + tw;
+			/* print ptr -> e */
+			j = print_more(end, ptr2, j);
+			count++;
+			/* ... */
+			ptr1 = end;
+		} else {
+			end = ptr2;
+		}
+		if (j > 2) {
+			printf("\x1b[%d;1H\x1b[2K", j);
+			printf(C(239)" %02d:%02d  "C(%d)"%*s%s "C(239)"~"C(250)" ",
+					l->time_h, l->time_m, nick_col(l->from),
+					(int)(ccur->nick_pad - strlen(l->from)), "", l->from);
+			ptr1 = l->text;
+			ptr2 = end;
+			while (ptr1 < ptr2)
+				putchar(*ptr1++);
+		}
+		return j + count;
+	} else {
+		return 3;
+	}
 }
 
 void
