@@ -52,69 +52,72 @@ nick_col(char *nick)
 }
 
 int
-print_more(char *s, char *e, int j)
+print_more(char *ptr1, char *ptr2, int r)
 {
 	int tw = w.ws_col - ccur->nick_pad - 15;
 	char *end;
-	if ((s + tw) < e) {
-		end = s + tw;
-		while (*end != ' ' && end > s)
+	if ((ptr1 + tw) < ptr2) {
+		end = ptr1 + tw;
+		while (*end != ' ' && end > ptr1)
 			end--;
-		if (end == s)
-			end = s + tw;
-		j = print_more(end, e, j);
-		s = end;
+		if (end == ptr1)
+			end = ptr1 + tw;
+		r = print_more(end, ptr2, r);
 	} else {
-		end = e;
+		end = ptr2;
 	}
-
-	if (j > 2) { 
-		printf("\x1b[%d;%dH\x1b[2K"C(239)"~"C(250)" %d~~", j, ccur->nick_pad + 10, j);
-		while (s < end)
-			putchar(*s++);
+	if (r > 2) {
+		printf("\x1b[%d;%dH\x1b[2K"C(239)"~"C(250), r, ccur->nick_pad + 10);
+		while (ptr1 < end)
+			putchar(*ptr1++);
 	}
-	return j+1;
+	return r - 1;
 }
 
 int
-print_line(int rows, int i)
+print_line(int row, int i)
 {
-	line *l = ccur->chat + ((i - 1 + 200) % 200);
+	line *l = ccur->chat + ((i - 1 + SCROLLBACK) % SCROLLBACK);
 	if (l->len > 0) {
-		if ( rows > w.ws_row - 1) {
-			return 3;
-		}
 		int tw = w.ws_col - ccur->nick_pad - 15;
 		int count = 1;
 		char *ptr1, *ptr2, *end;
 		ptr1 = l->text;
 		ptr2 = l->text + l->len - 1;
-		int j = print_line(rows + count, i - 1);
+		while ((ptr1 + tw) < ptr2) {
+			end = ptr1 + tw;
+			while (*end != ' ' && end > ptr1)
+				end--;
+			if (end == ptr1)
+				end = ptr1 + tw;
+			count++;
+			ptr1 = end;
+		}
+
+		if (row - count > 2)
+			row = print_line(row - count, i - 1) + count - 1;
+
+		ptr1 = l->text;
+		ptr2 = l->text + l->len - 1;
 		if ((ptr1 + tw) < ptr2) {
 			end = ptr1 + tw;
 			while (*end != ' ' && end > ptr1)
 				end--;
 			if (end == ptr1)
 				end = ptr1 + tw;
-			/* print ptr -> e */
-			j = print_more(end, ptr2, j);
-			count++;
-			/* ... */
-			ptr1 = end;
+			row = print_more(end, ptr2, row);
 		} else {
 			end = ptr2;
 		}
-		if (j > 2) {
-			printf("\x1b[%d;1H\x1b[2K", j);
+		if (row > 2) {
+			printf("\x1b[%d;1H\x1b[2K", row);
 			printf(C(239)" %02d:%02d  "C(%d)"%*s%s "C(239)"~"C(250)" ",
 					l->time_h, l->time_m, nick_col(l->from),
 					(int)(ccur->nick_pad - strlen(l->from)), "", l->from);
-			ptr1 = l->text;
-			ptr2 = end;
-			while (ptr1 < ptr2)
+			while (ptr1 < end)
 				putchar(*ptr1++);
 		}
-		return j + count;
+		return row + count;
 	} else {
 		return 3;
 	}
@@ -124,9 +127,7 @@ void
 draw_chat()
 {
 	printf("\x1b[s"); /* save cursor location */
-	int rows = 4; /* save 4 lines, for separators, channel bar and input bar */
-	int i = ccur->cur_line;
-	int r = print_line(rows, i); /* returns row of last printed line */
+	int r = print_line(w.ws_row - 2, ccur->cur_line);
 	while (r < w.ws_row - 1) {
 		printf("\x1b[%d;1H\x1b[2K", r++);
 	}
