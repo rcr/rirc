@@ -16,6 +16,9 @@ void sendf(const char*, ...);
 void send_pong(char*);
 void dis_server(void);
 void con_server(char*);
+void send_part(char*);
+void close_channel(char*);
+
 void ins_line(char*, char*, channel*);
 char* cmdcmp(char*, char*);
 char* cmdcasecmp(char*, char*);
@@ -24,14 +27,20 @@ int get_numeric_code(char**);
 char sendbuff[BUFFSIZE];
 
 /* Config Stuff */
-char nick[] = "rcr";
-char user[] = "rcr";
+char nick[] = "rirctest";
+char user[] = "rirctest";
 char realname[] = "Richard Robbins";
 
 int soc;
 int connected = 0;
 
-channel *ccur;
+char recv_buff[BUFFSIZE];
+char *recv_i = recv_buff;
+
+time_t raw_t;
+struct tm *t;
+
+channel *ccur, *cserver;
 channel rirc = {
 	.active = 0,
 	.cur_line = 0,
@@ -60,7 +69,6 @@ channel_sw(int next)
 	if (tmp != ccur)
 		draw_full();
 }
-
 
 void
 con_server(char *hostname)
@@ -217,9 +225,6 @@ send_join(char *ptr, int count)
 	return 0;
 }
 
-void send_part(char*);
-void close_channel(char*);
-
 void
 close_channel(char *ptr)
 {
@@ -282,12 +287,6 @@ send_msg(char *msg, int count)
 	if (err == 2)
 		ins_line("Incorrect arguments", 0, 0);
 }
-
-char recv_buff[BUFFSIZE];
-char *recv_i = recv_buff;
-
-time_t raw_t;
-struct tm *t;
 
 void
 ins_line(char *inp, char *from, channel *chan)
@@ -374,10 +373,21 @@ recv_join(char *pfx, char *msg)
 	char *p = pfx;
 	char *n = nick;
 	int isme = 0;
-	while (*p++ == *n++) {
-		if (*p == '!')
+	while (*p == *n) {
+		p++, n++;
+		if (*p == '!' && *n == '\0') {
 			isme = 1;
+			break;
+		} else if (*n == '\0') {
+			break;
+		}
 	}
+	char buff[BUFFSIZE];
+	char *nick = pfx;
+	while (*pfx != '!')
+		pfx++;
+	*pfx = '\0';
+	snprintf(buff, BUFFSIZE-1, "%s has joined %s", nick, msg);
 
 	if (isme) {
 		channel *c = malloc(sizeof(channel));
@@ -449,17 +459,17 @@ do_recv()
 
 	if (isdigit(*ptr)) { /* code */
 
-		goto rpl_error;
+		ins_line(ptr, 0, 0);
 
 		int code = get_numeric_code(&ptr);
 		if (!code) {
 			goto rpl_error;
 		} else if (code < 200) {
-			;
+			; /* from: CON */
 		} else if (code < 400) {
-			;
+			; /* from: INF */
 		} else if (code < 600) {
-			;
+			; /* from: ERR */
 		} else {
 			goto rpl_error;
 		}
