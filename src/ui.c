@@ -83,29 +83,29 @@ print_line(int row, int i)
 		int count = 1;
 		char *ptr1, *ptr2, *end;
 		ptr1 = l->text;
-		ptr2 = l->text + l->len - 1;
+		ptr2 = l->text + l->len;
 		while ((ptr1 + tw) < ptr2) {
 			end = ptr1 + tw;
 			while (*end != ' ' && end > ptr1)
 				end--;
 			if (end == ptr1)
 				end = ptr1 + tw;
+			ptr1 = end + 1;
 			count++;
-			ptr1 = end;
 		}
 
 		if (row - count > 2)
 			row = print_line(row - count, i - 1) + count - 1;
 
 		ptr1 = l->text;
-		ptr2 = l->text + l->len - 1;
+		ptr2 = l->text + l->len;
 		if ((ptr1 + tw) < ptr2) {
 			end = ptr1 + tw;
 			while (*end != ' ' && end > ptr1)
 				end--;
 			if (end == ptr1)
 				end = ptr1 + tw;
-			row = print_more(end, ptr2, row);
+			row = print_more(end + 1, ptr2, row);
 		} else {
 			end = ptr2;
 		}

@@ -305,7 +305,7 @@ ins_line(char *inp, char *from, channel *chan)
 	if (l->len)
 		free(l->text);
 
-	l->len = strlen(inp) + 1;
+	l->len = strlen(inp);
 	l->text = malloc(l->len);
 	memcpy(l->text, inp, l->len);
 
