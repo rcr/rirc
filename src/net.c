@@ -427,6 +427,23 @@ recv_join(char *pfx, char *msg)
 }
 
 void
+recv_quit(char *pfx, char *msg)
+{
+	/* :user!user@localhost.localdomain QUIT :Gone to have lunch */
+	while (*pfx == ' ' || *pfx == ':')
+		pfx++;
+	while (*msg == ' ' || *msg == ':')
+		msg++;
+	char *nick = pfx;
+	while (*pfx != '!')
+		pfx++;
+	*pfx = '\0';
+	char buff[BUFFSIZE];
+	snprintf(buff, BUFFSIZE-1, "%s has quit (Quit: %s)", nick, msg);
+	ins_line(buff, "<", 0);
+}
+
+void
 recv_part(char *pfx, char *msg)
 {
 	//TODO: if no part message, display none
@@ -488,6 +505,8 @@ do_recv()
 		recv_join(pfx, args);
 	} else if ((args = cmdcmp("PART", ptr))) {
 		recv_part(pfx, args);
+	} else if ((args = cmdcmp("QUIT", ptr))) {
+		recv_quit(pfx, args);
 	} else if ((args = cmdcmp("PING", ptr))) {
 		send_pong(args);
 	} else {
