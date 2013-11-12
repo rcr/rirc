@@ -66,7 +66,7 @@ void
 cleanup(int clear)
 {
 	tcsetattr(0, TCSADRAIN, &oterm);
-	if (clear) printf("\033[H\033[J");
+	if (clear) printf("\x1b[H\x1b[J");
 }
 
 void

@@ -12,17 +12,26 @@
 
 #define MAXCHANS 10
 
-void sendf(const char*, ...);
-void send_pong(char*);
-void dis_server(void);
 void con_server(char*);
-void send_part(char*);
-void close_channel(char*);
-
-void ins_line(char*, char*, channel*);
-char* cmdcmp(char*, char*);
+void dis_server(void);
+void sendf(const char*, ...);
 char* cmdcasecmp(char*, char*);
+char* cmdcmp(char*, char*);
 int get_numeric_code(char**);
+char* getarg(char*);
+channel* get_channel(char*);
+int send_priv(char*);
+void send_pong(char*);
+int send_conn(char*);
+int send_join(char*);
+void close_channel(char*);
+void send_part(char*);
+void ins_line(char*, char*, channel*);
+void recv_priv(char*, char*);
+void recv_join(char*, char*);
+void recv_quit(char*, char*);
+void recv_part(char*, char*);
+void do_recv();
 
 char sendbuff[BUFFSIZE];
 
@@ -189,7 +198,7 @@ get_channel(char *chan)
 /* end utils */
 
 int
-send_priv(char *ptr, int count)
+send_priv(char *ptr)
 {
 	/* TODO: - /msg (target) or if target non-blank*/
 	if (ccur == &rirc) {
@@ -208,7 +217,7 @@ send_pong(char *server)
 }
 
 int
-send_conn(char *ptr, int count)
+send_conn(char *ptr)
 {
 	if (!(ptr = getarg(ptr)))
 		return 1;
@@ -217,7 +226,7 @@ send_conn(char *ptr, int count)
 }
 
 int
-send_join(char *ptr, int count)
+send_join(char *ptr)
 {
 	if (!(ptr = getarg(ptr)))
 		return 1;
@@ -260,11 +269,11 @@ send_msg(char *msg, int count)
 	int err = 0;
 	/* 512 bytes: Max IRC msg length */
 	if (*msg != '/') {
-		err = send_priv(msg, count);
+		err = send_priv(msg);
 	} else if ((ptr = cmdcasecmp("JOIN", ++msg))) {
-		err = send_join(ptr, count);
+		err = send_join(ptr);
 	} else if ((ptr = cmdcasecmp("CONNECT", msg))) {
-		err = send_conn(ptr, count);
+		err = send_conn(ptr);
 	} else if ((ptr = cmdcasecmp("DISCONNECT", msg))) {
 		dis_server();
 	} else if ((ptr = cmdcasecmp("CLOSE", msg))) {
@@ -275,7 +284,7 @@ send_msg(char *msg, int count)
 		dis_server();
 		run = 0;
 	} else if ((ptr = cmdcasecmp("MSG", msg))) {
-		err = send_priv(ptr, count);
+		err = send_priv(ptr);
 	} else {
 		snprintf(errbuff, BUFFSIZE-1, "Unknown command: %.*s%s",
 				15, msg, count > 15 ? "..." : "");
@@ -305,7 +314,7 @@ ins_line(char *inp, char *from, channel *chan)
 	if (l->len)
 		free(l->text);
 
-	l->len = strlen(inp);
+	l->len = strlen(inp) + 1;
 	l->text = malloc(l->len);
 	memcpy(l->text, inp, l->len);
 
@@ -389,8 +398,9 @@ recv_join(char *pfx, char *msg)
 	*pfx = '\0';
 	snprintf(buff, BUFFSIZE-1, "%s has joined %s", nick, msg);
 
+	channel *c;
 	if (isme) {
-		channel *c = malloc(sizeof(channel));
+		c = malloc(sizeof(channel));
 		c->active = 0;
 		c->cur_line = 0;
 		c->nick_pad = 0;
@@ -408,7 +418,6 @@ recv_join(char *pfx, char *msg)
 
 		draw_full();
 	} else {
-		channel *c;
 		if ((c = get_channel(msg)) != NULL) {
 			ins_line(buff, ">", c);
 		} else {

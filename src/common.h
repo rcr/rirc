@@ -18,10 +18,10 @@ void resize(void);
 void draw_full(void);
 void draw_chat(void);
 void draw_chans(void);
+void draw_input(char*, int, int);
 
 /* input.c */
 void input(char*, int);
-void draw_input(char*, int, int);
 
 int run;
 
