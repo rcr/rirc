@@ -15,6 +15,9 @@ extern channel rirc;
 extern channel *ccur;
 channel *rircp = &rirc;
 
+int tw = 0;  /* text width */
+int nlw = 3; /* nicklist width */
+
 void
 resize()
 {
@@ -51,78 +54,6 @@ nick_col(char *nick)
 	return (col % 8);
 }
 
-int
-print_more(char *ptr1, char *ptr2, int r)
-{
-	int tw = w.ws_col - ccur->nick_pad - 15;
-	char *end;
-	if ((ptr1 + tw) < ptr2) {
-		end = ptr1 + tw;
-		while (*end != ' ' && end > ptr1)
-			end--;
-		if (end == ptr1)
-			end = ptr1 + tw;
-		r = print_more(end, ptr2, r);
-	} else {
-		end = ptr2;
-	}
-	if (r > 2) {
-		printf("\x1b[%d;%dH\x1b[2K"C(239)"~"C(250), r, ccur->nick_pad + 10);
-		while (ptr1 < end)
-			putchar(*ptr1++);
-	}
-	return r - 1;
-}
-
-int
-print_line(int row, int i)
-{
-	line *l = ccur->chat + ((i - 1 + SCROLLBACK) % SCROLLBACK);
-	if (l->len > 0) {
-		int tw = w.ws_col - ccur->nick_pad - 15;
-		int count = 1;
-		char *ptr1, *ptr2, *end;
-		ptr1 = l->text;
-		ptr2 = l->text + l->len;
-		while ((ptr1 + tw) < ptr2) {
-			end = ptr1 + tw;
-			while (*end != ' ' && end > ptr1)
-				end--;
-			if (end == ptr1)
-				end = ptr1 + tw;
-			ptr1 = end + 1;
-			count++;
-		}
-
-		if (row - count > 2)
-			row = print_line(row - count, i - 1) + count - 1;
-
-		ptr1 = l->text;
-		ptr2 = l->text + l->len;
-		if ((ptr1 + tw) < ptr2) {
-			end = ptr1 + tw;
-			while (*end != ' ' && end > ptr1)
-				end--;
-			if (end == ptr1)
-				end = ptr1 + tw;
-			row = print_more(end + 1, ptr2, row);
-		} else {
-			end = ptr2;
-		}
-		if (row > 2) {
-			printf("\x1b[%d;1H\x1b[2K", row);
-			printf(C(239)" %02d:%02d  "C(%d)"%*s%s "C(239)"~"C(250)" ",
-					l->time_h, l->time_m, nick_col(l->from),
-					(int)(ccur->nick_pad - strlen(l->from)), "", l->from);
-			while (ptr1 < end)
-				putchar(*ptr1++);
-		}
-		return row + count;
-	} else {
-		return 3;
-	}
-}
-
 void
 draw_chat()
 {
@@ -134,28 +65,85 @@ draw_chat()
 	printf("\x1b[u"); /* restore cursor location */
 }
 
-void
-draw_chans()
+char*
+word_wrap(char *start, char *end)
 {
-	printf("\033[s"); /* save cursor location */
-	printf("\033[H\033[K");
-	int len, width = 0;
-	channel *c = rircp;
-	do {
-		len = strlen(c->name);
-		if (width + len + 4 < w.ws_col) {
-			int color;
-			if (c == ccur)
-				color = 255;
-			else
-				color = c->active ? 245 : 239;
-			printf("\033[38;5;%dm  %s  ", color, c->name);
-			width += len + 4;
-			c = c->next;
+	char *wrap;
+	if ((wrap = start + tw) < end) {
+
+		while (*wrap != ' ' && wrap > start)
+			wrap--;
+
+		if (wrap == start)
+			wrap += tw;
+
+		if (wrap == end)
+			return NULL;
+		else if (*wrap == ' ')
+			return wrap + 1;
+		else
+			return wrap;
+	} else {
+		return NULL;
+	}
+}
+
+int
+print_line(int row, int i)
+{
+	line *l = ccur->chat + ((i - 1 + SCROLLBACK) % SCROLLBACK);
+	if (l->len) {
+
+		tw = w.ws_col - ccur->nick_pad - nlw - 13;
+
+		int count = 1;
+		char *ptr1, *ptr2, *wrap;
+
+		ptr1 = l->text;
+		ptr2 = l->text + l->len;
+
+		while ((ptr1 = word_wrap(ptr1, ptr2)) != NULL && ptr1 != ptr2)
+			count++;
+
+		if (row - count > 2)
+			row = print_line(row - count, i - 1) + count - 1;
+
+		ptr1 = l->text;
+		if ((wrap = word_wrap(ptr1, ptr2)) != NULL)
+			row = print_more(wrap, ptr2, row);
+		else
+			wrap = ptr2;
+
+		if (row > 2) {
+			printf("\x1b[%d;1H\x1b[2K", row);
+			printf(C(239)" %02d:%02d  "C(%d)"%*s%s "C(239)"~"C(250)" ",
+					l->time_h, l->time_m, nick_col(l->from),
+					(int)(ccur->nick_pad - strlen(l->from)), "", l->from);
+			while (ptr1 < wrap)
+				putchar(*ptr1++);
 		}
-		else break;
-	} while (c != rircp);
-	printf("\033[u"); /* restore cursor location */
+		return row + count;
+	} else {
+		return 3;
+	}
+}
+
+int
+print_more(char *start, char *end, int row)
+{
+	char *wrap;
+	if ((wrap = word_wrap(start, end)) != NULL && wrap != end)
+		row = print_more(wrap, end, row);
+	else
+		wrap = end;
+
+	if (row > 2) {
+		printf("\x1b[%d;%dH\x1b[2K", row, ccur->nick_pad + 10);
+		printf(C(239)"~"C(250)" ");
+		while (start < wrap)
+			putchar(*start++);
+	}
+	return row - 1;
 }
 
 void
