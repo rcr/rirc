@@ -21,6 +21,8 @@ struct winsize w;
 int tw = 0;  /* text width */
 int nlw = 3; /* nicklist width */
 
+int nick_cols[] = {20, 51, 216, 83, 103, 115, 163, 193};
+
 void
 resize(void)
 {
@@ -76,9 +78,9 @@ int
 nick_col(char *nick)
 {
 	int col = 0;
-	while (*nick++ != '\0')
-		col += *nick;
-	return (col % 8);
+	while (*nick != '\0')
+		col += *nick++;
+	return nick_cols[col % sizeof(nick_cols)/sizeof(nick_cols[0])];
 }
 
 char*
