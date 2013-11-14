@@ -19,6 +19,7 @@ char* cmdcasecmp(char*, char*);
 char* cmdcmp(char*, char*);
 int get_numeric_code(char**);
 char* getarg(char*);
+char* getarg_after(char**, char);
 channel* get_channel(char*);
 int send_priv(char*);
 void send_pong(char*);
@@ -184,6 +185,20 @@ getarg(char *ptr)
 		return NULL;
 }
 
+char*
+getarg_after(char **p, char c)
+{
+	char *ptr = *p;
+	while (*ptr != c && *ptr != '\0')
+		ptr++;
+	if (*ptr == '\0')
+		return NULL;
+	else {
+		*p = ptr + 1;
+		return ptr;
+	}
+}
+
 channel*
 get_channel(char *chan)
 {
@@ -314,7 +329,7 @@ ins_line(char *inp, char *from, channel *chan)
 	if (l->len)
 		free(l->text);
 
-	l->len = strlen(inp) + 1;
+	l->len = strlen(inp);
 	l->text = malloc(l->len);
 	memcpy(l->text, inp, l->len);
 
@@ -483,19 +498,26 @@ do_recv()
 		while (*ptr++ != ' ' && *ptr != '\0');
 	}
 
-	if (isdigit(*ptr)) { /* code */
-
-		ins_line(ptr, 0, 0);
+	if (isdigit(*ptr)) { /* Reply code */
 
 		int code = get_numeric_code(&ptr);
+
+		char *args;
+		/* Cant parse until ':' because of 004, 005, 254, 255, etc */
+		if ((args = getarg_after(&ptr, ' ')) == NULL)
+			goto rpl_error;
+		/* So remove it here */
+		if (*ptr == ':')
+			ptr++;
+
 		if (!code) {
 			goto rpl_error;
 		} else if (code < 200) {
-			; /* from: CON */
+			ins_line(ptr, "CON", 0);
 		} else if (code < 400) {
-			; /* from: INF */
+			ins_line(ptr, "INFO", 0);
 		} else if (code < 600) {
-			; /* from: ERR */
+			ins_line(ptr, "ERROR", 0);
 		} else {
 			goto rpl_error;
 		}
@@ -509,6 +531,15 @@ do_recv()
 		recv_quit(pfx, args);
 	} else if ((args = cmdcmp("PING", ptr))) {
 		send_pong(args);
+		/* TODO:
+	} else if ((args = cmdcmp("NICK", ptr))) {
+		recv_nick(...;
+	} else if ((args = cmdcmp("MODE", ptr))) {
+		recv_mode(...;
+	} else if ((args = cmdcmp("NOTICE", ptr))) {
+		recv_notice(...
+		;
+		*/
 	} else {
 		goto rpl_error;
 	}
