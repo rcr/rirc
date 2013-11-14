@@ -50,6 +50,8 @@ esccmp(char *esc, char *inp)
 void
 ready_send()
 {
+	if (ptr1 == 0)
+		return;
 	while (ptr2 < MAXINPUT-1)
 		text[ptr1++] = text[ptr2++];
 	text[ptr1] = '\0';
