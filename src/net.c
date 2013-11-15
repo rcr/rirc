@@ -189,13 +189,34 @@ char*
 getarg_after(char **p, char c)
 {
 	char *ptr = *p;
+
 	while (*ptr != c && *ptr != '\0')
 		ptr++;
+
 	if (*ptr == '\0')
 		return NULL;
 	else {
-		*p = ptr + 1;
+		*p = ++ptr;
 		return ptr;
+	}
+}
+
+
+void
+trimarg_after(char **arg, char c)
+{
+	char *p = *arg;
+	for (;;) {
+		if (*p == '\0') {
+			*arg = p;
+			break;
+		} else if (*p == c) {
+			*p = '\0';
+			*arg = (p + 1);
+			break;
+		} else {
+			p++;
+		}
 	}
 }
 
@@ -355,32 +376,35 @@ ins_line(char *inp, char *from, channel *chan)
 	}
 }
 
-void
-recv_priv(char *pfx, char *msg)
+int
+recv_priv(char *prfx, char *mesg)
 {
-	/* TODO create priv channel, or show in correct channel */
-	while (*pfx == ' ' || *pfx == ':')
-		pfx++;
-	char *from = pfx;
-	while (*pfx != '!')
-		pfx++;
-	*pfx = '\0';
+	/* :nick!user@hostname.localdomain PRIVMSG <target> :Message */
 
-	while (*msg == ' ')
-		msg++;
-	char *dest = msg;
-	while (*msg != ' ')
-		msg++;
-	*msg++ = '\0';
-	while (*msg == ' ' || *msg == ':')
-		msg++;
-	
+	char *from, *targ;
+
+	/* Get the sender's nick */
+	if ((from = getarg_after(&prfx, ':')) == NULL)
+		return 1;
+	trimarg_after(&prfx, '!');
+
+	/* Get the message target */
+	if ((targ = getarg_after(&mesg, ' ')) == NULL)
+		return 1;
+	trimarg_after(&mesg, ' ');
+
+	/* Get the message */
+	if ((mesg = getarg_after(&mesg, ':')) == NULL)
+		return 1;
+
 	channel *c;
-	if ((c = get_channel(dest)) != NULL) {
-		ins_line(msg, from, c);
-	} else {
-		ins_line("NO CHANNEL FOUND", 0, 0);
+	if ((c = get_channel(targ)) != NULL)
+		ins_line(mesg, from, c);
+	else {
+		snprintf(errbuff, BUFFSIZE-1, "PRIVMSG: target %s not found", targ);
+		ins_line(errbuff, "ERR", 0);
 	}
+	return 0;
 }
 
 void
@@ -480,7 +504,6 @@ recv_part(char *pfx, char *msg)
 	snprintf(buff, BUFFSIZE-1, "%s has left %s ~ (%s)", nick, chan, msg);
 
 	channel *c;
-	ins_line(chan, "test", 0);
 	if ((c = get_channel(chan)) != NULL) {
 		ins_line(buff, "<", c);
 	} else {
@@ -522,7 +545,7 @@ do_recv()
 			goto rpl_error;
 		}
 	} else if ((args = cmdcmp("PRIVMSG", ptr))) {
-		recv_priv(pfx, args);
+		err = recv_priv(pfx, args);
 	} else if ((args = cmdcmp("JOIN", ptr))) {
 		recv_join(pfx, args);
 	} else if ((args = cmdcmp("PART", ptr))) {
@@ -543,7 +566,9 @@ do_recv()
 	} else {
 		goto rpl_error;
 	}
-	return;
+
+	if (!err)
+		return;
 
 rpl_error:
 	snprintf(errbuff, BUFFSIZE-1, "RPL ERROR: %s", recv_buff);
