@@ -19,7 +19,11 @@ char* getarg(char*);
 char* getarg_after(char**, char);
 int get_numeric_code(char**);
 int recv_join(char*, char*);
+int recv_nick(char*, char*);
+int recv_note(char*, char*);
+int recv_part(char*, char*);
 int recv_priv(char*, char*);
+int recv_quit(char*, char*);
 int send_conn(char*);
 int send_join(char*);
 int send_priv(char*);
@@ -28,8 +32,6 @@ void con_server(char*);
 void dis_server(void);
 void do_recv();
 void ins_line(char*, char*, channel*);
-void recv_part(char*, char*);
-void recv_quit(char*, char*);
 void send_part(char*);
 void send_pong(char*);
 void sendf(const char*, ...);
@@ -465,8 +467,12 @@ recv_join(char *prfx, char *mesg)
 	trimarg_after(&prfx, '!');
 
 	/* Get the channel to join */
-	if ((chan = getarg_after(&mesg, ':')) == NULL)
+	if ((chan = getarg_after(&mesg, ' ')) == NULL)
 		return 1;
+
+	/* FIXME: Stupid. ngircd uses JOIN :#channel, freenode used JOIN #channel */
+	if (*chan == ':')
+		chan++;
 
 	char buff[BUFFSIZE];
 	snprintf(buff, BUFFSIZE-1, "%s has joined %s", nick, chan);
@@ -504,56 +510,90 @@ recv_join(char *prfx, char *mesg)
 }
 
 void
-recv_quit(char *pfx, char *msg)
+
+int
+recv_nick(char *prfx, char *mesg)
 {
-	/* :nick!user@localhost.localdomain QUIT [:Optional part message] */
-	while (*pfx == ' ' || *pfx == ':')
-		pfx++;
-	while (*msg == ' ' || *msg == ':')
-		msg++;
-	char *nick = pfx;
-	while (*pfx != '!')
-		pfx++;
-	*pfx = '\0';
+	/* :nick!user@localhost.localdomain NICK rcr2 */
+
+	char *cur_nick, *new_nick;
+
+	if ((cur_nick = getarg_after(&prfx, ':')) == NULL)
+		return 1;
+	trimarg_after(&prfx, '!');
+
+	if ((new_nick = getarg_after(&mesg, ':')) == NULL)
+		return 1;
+
+	/* TODO: - change name in all channels where use is */
+	/*       - display message in those channels */
 	char buff[BUFFSIZE];
-	snprintf(buff, BUFFSIZE-1, "%s has quit (Quit: %s)", nick, msg);
-	ins_line(buff, "<", 0);
+	snprintf(buff, BUFFSIZE-1, "%s -> %s", cur_nick, new_nick);
+	ins_line(buff, "+", 0);
+
+	return 0;
 }
 
-void
-recv_part(char *pfx, char *msg)
+int
+recv_quit(char *prfx, char *mesg)
 {
-	//TODO: if no part message, display none
+	/* :nick!user@localhost.localdomain QUIT [:Optional part message] */
 
-	/* :nick!user@hostname.localdomain PART #channel [:Optional part message] */
-	while (*pfx == ' ' || *pfx == ':')
-		pfx++;
-	while (*msg == ' ' || *msg == ':')
-		msg++;
+	char *nick;
+	if ((nick = getarg_after(&prfx, ':')) == NULL)
+		return 1;
+	trimarg_after(&prfx, '!');
 
-	char *nick = pfx;
-	char *chan = msg;
-	while (*pfx++ != '!');
-	*pfx = '\0';
-	while (*msg != ' ')
-		msg++;
-	*msg++ = '\0';
-	while (*msg++ != ':');
+	/* TODO: this should be inserted into any channel where the user was... */
 
 	char buff[BUFFSIZE];
-	snprintf(buff, BUFFSIZE-1, "%s has left %s ~ (%s)", nick, chan, msg);
+	if ((mesg = getarg_after(&mesg, ':')) == NULL)
+		snprintf(buff, BUFFSIZE-1, "%s has quit", nick);
+	else
+		snprintf(buff, BUFFSIZE-1, "%s has quit (%s)", nick, mesg);
+
+	ins_line(buff, "<", 0);
+	return 0;
+}
+
+int
+recv_part(char *prfx, char *mesg)
+{
+	/* :nick!user@hostname.localdomain PART #channel [:Optional part message] */
+
+	char *nick, *chan;
+
+	if ((nick = getarg_after(&prfx, ':')) == NULL)
+		return 1;
+	trimarg_after(&prfx, '!');
+
+	if (is_me(nick))
+		return 0;
+
+	if ((chan = getarg_after(&mesg, ' ')) == NULL)
+		return 1;
+	trimarg_after(&mesg, ' ');
+
+	char buff[BUFFSIZE];
+	if ((mesg = getarg_after(&mesg, ':')) == NULL)
+		snprintf(buff, BUFFSIZE-1, "%s has left %s", nick, chan);
+	else
+		snprintf(buff, BUFFSIZE-1, "%s has left %s (%s)", nick, chan, mesg);
 
 	channel *c;
-	if ((c = get_channel(chan)) != NULL) {
+	if ((c = get_channel(chan)) != NULL)
 		ins_line(buff, "<", c);
-	} else {
-		ins_line("NO CHANNEL FOUND", 0 ,0);
+	else {
+		snprintf(errbuff, BUFFSIZE-1, "PART: channel %s not found", chan);
+		ins_line(errbuff, "ERR", 0);
 	}
+	return 0;
 }
 
 void
 do_recv()
 {
+	int err = 0;
 	char *args, *pfx = 0, *ptr = recv_buff;
 
 	if (*ptr == ':') {
@@ -589,7 +629,7 @@ do_recv()
 	} else if ((args = cmdcmp("JOIN", ptr))) {
 		err = recv_join(pfx, args);
 	} else if ((args = cmdcmp("PART", ptr))) {
-		recv_part(pfx, args);
+		err = recv_part(pfx, args);
 	} else if ((args = cmdcmp("QUIT", ptr))) {
 		err = recv_quit(pfx, args);
 	} else if ((args = cmdcmp("NOTICE", ptr))) {
@@ -599,12 +639,10 @@ do_recv()
 	} else if ((args = cmdcmp("PING", ptr))) {
 		send_pong(args);
 		/* TODO:
-	} else if ((args = cmdcmp("NICK", ptr))) {
-		recv_nick(...;
 	} else if ((args = cmdcmp("MODE", ptr))) {
 		recv_mode(...;
-	} else if ((args = cmdcmp("NOTICE", ptr))) {
-		recv_notice(...
+	} else if ((args = cmdcmp("INFO", ptr))) {
+		recv_mode(...;
 		;
 		*/
 	} else {
