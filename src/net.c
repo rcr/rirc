@@ -425,6 +425,34 @@ recv_priv(char *prfx, char *mesg)
 }
 
 int
+recv_note(char *prfx, char *mesg)
+{
+	/* :name.hostname.localdomain NOTICE <target> :Message */
+
+	char *targ;
+
+	/* Get the message target */
+	if ((targ = getarg_after(&mesg, ' ')) == NULL)
+		return 1;
+	trimarg_after(&mesg, ' ');
+
+	/* Get the message */
+	if ((mesg = getarg_after(&mesg, ':')) == NULL)
+		return 1;
+
+	if (is_me(targ)) {
+		ins_line(mesg, 0, 0);
+	} else {
+		channel *c;
+		if ((c = get_channel(targ)) != NULL)
+			ins_line(mesg, 0, c);
+		else
+			ins_line(mesg, 0, 0);
+	}
+	return 0;
+}
+
+int
 recv_join(char *prfx, char *mesg)
 {
 	/* :user!~user@localhost.localdomain JOIN :#testing */
@@ -563,7 +591,11 @@ do_recv()
 	} else if ((args = cmdcmp("PART", ptr))) {
 		recv_part(pfx, args);
 	} else if ((args = cmdcmp("QUIT", ptr))) {
-		recv_quit(pfx, args);
+		err = recv_quit(pfx, args);
+	} else if ((args = cmdcmp("NOTICE", ptr))) {
+		err = recv_note(pfx, args);
+	} else if ((args = cmdcmp("NICK", ptr))) {
+		err = recv_nick(pfx, args);
 	} else if ((args = cmdcmp("PING", ptr))) {
 		send_pong(args);
 		/* TODO:
