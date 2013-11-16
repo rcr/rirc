@@ -220,6 +220,19 @@ trimarg_after(char **arg, char c)
 	}
 }
 
+int
+is_me(char *nick)
+{
+	char *n = nick_me;
+	while (*n == *nick) {
+		if (*n == '\0')
+			return 1;
+		else
+			n++, nick++;
+	}
+	return 0;
+}
+
 channel*
 get_channel(char *chan)
 {
@@ -397,12 +410,16 @@ recv_priv(char *prfx, char *mesg)
 	if ((mesg = getarg_after(&mesg, ':')) == NULL)
 		return 1;
 
-	channel *c;
-	if ((c = get_channel(targ)) != NULL)
-		ins_line(mesg, from, c);
-	else {
-		snprintf(errbuff, BUFFSIZE-1, "PRIVMSG: target %s not found", targ);
-		ins_line(errbuff, "ERR", 0);
+	if (is_me(targ)) {
+		/* TODO: create a private chat buffer */
+	} else {
+		channel *c;
+		if ((c = get_channel(targ)) != NULL)
+			ins_line(mesg, from, c);
+		else {
+			snprintf(errbuff, BUFFSIZE-1, "PRIVMSG: target %s not found", targ);
+			ins_line(errbuff, "ERR", 0);
+		}
 	}
 	return 0;
 }
@@ -438,7 +455,8 @@ recv_join(char *pfx, char *msg)
 	snprintf(buff, BUFFSIZE-1, "%s has joined %s", nick, msg);
 
 	channel *c;
-	if (isme) {
+	if (is_me(nick)) {
+		/* Server confirmed join, create channel buffer */
 		c = malloc(sizeof(channel));
 		c->active = 0;
 		c->cur_line = 0;
