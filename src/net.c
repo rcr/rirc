@@ -12,27 +12,28 @@
 
 #define MAXCHANS 10
 
-void con_server(char*);
-void dis_server(void);
-void sendf(const char*, ...);
+channel* get_channel(char*);
 char* cmdcasecmp(char*, char*);
 char* cmdcmp(char*, char*);
-int get_numeric_code(char**);
 char* getarg(char*);
 char* getarg_after(char**, char);
-channel* get_channel(char*);
-int send_priv(char*);
-void send_pong(char*);
+int get_numeric_code(char**);
+int recv_join(char*, char*);
+int recv_priv(char*, char*);
 int send_conn(char*);
 int send_join(char*);
+int send_priv(char*);
 void close_channel(char*);
-void send_part(char*);
-void ins_line(char*, char*, channel*);
-void recv_priv(char*, char*);
-void recv_join(char*, char*);
-void recv_quit(char*, char*);
-void recv_part(char*, char*);
+void con_server(char*);
+void dis_server(void);
 void do_recv();
+void ins_line(char*, char*, channel*);
+void recv_part(char*, char*);
+void recv_quit(char*, char*);
+void send_part(char*);
+void send_pong(char*);
+void sendf(const char*, ...);
+void trimarg_after(char**, char);
 
 char sendbuff[BUFFSIZE];
 
@@ -71,11 +72,10 @@ void
 channel_sw(int next)
 {
 	channel *tmp = ccur;
-	if (next) {
+	if (next)
 		ccur = ccur->next;
-	} else {
+	else
 		ccur = ccur->prev;
-	}
 	if (tmp != ccur)
 		draw_full();
 }
@@ -472,12 +472,13 @@ recv_join(char *prfx, char *mesg)
 			ins_line(errbuff, "ERR", 0);
 		}
 	}
+	return 0;
 }
 
 void
 recv_quit(char *pfx, char *msg)
 {
-	/* :user!user@localhost.localdomain QUIT :Gone to have lunch */
+	/* :nick!user@localhost.localdomain QUIT [:Optional part message] */
 	while (*pfx == ' ' || *pfx == ':')
 		pfx++;
 	while (*msg == ' ' || *msg == ':')
@@ -495,6 +496,8 @@ void
 recv_part(char *pfx, char *msg)
 {
 	//TODO: if no part message, display none
+
+	/* :nick!user@hostname.localdomain PART #channel [:Optional part message] */
 	while (*pfx == ' ' || *pfx == ':')
 		pfx++;
 	while (*msg == ' ' || *msg == ':')
@@ -556,7 +559,7 @@ do_recv()
 	} else if ((args = cmdcmp("PRIVMSG", ptr))) {
 		err = recv_priv(pfx, args);
 	} else if ((args = cmdcmp("JOIN", ptr))) {
-		recv_join(pfx, args);
+		err = recv_join(pfx, args);
 	} else if ((args = cmdcmp("PART", ptr))) {
 		recv_part(pfx, args);
 	} else if ((args = cmdcmp("QUIT", ptr))) {
