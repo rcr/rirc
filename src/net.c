@@ -37,8 +37,8 @@ void do_recv();
 char sendbuff[BUFFSIZE];
 
 /* Config Stuff */
-char nick[] = "rirctest";
-char user[] = "rirctest";
+char nick_me[] = "r18449";
+char user_me[] = "r18449";
 char realname[] = "Richard Robbins";
 
 int soc;
@@ -103,8 +103,8 @@ con_server(char *hostname)
 	if (connect(soc, (struct sockaddr *) &server, sizeof(server)) < 0)
 		fatal("connect");
 	else {
-		sendf("NICK %s\r\n", nick);
-		sendf("USER %s 8 * :%s\r\n", user, realname);
+		sendf("NICK %s\r\n", nick_me);
+		sendf("USER %s 8 * :%s\r\n", user_me, realname);
 	}
 	strncpy(rirc.name, hostname, 50), draw_chans();
 	connected = 1;
@@ -253,7 +253,7 @@ send_priv(char *ptr)
 	if (ccur == &rirc) {
 		ins_line("This is not a channel!", "-!!-", 0);
 	} else {
-		ins_line(ptr, nick, ccur);
+		ins_line(ptr, nick_me, ccur);
 		sendf("PRIVMSG %s :%s\r\n", ccur->name, ptr);
 	}
 	return 0;
@@ -424,35 +424,24 @@ recv_priv(char *prfx, char *mesg)
 	return 0;
 }
 
-void
-recv_join(char *pfx, char *msg)
+int
+recv_join(char *prfx, char *mesg)
 {
 	/* :user!~user@localhost.localdomain JOIN :#testing */
 
-	while (*pfx == ' ' || *pfx == ':')
-		pfx++;
-	while (*msg == ' ' || *msg == ':')
-		msg++;
-	
-	/* compare to nick */
-	char *p = pfx;
-	char *n = nick;
-	int isme = 0;
-	while (*p == *n) {
-		p++, n++;
-		if (*p == '!' && *n == '\0') {
-			isme = 1;
-			break;
-		} else if (*n == '\0') {
-			break;
-		}
-	}
+	char *nick, *chan;
+
+	/* Get the joining nick */
+	if ((nick = getarg_after(&prfx, ':')) == NULL)
+		return 1;
+	trimarg_after(&prfx, '!');
+
+	/* Get the channel to join */
+	if ((chan = getarg_after(&mesg, ':')) == NULL)
+		return 1;
+
 	char buff[BUFFSIZE];
-	char *nick = pfx;
-	while (*pfx != '!')
-		pfx++;
-	*pfx = '\0';
-	snprintf(buff, BUFFSIZE-1, "%s has joined %s", nick, msg);
+	snprintf(buff, BUFFSIZE-1, "%s has joined %s", nick, chan);
 
 	channel *c;
 	if (is_me(nick)) {
@@ -463,8 +452,9 @@ recv_join(char *pfx, char *msg)
 		c->nick_pad = 0;
 		c->connected = 1;
 		memset(c->chat, 0, sizeof(c->chat));
-		strncpy(c->name, msg, 50);
+		strncpy(c->name, chan, 50);
 
+		/* Insert into linked list */
 		c->next = ccur->next;
 		c->prev = ccur;
 		ccur->next->prev = c;
@@ -475,10 +465,11 @@ recv_join(char *pfx, char *msg)
 
 		draw_full();
 	} else {
-		if ((c = get_channel(msg)) != NULL) {
+		if ((c = get_channel(chan)) != NULL)
 			ins_line(buff, ">", c);
-		} else {
-			ins_line("NO CHANNEL FOUND", 0 ,0);
+		else {
+			snprintf(errbuff, BUFFSIZE-1, "JOIN: channel %s not found", chan);
+			ins_line(errbuff, "ERR", 0);
 		}
 	}
 }
