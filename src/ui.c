@@ -21,7 +21,7 @@ struct winsize w;
 int tw = 0;  /* text width */
 int nlw = 3; /* nicklist width */
 
-int nick_cols[] = {20, 51, 216, 83, 103, 115, 163, 193};
+int nick_cols[] = {1, 2, 3, 4, 5, 6, 7, 8, 9};
 
 void
 resize(void)
@@ -47,7 +47,7 @@ draw_full(void)
 {
 	draw_chans();
 	draw_chat();
-	/* TODO: redraw input bar */
+	draw_input();
 }
 
 void
@@ -174,13 +174,25 @@ print_more(char *start, char *end, int row)
 }
 
 void
-draw_input(char *text, int ptr1, int ptr2)
+draw_input(void)
 {
-	int p;
+	int winsz = w.ws_col / 3;
+
+	if (inp1 - window > (w.ws_col - 6))
+		window += winsz;
+	else if (inp1 == window - 1)
+		window -= (winsz > window) ? window : winsz;
+
 	printf(C(239)"\x1b[%d;6H\x1b[K"C(250), w.ws_row);
-	for (p = 0; p < ptr1; p++)
-		putchar(text[p]);
-	for (p = ptr2; p < MAXINPUT-1; p++)
-		putchar(text[p]);
-	printf("\x1b[%d;%dH", w.ws_row, ptr1+6);
+
+	int p = window;
+	while (p < inp1)
+		putchar(input_bar[p++]);
+
+	p = inp2;
+	int num = w.ws_col - inp1 + window - 5;
+	while (num-- > 0 && p < MAXINPUT-1)
+		putchar(input_bar[p++]);
+
+	printf("\x1b[%d;%dH", w.ws_row, inp1 - window + 6);
 }

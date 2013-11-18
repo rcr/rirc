@@ -2,11 +2,8 @@
 
 #include "common.h"
 
-#define SENDBUFF MAXINPUT+3 /* Allow room for \r\n\0 */
-
-char text[SENDBUFF];
-int ptr1 = 0;
-int ptr2 = MAXINPUT-1;
+int inp1 = 0;
+int inp2 = MAXINPUT-1;
 
 void cur_lr(int);
 void del_char(int);
@@ -17,26 +14,26 @@ int esccmp(char*, char*);
 void
 ins_char(char c)
 {
-	if (ptr1 < ptr2)
-		text[ptr1++] = c;
+	if (inp1 < inp2)
+		input_bar[inp1++] = c;
 }
 
 void
 del_char(int left)
 {
-	if (left && ptr1 > 0)
-		ptr1--;
-	else if (!left && ptr2 < MAXINPUT-1)
-		ptr2++;
+	if (left && inp1 > 0)
+		inp1--;
+	else if (!left && inp2 < MAXINPUT-1)
+		inp2++;
 }
 
 void
 cur_lr(int left)
 {
-	if (left && ptr1 > 0)
-		text[--ptr2] = text[--ptr1];
-	else if (!left && ptr2 < MAXINPUT-1)
-		text[++ptr1] = text[++ptr2];
+	if (left && inp1 > 0)
+		input_bar[--inp2] = input_bar[--inp1];
+	else if (!left && inp2 < MAXINPUT-1)
+		input_bar[++inp1] = input_bar[++inp2];
 }
 
 int
@@ -50,14 +47,15 @@ esccmp(char *esc, char *inp)
 void
 ready_send()
 {
-	if (ptr1 == 0)
+	if (inp1 == 0)
 		return;
-	while (ptr2 < MAXINPUT-1)
-		text[ptr1++] = text[ptr2++];
-	text[ptr1] = '\0';
-	send_msg(text, ptr1-1);
-	ptr1 = 0;
-	ptr2 = MAXINPUT-1;
+	while (inp2 < MAXINPUT-1)
+		input_bar[inp1++] = input_bar[inp2++];
+	input_bar[inp1] = '\0';
+	send_msg(input_bar, inp1-1);
+	window = 0;
+	inp1 = 0;
+	inp2 = MAXINPUT-1;
 }
 
 void
@@ -86,5 +84,5 @@ input(char *inp, int count)
 	} /* else {
 		paste
 	} */
-	draw_input(text, ptr1, ptr2);
+	draw_input();
 }
