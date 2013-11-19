@@ -26,7 +26,7 @@ int recv_priv(char*, char*);
 int recv_quit(char*, char*);
 int send_conn(char*);
 int send_join(char*);
-int send_priv(char*);
+int send_priv(char*, int);
 void close_channel(char*);
 void con_server(char*);
 void dis_server(void);
@@ -249,14 +249,51 @@ get_channel(char *chan)
 /* end utils */
 
 int
-send_priv(char *ptr)
+send_priv(char *mesg, int to_chan)
 {
-	/* TODO: - /msg (target) or if target non-blank*/
-	if (ccur == &rirc) {
-		ins_line("This is not a channel!", "-!!-", 0);
+	if (to_chan) {
+		if (ccur == &rirc)
+			ins_line("This is not a channel!", "-!!-", 0);
+		else {
+			ins_line(mesg, nick_me, ccur);
+			sendf("PRIVMSG %s :%s\r\n", ccur->name, mesg);
+		}
 	} else {
-		ins_line(ptr, nick_me, ccur);
-		sendf("PRIVMSG %s :%s\r\n", ccur->name, ptr);
+		/* TODO: the parsing logic here can be simplified and combined 
+		 * with getarg */
+		char *targ;
+		if ((targ = getarg_after(&mesg, ' ')) == NULL)
+			return 1;
+		trimarg_after(&mesg, ' ');
+		while (*mesg == ' ' && *mesg != '\0')
+			mesg++;
+		if (*mesg == '\0')
+			return 1;
+
+		channel *c;
+		if ((c = get_channel(targ)) != NULL) {
+			ins_line(mesg, nick_me, c);
+		} else {
+			/* new channel */
+			c = malloc(sizeof(channel));
+			c->active = 0;
+			c->cur_line = 0;
+			c->nick_pad = 0;
+			c->connected = 1;
+			memset(c->chat, 0, sizeof(c->chat));
+			strncpy(c->name, targ, 50);
+
+			/* Insert into linked list */
+			c->next = ccur->next;
+			c->prev = ccur;
+			ccur->next->prev = c;
+			ccur->next = c;
+
+			ccur = c;
+			ins_line(mesg, nick_me, c);
+			draw_full();
+		}
+		sendf("PRIVMSG %s :%s\r\n", targ, mesg);
 	}
 	return 0;
 }
@@ -320,7 +357,7 @@ send_msg(char *msg, int count)
 	int err = 0;
 	/* 512 bytes: Max IRC msg length */
 	if (*msg != '/') {
-		err = send_priv(msg);
+		err = send_priv(msg, 1);
 	} else if ((ptr = cmdcasecmp("JOIN", ++msg))) {
 		err = send_join(ptr);
 	} else if ((ptr = cmdcasecmp("CONNECT", msg))) {
@@ -335,7 +372,7 @@ send_msg(char *msg, int count)
 		dis_server();
 		run = 0;
 	} else if ((ptr = cmdcasecmp("MSG", msg))) {
-		err = send_priv(ptr);
+		err = send_priv(ptr, 0);
 	} else {
 		snprintf(errbuff, BUFFSIZE-1, "Unknown command: %.*s%s",
 				15, msg, count > 15 ? "..." : "");
@@ -412,10 +449,52 @@ recv_priv(char *prfx, char *mesg)
 	if ((mesg = getarg_after(&mesg, ':')) == NULL)
 		return 1;
 
+	// line_t type = DEFAULT;
+
+	/* Check for markup */
+	if (*mesg == 0x01) {
+
+		char *ptr;
+		if ((ptr = getarg_after(&mesg, 0x01)) == NULL)
+			return 1;
+		trimarg_after(&mesg, ' ');
+
+		if (cmdcmp("ACTION", ptr)) {
+			// type = ACTION;
+			/* TODO: ine_line(buff, from, chanel, line_t type) */
+			/* strip terminating 0x01 */
+			char test[BUFFSIZE];
+			snprintf(test, BUFFSIZE-1, "%s %s", from, mesg);
+			ins_line(test, "*", 0);
+		} else {
+			return 1;
+		}
+	}
+
+	channel *c;
 	if (is_me(targ)) {
-		/* TODO: create a private chat buffer */
+		/* Private message, */
+		if ((c = get_channel(from)) != NULL)
+			ins_line(mesg, from, c);
+		else {
+			c = malloc(sizeof(channel));
+			c->active = 0;
+			c->cur_line = 0;
+			c->nick_pad = 0;
+			c->connected = 1;
+			memset(c->chat, 0, sizeof(c->chat));
+			strncpy(c->name, from, 50);
+
+			/* Insert into linked list */
+			c->next = ccur->next;
+			c->prev = ccur;
+			ccur->next->prev = c;
+			ccur->next = c;
+
+			ins_line(mesg, from, c);
+			draw_chans();
+		}
 	} else {
-		channel *c;
 		if ((c = get_channel(targ)) != NULL)
 			ins_line(mesg, from, c);
 		else {
