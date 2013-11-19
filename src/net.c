@@ -29,8 +29,8 @@ int send_join(char*);
 int send_priv(char*, int);
 void close_channel(char*);
 void con_server(char*);
-void dis_server(void);
-void do_recv();
+void dis_server(int);
+void do_recv(void);
 void ins_line(char*, char*, channel*);
 void send_part(char*);
 void send_pong(char*);
@@ -63,7 +63,7 @@ channel rirc = {
 };
 
 void
-init_chans()
+init_chans(void)
 {
 	ccur = &rirc;
 	ccur->next = &rirc;
@@ -113,9 +113,11 @@ con_server(char *hostname)
 }
 
 void
-dis_server(void)
+dis_server(int kill)
 {
-	if (!connected) {
+	if (kill) {
+		run = 0;
+	} else if (!connected) {
 		ins_line("Not connected", "-!!-", ccur);
 	} else {
 		sendf("QUIT :Quitting!\r\n");
@@ -194,13 +196,14 @@ getarg_after(char **p, char c)
 
 	while (*ptr != c && *ptr != '\0')
 		ptr++;
+	while (*ptr == c && *ptr != '\0')
+		ptr++;
+	*p = ptr;
 
 	if (*ptr == '\0')
 		return NULL;
-	else {
-		*p = ++ptr;
+	else
 		return ptr;
-	}
 }
 
 
@@ -363,26 +366,25 @@ send_msg(char *msg, int count)
 	} else if ((ptr = cmdcasecmp("CONNECT", msg))) {
 		err = send_conn(ptr);
 	} else if ((ptr = cmdcasecmp("DISCONNECT", msg))) {
-		dis_server();
+		dis_server(0);
 	} else if ((ptr = cmdcasecmp("CLOSE", msg))) {
 		close_channel(msg);
 	} else if ((ptr = cmdcasecmp("PART", msg))) {
 		send_part(msg);
 	} else if ((ptr = cmdcasecmp("QUIT", msg))) {
-		dis_server();
-		run = 0;
+		dis_server(1);
 	} else if ((ptr = cmdcasecmp("MSG", msg))) {
 		err = send_priv(ptr, 0);
 	} else {
 		snprintf(errbuff, BUFFSIZE-1, "Unknown command: %.*s%s",
 				15, msg, count > 15 ? "..." : "");
-		ins_line(errbuff, 0, 0);
+		ins_line(errbuff, "-!!-", ccur);
 		return;
 	}
 	if (err == 1)
-		ins_line("Insufficient arguments", 0, 0);
+		ins_line("Insufficient arguments", "-!!-", ccur);
 	if (err == 2)
-		ins_line("Incorrect arguments", 0, 0);
+		ins_line("Incorrect arguments", "-!!-", ccur);
 }
 
 void
@@ -670,7 +672,7 @@ recv_part(char *prfx, char *mesg)
 }
 
 void
-do_recv()
+do_recv(void)
 {
 	int err = 0;
 	char *args, *pfx = 0, *ptr = recv_buff;
