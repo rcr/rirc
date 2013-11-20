@@ -191,20 +191,19 @@ getarg(char *ptr)
 }
 
 char*
-getarg_after(char **p, char c)
+getarg_after(char **p1, char c)
 {
-	char *ptr = *p;
+	char *p2 = *p1;
+	while (*p2 != c && *p2 != '\0')
+		p2++;
+	while (*p2 == c && *p2 != '\0')
+		p2++;
+	*p1 = p2;
 
-	while (*ptr != c && *ptr != '\0')
-		ptr++;
-	while (*ptr == c && *ptr != '\0')
-		ptr++;
-	*p = ptr;
-
-	if (*ptr == '\0')
+	if (*p1 == '\0')
 		return NULL;
 	else
-		return ptr;
+		return p2;
 }
 
 
