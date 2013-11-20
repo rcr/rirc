@@ -13,6 +13,7 @@
 #define MAXCHANS 10
 
 channel* get_channel(char*);
+channel* new_channel(char*);
 char* cmdcasecmp(char*, char*);
 char* cmdcmp(char*, char*);
 char* getarg(char*);
@@ -225,6 +226,29 @@ trimarg_after(char **arg, char c)
 	}
 }
 
+channel*
+new_channel(char *name)
+{
+	/* TODO: track channel count */
+	channel *c;
+	if ((c = malloc(sizeof(channel))) == NULL)
+		fatal("new_channel");
+	c->active = 0;
+	c->cur_line = 0;
+	c->nick_pad = 0;
+	c->connected = 1;
+	memset(c->chat, 0, sizeof(c->chat));
+	strncpy(c->name, name, 50);
+
+	/* Insert into linked list */
+	c->next = ccur->next;
+	c->prev = ccur;
+	ccur->next->prev = c;
+	ccur->next = c;
+
+	return c;
+}
+
 int
 is_me(char *nick)
 {
@@ -274,28 +298,13 @@ send_priv(char *mesg, int to_chan)
 			return 1;
 
 		channel *c;
-		if ((c = get_channel(targ)) != NULL) {
-			ins_line(mesg, nick_me, c);
-		} else {
-			/* new channel */
-			c = malloc(sizeof(channel));
-			c->active = 0;
-			c->cur_line = 0;
-			c->nick_pad = 0;
-			c->connected = 1;
-			memset(c->chat, 0, sizeof(c->chat));
-			strncpy(c->name, targ, 50);
-
-			/* Insert into linked list */
-			c->next = ccur->next;
-			c->prev = ccur;
-			ccur->next->prev = c;
-			ccur->next = c;
-
+		if ((c = get_channel(targ)) == NULL)
+			ccur = new_channel(targ);
+		else
 			ccur = c;
-			ins_line(mesg, nick_me, c);
-			draw_full();
-		}
+		ins_line(mesg, nick_me, ccur);
+		draw_full();
+
 		sendf("PRIVMSG %s :%s\r\n", targ, mesg);
 	}
 	return 0;
@@ -476,26 +485,10 @@ recv_priv(char *prfx, char *mesg)
 	channel *c;
 	if (is_me(targ)) {
 		/* Private message, */
-		if ((c = get_channel(from)) != NULL)
-			ins_line(mesg, from, c);
-		else {
-			c = malloc(sizeof(channel));
-			c->active = 0;
-			c->cur_line = 0;
-			c->nick_pad = 0;
-			c->connected = 1;
-			memset(c->chat, 0, sizeof(c->chat));
-			strncpy(c->name, from, 50);
-
-			/* Insert into linked list */
-			c->next = ccur->next;
-			c->prev = ccur;
-			ccur->next->prev = c;
-			ccur->next = c;
-
-			ins_line(mesg, from, c);
-			draw_chans();
-		}
+		if ((c = get_channel(from)) == NULL)
+			c = new_channel(from);
+		ins_line(mesg, from, c);
+		draw_chans();
 	} else {
 		if ((c = get_channel(targ)) != NULL)
 			ins_line(mesg, from, c);
@@ -558,28 +551,12 @@ recv_join(char *prfx, char *mesg)
 	char buff[BUFFSIZE];
 	snprintf(buff, BUFFSIZE-1, "%s has joined %s", nick, chan);
 
-	channel *c;
 	if (is_me(nick)) {
-		/* Server confirmed join, create channel buffer */
-		c = malloc(sizeof(channel));
-		c->active = 0;
-		c->cur_line = 0;
-		c->nick_pad = 0;
-		c->connected = 1;
-		memset(c->chat, 0, sizeof(c->chat));
-		strncpy(c->name, chan, 50);
-
-		/* Insert into linked list */
-		c->next = ccur->next;
-		c->prev = ccur;
-		ccur->next->prev = c;
-		ccur->next = c;
-
-		ccur = c;
-		ins_line(buff, ">", c);
-
+		ccur = new_channel(chan);
+		ins_line(buff, ">", ccur);
 		draw_full();
 	} else {
+		channel *c;
 		if ((c = get_channel(chan)) != NULL)
 			ins_line(buff, ">", c);
 		else {
