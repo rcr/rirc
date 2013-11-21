@@ -33,7 +33,7 @@ cur_lr(int left)
 	if (left && inp1 > 0)
 		input_bar[--inp2] = input_bar[--inp1];
 	else if (!left && inp2 < MAXINPUT-1)
-		input_bar[++inp1] = input_bar[++inp2];
+		input_bar[inp1++] = input_bar[inp2++];
 }
 
 int
