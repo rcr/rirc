@@ -139,8 +139,8 @@ sendf(const char *fmt, ...)
 {
 	va_list args;
 	va_start(args, fmt);
-	vsnprintf(sendbuff, BUFFSIZE - 1, fmt, args);
-	send(soc, sendbuff, strlen(sendbuff), 0);
+	int c = vsnprintf(sendbuff, BUFFSIZE-1, fmt, args);
+	send(soc, sendbuff, c, 0);
 	va_end(args);
 }
 
