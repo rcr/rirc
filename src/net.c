@@ -32,13 +32,12 @@ void close_channel(char*);
 void con_server(char*);
 void dis_server(int);
 void do_recv(void);
-void ins_line(char*, char*, channel*);
+void newline(channel*, line_t, char*, char*, int);
+void newlinef(channel*, line_t, char*, char*, ...);
 void send_part(char*);
 void send_pong(char*);
 void sendf(const char*, ...);
 void trimarg_after(char**, char);
-
-char sendbuff[BUFFSIZE];
 
 /* Config Stuff */
 char nick_me[] = "r18449";
@@ -119,14 +118,14 @@ dis_server(int kill)
 	if (kill) {
 		run = 0;
 	} else if (!connected) {
-		ins_line("Not connected", "-!!-", ccur);
+		newline(ccur, DEFAULT, "-!!-", "Not connected", 0);
 	} else {
 		sendf("QUIT :Quitting!\r\n");
 		close(soc); /* wait for reply before closing? */
 		strcpy(rirc.name, "rirc"), draw_chans();
 		channel *c = &rirc;
 		do {
-			ins_line("(disconnected)", "-!!-", c);
+			newline(c, DEFAULT, "-!!-", "(disconnected)", 0);
 			c = c->next;
 		} while (c != &rirc);
 		connected = 0;
@@ -139,8 +138,9 @@ sendf(const char *fmt, ...)
 {
 	va_list args;
 	va_start(args, fmt);
-	int c = vsnprintf(sendbuff, BUFFSIZE-1, fmt, args);
-	send(soc, sendbuff, c, 0);
+	char buff[BUFFSIZE];
+	int len = vsnprintf(buff, BUFFSIZE-1, fmt, args);
+	send(soc, buff, len, 0);
 	va_end(args);
 }
 
@@ -279,9 +279,9 @@ send_priv(char *mesg, int to_chan)
 {
 	if (to_chan) {
 		if (ccur == &rirc)
-			ins_line("This is not a channel!", "-!!-", 0);
+			newline(0, DEFAULT, "-!!-", "This is not a channel!", 0);
 		else {
-			ins_line(mesg, nick_me, ccur);
+			newline(ccur, DEFAULT, nick_me, mesg, 0);
 			sendf("PRIVMSG %s :%s\r\n", ccur->name, mesg);
 		}
 	} else {
@@ -301,7 +301,7 @@ send_priv(char *mesg, int to_chan)
 			ccur = new_channel(targ);
 		else
 			ccur = c;
-		ins_line(mesg, nick_me, ccur);
+		newline(ccur, DEFAULT, nick_me, mesg, 0);
 		draw_full();
 
 		sendf("PRIVMSG %s :%s\r\n", targ, mesg);
@@ -337,7 +337,7 @@ void
 close_channel(char *ptr)
 {
 	if (ccur == &rirc)
-		ins_line("Cannot execute 'close' on server buffer", "-!!-", &rirc);
+		newline(0, DEFAULT, "-!!-", "Cannot execute 'close' on server", 0);
 	else {
 		sendf("PART %s\r\n", ccur->name);
 		channel *c = ccur;
@@ -353,11 +353,11 @@ void
 send_part(char *ptr)
 {
 	if (ccur == &rirc)
-		ins_line("Cannot execute 'part' on server buffer", "-!!-", &rirc);
+		newline(0, DEFAULT, "-!!-", "Cannot execute 'part' on server", 0);
 	else {
-		ins_line("(disconnected)", "", ccur);
-		ccur->connected = 0;
+		newline(ccur, DEFAULT, "", "(disconnected)", 0);
 		sendf("PART %s\r\n", ccur->name);
+		ccur->connected = 0;
 	}
 }
 
@@ -384,58 +384,75 @@ send_msg(char *msg, int count)
 	} else if ((ptr = cmdcasecmp("MSG", msg))) {
 		err = send_priv(ptr, 0);
 	} else {
-		snprintf(errbuff, BUFFSIZE-1, "Unknown command: %.*s%s",
+		newlinef(ccur, DEFAULT, "-!!-", "Unknown command: %.*s%s",
 				15, msg, count > 15 ? "..." : "");
-		ins_line(errbuff, "-!!-", ccur);
 		return;
 	}
 	if (err == 1)
-		ins_line("Insufficient arguments", "-!!-", ccur);
+		newline(ccur, DEFAULT, "-!!-", "Insufficient arguments", 0);
 	if (err == 2)
-		ins_line("Incorrect arguments", "-!!-", ccur);
+		newline(ccur, DEFAULT, "-!!-", "Incorrect arguments", 0);
 }
 
+
+/* not even really needed, just check if args are null? */
 void
-ins_line(char *inp, char *from, channel *chan)
+newline(channel *c, line_t type, char *from, char *mesg, int len)
 {
 	if (!connected) {
 		from = "-!!-";
-		inp = "You are not connected to a server";
+		mesg = "You are not connected to a server";
+		len = strlen(mesg);
 	}
 
-	if (chan == 0)
-		chan = &rirc;
+	if (len == 0)
+		len = strlen(mesg);
+
+	if (c == 0)
+		c = &rirc;
 
 	struct line *l;
-	l = &chan->chat[chan->cur_line];
+	l = &c->chat[c->cur_line];
 
 	if (l->len)
 		free(l->text);
 
-	l->len = strlen(inp);
-	l->text = malloc(l->len);
-	memcpy(l->text, inp, l->len);
+	l->len = len;
+	l->text = malloc(len);
+	memcpy(l->text, mesg, len);
 
 	time(&raw_t);
 	t = localtime(&raw_t);
 	l->time_h = t->tm_hour;
 	l->time_m = t->tm_min;
 
+	l->type = type;
+
 	if (!from) /* Server message */
-		strncpy(l->from, chan->name, 50);
+		strncpy(l->from, c->name, 50);
 	else
 		strncpy(l->from, from, 50);
 
-	int len;
-	if ((len = strlen(l->from)) > chan->nick_pad)
-		chan->nick_pad = len;
+	int len_from;
+	if ((len_from = strlen(l->from)) > c->nick_pad)
+		c->nick_pad = len_from;
 
-	chan->cur_line++;
-	chan->cur_line %= SCROLLBACK;
+	c->cur_line++;
+	c->cur_line %= SCROLLBACK;
 
-	if (chan == ccur) {
+	if (c == ccur)
 		draw_chat();
-	}
+}
+
+void
+newlinef(channel *c, line_t type, char *from, char *fmt, ...)
+{
+	va_list args;
+	va_start(args, fmt);
+	char buff[BUFFSIZE];
+	int len = vsnprintf(buff, BUFFSIZE-1, fmt, args);
+	newline(c, type, from, buff, len);
+	va_end(args);
 }
 
 int
@@ -473,9 +490,7 @@ recv_priv(char *prfx, char *mesg)
 			// type = ACTION;
 			/* TODO: ine_line(buff, from, chanel, line_t type) */
 			/* strip terminating 0x01 */
-			char test[BUFFSIZE];
-			snprintf(test, BUFFSIZE-1, "%s %s", from, mesg);
-			ins_line(test, "*", 0);
+			newlinef(0, DEFAULT, "*", "%s %s", from, mesg);
 		} else {
 			return 1;
 		}
@@ -486,15 +501,13 @@ recv_priv(char *prfx, char *mesg)
 		/* Private message, */
 		if ((c = get_channel(from)) == NULL)
 			c = new_channel(from);
-		ins_line(mesg, from, c);
+		newline(c, DEFAULT, from, mesg, 0);
 		draw_chans();
 	} else {
 		if ((c = get_channel(targ)) != NULL)
-			ins_line(mesg, from, c);
-		else {
-			snprintf(errbuff, BUFFSIZE-1, "PRIVMSG: target %s not found", targ);
-			ins_line(errbuff, "ERR", 0);
-		}
+			newline(c, DEFAULT, from, mesg, 0);
+		else
+			newlinef(0, DEFAULT, "ERR", "PRIVMSG: target %s not found", targ);
 	}
 	return 0;
 }
@@ -516,13 +529,13 @@ recv_note(char *prfx, char *mesg)
 		return 1;
 
 	if (is_me(targ)) {
-		ins_line(mesg, 0, 0);
+		newline(0, DEFAULT, 0, mesg, 0);
 	} else {
 		channel *c;
 		if ((c = get_channel(targ)) != NULL)
-			ins_line(mesg, 0, c);
+			newline(c, DEFAULT, 0, mesg, 0);
 		else
-			ins_line(mesg, 0, 0);
+			newline(0, DEFAULT, 0, mesg, 0);
 	}
 	return 0;
 }
@@ -584,9 +597,7 @@ recv_nick(char *prfx, char *mesg)
 
 	/* TODO: - change name in all channels where use is */
 	/*       - display message in those channels */
-	char buff[BUFFSIZE];
-	snprintf(buff, BUFFSIZE-1, "%s -> %s", cur_nick, new_nick);
-	ins_line(buff, "+", 0);
+	newlinef(0, NICK, "", "NICK: %s -> %s", cur_nick, new_nick);
 
 	return 0;
 }
@@ -603,13 +614,11 @@ recv_quit(char *prfx, char *mesg)
 
 	/* TODO: this should be inserted into any channel where the user was... */
 
-	char buff[BUFFSIZE];
 	if ((mesg = getarg_after(&mesg, ':')) == NULL)
-		snprintf(buff, BUFFSIZE-1, "%s has quit", nick);
+		newlinef(0, JOINPART, "<", "%s has quit", nick);
 	else
-		snprintf(buff, BUFFSIZE-1, "%s has quit (%s)", nick, mesg);
+		newlinef(0, JOINPART, "<", "%s has quit (%s)", nick, mesg);
 
-	ins_line(buff, "<", 0);
 	return 0;
 }
 
@@ -631,19 +640,15 @@ recv_part(char *prfx, char *mesg)
 		return 1;
 	trimarg_after(&mesg, ' ');
 
-	char buff[BUFFSIZE];
-	if ((mesg = getarg_after(&mesg, ':')) == NULL)
-		snprintf(buff, BUFFSIZE-1, "%s has left %s", nick, chan);
-	else
-		snprintf(buff, BUFFSIZE-1, "%s has left %s (%s)", nick, chan, mesg);
-
 	channel *c;
 	if ((c = get_channel(chan)) != NULL)
-		ins_line(buff, "<", c);
-	else {
-		snprintf(errbuff, BUFFSIZE-1, "PART: channel %s not found", chan);
-		ins_line(errbuff, "ERR", 0);
-	}
+		if ((mesg = getarg_after(&mesg, ':')) == NULL)
+			newlinef(c, JOINPART, "<", "%s has left %s", nick, chan);
+		else
+			newlinef(c, JOINPART, "<", "%s has left %s (%s)", nick, chan, mesg);
+	else
+		newlinef(0, JOINPART, "<", "PART: channel %s not found", chan);
+
 	return 0;
 }
 
@@ -673,11 +678,11 @@ do_recv(void)
 		if (!code) {
 			goto rpl_error;
 		} else if (code < 200) {
-			ins_line(ptr, "CON", 0);
+			newline(0, NUMRPL, "CON", ptr, 0);
 		} else if (code < 400) {
-			ins_line(ptr, "INFO", 0);
+			newline(0, NUMRPL, "INFO", ptr, 0);
 		} else if (code < 600) {
-			ins_line(ptr, "ERROR", 0);
+			newline(0, NUMRPL, "ERROR", ptr, 0);
 		} else {
 			goto rpl_error;
 		}
@@ -710,8 +715,7 @@ do_recv(void)
 		return;
 
 rpl_error:
-	snprintf(errbuff, BUFFSIZE-1, "RPL ERROR: %s", recv_buff);
-	ins_line(errbuff, 0, &rirc);
+	newlinef(0, DEFAULT, 0, "RPL ERROR: %s", recv_buff);
 }
 
 void

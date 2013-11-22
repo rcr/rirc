@@ -3,9 +3,7 @@
 #define SCROLLBACK 300
 #define SENDBUFF MAXINPUT + 3
 
-char errbuff[BUFFSIZE];
-
-typedef enum {DEFAULT, JOINPART, ACTION} line_t;
+typedef enum {DEFAULT, JOINPART, NICK, ACTION, NUMRPL} line_t;
 
 /* rirc.c */
 void fatal(char*);
