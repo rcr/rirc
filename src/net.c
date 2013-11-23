@@ -208,21 +208,17 @@ getarg_after(char **p1, char c)
 
 
 void
-trimarg_after(char **arg, char c)
+trimarg_after(char **p1, char c)
 {
-	char *p = *arg;
-	for (;;) {
-		if (*p == '\0') {
-			*arg = p;
-			break;
-		} else if (*p == c) {
-			*p = '\0';
-			*arg = (p + 1);
-			break;
-		} else {
-			p++;
-		}
-	}
+	char *p2 = *p1;
+
+	while (*p2 != c && *p2 != '\0')
+		p2++;
+
+	if (*p2 != '\0')
+		*p2++ = '\0';
+
+	*p1 = p2;
 }
 
 channel*
