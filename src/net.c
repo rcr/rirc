@@ -181,13 +181,13 @@ get_numeric_code(char **c)
 char*
 getarg(char *ptr)
 {
-	while (*ptr == ' ')
+	while (*ptr == ' ' && *ptr != '\0')
 		ptr++;
 
-	if (*ptr != '\0')
-		return ptr;
-	else
+	if (*ptr == '\0')
 		return NULL;
+	else
+		return ptr;
 }
 
 char*
