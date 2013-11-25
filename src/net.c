@@ -719,14 +719,14 @@ recv_msg(char *input, int count)
 {
 	while (count-- > 0) {
 
-		if (recv_i < recv_buff + BUFFSIZE)
+		if (recv_i < recv_buff + BUFFSIZE && *input != '\n')
 			*recv_i++ = *input;
 
 		input++;
-		if (*input == '\r' && *(input + 1) == '\n') {
+		if (*input == '\r') {
 			*recv_i = '\0';
-			input += 2;
-			count -= 2;
+			input++;
+			count--;
 			do_recv();
 			recv_i = recv_buff;
 		}
