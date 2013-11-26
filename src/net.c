@@ -90,8 +90,11 @@ con_server(char *hostname)
 
 	struct hostent *host;
 	struct in_addr h_addr;
-	if ((host = gethostbyname(hostname)) == NULL)
-		fatal("nslookup");
+	if ((host = gethostbyname(hostname)) == NULL) {
+		newlinef(0, NOCHECK, "-!!-", "Error while resolving: %s", hostname);
+		return;
+	}
+
 	h_addr.s_addr = *((unsigned long *) host->h_addr_list[0]);
 
 	struct sockaddr_in server;
@@ -102,10 +105,11 @@ con_server(char *hostname)
 	server.sin_family = AF_INET;
 	server.sin_addr.s_addr = inet_addr(inet_ntoa(h_addr));
 	server.sin_port = htons(6667);
-	if (connect(soc, (struct sockaddr *) &server, sizeof(server)) < 0)
-		fatal("connect");
-	else {
-		sendf("NICK %s\r\n", nick_me);
+	if (connect(soc, (struct sockaddr *) &server, sizeof(server)) < 0) {
+		newlinef(0, NOCHECK, "-!!-", "Error connecting to: %s", hostname);
+		return;
+	} else {
+		sendf("NICK %s\r\n", nicks[nicks_i]);
 		sendf("USER %s 8 * :%s\r\n", user_me, realname);
 	}
 	strncpy(rirc.name, hostname, 50), draw_chans();
@@ -395,9 +399,10 @@ send_msg(char *msg, int count)
 void
 newline(channel *c, line_t type, char *from, char *mesg, int len)
 {
-	if (!connected) {
+	if (!connected && type != NOCHECK) {
 		from = "-!!-";
 		mesg = "You are not connected to a server";
+		type = DEFAULT;
 		len = strlen(mesg);
 	}
 
@@ -414,7 +419,8 @@ newline(channel *c, line_t type, char *from, char *mesg, int len)
 		free(l->text);
 
 	l->len = len;
-	l->text = malloc(len);
+	if ((l->text = malloc(len)) == NULL)
+		fatal("newline");
 	memcpy(l->text, mesg, len);
 
 	time(&raw_t);
