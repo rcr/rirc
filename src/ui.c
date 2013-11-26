@@ -144,10 +144,16 @@ print_line(int row, int i)
 	else
 		wrap = ptr2;
 
+	int fromcol;
+	if (l->type == JOINPART)
+		fromcol = 239;
+	else
+		fromcol = nick_col(l->from);
+
 	if (row > 2) {
 		printf("\x1b[%d;1H\x1b[2K", row);
 		printf(C(239)" %02d:%02d  "C(%d)"%*s%s "C(239)"~"C(250)" ",
-				l->time_h, l->time_m, nick_col(l->from),
+				l->time_h, l->time_m, fromcol,
 				(int)(ccur->nick_pad - strlen(l->from)), "", l->from);
 		while (ptr1 < wrap)
 			putchar(*ptr1++);

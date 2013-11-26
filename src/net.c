@@ -27,6 +27,7 @@ int recv_priv(char*, char*);
 int recv_quit(char*, char*);
 int send_conn(char*);
 int send_join(char*);
+int send_pong(char*);
 int send_priv(char*, int);
 void close_channel(char*);
 void con_server(char*);
@@ -172,11 +173,11 @@ get_numeric_code(char **c)
 	int sum = 0, factor = 100;
 	do {
 		sum += factor * (*code - '0');
-		factor = factor / 10;
+		factor /= 10;
 	} while (isdigit(*++code) && factor > 0);
 
 	if (*code != ' ' || factor > 0)
-		return 0;
+		return -1;
 
 	*c = code + 1;
 	return sum;
@@ -285,15 +286,11 @@ send_priv(char *mesg, int to_chan)
 			sendf("PRIVMSG %s :%s\r\n", ccur->name, mesg);
 		}
 	} else {
-		/* TODO: the parsing logic here can be simplified and combined 
-		 * with getarg */
 		char *targ;
 		if ((targ = getarg_after(&mesg, ' ')) == NULL)
 			return 1;
 		trimarg_after(&mesg, ' ');
-		while (*mesg == ' ' && *mesg != '\0')
-			mesg++;
-		if (*mesg == '\0')
+		if ((mesg = getarg_after(&mesg, ' ')) == NULL)
 			return 1;
 
 		channel *c;
@@ -309,10 +306,13 @@ send_priv(char *mesg, int to_chan)
 	return 0;
 }
 
-void
-send_pong(char *server)
+int
+send_pong(char *ptr)
 {
-	sendf("PONG%s\r\n", server);
+	if (!(ptr = getarg(ptr)))
+		return 1;
+	sendf("PONG %s\r\n", ptr);
+	return 0;
 }
 
 int
@@ -477,8 +477,6 @@ recv_priv(char *prfx, char *mesg)
 	/* Get the message */
 	if ((mesg = getarg_after(&mesg, ':')) == NULL)
 		return 1;
-
-	// line_t type = DEFAULT;
 
 	/* Check for markup */
 	if (*mesg == 0x01) {
@@ -657,22 +655,26 @@ recv_part(char *prfx, char *mesg)
 void
 do_recv(void)
 {
-	int err = 0;
-	char *args, *pfx = 0, *ptr = recv_buff;
+	int code, err = 0;
+	char *args, *prfx = 0;
+	char *ptr = recv_buff;
 
+	/* Check for message prefix */
 	if (*ptr == ':') {
-		pfx = ptr;
-		while (*ptr++ != ' ' && *ptr != '\0');
+		prfx = ptr;
+		if ((ptr = getarg_after(&ptr, ' ')) == NULL)
+			goto rpl_error;
 	}
 
 	if (isdigit(*ptr)) { /* Reply code */
 
-		int code = get_numeric_code(&ptr);
+		if ((code = get_numeric_code(&ptr)) == -1)
+			goto rpl_error;
 
-		char *args;
 		/* Cant parse until ':' because of 004, 005, 254, 255, etc */
 		if ((args = getarg_after(&ptr, ' ')) == NULL)
 			goto rpl_error;
+
 		/* So remove it here */
 		if (*ptr == ':')
 			ptr++;
@@ -723,18 +725,13 @@ rpl_error:
 void
 recv_msg(char *input, int count)
 {
-	while (count-- > 0) {
-
-		if (recv_i < recv_buff + BUFFSIZE && *input != '\n')
-			*recv_i++ = *input;
-
-		input++;
+	while (count--) {
 		if (*input == '\r') {
 			*recv_i = '\0';
-			input++;
-			count--;
 			do_recv();
 			recv_i = recv_buff;
-		}
+		} else if (recv_i < recv_buff + BUFFSIZE && *input != '\n')
+			*recv_i++ = *input;
+		input++;
 	}
 }

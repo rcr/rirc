@@ -53,8 +53,7 @@ ready_send()
 		input_bar[inp1++] = input_bar[inp2++];
 	input_bar[inp1] = '\0';
 	send_msg(input_bar, inp1-1);
-	window = 0;
-	inp1 = 0;
+	inp1 = window = 0;
 	inp2 = MAXINPUT-1;
 }
 
