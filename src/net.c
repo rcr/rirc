@@ -35,6 +35,9 @@ void dis_server(int);
 void do_recv(void);
 void newline(channel*, line_t, char*, char*, int);
 void newlinef(channel*, line_t, char*, char*, ...);
+void recv_000(int, char*);
+void recv_200(int, char*);
+void recv_400(int, char*);
 void send_part(char*);
 void send_pong(char*);
 void sendf(const char*, ...);
@@ -653,6 +656,33 @@ recv_part(char *prfx, char *mesg)
 }
 
 void
+recv_000(int code, char *mesg)
+{
+	switch(code) {
+		default:
+			newline(0, NUMRPL, "CON", mesg, 0);
+	}
+}
+
+void
+recv_200(int code, char *mesg)
+{
+	switch(code) {
+		default:
+			newline(0, NUMRPL, "INFO", mesg, 0);
+	}
+}
+
+void
+recv_400(int code, char *mesg)
+{
+	switch(code) {
+		default:
+			newline(0, NUMRPL, "ERR", mesg, 0);
+	}
+}
+
+void
 do_recv(void)
 {
 	int code, err = 0;
@@ -682,11 +712,11 @@ do_recv(void)
 		if (!code) {
 			goto rpl_error;
 		} else if (code < 200) {
-			newline(0, NUMRPL, "CON", ptr, 0);
+			recv_000(code, ptr);
 		} else if (code < 400) {
-			newline(0, NUMRPL, "INFO", ptr, 0);
+			recv_200(code, ptr);
 		} else if (code < 600) {
-			newline(0, NUMRPL, "ERROR", ptr, 0);
+			recv_400(code, ptr);
 		} else {
 			goto rpl_error;
 		}
