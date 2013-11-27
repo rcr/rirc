@@ -22,6 +22,7 @@ char* cmdcasecmp(char*, char*);
 char* cmdcmp(char*, char*);
 char* getarg(char*);
 char* getarg_after(char**, char);
+int get_auto_nick(char*);
 int get_numeric_code(char**);
 int recv_join(char*, char*);
 int recv_nick(char*, char*);
@@ -31,6 +32,7 @@ int recv_priv(char*, char*);
 int recv_quit(char*, char*);
 int send_conn(char*);
 int send_join(char*);
+int send_nick(char*);
 int send_pong(char*);
 int send_priv(char*, int);
 void close_channel(char*);
@@ -49,6 +51,10 @@ void trimarg_after(char**, char);
 /* Config Stuff */
 char *user_me = "rcr";
 char *realname = "Richard Robbins";
+/* server to connect to automatically on startup */
+char *autoconn = "";
+/* comma separated list of channels to join on connect*/
+char *autojoin = "#abc";
 /* comma and/or space separated list of nicks */
 char *nicks = "rcr, rcr_, rcr__";
 char *nptr, nick_me[50];
@@ -367,6 +373,15 @@ send_join(char *ptr)
 	return 0;
 }
 
+int
+send_nick(char *ptr)
+{
+	if (!(ptr = getarg(ptr)))
+		return 1;
+	sendf("NICK %s\r\n", ptr);
+	return 0;
+}
+
 void
 close_channel(char *ptr)
 {
@@ -413,6 +428,8 @@ send_msg(char *msg, int count)
 		close_channel(msg);
 	} else if ((ptr = cmdcasecmp("PART", msg))) {
 		send_part(msg);
+	} else if ((ptr = cmdcasecmp("NICK", msg))) {
+		err = send_nick(ptr);
 	} else if ((ptr = cmdcasecmp("QUIT", msg))) {
 		dis_server(1);
 	} else if ((ptr = cmdcasecmp("MSG", msg))) {
@@ -428,8 +445,6 @@ send_msg(char *msg, int count)
 		newline(ccur, DEFAULT, "-!!-", "Incorrect arguments", 0);
 }
 
-
-/* not even really needed, just check if args are null? */
 void
 newline(channel *c, line_t type, char *from, char *mesg, int len)
 {
@@ -521,9 +536,8 @@ recv_priv(char *prfx, char *mesg)
 		trimarg_after(&mesg, ' ');
 
 		if (cmdcmp("ACTION", ptr)) {
+			/* TODO strip terminating 0x01 */
 			// type = ACTION;
-			/* TODO: ine_line(buff, from, chanel, line_t type) */
-			/* strip terminating 0x01 */
 			newlinef(0, DEFAULT, "*", "%s %s", from, mesg);
 		} else {
 			return 1;
@@ -594,26 +608,20 @@ recv_join(char *prfx, char *mesg)
 	if (*chan == ':')
 		chan++;
 
-	char buff[BUFFSIZE];
-	snprintf(buff, BUFFSIZE-1, "%s has joined %s", nick, chan);
-
 	if (is_me(nick)) {
 		ccur = new_channel(chan);
-		ins_line(buff, ">", ccur);
+		newlinef(ccur, JOINPART, ">", "%s has joined %s", nick, chan);
 		draw_full();
 	} else {
 		channel *c;
 		if ((c = get_channel(chan)) != NULL)
-			ins_line(buff, ">", c);
-		else {
-			snprintf(errbuff, BUFFSIZE-1, "JOIN: channel %s not found", chan);
-			ins_line(errbuff, "ERR", 0);
-		}
+			newlinef(c, JOINPART, ">", "%s has joined %s", nick, chan);
+		else
+			newlinef(0, DEFAULT, "ERR", "JOIN: channel %s not found", chan);
 	}
 	return 0;
 }
 
-void
 
 int
 recv_nick(char *prfx, char *mesg)
@@ -629,10 +637,15 @@ recv_nick(char *prfx, char *mesg)
 	if ((new_nick = getarg_after(&mesg, ':')) == NULL)
 		return 1;
 
-	/* TODO: - change name in all channels where use is */
-	/*       - display message in those channels */
-	newlinef(0, NICK, "", "NICK: %s -> %s", cur_nick, new_nick);
-
+	if (is_me(cur_nick)) {
+		strncpy(nick_me, new_nick, 50);
+		newlinef(ccur, NICK, "", "You are now known as %s", new_nick);
+	} else {
+		/* TODO: - change name in all channels where use is */
+		/*       - display message in those channels */
+		/* if is_me: just print to all channels */
+		newlinef(0, NICK, "", "NICK: %s -> %s", cur_nick, new_nick);
+	}
 	return 0;
 }
 
@@ -691,7 +704,9 @@ recv_000(int code, char *mesg)
 {
 	switch(code) {
 		case RPL_WELCOME:
-			/* Got welcome: reset autonicks, set registerd */
+			/* Got welcome: send autojoins, reset autonicks, set registerd */
+			if (*autojoin != '\0')
+				send_join(autojoin);
 			nptr = nicks;
 			registered = 1;
 			break;
@@ -773,20 +788,19 @@ do_recv(void)
 			goto rpl_error;
 		}
 	} else if ((args = cmdcmp("PRIVMSG", ptr))) {
-		err = recv_priv(pfx, args);
+		err = recv_priv(prfx, args);
 	} else if ((args = cmdcmp("JOIN", ptr))) {
-		err = recv_join(pfx, args);
+		err = recv_join(prfx, args);
 	} else if ((args = cmdcmp("PART", ptr))) {
-		err = recv_part(pfx, args);
+		err = recv_part(prfx, args);
 	} else if ((args = cmdcmp("QUIT", ptr))) {
-		err = recv_quit(pfx, args);
+		err = recv_quit(prfx, args);
 	} else if ((args = cmdcmp("NOTICE", ptr))) {
-		err = recv_note(pfx, args);
+		err = recv_note(prfx, args);
 	} else if ((args = cmdcmp("NICK", ptr))) {
-		err = recv_nick(pfx, args);
+		err = recv_nick(prfx, args);
 	} else if ((args = cmdcmp("PING", ptr))) {
-		send_pong(args);
-		/* TODO:
+		err = send_pong(args);
 	} else if ((args = cmdcmp("MODE", ptr))) {
 		recv_mode(...;
 	} else if ((args = cmdcmp("INFO", ptr))) {
