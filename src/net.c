@@ -12,6 +12,10 @@
 
 #define MAXCHANS 10
 
+#define RPL_WELCOME            1
+#define ERR_NICKNAMEINUSE    433
+#define ERR_ERRONEUSNICKNAME 432
+
 channel* get_channel(char*);
 channel* new_channel(char*);
 char* cmdcasecmp(char*, char*);
@@ -39,17 +43,19 @@ void recv_000(int, char*);
 void recv_200(int, char*);
 void recv_400(int, char*);
 void send_part(char*);
-void send_pong(char*);
 void sendf(const char*, ...);
 void trimarg_after(char**, char);
 
 /* Config Stuff */
-char nick_me[] = "r18449";
-char user_me[] = "r18449";
-char realname[] = "Richard Robbins";
+char *user_me = "rcr";
+char *realname = "Richard Robbins";
+/* comma and/or space separated list of nicks */
+char *nicks = "rcr, rcr_, rcr__";
+char *nptr, nick_me[50];
 
 int soc;
 int connected = 0;
+int registered = 0;
 
 char recv_buff[BUFFSIZE];
 char *recv_i = recv_buff;
@@ -69,6 +75,10 @@ channel rirc = {
 void
 init_chans(void)
 {
+	/* initialize nick and server buffer */
+	nptr = nicks;
+	get_auto_nick(nptr);
+
 	ccur = &rirc;
 	ccur->next = &rirc;
 	ccur->prev = &rirc;
@@ -113,7 +123,7 @@ con_server(char *hostname)
 		newlinef(0, NOCHECK, "-!!-", "Error connecting to: %s", hostname);
 		return;
 	} else {
-		sendf("NICK %s\r\n", nicks[nicks_i]);
+		sendf("NICK %s\r\n", nick_me);
 		sendf("USER %s 8 * :%s\r\n", user_me, realname);
 	}
 	strncpy(rirc.name, hostname, 50), draw_chans();
@@ -136,7 +146,7 @@ dis_server(int kill)
 			newline(c, DEFAULT, "-!!-", "(disconnected)", 0);
 			c = c->next;
 		} while (c != &rirc);
-		connected = 0;
+		connected = registered = 0;
 	}
 }
 
@@ -150,6 +160,27 @@ sendf(const char *fmt, ...)
 	int len = vsnprintf(buff, BUFFSIZE-1, fmt, args);
 	send(soc, buff, len, 0);
 	va_end(args);
+}
+
+int
+get_auto_nick(char *p)
+{
+	char *n = nick_me;
+
+	while (*p == ' ' || *p == ',')
+		p++;
+
+	if (*p == '\0')
+		return 0;
+
+	int c = 0;
+	while (*p != ' ' && *p != ',' && *p != '\0' && c++ < 50)
+		*n++ = *p++;
+
+	*n = '\0';
+	nptr = p;
+
+	return 1;
 }
 
 char*
@@ -659,6 +690,11 @@ void
 recv_000(int code, char *mesg)
 {
 	switch(code) {
+		case RPL_WELCOME:
+			/* Got welcome: reset autonicks, set registerd */
+			nptr = nicks;
+			registered = 1;
+			break;
 		default:
 			newline(0, NUMRPL, "CON", mesg, 0);
 	}
@@ -677,6 +713,22 @@ void
 recv_400(int code, char *mesg)
 {
 	switch(code) {
+		case ERR_NICKNAMEINUSE:
+			/* <nick> :Nickname is already in use */
+			if (!registered) {
+				if (get_auto_nick(nptr))
+					sendf("NICK %s\r\n", nick_me);
+				else
+					/* TODO: generate rirc_(8 random ascii) */
+					/* and display message */
+					newline(0, NOCHECK, "-!!-", "Nicks exhausted", 0);
+			} else
+				newline(0, NUMRPL, "--", mesg, 0);
+			break;
+		case ERR_ERRONEUSNICKNAME:
+			/* <nick> :Erroneous nickname */
+			newline(0, NUMRPL, "--", mesg, 0);
+			break;
 		default:
 			newline(0, NUMRPL, "ERR", mesg, 0);
 	}
