@@ -69,7 +69,8 @@ char *recv_i = recv_buff;
 time_t raw_t;
 struct tm *t;
 
-channel *ccur, *cserver;
+server *scur;
+channel *ccur;
 channel rirc = {
 	.active = 0,
 	.cur_line = 0,
@@ -277,6 +278,7 @@ new_channel(char *name)
 	c->cur_line = 0;
 	c->nick_pad = 0;
 	c->connected = 1;
+	c->server = scur;
 	memset(c->chat, 0, sizeof(c->chat));
 	strncpy(c->name, name, 50);
 
@@ -287,6 +289,26 @@ new_channel(char *name)
 	ccur->next = c;
 
 	return c;
+}
+
+server*
+new_server(char *name)
+{
+	server *s;
+	if ((s = malloc(sizeof(server))) == NULL)
+		fatal("new_server");
+	s->soc = 0;
+	s->connected = 0;
+	s->registerd = 0;
+	strncpy(s->name, name, 50);
+
+	/* Insert into linked list */
+	s->next = scur->next;
+	s->prev = scur;
+	scur->next->prev = s;
+	scur->next = s;
+
+	return s;
 }
 
 int
@@ -802,11 +824,9 @@ do_recv(void)
 	} else if ((args = cmdcmp("PING", ptr))) {
 		err = send_pong(args);
 	} else if ((args = cmdcmp("MODE", ptr))) {
-		recv_mode(...;
-	} else if ((args = cmdcmp("INFO", ptr))) {
-		recv_mode(...;
-		;
-		*/
+		err = recv_mode(prfx, args);
+	} else if ((args = cmdcmp("ERROR", ptr))) {
+		newlinef(0, DEFAULT, 0, recv_buff, 0);
 	} else {
 		goto rpl_error;
 	}

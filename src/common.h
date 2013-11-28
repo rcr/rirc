@@ -29,6 +29,16 @@ void input(char*, int);
 
 int run;
 
+typedef struct server
+{
+	int soc;
+	int connected;
+	int registerd;
+	char name[50];
+	struct server *prev;
+	struct server *next;
+} server;
+
 typedef struct line
 {
 	int len;
@@ -47,6 +57,7 @@ typedef struct channel
 	int connected;
 	char name[50];
 	line chat[SCROLLBACK];
+	struct server *server;
 	struct channel *prev;
 	struct channel *next;
 } channel;
