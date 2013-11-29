@@ -36,7 +36,7 @@ int send_nick(char*);
 int send_pong(char*);
 int send_priv(char*, int);
 void close_channel(char*);
-void con_server(char*);
+void con_server(char*, int);
 void dis_server(int);
 void do_recv(void);
 void newline(channel*, line_t, char*, char*, int);
@@ -104,11 +104,8 @@ channel_sw(int next)
 }
 
 void
-con_server(char *hostname)
+con_server(char *hostname, int port)
 {
-	if (connected)
-		return;
-
 	struct hostent *host;
 	struct in_addr h_addr;
 	if ((host = gethostbyname(hostname)) == NULL) {
@@ -125,7 +122,7 @@ con_server(char *hostname)
 	memset(&server, 0, sizeof(server));
 	server.sin_family = AF_INET;
 	server.sin_addr.s_addr = inet_addr(inet_ntoa(h_addr));
-	server.sin_port = htons(6667);
+	server.sin_port = htons(port);
 	if (connect(soc, (struct sockaddr *) &server, sizeof(server)) < 0) {
 		newlinef(0, NOCHECK, "-!!-", "Error connecting to: %s", hostname);
 		return;
@@ -380,9 +377,38 @@ send_pong(char *ptr)
 int
 send_conn(char *ptr)
 {
+	int port = 0;
+	char *hostname;
+
 	if (!(ptr = getarg(ptr)))
 		return 1;
-	con_server(ptr);
+	hostname = ptr;
+
+	while (*ptr != ':' && *ptr != '\0')
+		ptr++;
+
+	if (*ptr == ':') {
+		*ptr++ = '\0';
+		/* Extract port number, max is 65535 */
+		int digits = 0, factor = 1;
+		while (*ptr != '\0' && isdigit(*ptr))
+			digits++, ptr++;
+		if (digits > 5) {
+			newline(0, NOCHECK, 0, "Invalid port number", 0);
+			return 0;
+		} else {
+			while (digits--) {
+				port += (*(--ptr) - '0') * factor;
+				factor *= 10;
+			}
+		}
+		if (port > 65535) {
+			newline(0, NOCHECK, 0, "Invalid port number", 0);
+			return 0;
+		}
+	} else
+		port = 6667;
+	con_server(hostname, port);
 	return 0;
 }
 
@@ -462,9 +488,9 @@ send_msg(char *msg, int count)
 		return;
 	}
 	if (err == 1)
-		newline(ccur, DEFAULT, "-!!-", "Insufficient arguments", 0);
+		newline(ccur, NOCHECK, "-!!-", "Insufficient arguments", 0);
 	if (err == 2)
-		newline(ccur, DEFAULT, "-!!-", "Incorrect arguments", 0);
+		newline(ccur, NOCHECK, "-!!-", "Incorrect arguments", 0);
 }
 
 void

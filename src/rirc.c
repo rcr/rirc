@@ -82,7 +82,8 @@ main_loop(void)
 
 	run = 1;
 
-	send_conn("localhost", strlen("localhost")); /* FIXME */
+	char server1[] = "localhost:1111";
+	send_conn(server1);
 
 	while (run) {
 
