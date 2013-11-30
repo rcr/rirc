@@ -9,10 +9,11 @@ typedef enum {DEFAULT, NOCHECK, JOINPART, NICK, ACTION, NUMRPL} line_t;
 void fatal(char*);
 
 /* net.c */
+void con_lost(int);
 void channel_sw(int);
 void init_chans(void);
 void send_msg(char*, int);
-void recv_msg(char*, int);
+void recv_msg(char*, int, int);
 
 /* ui.c */
 int window;
@@ -31,12 +32,9 @@ int run;
 
 typedef struct server
 {
-	int soc;
-	int connected;
-	int registerd;
+	int soc; /* if soc == 0, disconnected */
+	int reg; /* registered with the server */
 	char name[50];
-	struct server *prev;
-	struct server *next;
 } server;
 
 typedef struct line

@@ -14,9 +14,6 @@ void main_loop(void);
 
 struct termios oterm, nterm;
 
-extern int soc;
-extern int connected;
-
 int
 main(int argc, char **argv)
 {
@@ -69,16 +66,21 @@ cleanup(int clear)
 	if (clear) printf("\x1b[H\x1b[J");
 }
 
+/* FIXME */
+#define MAXSERVERS 5
+extern int numserver;
+
+struct pollfd fds[MAXSERVERS + 1] = {{0}};
+
 void
 main_loop(void)
 {
 	char buf[BUFFSIZE];
-	int ret, count = 0, time = 200;
-	struct pollfd fds[2];
+	int i, ret, count = 0, time = 200;
 
 	fds[0].fd = 0; /* stdin */
-	fds[0].events = POLLIN;
-	fds[1].events = POLLIN;
+	for (i = 0; i < MAXSERVERS + 1; i++)
+		fds[i].events = POLLIN;
 
 	run = 1;
 
@@ -87,8 +89,7 @@ main_loop(void)
 
 	while (run) {
 
-		fds[1].fd = soc;
-		ret = poll(fds, 1 + connected, time);
+		ret = poll(fds, numserver + 1, time);
 
 		if (ret == 0) { /* timed out check input buffer */
 			if (count > 0)
@@ -100,10 +101,17 @@ main_loop(void)
 		} else if (fds[0].revents & POLLIN) {
 			count = read(0, buf, BUFFSIZE);
 			time = 0;
-		} else if (fds[1].revents & POLLIN) {
-			count = read(soc, buf, BUFFSIZE);
-			recv_msg(buf, count);
-			time = count = 0;
+		/* Loop through all open sockets */
+		} else {
+			for (i = 1; i < numserver + 1; i++) {
+				if (fds[i].revents & POLLIN) {
+					if ((count = read(fds[i].fd, buf, BUFFSIZE)) == 0) {
+						con_lost(fds[i].fd);
+					}
+					recv_msg(buf, count, fds[i].fd);
+					time = count = 0;
+				}
+			}
 		}
 	}
 }

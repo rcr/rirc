@@ -25,6 +25,7 @@ char* getarg_after(char**, char);
 int get_auto_nick(char*);
 int get_numeric_code(char**);
 int recv_join(char*, char*);
+int recv_mode(char*, char*);
 int recv_nick(char*, char*);
 int recv_note(char*, char*);
 int recv_part(char*, char*);
@@ -35,10 +36,11 @@ int send_join(char*);
 int send_nick(char*);
 int send_pong(char*);
 int send_priv(char*, int);
+server* new_server(char*);
 void close_channel(char*);
 void con_server(char*, int);
 void dis_server(int);
-void do_recv(void);
+void do_recv(int);
 void newline(channel*, line_t, char*, char*, int);
 void newlinef(channel*, line_t, char*, char*, ...);
 void recv_000(int, char*);
@@ -47,6 +49,15 @@ void recv_400(int, char*);
 void send_part(char*);
 void sendf(const char*, ...);
 void trimarg_after(char**, char);
+
+#include <poll.h>
+#define MAXSERVERS 5
+extern struct pollfd fds[MAXSERVERS + 1];
+int numserver = 0;
+/* FIXME: scur isnt really needed. can use ccur->server */
+server *scur = 0;
+/* For server indexing by socket. 3 for stdin/out/err unused */
+server *s[MAXSERVERS + 3];
 
 /* Config Stuff */
 char *user_me = "rcr";
@@ -125,11 +136,26 @@ con_server(char *hostname, int port)
 	server.sin_port = htons(port);
 	if (connect(soc, (struct sockaddr *) &server, sizeof(server)) < 0) {
 		newlinef(0, NOCHECK, "-!!-", "Error connecting to: %s", hostname);
+		close(soc);
 		return;
 	} else {
+
+		s[soc] = new_server(hostname);
+
+		int i; /* start at 1. have to skip [0] because of stdin */
+		for (i = 1; i < MAXSERVERS + 1; i++) {
+			if (fds[i].fd == 0) {
+				fds[i].fd = soc;
+				break;
+			}
+		}
+		numserver++;
+
 		sendf("NICK %s\r\n", nick_me);
 		sendf("USER %s 8 * :%s\r\n", user_me, realname);
 	}
+
+	/* FIXME: not needed. Update drawchans() to get ccur->server->name */
 	strncpy(rirc.name, hostname, 50), draw_chans();
 	connected = 1;
 }
@@ -152,6 +178,14 @@ dis_server(int kill)
 		} while (c != &rirc);
 		connected = registered = 0;
 	}
+}
+
+void
+con_lost(int socket)
+{
+	s[socket]->soc = 0;
+	fds[socket] = fds[--numserver];
+	close(soc);
 }
 
 /* utils */
@@ -285,6 +319,9 @@ new_channel(char *name)
 	ccur->next->prev = c;
 	ccur->next = c;
 
+	/* TODO: */
+	/* server pointer */
+
 	return c;
 }
 
@@ -295,17 +332,13 @@ new_server(char *name)
 	if ((s = malloc(sizeof(server))) == NULL)
 		fatal("new_server");
 	s->soc = 0;
-	s->connected = 0;
-	s->registerd = 0;
+	s->reg = 0;
 	strncpy(s->name, name, 50);
+	return s;
 
 	/* Insert into linked list */
-	s->next = scur->next;
-	s->prev = scur;
-	scur->next->prev = s;
-	scur->next = s;
-
-	return s;
+//	s->next = scur->next;
+//	scur->next = s;
 }
 
 int
@@ -670,6 +703,11 @@ recv_join(char *prfx, char *mesg)
 	return 0;
 }
 
+int
+recv_mode(char *prfx, char *mesg)
+{
+	return 0;
+}
 
 int
 recv_nick(char *prfx, char *mesg)
@@ -798,7 +836,7 @@ recv_400(int code, char *mesg)
 }
 
 void
-do_recv(void)
+do_recv(int soc)
 {
 	int code, err = 0;
 	char *args, *prfx = 0;
@@ -865,12 +903,12 @@ rpl_error:
 }
 
 void
-recv_msg(char *input, int count)
+recv_msg(char *input, int count, int soc)
 {
 	while (count--) {
 		if (*input == '\r') {
 			*recv_i = '\0';
-			do_recv();
+			do_recv(soc);
 			recv_i = recv_buff;
 		} else if (recv_i < recv_buff + BUFFSIZE && *input != '\n')
 			*recv_i++ = *input;
