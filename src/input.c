@@ -68,6 +68,10 @@ input(char *inp, int count)
 			del_char(1);
 		else if (c == 0x0A) /* LF */
 			ready_send();
+		else if (c == 0x18) { /* ctrl-X */
+			channel_remove();
+			draw_full();
+		}
 	} else if (count > 0 && *inp++ == 0x1B) { /* escape sequence */
 		if (esccmp("[A", inp)) /* arrow up */
 			channel_sw(0); /* FIXME: testing channel switching */
