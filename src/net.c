@@ -115,6 +115,18 @@ channel_sw(int next)
 }
 
 void
+channel_remove(void)
+{
+	channel *tmp = ccur;
+	(tmp->prev)->next = ccur->next;
+	(tmp->next)->prev = ccur->prev;
+	ccur = ccur->prev;
+
+	if (tmp != ccur)
+		free(tmp);
+}
+
+void
 con_server(char *hostname, int port)
 {
 	struct hostent *host;
