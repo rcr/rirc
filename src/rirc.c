@@ -92,10 +92,11 @@ main_loop(void)
 		ret = poll(fds, numserver + 1, time);
 
 		if (ret == 0) { /* timed out check input buffer */
-			if (count > 0)
+			if (count > 0) {
 				input(buf, count);
-			count = 0;
-			time = 200;
+				count = 0;
+				time = 200;
+			}
 			if (buf[0] == 'q') /* FIXME */
 				fatal(""); /* FIXME */
 		} else if (fds[0].revents & POLLIN) {
