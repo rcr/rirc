@@ -107,9 +107,10 @@ main_loop(void)
 				if (fds[i].revents & POLLIN) {
 					if ((count = read(fds[i].fd, buf, BUFFSIZE)) == 0) {
 						con_lost(fds[i].fd);
+					} else {
+						recv_msg(buf, count, fds[i].fd);
+						time = count = 0;
 					}
-					recv_msg(buf, count, fds[i].fd);
-					time = count = 0;
 				}
 			}
 		}

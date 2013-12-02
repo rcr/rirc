@@ -850,9 +850,10 @@ recv_400(int code, char *mesg)
 void
 do_recv(int soc)
 {
+	scur = s[soc];
 	int code, err = 0;
 	char *args, *prfx = 0;
-	char *ptr = recv_buff;
+	char *ptr = scur->input;
 
 	/* Check for message prefix */
 	if (*ptr == ':') {
@@ -902,7 +903,7 @@ do_recv(int soc)
 	} else if ((args = cmdcmp("MODE", ptr))) {
 		err = recv_mode(prfx, args);
 	} else if ((args = cmdcmp("ERROR", ptr))) {
-		newlinef(0, DEFAULT, 0, recv_buff, 0);
+		newlinef(0, DEFAULT, 0, s[soc]->input, 0);
 	} else {
 		goto rpl_error;
 	}
@@ -911,19 +912,23 @@ do_recv(int soc)
 		return;
 
 rpl_error:
-	newlinef(0, DEFAULT, 0, "RPL ERROR: %s", recv_buff);
+	newlinef(0, DEFAULT, 0, "RPL ERROR: %s", s[soc]->input);
 }
 
 void
 recv_msg(char *input, int count, int soc)
 {
+	char *i = s[soc]->iptr;
+	char *max = s[soc]->input + BUFFSIZE;
+
 	while (count--) {
 		if (*input == '\r') {
-			*recv_i = '\0';
+			*i = '\0';
 			do_recv(soc);
-			recv_i = recv_buff;
-		} else if (recv_i < recv_buff + BUFFSIZE && *input != '\n')
-			*recv_i++ = *input;
+			i = s[soc]->input;
+		} else if (i < max && *input != '\n')
+			*i++ = *input;
 		input++;
 	}
+	s[soc]->iptr = i;
 }
