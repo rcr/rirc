@@ -1,8 +1,10 @@
 #define BUFFSIZE 512
 #define MAXINPUT 200
+#define MAXSERVERS 5
 #define SCROLLBACK 300
 #define SENDBUFF MAXINPUT + 3
 
+typedef enum {SERVER, CHANNEL} channel_t;
 typedef enum {DEFAULT, NOCHECK, JOINPART, NICK, ACTION, NUMRPL} line_t;
 
 /* rirc.c */
@@ -31,13 +33,6 @@ void input(char*, int);
 
 int run;
 
-typedef struct server
-{
-	int soc; /* if soc == 0, disconnected */
-	int reg; /* registered with the server */
-	char name[50];
-} server;
-
 typedef struct line
 {
 	int len;
@@ -55,8 +50,19 @@ typedef struct channel
 	int nick_pad;
 	int connected;
 	char name[50];
+	channel_t type;
 	line chat[SCROLLBACK];
 	struct server *server;
 	struct channel *prev;
 	struct channel *next;
 } channel;
+
+typedef struct server
+{
+	int soc; /* if soc == 0, disconnected */
+	int reg; /* registered with the server */
+	char name[50];
+	char input[BUFFSIZE];
+	char *iptr;
+	channel *channel;
+} server;

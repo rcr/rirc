@@ -5,12 +5,11 @@
 #include <netdb.h>
 #include <ctype.h>
 #include <time.h>
+#include <poll.h>
 #include <stdarg.h>
 #include <arpa/inet.h>
 
 #include "common.h"
-
-#define MAXCHANS 10
 
 #define RPL_WELCOME            1
 #define ERR_NICKNAMEINUSE    433
@@ -50,11 +49,8 @@ void send_part(char*);
 void sendf(const char*, ...);
 void trimarg_after(char**, char);
 
-#include <poll.h>
-#define MAXSERVERS 5
+int numserver = 3;
 extern struct pollfd fds[MAXSERVERS + 1];
-int numserver = 0;
-/* FIXME: scur isnt really needed. can use ccur->server */
 server *scur = 0;
 /* For server indexing by socket. 3 for stdin/out/err unused */
 server *s[MAXSERVERS + 3];
@@ -74,20 +70,23 @@ int soc;
 int connected = 0;
 int registered = 0;
 
-char recv_buff[BUFFSIZE];
-char *recv_i = recv_buff;
 
 time_t raw_t;
 struct tm *t;
 
-server *scur;
+channel *channels;
 channel *ccur;
+
 channel rirc = {
 	.active = 0,
 	.cur_line = 0,
 	.nick_pad = 0,
+	.connected = 0,
 	.name = "rirc",
-	.chat = {{0}}
+	.chat = {{0}},
+	.server = 0,
+	.prev = 0,
+	.next = 0,
 };
 
 void
@@ -98,6 +97,7 @@ init_chans(void)
 	get_auto_nick(nptr);
 
 	ccur = &rirc;
+	channels = &rirc;
 	ccur->next = &rirc;
 	ccur->prev = &rirc;
 }
@@ -153,22 +153,20 @@ con_server(char *hostname, int port)
 	} else {
 
 		s[soc] = new_server(hostname);
-
-		int i; /* start at 1. have to skip [0] because of stdin */
-		for (i = 1; i < MAXSERVERS + 1; i++) {
-			if (fds[i].fd == 0) {
-				fds[i].fd = soc;
-				break;
-			}
-		}
-		numserver++;
+		ccur = new_channel(hostname);
+		ccur->type = SERVER;
+		s[soc]->channel = ccur;
+		if (channels == &rirc)
+			channels = ccur;
+		fds[numserver++].fd = soc;
+		draw_chans();
 
 		sendf("NICK %s\r\n", nick_me);
 		sendf("USER %s 8 * :%s\r\n", user_me, realname);
 	}
 
 	/* FIXME: not needed. Update drawchans() to get ccur->server->name */
-	strncpy(rirc.name, hostname, 50), draw_chans();
+	//strncpy(rirc.name, hostname, 50), draw_chans();
 	connected = 1;
 }
 
@@ -200,7 +198,6 @@ con_lost(int socket)
 	close(soc);
 }
 
-/* utils */
 void
 sendf(const char *fmt, ...)
 {
@@ -208,7 +205,9 @@ sendf(const char *fmt, ...)
 	va_start(args, fmt);
 	char buff[BUFFSIZE];
 	int len = vsnprintf(buff, BUFFSIZE-1, fmt, args);
-	send(soc, buff, len, 0);
+	/* FIXME: send_pong doesnt care about ccur->server, replies to message by
+	 * scur set in do_recv */
+	send(ccur->server->soc, buff, len, 0);
 	va_end(args);
 }
 
@@ -321,19 +320,21 @@ new_channel(char *name)
 	c->cur_line = 0;
 	c->nick_pad = 0;
 	c->connected = 1;
-	c->server = scur;
+	c->type = CHANNEL;
+	c->server = s[soc];
 	memset(c->chat, 0, sizeof(c->chat));
 	strncpy(c->name, name, 50);
 
 	/* Insert into linked list */
-	c->next = ccur->next;
-	c->prev = ccur;
-	ccur->next->prev = c;
-	ccur->next = c;
-
-	/* TODO: */
-	/* server pointer */
-
+	if (ccur == &rirc) {
+		c->prev = c;
+		c->next = c;
+	} else {
+		c->prev = ccur;
+		c->next = ccur->next;
+		ccur->next->prev = c;
+		ccur->next = c;
+	}
 	return c;
 }
 
@@ -343,14 +344,11 @@ new_server(char *name)
 	server *s;
 	if ((s = malloc(sizeof(server))) == NULL)
 		fatal("new_server");
-	s->soc = 0;
 	s->reg = 0;
+	s->soc = soc;
+	s->iptr = s->input;
 	strncpy(s->name, name, 50);
 	return s;
-
-	/* Insert into linked list */
-//	s->next = scur->next;
-//	scur->next = s;
 }
 
 int
@@ -369,15 +367,15 @@ is_me(char *nick)
 channel*
 get_channel(char *chan)
 {
-	channel *c = &rirc;
+	channel *t = channels;
+	channel *c = channels;
 	do {
-		if (!strcmp(c->name, chan))
+		if (!strcmp(c->name, chan) && c->server == scur)
 			return c;
 		c = c->next;
-	} while (c != &rirc);
+	} while (c != t);
 	return NULL;
 }
-/* end utils */
 
 int
 send_priv(char *mesg, int to_chan)
@@ -480,7 +478,12 @@ close_channel(char *ptr)
 {
 	if (ccur == &rirc)
 		newline(0, DEFAULT, "-!!-", "Cannot execute 'close' on server", 0);
-	else {
+	else if (ccur->next == ccur) {
+		free(ccur);
+		channels = &rirc;
+		ccur = &rirc;
+		draw_full();
+	} else {
 		sendf("PART %s\r\n", ccur->name);
 		channel *c = ccur;
 		c->next->prev = c->prev;
@@ -551,8 +554,12 @@ newline(channel *c, line_t type, char *from, char *mesg, int len)
 	if (len == 0)
 		len = strlen(mesg);
 
-	if (c == 0)
-		c = &rirc;
+	if (c == 0) {
+		if (channels == &rirc)
+			c = &rirc;
+		else
+			c = s[soc]->channel;
+	}
 
 	struct line *l;
 	l = &c->chat[c->cur_line];

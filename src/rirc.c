@@ -12,7 +12,10 @@ void init_ui(void);
 void cleanup(int);
 void main_loop(void);
 
+extern int numserver;
+
 struct termios oterm, nterm;
+struct pollfd fds[MAXSERVERS + 1] = {{0}};
 
 int
 main(int argc, char **argv)
@@ -65,12 +68,6 @@ cleanup(int clear)
 	tcsetattr(0, TCSADRAIN, &oterm);
 	if (clear) printf("\x1b[H\x1b[J");
 }
-
-/* FIXME */
-#define MAXSERVERS 5
-extern int numserver;
-
-struct pollfd fds[MAXSERVERS + 1] = {{0}};
 
 void
 main_loop(void)
