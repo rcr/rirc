@@ -70,9 +70,6 @@ char *nicks = "rcr, rcr_, rcr__";
 time_t raw_t;
 struct tm *t;
 
-channel *channels;
-channel *ccur;
-
 channel rirc = {
 	.active = 0,
 	.cur_line = 0,
@@ -81,18 +78,12 @@ channel rirc = {
 	.chat = {{0}},
 	.server = 0,
 	.type = SERVER,
-	.prev = 0,
-	.next = 0,
+	.prev = &rirc,
+	.next = &rirc,
 };
 
-void
-init_chans(void)
-{
-	ccur = &rirc;
-	channels = &rirc;
-	ccur->next = &rirc;
-	ccur->prev = &rirc;
-}
+channel *ccur = &rirc;
+channel *channels = &rirc;
 
 void
 channel_sw(int next)
