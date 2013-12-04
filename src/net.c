@@ -21,7 +21,7 @@ char* cmdcasecmp(char*, char*);
 char* cmdcmp(char*, char*);
 char* getarg(char*);
 char* getarg_after(char**, char);
-int get_auto_nick(char*);
+int get_auto_nick(char*, char*);
 int get_numeric_code(char**);
 int recv_join(char*, char*);
 int recv_mode(char*, char*);
@@ -63,7 +63,6 @@ char *autoconn = "";
 char *autojoin = "#abc";
 /* comma and/or space separated list of nicks */
 char *nicks = "rcr, rcr_, rcr__";
-char *nptr, nick_me[50];
 
 int soc;
 int connected = 0;
@@ -91,10 +90,6 @@ channel rirc = {
 void
 init_chans(void)
 {
-	/* initialize nick and server buffer */
-	nptr = nicks;
-	get_auto_nick(nptr);
-
 	ccur = &rirc;
 	channels = &rirc;
 	ccur->next = &rirc;
@@ -152,6 +147,7 @@ con_server(char *hostname, int port)
 	} else {
 
 		s[soc] = new_server(hostname, port, soc);
+		get_auto_nick(s[soc]->nptr, s[soc]->nick_me);
 		ccur = new_channel(hostname);
 		ccur->type = SERVER;
 		s[soc]->channel = ccur;
@@ -211,10 +207,11 @@ sendf(const char *fmt, ...)
 }
 
 int
-get_auto_nick(char *p)
+get_auto_nick(char *p, char *nick)
 {
-	char *n = nick_me;
+	/* FIXME: check for null pointer and generate a nick here instead */
 
+	char *n = nick;
 	while (*p == ' ' || *p == ',')
 		p++;
 
@@ -226,7 +223,7 @@ get_auto_nick(char *p)
 		*n++ = *p++;
 
 	*n = '\0';
-	nptr = p;
+	s[rplsoc]->nptr = p;
 
 	return 1;
 }
@@ -346,6 +343,7 @@ new_server(char *name, int port, int soc)
 	s->reg = 0;
 	s->soc = soc;
 	s->port = port;
+	s->nptr = nicks;
 	s->iptr = s->input;
 	strncpy(s->name, name, 50);
 	return s;
@@ -354,7 +352,7 @@ new_server(char *name, int port, int soc)
 int
 is_me(char *nick)
 {
-	char *n = nick_me;
+	char *n = s[rplsoc]->nick_me;
 	while (*n == *nick) {
 		if (*n == '\0')
 			return 1;
@@ -743,7 +741,7 @@ recv_nick(char *prfx, char *mesg)
 		return 1;
 
 	if (is_me(cur_nick)) {
-		strncpy(nick_me, new_nick, 50);
+		strncpy(s[rplsoc]->nick_me, new_nick, 50);
 		newlinef(ccur, NICK, "", "You are now known as %s", new_nick);
 	} else {
 		/* TODO: - change name in all channels where use is */
@@ -809,11 +807,11 @@ recv_000(int code, char *mesg)
 {
 	switch(code) {
 		case RPL_WELCOME:
-			/* Got welcome: send autojoins, reset autonicks, set registerd */
+			/* Got welcome: send autojoins, reset autonicks, set registered */
 			if (*autojoin != '\0')
-				send_join(autojoin);
-			nptr = nicks;
-			registered = 1;
+				sendf(rplsoc, "JOIN %s\r\n", autojoin);
+			s[rplsoc]->nptr = nicks;
+			s[rplsoc]->reg = 1;
 			break;
 		default:
 			newline(0, NUMRPL, "CON", mesg, 0);
@@ -835,9 +833,9 @@ recv_400(int code, char *mesg)
 	switch(code) {
 		case ERR_NICKNAMEINUSE:
 			/* <nick> :Nickname is already in use */
-			if (!registered) {
-				if (get_auto_nick(nptr))
-					sendf("NICK %s\r\n", nick_me);
+			if (!s[rplsoc]->reg) {
+				if (get_auto_nick(s[rplsoc]->nptr, s[rplsoc]->nick_me))
+					sendf(rplsoc, "NICK %s\r\n", s[rplsoc]->nick_me);
 				else
 					/* TODO: generate rirc_(8 random ascii) */
 					/* and display message */

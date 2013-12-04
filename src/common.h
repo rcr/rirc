@@ -62,6 +62,8 @@ typedef struct server
 	int reg; /* registered with the server */
 	int port;
 	char name[50];
+	char *nptr;
+	char nick_me[50];
 	char input[BUFFSIZE];
 	char *iptr;
 	channel *channel;
