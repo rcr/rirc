@@ -49,6 +49,7 @@ void send_part(char*);
 void sendf(int, const char*, ...);
 void trimarg_after(char**, char);
 
+int rplsoc;
 int numserver = 3;
 extern struct pollfd fds[MAXSERVERS + 1];
 /* For server indexing by socket. 3 for stdin/out/err unused */
@@ -64,9 +65,6 @@ char *autojoin = "#abc";
 /* comma and/or space separated list of nicks */
 char *nicks = "rcr, rcr_, rcr__";
 
-int soc;
-int connected = 0;
-int registered = 0;
 
 
 time_t raw_t;
@@ -123,6 +121,7 @@ channel_remove(void)
 void
 con_server(char *hostname, int port)
 {
+	int soc;
 	struct hostent *host;
 	struct in_addr h_addr;
 	if ((host = gethostbyname(hostname)) == NULL) {
@@ -147,6 +146,7 @@ con_server(char *hostname, int port)
 	} else {
 
 		s[soc] = new_server(hostname, port, soc);
+		rplsoc = soc;
 		get_auto_nick(s[soc]->nptr, s[soc]->nick_me);
 		ccur = new_channel(hostname);
 		ccur->type = SERVER;
@@ -156,13 +156,9 @@ con_server(char *hostname, int port)
 		fds[numserver++].fd = soc;
 		draw_chans();
 
-		sendf("NICK %s\r\n", nick_me);
-		sendf("USER %s 8 * :%s\r\n", user_me, realname);
+		sendf(soc, "NICK %s\r\n", s[soc]->nick_me);
+		sendf(soc, "USER %s 8 * :%s\r\n", user_me, realname);
 	}
-
-	/* FIXME: not needed. Update drawchans() to get ccur->server->name */
-	//strncpy(rirc.name, hostname, 50), draw_chans();
-	connected = 1;
 }
 
 void
@@ -190,19 +186,17 @@ con_lost(int socket)
 {
 	s[socket]->soc = 0;
 	fds[socket] = fds[--numserver];
-	close(soc);
+	close(socket);
 }
 
 void
-sendf(const char *fmt, ...)
+sendf(int soc, const char *fmt, ...)
 {
 	va_list args;
 	va_start(args, fmt);
 	char buff[BUFFSIZE];
 	int len = vsnprintf(buff, BUFFSIZE-1, fmt, args);
-	/* FIXME: send_pong doesnt care about ccur->server, replies to message by
-	 * scur set in do_recv */
-	send(ccur->server->soc, buff, len, 0);
+	send(soc, buff, len, 0);
 	va_end(args);
 }
 
@@ -308,16 +302,14 @@ trimarg_after(char **p1, char c)
 channel*
 new_channel(char *name)
 {
-	/* TODO: track channel count */
 	channel *c;
 	if ((c = malloc(sizeof(channel))) == NULL)
 		fatal("new_channel");
 	c->active = 0;
 	c->cur_line = 0;
 	c->nick_pad = 0;
-	c->connected = 1;
 	c->type = CHANNEL;
-	c->server = s[soc];
+	c->server = s[rplsoc];
 	memset(c->chat, 0, sizeof(c->chat));
 	strncpy(c->name, name, 50);
 
@@ -365,13 +357,12 @@ is_me(char *nick)
 channel*
 get_channel(char *chan)
 {
-	channel *t = channels;
 	channel *c = channels;
 	do {
-		if (!strcmp(c->name, chan) && c->server == scur)
+		if (!strcmp(c->name, chan) && c->server == ccur->server)
 			return c;
 		c = c->next;
-	} while (c != t);
+	} while (c != channels);
 	return NULL;
 }
 
@@ -379,11 +370,11 @@ int
 send_priv(char *mesg, int to_chan)
 {
 	if (to_chan) {
-		if (ccur == &rirc)
+		if (ccur->type == SERVER)
 			newline(0, DEFAULT, "-!!-", "This is not a channel!", 0);
 		else {
-			newline(ccur, DEFAULT, nick_me, mesg, 0);
-			sendf("PRIVMSG %s :%s\r\n", ccur->name, mesg);
+			newline(ccur, DEFAULT, ccur->server->nick_me, mesg, 0);
+			sendf(ccur->server->soc, "PRIVMSG %s :%s\r\n", ccur->name, mesg);
 		}
 	} else {
 		char *targ;
@@ -398,10 +389,10 @@ send_priv(char *mesg, int to_chan)
 			ccur = new_channel(targ);
 		else
 			ccur = c;
-		newline(ccur, DEFAULT, nick_me, mesg, 0);
+		newline(ccur, DEFAULT, ccur->server->nick_me, mesg, 0);
 		draw_full();
 
-		sendf("PRIVMSG %s :%s\r\n", targ, mesg);
+		sendf(ccur->server->soc, "PRIVMSG %s :%s\r\n", targ, mesg);
 	}
 	return 0;
 }
@@ -411,7 +402,7 @@ send_pong(char *ptr)
 {
 	if (!(ptr = getarg(ptr)))
 		return 1;
-	sendf("PONG %s\r\n", ptr);
+	sendf(rplsoc, "PONG %s\r\n", ptr);
 	return 0;
 }
 
@@ -458,7 +449,7 @@ send_join(char *ptr)
 {
 	if (!(ptr = getarg(ptr)))
 		return 1;
-	sendf("JOIN %s\r\n", ptr);
+	sendf(ccur->server->soc, "JOIN %s\r\n", ptr);
 	return 0;
 }
 
@@ -467,7 +458,7 @@ send_nick(char *ptr)
 {
 	if (!(ptr = getarg(ptr)))
 		return 1;
-	sendf("NICK %s\r\n", ptr);
+	sendf(ccur->server->soc, "NICK %s\r\n", ptr);
 	return 0;
 }
 
@@ -482,7 +473,7 @@ close_channel(char *ptr)
 		ccur = &rirc;
 		draw_full();
 	} else {
-		sendf("PART %s\r\n", ccur->name);
+		sendf(ccur->server->soc, "PART %s\r\n", ccur->name);
 		channel *c = ccur;
 		c->next->prev = c->prev;
 		c->prev->next = c->next;
@@ -499,13 +490,12 @@ send_part(char *ptr)
 		newline(0, DEFAULT, "-!!-", "Cannot execute 'part' on server", 0);
 	else {
 		newline(ccur, DEFAULT, "", "(disconnected)", 0);
-		sendf("PART %s\r\n", ccur->name);
-		ccur->connected = 0;
+		sendf(ccur->server->soc, "PART %s\r\n", ccur->name);
 	}
 }
 
 void
-send_msg(char *msg, int count)
+send_mesg(char *msg, int count)
 {
 	char *ptr;
 	int err = 0;
@@ -542,12 +532,15 @@ send_msg(char *msg, int count)
 void
 newline(channel *c, line_t type, char *from, char *mesg, int len)
 {
+#if 0
+	If we're on a server and it's not connected. print this...
 	if (!connected && type != NOCHECK) {
 		from = "-!!-";
 		mesg = "You are not connected to a server";
 		type = DEFAULT;
 		len = strlen(mesg);
 	}
+#endif
 
 	if (len == 0)
 		len = strlen(mesg);
@@ -556,7 +549,7 @@ newline(channel *c, line_t type, char *from, char *mesg, int len)
 		if (channels == &rirc)
 			c = &rirc;
 		else
-			c = s[soc]->channel;
+			c = s[rplsoc]->channel;
 	}
 
 	struct line *l;
@@ -855,10 +848,11 @@ recv_400(int code, char *mesg)
 void
 do_recv(int soc)
 {
-	scur = s[soc];
+	rplsoc = soc;
+
 	int code, err = 0;
 	char *args, *prfx = 0;
-	char *ptr = scur->input;
+	char *ptr = s[soc]->input;
 
 	/* Check for message prefix */
 	if (*ptr == ':') {
@@ -921,7 +915,7 @@ rpl_error:
 }
 
 void
-recv_msg(char *input, int count, int soc)
+recv_mesg(char *input, int count, int soc)
 {
 	char *i = s[soc]->iptr;
 	char *max = s[soc]->input + BUFFSIZE;
