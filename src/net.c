@@ -35,7 +35,7 @@ int send_join(char*);
 int send_nick(char*);
 int send_pong(char*);
 int send_priv(char*, int);
-server* new_server(char*);
+server* new_server(char*, int, int);
 void close_channel(char*);
 void con_server(char*, int);
 void dis_server(int);
@@ -151,7 +151,7 @@ con_server(char *hostname, int port)
 		return;
 	} else {
 
-		s[soc] = new_server(hostname);
+		s[soc] = new_server(hostname, port, soc);
 		ccur = new_channel(hostname);
 		ccur->type = SERVER;
 		s[soc]->channel = ccur;
@@ -338,13 +338,14 @@ new_channel(char *name)
 }
 
 server*
-new_server(char *name)
+new_server(char *name, int port, int soc)
 {
 	server *s;
 	if ((s = malloc(sizeof(server))) == NULL)
 		fatal("new_server");
 	s->reg = 0;
 	s->soc = soc;
+	s->port = port;
 	s->iptr = s->input;
 	strncpy(s->name, name, 50);
 	return s;

@@ -60,6 +60,7 @@ typedef struct server
 {
 	int soc; /* if soc == 0, disconnected */
 	int reg; /* registered with the server */
+	int port;
 	char name[50];
 	char input[BUFFSIZE];
 	char *iptr;
