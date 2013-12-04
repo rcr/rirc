@@ -52,7 +52,7 @@ ready_send()
 	while (inp2 < MAXINPUT-1)
 		input_bar[inp1++] = input_bar[inp2++];
 	input_bar[inp1] = '\0';
-	send_msg(input_bar, inp1-1);
+	send_mesg(input_bar, inp1-1);
 	inp1 = window = 0;
 	inp2 = MAXINPUT-1;
 }
@@ -72,7 +72,8 @@ input(char *inp, int count)
 			channel_remove();
 			draw_full();
 		}
-	} else if (count > 0 && *inp++ == 0x1B) { /* escape sequence */
+	} else if (count > 0 && *inp == 0x1B) { /* escape sequence */
+		inp++;
 		if (esccmp("[A", inp)) /* arrow up */
 			channel_sw(0); /* FIXME: testing channel switching */
 		if (esccmp("[B", inp)) /* arrow down */
@@ -83,9 +84,11 @@ input(char *inp, int count)
 			cur_lr(1);
 		if (esccmp("[3~", inp)) /* delete */
 			del_char(0);
-		//printf("\n\n\n\nGot: %s\n", inp);
-	} /* else {
-		paste
-	} */
+	} else {
+		;
+		/* Got paste, confirm length with user, call warn_paste(int)
+		 * then:
+		 * while count-- , inp, send if max length */
+	}
 	draw_input();
 }

@@ -46,12 +46,11 @@ void recv_000(int, char*);
 void recv_200(int, char*);
 void recv_400(int, char*);
 void send_part(char*);
-void sendf(const char*, ...);
+void sendf(int, const char*, ...);
 void trimarg_after(char**, char);
 
 int numserver = 3;
 extern struct pollfd fds[MAXSERVERS + 1];
-server *scur = 0;
 /* For server indexing by socket. 3 for stdin/out/err unused */
 server *s[MAXSERVERS + 3];
 
@@ -81,10 +80,10 @@ channel rirc = {
 	.active = 0,
 	.cur_line = 0,
 	.nick_pad = 0,
-	.connected = 0,
 	.name = "rirc",
 	.chat = {{0}},
 	.server = 0,
+	.type = SERVER,
 	.prev = 0,
 	.next = 0,
 };

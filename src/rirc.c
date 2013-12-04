@@ -82,7 +82,9 @@ main_loop(void)
 	run = 1;
 
 	char server1[] = "localhost:1111";
+	char server2[] = "localhost:2222";
 	send_conn(server1);
+	send_conn(server2);
 
 	while (run) {
 
@@ -92,8 +94,8 @@ main_loop(void)
 			if (count > 0) {
 				input(buf, count);
 				count = 0;
-				time = 200;
 			}
+			time = 200;
 			if (buf[0] == 'q') /* FIXME */
 				fatal(""); /* FIXME */
 		} else if (fds[0].revents & POLLIN) {
@@ -103,12 +105,11 @@ main_loop(void)
 		} else {
 			for (i = 1; i < numserver + 1; i++) {
 				if (fds[i].revents & POLLIN) {
-					if ((count = read(fds[i].fd, buf, BUFFSIZE)) == 0) {
+					if ((count = read(fds[i].fd, buf, BUFFSIZE)) == 0)
 						con_lost(fds[i].fd);
-					} else {
-						recv_msg(buf, count, fds[i].fd);
-						time = count = 0;
-					}
+					else
+						recv_mesg(buf, count, fds[i].fd);
+					time = count = 0;
 				}
 			}
 		}

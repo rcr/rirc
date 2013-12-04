@@ -15,8 +15,8 @@ void con_lost(int);
 void channel_sw(int);
 void channel_remove();
 void init_chans(void);
-void send_msg(char*, int);
-void recv_msg(char*, int, int);
+void send_mesg(char*, int);
+void recv_mesg(char*, int, int);
 
 /* ui.c */
 int window;
@@ -48,7 +48,6 @@ typedef struct channel
 	int active;
 	int cur_line;
 	int nick_pad;
-	int connected;
 	char name[50];
 	channel_t type;
 	line chat[SCROLLBACK];
