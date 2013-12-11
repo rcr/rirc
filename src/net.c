@@ -50,7 +50,7 @@ void sendf(int, const char*, ...);
 void trimarg_after(char**, char);
 
 int rplsoc;
-int numserver = 3;
+int numserver = 1;
 extern struct pollfd fds[MAXSERVERS + 1];
 /* For server indexing by socket. 3 for stdin/out/err unused */
 server *s[MAXSERVERS + 3];
@@ -353,7 +353,7 @@ get_channel(char *chan)
 {
 	channel *c = channels;
 	do {
-		if (!strcmp(c->name, chan) && c->server == ccur->server)
+		if (!strcmp(c->name, chan) && c->server->soc == rplsoc)
 			return c;
 		c = c->next;
 	} while (c != channels);
@@ -365,7 +365,7 @@ send_priv(char *mesg, int to_chan)
 {
 	if (to_chan) {
 		if (ccur->type == SERVER)
-			newline(0, DEFAULT, "-!!-", "This is not a channel!", 0);
+			newline(ccur, DEFAULT, "-!!-", "This is not a channel!", 0);
 		else {
 			newline(ccur, DEFAULT, ccur->server->nick_me, mesg, 0);
 			sendf(ccur->server->soc, "PRIVMSG %s :%s\r\n", ccur->name, mesg);
