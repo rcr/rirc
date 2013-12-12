@@ -38,7 +38,7 @@ int send_priv(char*, int);
 server* new_server(char*, int, int);
 void close_channel(char*);
 void con_server(char*, int);
-void dis_server(int);
+void dis_server(server*, int);
 void do_recv(int);
 void newline(channel*, line_t, char*, char*, int);
 void newlinef(channel*, line_t, char*, char*, ...);
@@ -50,7 +50,7 @@ void sendf(int, const char*, ...);
 void trimarg_after(char**, char);
 
 int rplsoc;
-int numserver = 1;
+int numfds = 1; /* 1 for stdin */
 extern struct pollfd fds[MAXSERVERS + 1];
 /* For server indexing by socket. 3 for stdin/out/err unused */
 server *s[MAXSERVERS + 3];
@@ -144,7 +144,7 @@ con_server(char *hostname, int port)
 		s[soc]->channel = ccur;
 		if (channels == &rirc)
 			channels = ccur;
-		fds[numserver++].fd = soc;
+		fds[numfds++].fd = soc;
 		draw_chans();
 
 		sendf(soc, "NICK %s\r\n", s[soc]->nick_me);
@@ -153,31 +153,51 @@ con_server(char *hostname, int port)
 }
 
 void
-dis_server(int kill)
+dis_server(server *s, int kill)
 {
 	if (kill) {
-		run = 0;
-	} else if (!connected) {
-		newline(ccur, DEFAULT, "-!!-", "Not connected", 0);
-	} else {
-		sendf("QUIT :Quitting!\r\n");
-		close(soc); /* wait for reply before closing? */
-		strcpy(rirc.name, "rirc"), draw_chans();
-		channel *c = &rirc;
-		do {
-			newline(c, DEFAULT, "-!!-", "(disconnected)", 0);
+
+		int i; /* Shuffle fds to front of array */
+		for (i = 1; i < numfds; i++)
+			if (fds[i].fd == s->soc) break;
+		fds[i] = fds[--numfds];
+
+		channel *c = channels;
+		channel *e = channels->prev;
+
+		if (ccur == channels) {
+			if (channels->next->type == SERVER)
+				channels = channels->next;
+			else
+				channels = &rirc;
+		}
+		ccur = channels;
+
+		while (c <= e) {
+			channel *t = c;
+			if (t->server == s) {
+				t->next->prev = t->prev;
+				t->prev->next = t->next;
+				free(t);
+			}
 			c = c->next;
-		} while (c != &rirc);
-		connected = registered = 0;
+		}
+
+		sendf(s->soc, "QUIT :Quitting!\r\n");
+		close(s->soc);
+		free(s);
+
+		draw_full();
+	} else {
+		/* newline (disconnected) into all channels, set socket 0; */
+		;
 	}
 }
 
 void
 con_lost(int socket)
 {
-	s[socket]->soc = 0;
-	fds[socket] = fds[--numserver];
-	close(socket);
+	dis_server(s[socket], 0);
 }
 
 void
@@ -459,13 +479,11 @@ send_nick(char *ptr)
 void
 close_channel(char *ptr)
 {
-	if (ccur == &rirc)
-		newline(0, DEFAULT, "-!!-", "Cannot execute 'close' on server", 0);
-	else if (ccur->next == ccur) {
-		free(ccur);
-		channels = &rirc;
-		ccur = &rirc;
-		draw_full();
+	if (ccur->type == SERVER) {
+		if (ccur == &rirc)
+			newline(0, DEFAULT, "-!!-", "Cannot close main buffer", 0);
+		else
+			dis_server(ccur->server, 1);
 	} else {
 		sendf(ccur->server->soc, "PART %s\r\n", ccur->name);
 		channel *c = ccur;
@@ -501,7 +519,7 @@ send_mesg(char *msg, int count)
 	} else if ((ptr = cmdcasecmp("CONNECT", msg))) {
 		err = send_conn(ptr);
 	} else if ((ptr = cmdcasecmp("DISCONNECT", msg))) {
-		dis_server(0);
+		dis_server(ccur->server, 0);
 	} else if ((ptr = cmdcasecmp("CLOSE", msg))) {
 		close_channel(msg);
 	} else if ((ptr = cmdcasecmp("PART", msg))) {
@@ -509,7 +527,7 @@ send_mesg(char *msg, int count)
 	} else if ((ptr = cmdcasecmp("NICK", msg))) {
 		err = send_nick(ptr);
 	} else if ((ptr = cmdcasecmp("QUIT", msg))) {
-		dis_server(1);
+		run = 0;
 	} else if ((ptr = cmdcasecmp("MSG", msg))) {
 		err = send_priv(ptr, 0);
 	} else {

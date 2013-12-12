@@ -12,7 +12,7 @@ void init_ui(void);
 void cleanup(int);
 void main_loop(void);
 
-extern int numserver;
+extern int numfds;
 
 struct termios oterm, nterm;
 struct pollfd fds[MAXSERVERS + 1] = {{0}};
@@ -81,7 +81,7 @@ main_loop(void)
 
 	while (run) {
 
-		ret = poll(fds, numserver + 1, time);
+		ret = poll(fds, numfds, time);
 
 		if (ret == 0) { /* timed out check input buffer */
 			if (count > 0) {
@@ -94,7 +94,7 @@ main_loop(void)
 			time = 0;
 		/* Loop through all open sockets */
 		} else {
-			for (i = 1; i < numserver + 1; i++) {
+			for (i = 1; i < numfds; i++) {
 				if (fds[i].revents & POLLIN) {
 					if ((count = read(fds[i].fd, buf, BUFFSIZE)) == 0)
 						con_lost(fds[i].fd);
