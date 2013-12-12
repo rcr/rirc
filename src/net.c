@@ -212,11 +212,10 @@ sendf(int soc, const char *fmt, ...)
 }
 
 int
-get_auto_nick(char *p, char *nick)
+get_auto_nick(char *p, char *n)
 {
 	/* FIXME: check for null pointer and generate a nick here instead */
 
-	char *n = nick;
 	while (*p == ' ' || *p == ',')
 		p++;
 
@@ -228,6 +227,7 @@ get_auto_nick(char *p, char *nick)
 		*n++ = *p++;
 
 	*n = '\0';
+
 	s[rplsoc]->nptr = p;
 
 	return 1;
@@ -489,7 +489,7 @@ close_channel(char *ptr)
 		channel *c = ccur;
 		c->next->prev = c->prev;
 		c->prev->next = c->next;
-		ccur = c->next;
+		ccur = (ccur->next == channels) ? c->prev : c->next;
 		free(c);
 		draw_full();
 	}
