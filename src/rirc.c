@@ -79,11 +79,6 @@ main_loop(void)
 
 	run = 1;
 
-	char server1[] = "localhost:1111";
-	char server2[] = "localhost:2222";
-	send_conn(server1);
-	send_conn(server2);
-
 	while (run) {
 
 		ret = poll(fds, numserver + 1, time);
@@ -94,8 +89,6 @@ main_loop(void)
 				count = 0;
 			}
 			time = 200;
-			if (buf[0] == 'q') /* FIXME */
-				fatal(""); /* FIXME */
 		} else if (fds[0].revents & POLLIN) {
 			count = read(0, buf, BUFFSIZE);
 			time = 0;
