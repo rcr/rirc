@@ -13,7 +13,7 @@ void fatal(char*);
 /* net.c */
 void con_lost(int);
 void channel_sw(int);
-void channel_remove();
+void channel_close(void);
 void send_mesg(char*, int);
 void recv_mesg(char*, int, int);
 

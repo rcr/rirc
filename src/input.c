@@ -69,8 +69,7 @@ input(char *inp, int count)
 		else if (c == 0x0A) /* LF */
 			ready_send();
 		else if (c == 0x18) { /* ctrl-X */
-			channel_remove();
-			draw_full();
+			channel_close();
 		}
 	} else if (count > 0 && *inp == 0x1B) { /* escape sequence */
 		inp++;

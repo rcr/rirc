@@ -36,7 +36,6 @@ int send_nick(char*);
 int send_pong(char*);
 int send_priv(char*, int);
 server* new_server(char*, int, int);
-void close_channel(char*);
 void con_server(char*, int);
 void dis_server(server*, int);
 void do_recv(int);
@@ -93,18 +92,6 @@ channel_sw(int next)
 		ccur = ccur->prev;
 	if (tmp != ccur)
 		draw_full();
-}
-
-void
-channel_remove(void)
-{
-	channel *tmp = ccur;
-	(tmp->prev)->next = ccur->next;
-	(tmp->next)->prev = ccur->prev;
-	ccur = ccur->prev;
-
-	if (tmp != ccur)
-		free(tmp);
 }
 
 void
@@ -475,7 +462,7 @@ send_nick(char *ptr)
 }
 
 void
-close_channel(char *ptr)
+channel_close(void)
 {
 	if (ccur->type == SERVER) {
 		if (ccur == &rirc)
@@ -519,7 +506,7 @@ send_mesg(char *msg, int count)
 	} else if ((ptr = cmdcasecmp("DISCONNECT", msg))) {
 		dis_server(ccur->server, 0);
 	} else if ((ptr = cmdcasecmp("CLOSE", msg))) {
-		close_channel(msg);
+		channel_close();
 	} else if ((ptr = cmdcasecmp("PART", msg))) {
 		send_part(msg);
 	} else if ((ptr = cmdcasecmp("NICK", msg))) {
