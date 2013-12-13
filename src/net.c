@@ -65,8 +65,6 @@ char *autojoin = "#abc";
 /* comma and/or space separated list of nicks */
 char *nicks = "rcr, rcr_, rcr__";
 
-
-
 time_t raw_t;
 struct tm *t;
 
@@ -116,7 +114,7 @@ con_server(char *hostname, int port)
 	struct hostent *host;
 	struct in_addr h_addr;
 	if ((host = gethostbyname(hostname)) == NULL) {
-		newlinef(0, NOCHECK, "-!!-", "Error while resolving: %s", hostname);
+		newlinef(0, DEFAULT, "-!!-", "Error while resolving: %s", hostname);
 		return;
 	}
 
@@ -131,7 +129,7 @@ con_server(char *hostname, int port)
 	server.sin_addr.s_addr = inet_addr(inet_ntoa(h_addr));
 	server.sin_port = htons(port);
 	if (connect(soc, (struct sockaddr *) &server, sizeof(server)) < 0) {
-		newlinef(0, NOCHECK, "-!!-", "Error connecting to: %s", hostname);
+		newlinef(0, DEFAULT, "-!!-", "Error connecting to: %s", hostname);
 		close(soc);
 		return;
 	} else {
@@ -440,7 +438,7 @@ send_conn(char *ptr)
 		while (*ptr != '\0' && isdigit(*ptr))
 			digits++, ptr++;
 		if (digits > 5) {
-			newline(0, NOCHECK, 0, "Invalid port number", 0);
+			newline(0, DEFAULT, 0, "Invalid port number", 0);
 			return 0;
 		} else {
 			while (digits--) {
@@ -449,7 +447,7 @@ send_conn(char *ptr)
 			}
 		}
 		if (port > 65535) {
-			newline(0, NOCHECK, 0, "Invalid port number", 0);
+			newline(0, DEFAULT, 0, "Invalid port number", 0);
 			return 0;
 		}
 	} else
@@ -536,24 +534,14 @@ send_mesg(char *msg, int count)
 		return;
 	}
 	if (err == 1)
-		newline(ccur, NOCHECK, "-!!-", "Insufficient arguments", 0);
+		newline(ccur, DEFAULT, "-!!-", "Insufficient arguments", 0);
 	if (err == 2)
-		newline(ccur, NOCHECK, "-!!-", "Incorrect arguments", 0);
+		newline(ccur, DEFAULT, "-!!-", "Incorrect arguments", 0);
 }
 
 void
 newline(channel *c, line_t type, char *from, char *mesg, int len)
 {
-#if 0
-	If we're on a server and it's not connected. print this...
-	if (!connected && type != NOCHECK) {
-		from = "-!!-";
-		mesg = "You are not connected to a server";
-		type = DEFAULT;
-		len = strlen(mesg);
-	}
-#endif
-
 	if (len == 0)
 		len = strlen(mesg);
 
@@ -844,7 +832,7 @@ recv_400(int code, char *mesg)
 				else
 					/* TODO: generate rirc_(8 random ascii) */
 					/* and display message */
-					newline(0, NOCHECK, "-!!-", "Nicks exhausted", 0);
+					newline(0, DEFAULT, "-!!-", "Nicks exhausted", 0);
 			} else
 				newline(0, NUMRPL, "--", mesg, 0);
 			break;
