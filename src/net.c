@@ -140,6 +140,12 @@ con_server(char *hostname, int port)
 void
 dis_server(server *s, int kill)
 {
+	/* FIXME: is called from con_lost, dont send quit message */
+	if (channels == &rirc) {
+		newline(0, DEFAULT, "-!!-", "Cannot close main buffer", 0);
+		return;
+	}
+
 	if (kill) {
 
 		int i; /* Shuffle fds to front of array */
@@ -147,42 +153,59 @@ dis_server(server *s, int kill)
 			if (fds[i].fd == s->soc) break;
 		fds[i] = fds[--numfds];
 
-		channel *c = channels;
-		channel *e = channels->prev;
-
-		if (ccur == channels) {
-			if (channels->next->type == SERVER)
-				channels = channels->next;
-			else
-				channels = &rirc;
-		}
-		ccur = channels;
-
-		while (c <= e) {
-			channel *t = c;
-			if (t->server == s) {
+		channel *t, *c = channels;
+		do {
+			t = c;
+			if (t->server == s && t != channels) {
 				t->next->prev = t->prev;
 				t->prev->next = t->next;
 				free(t);
 			}
 			c = c->next;
+		} while (c != channels);
+
+		/* check channels, check ccur */
+		if (channels->server == s) {
+			t = channels;
+			if (channels->next == channels)
+				channels = &rirc;
+			else
+				channels = channels->next;
+			t->next->prev = t->prev;
+			t->prev->next = t->next;
+			free(t);
 		}
+		ccur = channels;
 
 		sendf(s->soc, "QUIT :Quitting!\r\n");
 		close(s->soc);
 		free(s);
 
-		draw_full();
 	} else {
-		/* newline (disconnected) into all channels, set socket 0; */
-		;
+		int i; /* Shuffle fds to front of array */
+		for (i = 1; i < numfds; i++)
+			if (fds[i].fd == s->soc) break;
+		fds[i] = fds[--numfds];
+
+		channel *c = channels;
+		do {
+			if (c->server == s)
+				newline(c, DEFAULT, "-!!-", "(disconnected)", 0);
+			c = c->next;
+		} while (c != channels);
+
+		sendf(s->soc, "QUIT :Quitting!\r\n");
+		close(s->soc);
+		s->soc = 0;
 	}
+	draw_full();
 }
 
 void
 con_lost(int socket)
 {
 	dis_server(s[socket], 0);
+	/* TODO: reconnect routine */
 }
 
 void
@@ -465,10 +488,7 @@ void
 channel_close(void)
 {
 	if (ccur->type == SERVER) {
-		if (ccur == &rirc)
-			newline(0, DEFAULT, "-!!-", "Cannot close main buffer", 0);
-		else
-			dis_server(ccur->server, 1);
+		dis_server(ccur->server, 1);
 	} else {
 		sendf(ccur->server->soc, "PART %s\r\n", ccur->name);
 		channel *c = ccur;
