@@ -4,6 +4,7 @@
 #include <signal.h>
 #include <unistd.h>
 #include <poll.h>
+#include <time.h>
 #include <termios.h>
 
 #include "common.h"
@@ -55,6 +56,8 @@ init_ui(void)
 	nterm.c_cc[VTIME] = 0;
 	if (tcsetattr(0, TCSADRAIN, &nterm) < 0)
 		fatal("tcsetattr");
+
+	srand(time(NULL));
 
 	/* Set sigwinch, init draw */
 	signal_sigwinch(0);

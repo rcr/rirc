@@ -21,7 +21,6 @@ char* cmdcasecmp(char*, char*);
 char* cmdcmp(char*, char*);
 char* getarg(char*);
 char* getarg_after(char**, char);
-int get_auto_nick(char*, char*);
 int get_numeric_code(char**);
 int recv_join(char*, char*);
 int recv_mode(char*, char*);
@@ -39,6 +38,7 @@ server* new_server(char*, int, int);
 void con_server(char*, int);
 void dis_server(server*, int);
 void do_recv(int);
+void get_auto_nick(char**, char*);
 void newline(channel*, line_t, char*, char*, int);
 void newlinef(channel*, line_t, char*, char*, ...);
 void recv_000(int, char*);
@@ -123,7 +123,7 @@ con_server(char *hostname, int port)
 
 		s[soc] = new_server(hostname, port, soc);
 		rplsoc = soc;
-		get_auto_nick(s[soc]->nptr, s[soc]->nick_me);
+		get_auto_nick(&(s[soc]->nptr), s[soc]->nick_me);
 		ccur = new_channel(hostname);
 		ccur->type = SERVER;
 		s[soc]->channel = ccur;
@@ -219,26 +219,30 @@ sendf(int soc, const char *fmt, ...)
 	va_end(args);
 }
 
-int
-get_auto_nick(char *p, char *n)
+void
+get_auto_nick(char **autonick, char *nick)
 {
-	/* FIXME: check for null pointer and generate a nick here instead */
-
+	char *p = *autonick;
 	while (*p == ' ' || *p == ',')
 		p++;
 
-	if (*p == '\0')
-		return 0;
+	if (*p == '\0') { /* Autonicks exhausted, generate a random nick */
+		char *base = "rirc_";
+		char *charset = "0123456789";
 
-	int c = 0;
-	while (*p != ' ' && *p != ',' && *p != '\0' && c++ < 50)
-		*n++ = *p++;
+		strcpy(nick, base);
+		nick += strlen(base);
 
-	*n = '\0';
-
-	s[rplsoc]->nptr = p;
-
-	return 1;
+		int i, len = strlen(charset);
+		for (i = 0; i < 4; i++)
+			*nick++ = charset[rand() % len];
+	} else {
+		int c = 0;
+		while (*p != ' ' && *p != ',' && *p != '\0' && c++ < 50)
+			*nick++ = *p++;
+		*autonick = p;
+	}
+	*nick = '\0';
 }
 
 char*
@@ -834,12 +838,8 @@ recv_400(int code, char *mesg)
 		case ERR_NICKNAMEINUSE:
 			/* <nick> :Nickname is already in use */
 			if (!s[rplsoc]->reg) {
-				if (get_auto_nick(s[rplsoc]->nptr, s[rplsoc]->nick_me))
-					sendf(rplsoc, "NICK %s\r\n", s[rplsoc]->nick_me);
-				else
-					/* TODO: generate rirc_(8 random ascii) */
-					/* and display message */
-					newline(0, DEFAULT, "-!!-", "Nicks exhausted", 0);
+				get_auto_nick(&(s[rplsoc]->nptr), s[rplsoc]->nick_me);
+				sendf(rplsoc, "NICK %s\r\n", s[rplsoc]->nick_me);
 			} else
 				newline(0, NUMRPL, "--", mesg, 0);
 			break;
