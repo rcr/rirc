@@ -16,7 +16,7 @@
 #define ERR_ERRONEUSNICKNAME 432
 
 channel* get_channel(char*);
-channel* new_channel(char*);
+channel* new_channel(char*, channel_t);
 char* cmdcasecmp(char*, char*);
 char* cmdcmp(char*, char*);
 char* getarg(char*);
@@ -324,15 +324,15 @@ trimarg_after(char **p1, char c)
 }
 
 channel*
-new_channel(char *name)
+new_channel(char *name, channel_t type)
 {
 	channel *c;
 	if ((c = malloc(sizeof(channel))) == NULL)
 		fatal("new_channel");
 	c->active = 0;
+	c->type = type;
 	c->cur_line = 0;
 	c->nick_pad = 0;
-	c->type = CHANNEL;
 	c->server = s[rplsoc];
 	memset(c->chat, 0, sizeof(c->chat));
 	strncpy(c->name, name, 50);
@@ -413,7 +413,7 @@ send_priv(char *mesg, int to_chan)
 
 		channel *c;
 		if ((c = get_channel(targ)) == NULL)
-			ccur = new_channel(targ);
+			ccur = new_channel(targ, CHANNEL);
 		else
 			ccur = c;
 		newline(ccur, DEFAULT, ccur->server->nick_me, mesg, 0);
@@ -663,7 +663,7 @@ recv_priv(char *prfx, char *mesg)
 	if (is_me(targ)) {
 		/* Private message, */
 		if ((c = get_channel(from)) == NULL)
-			c = new_channel(from);
+			c = new_channel(from, CHANNEL);
 		newline(c, DEFAULT, from, mesg, 0);
 		draw_chans();
 	} else {
@@ -724,7 +724,7 @@ recv_join(char *prfx, char *mesg)
 		chan++;
 
 	if (is_me(nick)) {
-		ccur = new_channel(chan);
+		ccur = new_channel(chan, CHANNEL);
 		newlinef(ccur, JOINPART, ">", "%s has joined %s", nick, chan);
 		draw_full();
 	} else {
