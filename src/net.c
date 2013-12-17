@@ -38,6 +38,7 @@ server* new_server(char*, int, int);
 void con_server(char*, int);
 void dis_server(server*, int);
 void do_recv(int);
+void free_channel(channel*);
 void get_auto_nick(char**, char*);
 void newline(channel*, line_t, char*, char*, int);
 void newlinef(channel*, line_t, char*, char*, ...);
@@ -502,6 +503,18 @@ channel_close(void)
 		free(c);
 		draw_full();
 	}
+}
+
+void
+free_channel(channel *c)
+{
+	line *l = c->chat;
+	line *e = l + SCROLLBACK;
+	c->next->prev = c->prev;
+	c->prev->next = c->next;
+	while (l->len && l < e)
+		free((l++)->text);
+	free(c);
 }
 
 void
