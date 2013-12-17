@@ -343,6 +343,8 @@ new_channel(char *name, channel_t type)
 		c->next = c;
 	} else {
 		/* Skip to end of server channels */
+		if (type == SERVER)
+			ccur = channels;
 		while (ccur->next->type == SERVER && ccur->next != channels)
 			ccur = ccur->next;
 		c->prev = ccur;
