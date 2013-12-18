@@ -86,13 +86,13 @@ channel *channels = &rirc;
 void
 channel_sw(int next)
 {
-	channel *tmp = ccur;
-	if (next)
+	if (ccur->next == ccur)
+		return;
+	else if (next)
 		ccur = ccur->next;
 	else
 		ccur = ccur->prev;
-	if (tmp != ccur)
-		draw_full();
+	draw_full();
 }
 
 void
@@ -229,14 +229,14 @@ get_auto_nick(char **autonick, char *nick)
 
 	if (*p == '\0') { /* Autonicks exhausted, generate a random nick */
 		char *base = "rirc_";
-		char *charset = "0123456789";
+		char *cset = "0123456789";
 
 		strcpy(nick, base);
 		nick += strlen(base);
 
-		int i, len = strlen(charset);
+		int i, len = strlen(cset);
 		for (i = 0; i < 4; i++)
-			*nick++ = charset[rand() % len];
+			*nick++ = cset[rand() % len];
 	} else {
 		int c = 0;
 		while (*p != ' ' && *p != ',' && *p != '\0' && c++ < 50)
@@ -497,12 +497,10 @@ channel_close(void)
 	if (ccur->type == SERVER) {
 		dis_server(ccur->server, 1);
 	} else {
-		sendf(ccur->server->soc, "PART %s\r\n", ccur->name);
 		channel *c = ccur;
-		c->next->prev = c->prev;
-		c->prev->next = c->next;
-		ccur = (ccur->next == channels) ? c->prev : c->next;
-		free(c);
+		sendf(ccur->server->soc, "PART %s\r\n", ccur->name);
+		ccur = (ccur->next == channels) ? ccur->prev : ccur->next;
+		free_channel(c);
 		draw_full();
 	}
 }
