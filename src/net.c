@@ -98,7 +98,6 @@ channel_sw(int next)
 void
 con_server(char *hostname, int port)
 {
-	int soc;
 	struct hostent *host;
 	struct in_addr h_addr;
 	if ((host = gethostbyname(hostname)) == NULL) {
@@ -108,33 +107,35 @@ con_server(char *hostname, int port)
 
 	h_addr.s_addr = *((unsigned long *) host->h_addr_list[0]);
 
-	struct sockaddr_in server;
-	if ((soc = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0)
+	struct sockaddr_in s_addr;
+	if ((rplsoc = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0)
 		fatal("socket");
 
-	memset(&server, 0, sizeof(server));
-	server.sin_family = AF_INET;
-	server.sin_addr.s_addr = inet_addr(inet_ntoa(h_addr));
-	server.sin_port = htons(port);
-	if (connect(soc, (struct sockaddr *) &server, sizeof(server)) < 0) {
+	memset(&s_addr, 0, sizeof(s_addr));
+	s_addr.sin_family = AF_INET;
+	s_addr.sin_addr.s_addr = inet_addr(inet_ntoa(h_addr));
+	s_addr.sin_port = htons(port);
+	if (connect(rplsoc, (struct sockaddr *) &s_addr, sizeof(s_addr)) < 0) {
 		newlinef(0, DEFAULT, "-!!-", "Error connecting to: %s", hostname);
-		close(soc);
+		close(rplsoc);
 		return;
 	} else {
+		server *ss = new_server(hostname, port, rplsoc);
+		s[rplsoc] = ss;
 
-		s[soc] = new_server(hostname, port, soc);
-		rplsoc = soc;
-		get_auto_nick(&(s[soc]->nptr), s[soc]->nick_me);
-		ccur = new_channel(hostname);
-		ccur->type = SERVER;
-		s[soc]->channel = ccur;
+		get_auto_nick(&(ss->nptr), ss->nick_me);
+
+		ccur = new_channel(hostname, SERVER);
+		ss->channel = ccur;
+
 		if (channels == &rirc)
 			channels = ccur;
-		fds[numfds++].fd = soc;
+
+		fds[numfds++].fd = rplsoc;
 		draw_chans();
 
-		sendf(soc, "NICK %s\r\n", s[soc]->nick_me);
-		sendf(soc, "USER %s 8 * :%s\r\n", user_me, realname);
+		sendf(rplsoc, "NICK %s\r\n", ss->nick_me);
+		sendf(rplsoc, "USER %s 8 * :%s\r\n", user_me, realname);
 	}
 }
 
@@ -147,34 +148,28 @@ dis_server(server *s, int kill)
 		return;
 	}
 
-	if (kill) {
+	int i; /* Shuffle fds to front of array */
+	for (i = 1; i < numfds; i++)
+		if (fds[i].fd == s->soc) break;
+	fds[i] = fds[--numfds];
 
-		int i; /* Shuffle fds to front of array */
-		for (i = 1; i < numfds; i++)
-			if (fds[i].fd == s->soc) break;
-		fds[i] = fds[--numfds];
+	if (kill) {
 
 		channel *t, *c = channels;
 		do {
 			t = c;
-			if (t->server == s && t != channels) {
-				t->next->prev = t->prev;
-				t->prev->next = t->next;
-				free(t);
-			}
+			if (t->server == s && t != channels)
+				free_channel(t);
 			c = c->next;
 		} while (c != channels);
 
-		/* check channels, check ccur */
 		if (channels->server == s) {
 			t = channels;
 			if (channels->next == channels)
 				channels = &rirc;
 			else
 				channels = channels->next;
-			t->next->prev = t->prev;
-			t->prev->next = t->next;
-			free(t);
+			free_channel(t);
 		}
 		ccur = channels;
 
@@ -183,10 +178,6 @@ dis_server(server *s, int kill)
 		free(s);
 
 	} else {
-		int i; /* Shuffle fds to front of array */
-		for (i = 1; i < numfds; i++)
-			if (fds[i].fd == s->soc) break;
-		fds[i] = fds[--numfds];
 
 		channel *c = channels;
 		do {
