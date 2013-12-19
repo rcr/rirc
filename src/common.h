@@ -5,6 +5,7 @@
 #define SENDBUFF MAXINPUT + 3
 
 typedef enum {SERVER, CHANNEL} channel_t;
+typedef enum {NONE, ACTIVE, NICKCH, PRIVMSG} activity_t;
 typedef enum {DEFAULT, JOINPART, NICK, ACTION, NUMRPL} line_t;
 
 /* rirc.c */
@@ -44,11 +45,11 @@ typedef struct line
 
 typedef struct channel
 {
-	int active;
 	int cur_line;
 	int nick_pad;
 	char name[50];
 	channel_t type;
+	activity_t active;
 	line chat[SCROLLBACK];
 	struct server *server;
 	struct channel *prev;

@@ -142,10 +142,14 @@ con_server(char *hostname, int port)
 void
 dis_server(server *s, int kill)
 {
-	/* FIXME: is called from con_lost, dont send quit message */
 	if (channels == &rirc) {
 		newline(0, DEFAULT, "-!!-", "Cannot close main buffer", 0);
 		return;
+	}
+
+	if (s->soc != 0) {
+		sendf(s->soc, "QUIT :Quitting!\r\n");
+		close(s->soc);
 	}
 
 	int i; /* Shuffle fds to front of array */
@@ -154,7 +158,6 @@ dis_server(server *s, int kill)
 	fds[i] = fds[--numfds];
 
 	if (kill) {
-
 		channel *t, *c = channels;
 		do {
 			t = c;
@@ -172,22 +175,14 @@ dis_server(server *s, int kill)
 			free_channel(t);
 		}
 		ccur = channels;
-
-		sendf(s->soc, "QUIT :Quitting!\r\n");
-		close(s->soc);
 		free(s);
-
 	} else {
-
 		channel *c = channels;
 		do {
 			if (c->server == s)
 				newline(c, DEFAULT, "-!!-", "(disconnected)", 0);
 			c = c->next;
 		} while (c != channels);
-
-		sendf(s->soc, "QUIT :Quitting!\r\n");
-		close(s->soc);
 		s->soc = 0;
 	}
 	draw_full();
@@ -196,6 +191,8 @@ dis_server(server *s, int kill)
 void
 con_lost(int socket)
 {
+	close(socket);
+	s[socket]->soc = 0;
 	dis_server(s[socket], 0);
 	/* TODO: reconnect routine */
 }
@@ -320,13 +317,13 @@ new_channel(char *name, channel_t type)
 	channel *c;
 	if ((c = malloc(sizeof(channel))) == NULL)
 		fatal("new_channel");
-	c->active = 0;
 	c->type = type;
 	c->cur_line = 0;
 	c->nick_pad = 0;
+	c->active = NONE;
 	c->server = s[rplsoc];
-	memset(c->chat, 0, sizeof(c->chat));
 	strncpy(c->name, name, 50);
+	memset(c->chat, 0, sizeof(c->chat));
 
 	/* Insert into linked list */
 	if (ccur == &rirc) {
