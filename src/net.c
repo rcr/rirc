@@ -817,6 +817,7 @@ recv_000(int code, char *mesg)
 				sendf(rplsoc, "JOIN %s\r\n", autojoin);
 			s[rplsoc]->nptr = nicks;
 			s[rplsoc]->reg = 1;
+			newline(s[rplsoc]->channel, DEFAULT, "CON", mesg, 0);
 			break;
 		default:
 			newline(0, NUMRPL, "CON", mesg, 0);
