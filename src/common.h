@@ -45,11 +45,11 @@ typedef struct line
 
 typedef struct channel
 {
-	int cur_line;
 	int nick_pad;
 	char name[50];
 	channel_t type;
 	activity_t active;
+	line *cur_line;
 	line chat[SCROLLBACK];
 	struct server *server;
 	struct channel *prev;

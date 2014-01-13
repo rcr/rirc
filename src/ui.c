@@ -8,7 +8,7 @@
 #define MAXINPUT 200
 
 int nick_col(char*);
-int print_line(int, int);
+int print_line(int, line*);
 int print_more(char*, char*, int);
 char* word_wrap(char*, char*);
 
@@ -109,18 +109,19 @@ void
 draw_chat(void)
 {
 	printf("\x1b[s"); /* save cursor location */
-	int r = print_line(w.ws_row - 2, ccur->cur_line);
+	int r = print_line(w.ws_row - 2, ccur->cur_line - 1);
 	while (r < w.ws_row - 1)
 		printf("\x1b[%d;1H\x1b[2K", r++);
 	printf("\x1b[u"); /* restore cursor location */
 }
 
 int
-print_line(int row, int i)
+print_line(int row, line *l)
 {
-	line *l = ccur->chat + ((i - 1 + SCROLLBACK) % SCROLLBACK);
+	if (l < ccur->chat)
+		l += SCROLLBACK;
 
-	if (!l->len)
+	if (!l->len || l == ccur->cur_line)
 		return 3;
 
 	tw = w.ws_col - ccur->nick_pad - nlw - 13;
@@ -135,7 +136,7 @@ print_line(int row, int i)
 		count++;
 
 	if (row - count > 2)
-		row = print_line(row - count, i - 1) + count - 1;
+		row = print_line(row - count, l - 1) + count - 1;
 
 	ptr1 = l->text;
 	if ((wrap = word_wrap(ptr1, ptr2)) != NULL)

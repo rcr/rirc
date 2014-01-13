@@ -70,7 +70,7 @@ struct tm *t;
 
 channel rirc = {
 	.active = 0,
-	.cur_line = 0,
+	.cur_line = rirc.chat,
 	.nick_pad = 0,
 	.name = "rirc",
 	.chat = {{0}},
@@ -318,7 +318,7 @@ new_channel(char *name, channel_t type)
 	if ((c = malloc(sizeof(channel))) == NULL)
 		fatal("new_channel");
 	c->type = type;
-	c->cur_line = 0;
+	c->cur_line = c->chat;
 	c->nick_pad = 0;
 	c->active = NONE;
 	c->server = s[rplsoc];
@@ -564,8 +564,10 @@ newline(channel *c, line_t type, char *from, char *mesg, int len)
 			c = s[rplsoc]->channel;
 	}
 
-	struct line *l;
-	l = &c->chat[c->cur_line];
+	line *l = c->cur_line++;
+
+	if (c->cur_line == &c->chat[SCROLLBACK])
+		c->cur_line = c->chat;
 
 	if (l->len)
 		free(l->text);
@@ -590,9 +592,6 @@ newline(channel *c, line_t type, char *from, char *mesg, int len)
 	int len_from;
 	if ((len_from = strlen(l->from)) > c->nick_pad)
 		c->nick_pad = len_from;
-
-	c->cur_line++;
-	c->cur_line %= SCROLLBACK;
 
 	if (c == ccur)
 		draw_chat();
