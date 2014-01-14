@@ -21,6 +21,7 @@ int tw = 0;  /* text width */
 int nlw = 3; /* nicklist width */
 
 int nick_cols[] = {1, 2, 3, 4, 5, 6, 7, 8, 9};
+int actv_cols[ACTV_SIZE] = {239, 247, 3};
 
 void
 resize(void)
@@ -59,12 +60,8 @@ draw_chans(void)
 	do {
 		len = strlen(c->name);
 		if (width + len + 4 < w.ws_col) {
-			int color;
-			if (c == ccur)
-				color = 255;
-			else
-				color = c->active ? 245 : 239;
-			printf("\x1b[38;5;%dm  %s  ", color, c->name);
+			printf("\x1b[38;5;%dm  %s  ",
+					(c == ccur) ? 255 : actv_cols[c->active], c->name);
 			width += len + 4;
 			c = c->next;
 		}

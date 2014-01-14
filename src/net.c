@@ -69,7 +69,7 @@ time_t raw_t;
 struct tm *t;
 
 channel rirc = {
-	.active = 0,
+	.active = NONE,
 	.cur_line = rirc.chat,
 	.nick_pad = 0,
 	.name = "rirc",
@@ -92,6 +92,7 @@ channel_sw(int next)
 		ccur = ccur->next;
 	else
 		ccur = ccur->prev;
+	ccur->active = NONE;
 	draw_full();
 }
 
@@ -595,6 +596,10 @@ newline(channel *c, line_t type, char *from, char *mesg, int len)
 
 	if (c == ccur)
 		draw_chat();
+	else if (type == DEFAULT && c->active < ACTIVE) {
+		c->active = ACTIVE;
+		draw_chans();
+	}
 }
 
 void
@@ -652,6 +657,7 @@ recv_priv(char *prfx, char *mesg)
 		if ((c = get_channel(from)) == NULL)
 			c = new_channel(from, CHANNEL);
 		newline(c, DEFAULT, from, mesg, 0);
+		c->active = PINGED;
 		draw_chans();
 	} else {
 		if ((c = get_channel(targ)) != NULL)

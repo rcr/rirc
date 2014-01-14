@@ -5,7 +5,7 @@
 #define SENDBUFF MAXINPUT + 3
 
 typedef enum {SERVER, CHANNEL} channel_t;
-typedef enum {NONE, ACTIVE, NICKCH, PRIVMSG} activity_t;
+typedef enum {NONE, ACTIVE, PINGED, ACTV_SIZE} activity_t;
 typedef enum {DEFAULT, JOINPART, NICK, ACTION, NUMRPL} line_t;
 
 /* rirc.c */
