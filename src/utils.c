@@ -1,3 +1,6 @@
+#include <stdlib.h>
+#include <string.h>
+
 /* AVL Tree implementation */
 typedef struct node {
 	char *nick;
@@ -10,11 +13,27 @@ typedef struct nicklist {
 	node *root;
 } nicklist;
 
+int nick_cmp(char*, char*);
 void nicklist_search(char*, nicklist*);
 void nicklist_insert(char*, nicklist*);
 void nicklist_delete(char*, nicklist*);
 
 
+
+int
+nick_cmp(char *n1, char *n2)
+{
+	/* Don't need to check for end of string, the longer will
+	 * compare a character to \0 and return */
+	for (;;) {
+		if (*n1 == *n2)
+			n1++, n2++;
+		else if (*n1 > *n2)
+			return 1;
+		else if (*n1 < *n2)
+			return 0;
+	};
+}
 
 void
 insert_nick(char *nick, nicklist *list)
