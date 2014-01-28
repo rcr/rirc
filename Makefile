@@ -2,7 +2,7 @@ ODIR = bld
 SDIR = src
 CFLAGS = -std=c99 -Wall -pedantic -g
 
-_OBJS = rirc.o input.o net.o ui.o
+_OBJS = rirc.o input.o net.o ui.o utils.o
 
 OBJS = $(patsubst %,$(ODIR)/%,$(_OBJS))
 
