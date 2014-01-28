@@ -31,7 +31,18 @@ int inp1, inp2;
 char input_bar[SENDBUFF];
 void input(char*, int);
 
+/* utils.c */
+struct node* node_delete(struct node*, char*);
+struct node* node_insert(struct node*, char*);
+
 int run;
+
+typedef struct node {
+	int height;
+	char *nick;
+	struct node *l;
+	struct node *r;
+} node;
 
 typedef struct line
 {
@@ -46,6 +57,8 @@ typedef struct line
 typedef struct channel
 {
 	int nick_pad;
+	int nick_count;
+	node *nick_root;
 	char name[50];
 	channel_t type;
 	activity_t active;

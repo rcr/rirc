@@ -1,27 +1,15 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "common.h"
+
 #define H(n) (n == NULL ? 0 : n->height)
 #define MAX(a, b) (a > b ? a : b)
-
-/* AVL Tree implementation */
-typedef struct node {
-	char *nick;
-	int height;
-	struct node *l;
-	struct node *r;
-} node;
-
-typedef struct nicklist {
-	int count;
-	node *root;
-} nicklist;
 
 int nick_cmp(char*, char*);
 node* new_node(char*);
 node* rotate_l(node*);
 node* rotate_r(node*);
-node* tree_insert(node*, char*);
 
 node *rotate_r(node *x)
 {
@@ -82,7 +70,7 @@ nick_cmp(char *n1, char *n2)
 }
 
 node*
-tree_insert(node *node, char *nick)
+node_insert(node *node, char *nick)
 {
 	if (node == NULL)
 		return new_node(nick);
@@ -91,9 +79,9 @@ tree_insert(node *node, char *nick)
 	if ((comp = nick_cmp(nick, node->nick)) == -1)
 		return node;
 	else if (comp)
-		node->r = tree_insert(node->r, nick);
+		node->r = node_insert(node->r, nick);
 	else
-		node->l = tree_insert(node->l, nick);
+		node->l = node_insert(node->l, nick);
 
 	node->height = MAX(H(node->l), H(node->r)) + 1;
 
