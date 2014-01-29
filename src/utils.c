@@ -1,5 +1,6 @@
 #include <stdlib.h>
 #include <string.h>
+#include <setjmp.h>
 
 #include "common.h"
 
@@ -10,6 +11,10 @@ int nick_cmp(char*, char*);
 node* new_node(char*);
 node* rotate_l(node*);
 node* rotate_r(node*);
+node* node_delete(struct node*, char*);
+node* node_insert(struct node*, char*);
+
+static jmp_buf jmpbuf;
 
 node *rotate_r(node *x)
 {
@@ -42,9 +47,7 @@ new_node(char *nick)
 {
 	node *node;
 	if ((node = malloc(sizeof(node))) == NULL)
-		return NULL; //		fatal("insert_nick");
-	if ((node->nick = malloc(strlen(nick))) == NULL)
-		return NULL; //		fatal("insert_nick");
+		fatal("insert_nick");
 	node->l = NULL;
 	node->r = NULL;
 	node->height = 1;
@@ -69,6 +72,28 @@ nick_cmp(char *n1, char *n2)
 	}
 }
 
+int
+nicklist_insert(node **n, char *nick)
+{
+	if (!setjmp(jmpbuf))
+		*n = node_insert(*n, nick);
+	else
+		return 0;
+
+	return 1;
+}
+
+int
+nicklist_delete(node **n, char *nick)
+{
+	if (!setjmp(jmpbuf))
+		*n = node_delete(*n, nick);
+	else
+		return 0;
+
+	return 1;
+}
+
 node*
 node_insert(node *node, char *nick)
 {
@@ -77,7 +102,7 @@ node_insert(node *node, char *nick)
 
 	int comp;
 	if ((comp = nick_cmp(nick, node->nick)) == -1)
-		return node;
+		longjmp(jmpbuf, 1);
 	else if (comp)
 		node->r = node_insert(node->r, nick);
 	else
@@ -102,4 +127,11 @@ node_insert(node *node, char *nick)
 	}
 
 	return node;
+}
+
+
+node*
+node_delete(node *node, char *nick)
+{
+	;
 }
