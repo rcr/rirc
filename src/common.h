@@ -1,6 +1,7 @@
 #define BUFFSIZE 512
 #define MAXINPUT 200
-#define MAXSERVERS 5
+#define NICKSIZE 50 /* TODO */
+#define MAXSERVERS 10
 #define SCROLLBACK 300
 #define SENDBUFF MAXINPUT + 3
 
@@ -8,7 +9,53 @@ typedef enum {SERVER, CHANNEL} channel_t;
 typedef enum {NONE, ACTIVE, PINGED, ACTV_SIZE} activity_t;
 typedef enum {DEFAULT, JOINPART, NICK, ACTION, NUMRPL} line_t;
 
+typedef struct node {
+	int height;
+	struct node *l;
+	struct node *r;
+	char nick[NICKSIZE];
+} node;
+
+typedef struct line
+{
+	int len;
+	int time_h;
+	int time_m;
+	char *text;
+	char from[NICKSIZE];
+	line_t type;
+} line;
+
+typedef struct channel
+{
+	activity_t active;
+	channel_t type;
+	char name[50];
+	int nick_pad;
+	int nick_count;         /* TODO */
+	struct channel *next;
+	struct channel *prev;
+	struct line *cur_line;
+	struct line chat[SCROLLBACK];
+	struct node *nicklist;  /* TODO */
+	struct server *server;
+} channel;
+
+typedef struct server
+{
+	char *iptr;
+	char *nptr;
+	char input[BUFFSIZE];
+	char name[50];
+	char nick_me[NICKSIZE];
+	int port;
+	int reg;
+	int soc;
+	struct channel *channel;
+} server;
+
 /* rirc.c */
+int run;
 void fatal(char*);
 
 /* net.c */
@@ -32,52 +79,5 @@ char input_bar[SENDBUFF];
 void input(char*, int);
 
 /* utils.c */
-struct node* node_delete(struct node*, char*);
-struct node* node_insert(struct node*, char*);
-
-int run;
-
-typedef struct node {
-	int height;
-	char *nick;
-	struct node *l;
-	struct node *r;
-} node;
-
-typedef struct line
-{
-	int len;
-	int time_h;
-	int time_m;
-	char from[50];
-	char *text;
-	line_t type;
-} line;
-
-typedef struct channel
-{
-	int nick_pad;
-	int nick_count;
-	node *nick_root;
-	char name[50];
-	channel_t type;
-	activity_t active;
-	line *cur_line;
-	line chat[SCROLLBACK];
-	struct server *server;
-	struct channel *prev;
-	struct channel *next;
-} channel;
-
-typedef struct server
-{
-	int soc; /* if soc == 0, disconnected */
-	int reg; /* registered with the server */
-	int port;
-	char name[50];
-	char *nptr;
-	char nick_me[50];
-	char input[BUFFSIZE];
-	char *iptr;
-	channel *channel;
-} server;
+int nicklist_insert(node**, char*);
+int nicklist_delete(node**, char*);
