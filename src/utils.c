@@ -11,8 +11,8 @@ int nick_cmp(char*, char*);
 node* new_node(char*);
 node* rotate_l(node*);
 node* rotate_r(node*);
-node* node_delete(struct node*, char*);
-node* node_insert(struct node*, char*);
+node* node_delete(node*, char*);
+node* node_insert(node*, char*);
 
 static jmp_buf jmpbuf;
 
@@ -45,31 +45,28 @@ node *rotate_l(node *x)
 node*
 new_node(char *nick)
 {
-	node *node;
-	if ((node = malloc(sizeof(node))) == NULL)
+	node *n;
+	if ((n = malloc(sizeof(node))) == NULL)
 		fatal("insert_nick");
-	node->l = NULL;
-	node->r = NULL;
-	node->height = 1;
-	strcpy(node->nick, nick);
-	return node;
+	n->l = NULL;
+	n->r = NULL;
+	n->height = 1;
+	strcpy(n->nick, nick);
+	return n;
 }
 
 int
 nick_cmp(char *n1, char *n2)
 {
-	for (;;) {
-		if (*n1 == *n2) {
-			if (*n1 == '\0')
-				return -1;
-			else
-				n1++, n2++;
-		}
-		else if (*n1 > *n2)
-			return 1;
-		else if (*n1 < *n2)
-			return 0;
-	}
+	while (*n1 == *n2 && *n1 != '\0')
+		n1++, n2++;
+
+	if (*n1 > *n2)
+		return 1;
+	if (*n1 < *n2)
+		return 0;
+
+	return -1;
 }
 
 int
