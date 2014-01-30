@@ -92,43 +92,97 @@ nicklist_delete(node **n, char *nick)
 }
 
 node*
-node_insert(node *node, char *nick)
+node_insert(node *n, char *nick)
 {
-	if (node == NULL)
+	if (n == NULL)
 		return new_node(nick);
 
 	int comp;
-	if ((comp = nick_cmp(nick, node->nick)) == -1)
+	if ((comp = nick_cmp(nick, n->nick)) == -1)
 		longjmp(jmpbuf, 1);
 	else if (comp)
-		node->r = node_insert(node->r, nick);
+		n->r = node_insert(n->r, nick);
 	else
-		node->l = node_insert(node->l, nick);
+		n->l = node_insert(n->l, nick);
 
-	node->height = MAX(H(node->l), H(node->r)) + 1;
+	n->height = MAX(H(n->l), H(n->r)) + 1;
 
-	int balance = H(node->l) - H(node->r);
+	int balance = H(n->l) - H(n->r);
 
 	/* Rebalance */
 	if (balance > 1) {
-		if (nick_cmp(nick, node->l->nick))
-			node->l = rotate_l(node->l);
+		if (nick_cmp(nick, n->l->nick))
+			n->l = rotate_l(n->l);
 
-		return rotate_r(node);
+		return rotate_r(n);
 	}
 	if (balance < -1) {
-		if (nick_cmp(node->r->nick, nick))
-			node->r = rotate_r(node->r);
+		if (nick_cmp(n->r->nick, nick))
+			n->r = rotate_r(n->r);
 
-		return rotate_l(node);
+		return rotate_l(n);
 	}
 
-	return node;
+	return n;
 }
 
-
 node*
-node_delete(node *node, char *nick)
+node_delete(node *n, char *nick)
 {
-	;
+	if (n == NULL)
+		longjmp(jmpbuf, 1);
+
+	int comp;
+	if ((comp = nick_cmp(nick, n->nick)) == -1) {
+
+		if (n->l && n->r) {
+
+			node *temp = n->r;
+			while (temp->l)
+				temp = temp->l;
+
+			strcpy(n->nick, temp->nick);
+
+			n->r = node_delete(n->r, temp->nick);
+		} else {
+
+			node *temp = n->l ? n->l : n->r;
+
+			if (temp == NULL) {
+				temp = n;
+				n = NULL;
+			} else {
+				*n = *temp;
+			}
+
+			free(temp);
+		}
+	}
+	else if(comp)
+		n->r = node_delete(n->r, nick);
+	else
+		n->l = node_delete(n->l, nick);
+
+	if (n == NULL)
+		return n;
+
+	n->height = MAX(H(n->l), H(n->r)) + 1;
+
+	int balance = H(n->l) - H(n->r);
+
+	/* Rebalance */
+	if (balance > 1) {
+		if (H(n->l->l) - H(n->l->r) < 0)
+			n->l =  rotate_l(n->l);
+
+		return rotate_r(n);
+	}
+	if (balance < -1) {
+		if (H(n->r->l) - H(n->r->r) > 0)
+			n->r = rotate_r(n->r);
+
+		return rotate_l(n);
+	}
+
+	return n;
 }
