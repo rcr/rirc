@@ -12,6 +12,8 @@
 #include "common.h"
 
 #define RPL_WELCOME            1
+#define RPL_NAMREPLY         353
+#define RPL_ENDOFNAMES       366
 #define ERR_NICKNAMEINUSE    433
 #define ERR_ERRONEUSNICKNAME 432
 
@@ -722,8 +724,10 @@ recv_join(char *prfx, char *mesg)
 		draw_full();
 	} else {
 		channel *c;
-		if ((c = get_channel(chan)) != NULL)
+		if ((c = get_channel(chan)) && nicklist_insert(&c->nicklist, nick)) {
 			newlinef(c, JOINPART, ">", "%s has joined %s", nick, chan);
+			c->nick_count++;
+		}
 		else
 			newlinef(0, DEFAULT, "ERR", "JOIN: channel %s not found", chan);
 	}
@@ -772,12 +776,20 @@ recv_quit(char *prfx, char *mesg)
 		return 1;
 	trimarg_after(&prfx, '!');
 
-	/* TODO: this should be inserted into any channel where the user was... */
+	mesg = getarg_after(&mesg, ':');
 
-	if ((mesg = getarg_after(&mesg, ':')) == NULL)
-		newlinef(0, JOINPART, "<", "%s has quit", nick);
-	else
-		newlinef(0, JOINPART, "<", "%s has quit (%s)", nick, mesg);
+	channel *c = channels;
+	do {
+		/* TODO: ensure this is working after join works */
+		if (c->server == s[rplsoc] && nicklist_delete(&c->nicklist, nick)) {
+			c->nick_count--;
+			if (mesg != NULL)
+				newlinef(c, JOINPART, "<", "%s has quit (%s)", nick, mesg);
+			else
+				newlinef(c, JOINPART, "<", "%s has quit", nick);
+		}
+		c = c->next;
+	} while (c != channels);
 
 	return 0;
 }
