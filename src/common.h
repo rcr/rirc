@@ -68,6 +68,7 @@ void recv_mesg(char*, int, int);
 /* ui.c */
 int window;
 void resize(void);
+void draw_bar(void);
 void draw_full(void);
 void draw_chat(void);
 void draw_chans(void);

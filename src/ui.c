@@ -38,8 +38,20 @@ resize(void)
 	printf("\x1b[%d;1H\x1b[2K", w.ws_row-1);
 	for (i = 0; i < w.ws_col; i++) /* Lower separator */
 		printf("―");
+
+	draw_bar();
+
 	printf("\x1b[%d;1H\x1b[2K >>> "C(250), w.ws_row); /* bottom bar */
 	draw_full();
+}
+
+void
+draw_bar()
+{
+	printf("\x1b[s"); /* save cursor location */
+	printf("\x1b[%d;2H"C(239), w.ws_row-1);
+	printf("[%d]―――――", ccur->nick_count);
+	printf("\x1b[u"); /* restore cursor location */
 }
 
 void
@@ -47,6 +59,7 @@ draw_full(void)
 {
 	draw_chans();
 	draw_chat();
+	draw_bar();
 	draw_input();
 }
 
