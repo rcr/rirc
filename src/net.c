@@ -321,8 +321,10 @@ new_channel(char *name, channel_t type)
 	if ((c = malloc(sizeof(channel))) == NULL)
 		fatal("new_channel");
 	c->type = type;
-	c->cur_line = c->chat;
 	c->nick_pad = 0;
+	c->nick_count = 0;
+	c->nicklist = NULL;
+	c->cur_line = c->chat;
 	c->active = NONE;
 	c->server = s[rplsoc];
 	strncpy(c->name, name, 50);
@@ -724,9 +726,13 @@ recv_join(char *prfx, char *mesg)
 		draw_full();
 	} else {
 		channel *c;
-		if ((c = get_channel(chan)) && nicklist_insert(&c->nicklist, nick)) {
+		/* TODO: ops status */
+		if (*nick == '@' || *nick == '+')
+			nick++;
+		if ((c = get_channel(chan)) && nicklist_insert(&(c->nicklist), nick)) {
 			newlinef(c, JOINPART, ">", "%s has joined %s", nick, chan);
 			c->nick_count++;
+			draw_bar();
 		}
 		else
 			newlinef(0, DEFAULT, "ERR", "JOIN: channel %s not found", chan);
@@ -756,12 +762,16 @@ recv_nick(char *prfx, char *mesg)
 
 	if (is_me(cur_nick)) {
 		strncpy(s[rplsoc]->nick_me, new_nick, 50);
-		newlinef(ccur, NICK, "", "You are now known as %s", new_nick);
+		newlinef(ccur, NICK, "*", "You are now known as %s", new_nick);
 	} else {
-		/* TODO: - change name in all channels where use is */
-		/*       - display message in those channels */
-		/* if is_me: just print to all channels */
-		newlinef(0, NICK, "", "NICK: %s -> %s", cur_nick, new_nick);
+		channel *c = channels;
+		do {
+			if (c->server == s[rplsoc] && nicklist_delete(&c->nicklist, cur_nick)) {
+				nicklist_insert(&c->nicklist, new_nick);
+				newlinef(c, NICK, "*", "%s  >>  %s", cur_nick, new_nick);
+			}
+			c = c->next;
+		} while (c != channels);
 	}
 	return 0;
 }
@@ -780,7 +790,6 @@ recv_quit(char *prfx, char *mesg)
 
 	channel *c = channels;
 	do {
-		/* TODO: ensure this is working after join works */
 		if (c->server == s[rplsoc] && nicklist_delete(&c->nicklist, nick)) {
 			c->nick_count--;
 			if (mesg != NULL)
@@ -790,6 +799,7 @@ recv_quit(char *prfx, char *mesg)
 		}
 		c = c->next;
 	} while (c != channels);
+	draw_bar();
 
 	return 0;
 }
@@ -844,10 +854,54 @@ recv_000(int code, char *mesg)
 void
 recv_200(int code, char *mesg)
 {
+	channel *c;
+	char *chan, *nick, *type;
+
 	switch(code) {
+		/* "("="/"*"/"@") <channel> :*([ "@" / "+" ] <nick>) */
+		case RPL_NAMREPLY:
+			/* TODO: channel type */
+			type = mesg; /* =,*,@ */
+			trimarg_after(&mesg, ' ');
+
+			chan = mesg;
+			trimarg_after(&mesg, ' ');
+
+			if ((c = get_channel(chan)) == NULL)
+				goto error;
+
+			if ((mesg = getarg_after(&mesg, ':')) == NULL)
+				goto error;
+
+			for (;;) {
+				nick = mesg;
+				trimarg_after(&mesg, ' ');
+
+				if (*nick == '\0')
+					break;
+
+				/* TODO: ops status */
+				if (*nick == '@' || *nick == '+')
+					nick++;
+				if (nicklist_insert(&c->nicklist, nick))
+					c->nick_count++;
+			}
+			draw_bar();
+			break;
+		case RPL_ENDOFNAMES:
+			chan = mesg;
+			trimarg_after(&mesg, ' ');
+			newlinef(0, NUMRPL, "TEST", "CHAN: %s", mesg);
+			if ((c = get_channel(mesg)) == NULL)
+				goto error;
+			newlinef(c, NUMRPL, "TEST", "count: %d", c->nick_count);
+			break;
 		default:
-			newline(0, NUMRPL, "INFO", mesg, 0);
+			newlinef(0, NUMRPL, "INFO", "%d ::: %s", code, mesg);
 	}
+	return;
+error:
+	newlinef(0, NUMRPL, "INFO", "%d ::: %s", code, mesg);
 }
 
 void
