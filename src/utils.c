@@ -57,6 +57,16 @@ new_node(char *nick)
 	return n;
 }
 
+void
+free_nicklist(node *n)
+{
+	if (n == NULL)
+		return;
+	free_nicklist(n->l);
+	free_nicklist(n->r);
+	free(n);
+}
+
 int
 nick_cmp(char *n1, char *n2)
 {

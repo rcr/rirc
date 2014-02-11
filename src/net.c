@@ -510,6 +510,7 @@ free_channel(channel *c)
 	c->prev->next = c->next;
 	while (l->len && l < e)
 		free((l++)->text);
+	free_nicklist(c->nicklist);
 	free(c);
 }
 

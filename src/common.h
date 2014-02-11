@@ -82,3 +82,4 @@ void input(char*, int);
 /* utils.c */
 int nicklist_insert(node**, char*);
 int nicklist_delete(node**, char*);
+void free_nicklist(node*);
