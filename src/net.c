@@ -574,9 +574,6 @@ newline(channel *c, line_t type, char *from, char *mesg, int len)
 
 	line *l = c->cur_line++;
 
-	if (c->cur_line == &c->chat[SCROLLBACK])
-		c->cur_line = c->chat;
-
 	if (l->len)
 		free(l->text);
 
@@ -600,6 +597,9 @@ newline(channel *c, line_t type, char *from, char *mesg, int len)
 	int len_from;
 	if ((len_from = strlen(l->from)) > c->nick_pad)
 		c->nick_pad = len_from;
+
+	if (c->cur_line == &c->chat[SCROLLBACK])
+		c->cur_line = c->chat;
 
 	if (c == ccur)
 		draw_chat();
@@ -725,7 +725,6 @@ recv_join(char *prfx, char *mesg)
 
 	if (is_me(nick)) {
 		ccur = new_channel(chan, CHANNEL);
-		newlinef(ccur, JOINPART, ">", "%s has joined %s", nick, chan);
 		draw_full();
 	} else {
 		channel *c;
@@ -826,13 +825,15 @@ recv_part(char *prfx, char *mesg)
 	trimarg_after(&mesg, ' ');
 
 	channel *c;
-	if ((c = get_channel(chan)) != NULL)
+	if ((c = get_channel(chan)) != NULL) {
+		c->nick_count--;
 		if ((mesg = getarg_after(&mesg, ':')) == NULL)
 			newlinef(c, JOINPART, "<", "%s has left %s", nick, chan);
 		else
 			newlinef(c, JOINPART, "<", "%s has left %s (%s)", nick, chan, mesg);
-	else
+	} else
 		newlinef(0, JOINPART, "<", "PART: channel %s not found", chan);
+	draw_bar();
 
 	return 0;
 }
@@ -861,6 +862,7 @@ recv_200(int code, char *mesg)
 	char *chan, *nick, *type;
 
 	switch(code) {
+
 		/* "("="/"*"/"@") <channel> :*([ "@" / "+" ] <nick>) */
 		case RPL_NAMREPLY:
 			/* TODO: channel type */
@@ -948,18 +950,21 @@ void
 recv_400(int code, char *mesg)
 {
 	switch(code) {
+
+		/* <nick> :Nickname is already in use */
 		case ERR_NICKNAMEINUSE:
-			/* <nick> :Nickname is already in use */
 			if (!s[rplsoc]->reg) {
 				get_auto_nick(&(s[rplsoc]->nptr), s[rplsoc]->nick_me);
 				sendf(rplsoc, "NICK %s\r\n", s[rplsoc]->nick_me);
 			} else
 				newline(0, NUMRPL, "--", mesg, 0);
 			break;
+
+		/* <nick> :Erroneous nickname */
 		case ERR_ERRONEUSNICKNAME:
-			/* <nick> :Erroneous nickname */
 			newline(0, NUMRPL, "--", mesg, 0);
 			break;
+
 		default:
 			newline(0, NUMRPL, "ERR", mesg, 0);
 	}

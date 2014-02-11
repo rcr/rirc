@@ -16,7 +16,8 @@ node* node_insert(node*, char*);
 
 static jmp_buf jmpbuf;
 
-node *rotate_r(node *x)
+node*
+rotate_r(node *x)
 {
 	node *y = x->l;
 	node *T2 = y->r;
@@ -29,7 +30,8 @@ node *rotate_r(node *x)
 	return y;
 }
 
-node *rotate_l(node *x)
+node*
+rotate_l(node *x)
 {
 	node *y = x->r;
 	node *T2 = y->l;
@@ -47,7 +49,7 @@ new_node(char *nick)
 {
 	node *n;
 	if ((n = malloc(sizeof(node))) == NULL)
-		fatal("insert_nick");
+		fatal("new_node");
 	n->l = NULL;
 	n->r = NULL;
 	n->height = 1;
@@ -162,9 +164,6 @@ node_delete(node *n, char *nick)
 		n->r = node_delete(n->r, nick);
 	else
 		n->l = node_delete(n->l, nick);
-
-	if (n == NULL)
-		return n;
 
 	n->height = MAX(H(n->l), H(n->r)) + 1;
 
