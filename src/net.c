@@ -12,6 +12,9 @@
 #include "common.h"
 
 #define RPL_WELCOME            1
+#define RPL_NOTOPIC          331
+#define RPL_TOPIC            332
+#define RPL_TOPICWHOTIME     333
 #define RPL_NAMREPLY         353
 #define RPL_ENDOFNAMES       366
 #define ERR_NICKNAMEINUSE    433
@@ -888,14 +891,51 @@ recv_200(int code, char *mesg)
 			}
 			draw_bar();
 			break;
+
 		case RPL_ENDOFNAMES:
+			break;
+
+		case RPL_NOTOPIC:
+			break;
+
+		/* <channel> :<topic> */
+		case RPL_TOPIC:
 			chan = mesg;
 			trimarg_after(&mesg, ' ');
-			newlinef(0, NUMRPL, "TEST", "CHAN: %s", mesg);
-			if ((c = get_channel(mesg)) == NULL)
+
+			if ((mesg = getarg_after(&mesg, ':')) == NULL)
 				goto error;
-			newlinef(c, NUMRPL, "TEST", "count: %d", c->nick_count);
+
+			if ((c = get_channel(chan)) == NULL)
+				goto error;
+
+			newlinef(c, NUMRPL, "--", "Topic for %s is \"%s\"", chan, mesg);
 			break;
+
+		/* <channel> <nick> <time> */
+		case RPL_TOPICWHOTIME:
+			chan = mesg;
+			trimarg_after(&mesg, ' ');
+
+			nick = mesg;
+			trimarg_after(&mesg, ' ');
+
+			char *time;
+
+			time = mesg;
+			trimarg_after(&mesg, ' ');
+
+			time_t raw_time = atoi(time);
+
+			if ((mesg = getarg_after(&mesg, ':')) == NULL)
+				goto error;
+
+			if ((c = get_channel(chan)) == NULL)
+				goto error;
+			newlinef(c, NUMRPL, "--", "Topic set by %s, %s",
+					nick, ctime(&raw_time));
+			break;
+
 		default:
 			newlinef(0, NUMRPL, "INFO", "%d ::: %s", code, mesg);
 	}
