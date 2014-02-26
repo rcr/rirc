@@ -16,6 +16,64 @@ node* node_insert(node*, char*);
 
 static jmp_buf jmpbuf;
 
+int
+getarg2(char **arg, char **str)
+{
+	char *i = *str;
+
+	while (*i == ' ')
+		i++;
+
+	if (*i == '\0')
+		return 0;
+
+	if (*i == ':') {
+		i++;
+		if (*i == '\0')
+			return 0;
+		else {
+			*arg = i;
+			return 2;
+		}
+	}
+
+	*arg = i;
+
+	while (*i != ' ' && *i != '\0')
+		i++;
+
+	if (*i == ' ')
+		*i++ = '\0';
+
+	*str = i;
+
+	return 1;
+}
+
+int
+getargc(char **arg, char **str, char c)
+{
+	char *i = *str;
+
+	while (*i == ' ' || *i == ':')
+		i++;
+
+	if (*i == '\0')
+		return 0;
+
+	*arg = i;
+
+	while (*i != c && *i != '\0')
+		i++;
+
+	if (*i == c)
+		*i++ = '\0';
+
+	*str = i;
+
+	return 1;
+}
+
 node*
 rotate_r(node *x)
 {

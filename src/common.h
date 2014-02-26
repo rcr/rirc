@@ -80,6 +80,8 @@ char input_bar[SENDBUFF];
 void input(char*, int);
 
 /* utils.c */
+int getarg2(char**, char**);
+int getargc(char**, char**, char);
 int nicklist_insert(node**, char*);
 int nicklist_delete(node**, char*);
 void free_nicklist(node*);
