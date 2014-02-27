@@ -622,57 +622,54 @@ newlinef(channel *c, line_t type, char *from, char *fmt, ...)
 }
 
 int
-recv_priv(char *prfx, char *mesg)
+recv_priv(char *prfx, char *args)
 {
-	/* :nick!user@hostname.localdomain PRIVMSG <target> :Message */
+	/* :nick!user@hostname.domain PRIVMSG <target> :<message> */
 
-	char *from, *targ;
+	char *from, *targ, *mesg;
+	channel *c;
 
-	/* Get the sender's nick */
-	if ((from = getarg_after(&prfx, ':')) == NULL)
+	if (!getargc(&from, &prfx, '!'))
 		return 1;
-	trimarg_after(&prfx, '!');
 
-	/* Get the message target */
-	if ((targ = getarg_after(&mesg, ' ')) == NULL)
+	if (!getarg2(&targ, &args))
 		return 1;
-	trimarg_after(&mesg, ' ');
 
-	/* Get the message */
-	if ((mesg = getarg_after(&mesg, ':')) == NULL)
+	if (!getarg2(&mesg, &args))
 		return 1;
+
+	if (is_me(targ)) {
+
+		if ((c = get_channel(from)) == NULL)
+			c = new_channel(from, CHANNEL);
+
+		if (c != ccur)
+			c->active = PINGED;
+
+		draw_chans();
+	} else if ((c = get_channel(targ)) == NULL)
+		newlinef(0, DEFAULT, "ERR", "PRIVMSG: target %s not found", targ);
 
 	/* Check for markup */
 	if (*mesg == 0x01) {
 
-		char *ptr;
-		if ((ptr = getarg_after(&mesg, 0x01)) == NULL)
-			return 1;
-		trimarg_after(&mesg, ' ');
+		char *cmd, *ptr = ++mesg;
 
-		if (cmdcmp("ACTION", ptr)) {
-			/* TODO strip terminating 0x01 */
-			// type = ACTION;
-			newlinef(0, DEFAULT, "*", "%s %s", from, mesg);
-		} else {
+		if (!getarg2(&cmd, &mesg))
 			return 1;
-		}
-	}
 
-	channel *c;
-	if (is_me(targ)) {
-		/* Private message, */
-		if ((c = get_channel(from)) == NULL)
-			c = new_channel(from, CHANNEL);
-		newline(c, DEFAULT, from, mesg, 0);
-		c->active = PINGED;
-		draw_chans();
-	} else {
-		if ((c = get_channel(targ)) != NULL)
-			newline(c, DEFAULT, from, mesg, 0);
+		while (*ptr != 0x01 && *ptr != '\0')
+			ptr++;
+		*ptr = '\0';
+
+		if (cmdcmp("ACTION", cmd))
+			newlinef(c, ACTION, "*", "%s %s", from, mesg);
 		else
-			newlinef(0, DEFAULT, "ERR", "PRIVMSG: target %s not found", targ);
+			newlinef(0, DEFAULT, "ERR", "PRIVMSG: unknown command %s", cmd);
+	} else {
+		newline(c, DEFAULT, from, mesg, 0);
 	}
+
 	return 0;
 }
 
