@@ -233,6 +233,9 @@ node_delete(node *n, char *nick)
 	else
 		n->l = node_delete(n->l, nick);
 
+	if (n == NULL)
+		return n;
+
 	n->height = MAX(H(n->l), H(n->r)) + 1;
 
 	int balance = H(n->l) - H(n->r);
