@@ -674,30 +674,24 @@ recv_priv(char *prfx, char *args)
 }
 
 int
-recv_note(char *prfx, char *mesg)
+recv_note(char *prfx, char *args)
 {
-	/* :name.hostname.localdomain NOTICE <target> :Message */
+	/* :nick.hostname.domain NOTICE <target> :<message> */
 
-	char *targ;
+	char *targ, *mesg;
+	channel *c;
 
-	/* Get the message target */
-	if ((targ = getarg_after(&mesg, ' ')) == NULL)
-		return 1;
-	trimarg_after(&mesg, ' ');
-
-	/* Get the message */
-	if ((mesg = getarg_after(&mesg, ':')) == NULL)
+	if (!getarg2(&targ, &args))
 		return 1;
 
-	if (is_me(targ)) {
+	if (!getarg2(&mesg, &args))
+		return 1;
+
+	if ((c = get_channel(targ)) != NULL)
+		newline(c, DEFAULT, 0, mesg, 0);
+	else
 		newline(0, DEFAULT, 0, mesg, 0);
-	} else {
-		channel *c;
-		if ((c = get_channel(targ)) != NULL)
-			newline(c, DEFAULT, 0, mesg, 0);
-		else
-			newline(0, DEFAULT, 0, mesg, 0);
-	}
+
 	return 0;
 }
 
