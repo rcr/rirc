@@ -696,40 +696,32 @@ recv_note(char *prfx, char *args)
 }
 
 int
-recv_join(char *prfx, char *mesg)
+recv_join(char *prfx, char *args)
 {
-	/* :user!~user@localhost.localdomain JOIN :#testing */
+	/* :nick!user@hostname.domain JOIN :<channel> */
 
 	char *nick, *chan;
+	channel *c;
 
-	/* Get the joining nick */
-	if ((nick = getarg_after(&prfx, ':')) == NULL)
-		return 1;
-	trimarg_after(&prfx, '!');
-
-	/* Get the channel to join */
-	if ((chan = getarg_after(&mesg, ' ')) == NULL)
+	if (!getargc(&nick, &prfx, '!'))
 		return 1;
 
-	/* FIXME: Stupid. ngircd uses JOIN :#channel, freenode used JOIN #channel */
-	if (*chan == ':')
-		chan++;
+	if (!getarg2(&chan, &args))
+		return 1;
 
 	if (is_me(nick)) {
 		ccur = new_channel(chan, CHANNEL);
 		draw_full();
 	} else {
-		channel *c;
-		/* TODO: ops status */
-		if (*nick == '@' || *nick == '+')
-			nick++;
 		if ((c = get_channel(chan)) && nicklist_insert(&(c->nicklist), nick)) {
 			newlinef(c, JOINPART, ">", "%s has joined %s", nick, chan);
 			c->nick_count++;
 			draw_bar();
-		}
-		else
+		} else if (c == NULL) {
 			newlinef(0, DEFAULT, "ERR", "JOIN: channel %s not found", chan);
+		} else {
+			newlinef(0, DEFAULT, "ERR", "JOIN: %s already in %s", chan, nick);
+		}
 	}
 	return 0;
 }
