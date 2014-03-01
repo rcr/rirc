@@ -793,32 +793,35 @@ recv_quit(char *prfx, char *args)
 }
 
 int
-recv_part(char *prfx, char *mesg)
+recv_part(char *prfx, char *args)
 {
-	/* :nick!user@hostname.localdomain PART #channel [:Optional part message] */
+	/* :nick!user@hostname.domain PART <channel> <:optional message> */
 
-	char *nick, *chan;
+	char *nick, *chan, *mesg;
+	channel *c;
 
-	if ((nick = getarg_after(&prfx, ':')) == NULL)
+	if (!getargc(&nick, &prfx, '!'))
 		return 1;
-	trimarg_after(&prfx, '!');
+
+	if (!getarg2(&chan, &args))
+		return 1;
+
+	if (!getarg2(&mesg, &args))
+		mesg = NULL;
 
 	if (is_me(nick))
 		return 0;
 
-	if ((chan = getarg_after(&mesg, ' ')) == NULL)
-		return 1;
-	trimarg_after(&mesg, ' ');
-
-	channel *c;
 	if ((c = get_channel(chan)) != NULL) {
-		c->nick_count--;
-		if ((mesg = getarg_after(&mesg, ':')) == NULL)
-			newlinef(c, JOINPART, "<", "%s has left %s", nick, chan);
-		else
-			newlinef(c, JOINPART, "<", "%s has left %s (%s)", nick, chan, mesg);
-	} else
-		newlinef(0, JOINPART, "<", "PART: channel %s not found", chan);
+		if (nicklist_delete(&c->nicklist, nick)) {
+			c->nick_count--;
+			if (mesg != NULL)
+				newlinef(c, JOINPART, "<", "%s left (%s)", nick, mesg);
+			else
+				newlinef(c, JOINPART, "<", "%s left", nick);
+		}
+	}
+
 	draw_bar();
 
 	return 0;
