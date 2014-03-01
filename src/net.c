@@ -763,18 +763,19 @@ recv_nick(char *prfx, char *mesg)
 }
 
 int
-recv_quit(char *prfx, char *mesg)
+recv_quit(char *prfx, char *args)
 {
-	/* :nick!user@localhost.localdomain QUIT [:Optional part message] */
+	/* :nick!user@hostname.domain QUIT <:optional message> */
 
-	char *nick;
-	if ((nick = getarg_after(&prfx, ':')) == NULL)
-		return 1;
-	trimarg_after(&prfx, '!');
-
-	mesg = getarg_after(&mesg, ':');
-
+	char *nick, *mesg;
 	channel *c = channels;
+
+	if (!getargc(&nick, &prfx, '!'))
+		return 1;
+
+	if (!getarg2(&mesg, &args))
+		mesg = NULL;
+
 	do {
 		if (c->server == s[rplsoc] && nicklist_delete(&c->nicklist, nick)) {
 			c->nick_count--;
@@ -785,6 +786,7 @@ recv_quit(char *prfx, char *mesg)
 		}
 		c = c->next;
 	} while (c != channels);
+
 	draw_bar();
 
 	return 0;
