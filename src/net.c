@@ -721,6 +721,7 @@ recv_join(char *prfx, char *args)
 			newlinef(0, DEFAULT, "ERR", "JOIN: %s already in %s", chan, nick);
 		}
 	}
+
 	return 0;
 }
 
@@ -731,17 +732,16 @@ recv_mode(char *prfx, char *mesg)
 }
 
 int
-recv_nick(char *prfx, char *mesg)
+recv_nick(char *prfx, char *args)
 {
-	/* :nick!user@localhost.localdomain NICK rcr2 */
+	/* :nick!user@hostname.domain NICK <new nick> */
 
 	char *cur_nick, *new_nick;
 
-	if ((cur_nick = getarg_after(&prfx, ':')) == NULL)
+	if (!getargc(&cur_nick, &prfx, '!'))
 		return 1;
-	trimarg_after(&prfx, '!');
 
-	if ((new_nick = getarg_after(&mesg, ':')) == NULL)
+	if (!getarg2(&new_nick, &args))
 		return 1;
 
 	if (is_me(cur_nick)) {
@@ -757,6 +757,7 @@ recv_nick(char *prfx, char *mesg)
 			c = c->next;
 		} while (c != channels);
 	}
+
 	return 0;
 }
 
@@ -804,20 +805,15 @@ recv_part(char *prfx, char *args)
 	if (!getarg2(&chan, &args))
 		return 1;
 
-	if (!getarg2(&mesg, &args))
-		mesg = NULL;
-
 	if (is_me(nick))
 		return 0;
 
-	if ((c = get_channel(chan)) != NULL) {
-		if (nicklist_delete(&c->nicklist, nick)) {
-			c->nick_count--;
-			if (mesg != NULL)
-				newlinef(c, JOINPART, "<", "%s left (%s)", nick, mesg);
-			else
-				newlinef(c, JOINPART, "<", "%s left", nick);
-		}
+	if ((c = get_channel(chan)) && nicklist_delete(&c->nicklist, nick)) {
+		c->nick_count--;
+		if (getarg2(&mesg, &args))
+			newlinef(c, JOINPART, "<", "%s left %s (%s)", nick, chan, mesg);
+		else
+			newlinef(c, JOINPART, "<", "%s left %s", nick, chan);
 	}
 
 	draw_bar();
