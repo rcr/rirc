@@ -392,33 +392,31 @@ get_channel(char *chan)
 }
 
 int
-send_priv(char *mesg, int to_chan)
+send_priv(char *args, int to_chan)
 {
 	if (to_chan) {
 		if (ccur->type == SERVER)
 			newline(ccur, DEFAULT, "-!!-", "This is not a channel!", 0);
 		else {
-			newline(ccur, DEFAULT, ccur->server->nick_me, mesg, 0);
-			sendf(ccur->server->soc, "PRIVMSG %s :%s\r\n", ccur->name, mesg);
+			newline(ccur, DEFAULT, ccur->server->nick_me, args, 0);
+			sendf(ccur->server->soc, "PRIVMSG %s :%s\r\n", ccur->name, args);
 		}
 	} else {
-		char *targ;
-		if ((targ = getarg_after(&mesg, ' ')) == NULL)
+		char *targ, *mesg;
+
+		if (!getarg2(&targ, &args))
 			return 1;
-		trimarg_after(&mesg, ' ');
-		if ((mesg = getarg_after(&mesg, ' ')) == NULL)
+		if (!getarg2(&mesg, &args))
 			return 1;
 
-		channel *c;
-		if ((c = get_channel(targ)) == NULL)
+		if (!(ccur = get_channel(targ)))
 			ccur = new_channel(targ, CHANNEL);
-		else
-			ccur = c;
-		newline(ccur, DEFAULT, ccur->server->nick_me, mesg, 0);
-		draw_full();
 
 		sendf(ccur->server->soc, "PRIVMSG %s :%s\r\n", targ, mesg);
+		newline(ccur, DEFAULT, ccur->server->nick_me, mesg, 0);
+		draw_full();
 	}
+
 	return 0;
 }
 
