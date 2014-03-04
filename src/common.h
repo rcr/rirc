@@ -32,12 +32,12 @@ typedef struct channel
 	channel_t type;
 	char name[50];
 	int nick_pad;
-	int nick_count;         /* TODO */
+	int nick_count;
 	struct channel *next;
 	struct channel *prev;
 	struct line *cur_line;
 	struct line chat[SCROLLBACK];
-	struct node *nicklist;  /* TODO */
+	struct node *nicklist;
 	struct server *server;
 } channel;
 
@@ -80,7 +80,8 @@ char input_bar[SENDBUFF];
 void input(char*, int);
 
 /* utils.c */
-int getarg2(char**, char**);
+int cmdcmp(char**, char*);
+int getarg(char**, char**);
 int getargc(char**, char**, char);
 int nicklist_insert(node**, char*);
 int nicklist_delete(node**, char*);

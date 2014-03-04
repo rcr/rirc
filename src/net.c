@@ -23,9 +23,6 @@
 channel* get_channel(char*);
 channel* new_channel(char*, channel_t);
 char* cmdcasecmp(char*, char*);
-char* cmdcmp(char*, char*);
-char* getarg(char*);
-char* getarg_after(char**, char);
 int get_numeric_code(char**);
 int recv_join(char*, char*);
 int recv_mode(char*, char*);
@@ -52,7 +49,6 @@ void recv_200(int, char*);
 void recv_400(int, char*);
 void send_part(char*);
 void sendf(int, const char*, ...);
-void trimarg_after(char**, char);
 
 int rplsoc;
 int numfds = 1; /* 1 for stdin */
@@ -248,14 +244,6 @@ cmdcasecmp(char *cmd, char *inp)
 	return 0;
 }
 
-char*
-cmdcmp(char *cmd, char *inp)
-{
-	while (*cmd++ == *inp++)
-		if (*cmd == '\0' && (*inp == '\0' || *inp == ' ')) return inp;
-	return 0;
-}
-
 int
 get_numeric_code(char **c)
 {
@@ -272,49 +260,6 @@ get_numeric_code(char **c)
 
 	*c = code + 1;
 	return sum;
-}
-
-char*
-getarg(char *ptr)
-{
-	while (*ptr == ' ' && *ptr != '\0')
-		ptr++;
-
-	if (*ptr == '\0')
-		return NULL;
-	else
-		return ptr;
-}
-
-char*
-getarg_after(char **p1, char c)
-{
-	char *p2 = *p1;
-	while (*p2 != c && *p2 != '\0')
-		p2++;
-	while (*p2 == c && *p2 != '\0')
-		p2++;
-	*p1 = p2;
-
-	if (*p1 == '\0')
-		return NULL;
-	else
-		return p2;
-}
-
-
-void
-trimarg_after(char **p1, char c)
-{
-	char *p2 = *p1;
-
-	while (*p2 != c && *p2 != '\0')
-		p2++;
-
-	if (*p2 != '\0')
-		*p2++ = '\0';
-
-	*p1 = p2;
 }
 
 channel*
@@ -404,9 +349,9 @@ send_priv(char *args, int to_chan)
 	} else {
 		char *targ, *mesg;
 
-		if (!getarg2(&targ, &args))
+		if (!getarg(&targ, &args))
 			return 1;
-		if (!getarg2(&mesg, &args))
+		if (!getarg(&mesg, &args))
 			return 1;
 
 		if (!(ccur = get_channel(targ)))
@@ -423,7 +368,7 @@ send_priv(char *args, int to_chan)
 int
 send_pong(char *ptr)
 {
-	if (!(ptr = getarg(ptr)))
+	if (!getarg(&ptr, &ptr))
 		return 1;
 	sendf(rplsoc, "PONG %s\r\n", ptr);
 	return 0;
@@ -432,28 +377,23 @@ send_pong(char *ptr)
 int
 send_conn(char *ptr)
 {
-	int port = 0;
-	char *hostname;
+	int port = 6667;
+	char *hostname, *p;
 
-	if (!(ptr = getarg(ptr)))
+	if (!getargc(&hostname, &ptr, ':'))
 		return 1;
-	hostname = ptr;
 
-	while (*ptr != ':' && *ptr != '\0')
-		ptr++;
-
-	if (*ptr == ':') {
-		*ptr++ = '\0';
+	if (getarg(&p, &ptr)) {
 		/* Extract port number, max is 65535 */
-		int digits = 0, factor = 1;
-		while (*ptr != '\0' && isdigit(*ptr))
-			digits++, ptr++;
+		int digits = port = 0, factor = 1;
+		while (*p != '\0' && isdigit(*p))
+			digits++, p++;
 		if (digits > 5) {
 			newline(0, DEFAULT, 0, "Invalid port number", 0);
 			return 0;
 		} else {
 			while (digits--) {
-				port += (*(--ptr) - '0') * factor;
+				port += (*(--p) - '0') * factor;
 				factor *= 10;
 			}
 		}
@@ -461,8 +401,8 @@ send_conn(char *ptr)
 			newline(0, DEFAULT, 0, "Invalid port number", 0);
 			return 0;
 		}
-	} else
-		port = 6667;
+	}
+
 	con_server(hostname, port);
 	return 0;
 }
@@ -470,7 +410,7 @@ send_conn(char *ptr)
 int
 send_join(char *ptr)
 {
-	if (!(ptr = getarg(ptr)))
+	if (!getarg(&ptr, &ptr))
 		return 1;
 	sendf(ccur->server->soc, "JOIN %s\r\n", ptr);
 	return 0;
@@ -479,7 +419,7 @@ send_join(char *ptr)
 int
 send_nick(char *ptr)
 {
-	if (!(ptr = getarg(ptr)))
+	if (!getarg(&ptr, &ptr))
 		return 1;
 	sendf(ccur->server->soc, "NICK %s\r\n", ptr);
 	return 0;
@@ -630,10 +570,10 @@ recv_priv(char *prfx, char *args)
 	if (!getargc(&from, &prfx, '!'))
 		return 1;
 
-	if (!getarg2(&targ, &args))
+	if (!getarg(&targ, &args))
 		return 1;
 
-	if (!getarg2(&mesg, &args))
+	if (!getarg(&mesg, &args))
 		return 1;
 
 	if (is_me(targ)) {
@@ -653,14 +593,13 @@ recv_priv(char *prfx, char *args)
 
 		char *cmd, *ptr = ++mesg;
 
-		if (!getarg2(&cmd, &mesg))
+		if (!getarg(&cmd, &mesg))
 			return 1;
 
-		while (*ptr != 0x01 && *ptr != '\0')
-			ptr++;
-		*ptr = '\0';
+		if (!getargc(&ptr, &ptr, 0x01))
+			return 1;
 
-		if (cmdcmp("ACTION", cmd))
+		if (cmdcmp(&cmd, "ACTION"))
 			newlinef(c, ACTION, "*", "%s %s", from, mesg);
 		else
 			newlinef(0, DEFAULT, "ERR", "PRIVMSG: unknown command %s", cmd);
@@ -679,10 +618,10 @@ recv_note(char *prfx, char *args)
 	char *targ, *mesg;
 	channel *c;
 
-	if (!getarg2(&targ, &args))
+	if (!getarg(&targ, &args))
 		return 1;
 
-	if (!getarg2(&mesg, &args))
+	if (!getarg(&mesg, &args))
 		return 1;
 
 	if ((c = get_channel(targ)) != NULL)
@@ -704,7 +643,7 @@ recv_join(char *prfx, char *args)
 	if (!getargc(&nick, &prfx, '!'))
 		return 1;
 
-	if (!getarg2(&chan, &args))
+	if (!getarg(&chan, &args))
 		return 1;
 
 	if (is_me(nick)) {
@@ -726,7 +665,7 @@ recv_join(char *prfx, char *args)
 }
 
 int
-recv_mode(char *prfx, char *mesg)
+recv_mode(char *prfx, char *args)
 {
 	return 0;
 }
@@ -741,7 +680,7 @@ recv_nick(char *prfx, char *args)
 	if (!getargc(&cur_nick, &prfx, '!'))
 		return 1;
 
-	if (!getarg2(&new_nick, &args))
+	if (!getarg(&new_nick, &args))
 		return 1;
 
 	if (is_me(cur_nick)) {
@@ -772,7 +711,7 @@ recv_quit(char *prfx, char *args)
 	if (!getargc(&nick, &prfx, '!'))
 		return 1;
 
-	if (!getarg2(&mesg, &args))
+	if (!getarg(&mesg, &args))
 		mesg = NULL;
 
 	do {
@@ -802,7 +741,7 @@ recv_part(char *prfx, char *args)
 	if (!getargc(&nick, &prfx, '!'))
 		return 1;
 
-	if (!getarg2(&chan, &args))
+	if (!getarg(&chan, &args))
 		return 1;
 
 	if (is_me(nick))
@@ -810,7 +749,7 @@ recv_part(char *prfx, char *args)
 
 	if ((c = get_channel(chan)) && nicklist_delete(&c->nicklist, nick)) {
 		c->nick_count--;
-		if (getarg2(&mesg, &args))
+		if (getarg(&mesg, &args))
 			newlinef(c, JOINPART, "<", "%s left %s (%s)", nick, chan, mesg);
 		else
 			newlinef(c, JOINPART, "<", "%s left %s", nick, chan);
@@ -839,35 +778,30 @@ recv_000(int code, char *mesg)
 }
 
 void
-recv_200(int code, char *mesg)
+recv_200(int code, char *args)
 {
+	char *chan, *nick, *type, *time;
 	channel *c;
-	char *chan, *nick, *type;
 
 	switch(code) {
 
 		/* "("="/"*"/"@") <channel> :*([ "@" / "+" ] <nick>) */
 		case RPL_NAMREPLY:
-			/* TODO: channel type */
-			type = mesg; /* =,*,@ */
-			trimarg_after(&mesg, ' ');
 
-			chan = mesg;
-			trimarg_after(&mesg, ' ');
+			/* TODO: channel type */
+			if (!getarg(&type, &args))
+				goto error;
+
+			if (!getarg(&chan, &args))
+				goto error;
 
 			if ((c = get_channel(chan)) == NULL)
 				goto error;
 
-			if ((mesg = getarg_after(&mesg, ':')) == NULL)
+			if (!getarg(&args, &args))
 				goto error;
 
-			for (;;) {
-				nick = mesg;
-				trimarg_after(&mesg, ' ');
-
-				if (*nick == '\0')
-					break;
-
+			while (getarg(&nick, &args)) {
 				/* TODO: ops status */
 				if (*nick == '@' || *nick == '+')
 					nick++;
@@ -885,48 +819,46 @@ recv_200(int code, char *mesg)
 
 		/* <channel> :<topic> */
 		case RPL_TOPIC:
-			chan = mesg;
-			trimarg_after(&mesg, ' ');
 
-			if ((mesg = getarg_after(&mesg, ':')) == NULL)
+			if (!getarg(&chan, &args))
+				goto error;
+
+			if (!getarg(&args, &args))
 				goto error;
 
 			if ((c = get_channel(chan)) == NULL)
 				goto error;
 
-			newlinef(c, NUMRPL, "--", "Topic for %s is \"%s\"", chan, mesg);
+			newlinef(c, NUMRPL, "--", "Topic for %s is \"%s\"", chan, args);
 			break;
 
 		/* <channel> <nick> <time> */
 		case RPL_TOPICWHOTIME:
-			chan = mesg;
-			trimarg_after(&mesg, ' ');
 
-			nick = mesg;
-			trimarg_after(&mesg, ' ');
+			if (!getarg(&chan, &args))
+				goto error;
 
-			char *time;
+			if (!getarg(&nick, &args))
+				goto error;
 
-			time = mesg;
-			trimarg_after(&mesg, ' ');
-
-			time_t raw_time = atoi(time);
-
-			if ((mesg = getarg_after(&mesg, ':')) == NULL)
+			if (!getarg(&time, &args))
 				goto error;
 
 			if ((c = get_channel(chan)) == NULL)
 				goto error;
-			newlinef(c, NUMRPL, "--", "Topic set by %s, %s",
-					nick, ctime(&raw_time));
+
+			time_t raw_time = atoi(time);
+			time = ctime(&raw_time);
+
+			newlinef(c, NUMRPL, "--", "Topic set by %s, %s", nick, time);
 			break;
 
 		default:
-			newlinef(0, NUMRPL, "INFO", "%d ::: %s", code, mesg);
+			newlinef(0, NUMRPL, "INFO", "%d ::: %s", code, args);
 	}
 	return;
 error:
-	newlinef(0, NUMRPL, "INFO", "%d ::: %s", code, mesg);
+	newlinef(0, NUMRPL, "INFO", "%d ::: %s", code, args);
 }
 
 void
@@ -959,28 +891,21 @@ do_recv(int soc)
 	rplsoc = soc;
 
 	int code, err = 0;
-	char *args, *prfx = 0;
+	char *args, *prfx;
 	char *ptr = s[soc]->input;
 
 	/* Check for message prefix */
-	if (*ptr == ':') {
-		prfx = ptr;
-		if ((ptr = getarg_after(&ptr, ' ')) == NULL)
-			goto rpl_error;
-	}
+	if (*ptr == ':' && !getargc(&prfx, &ptr, ' '))
+		goto rpl_error;
 
-	if (isdigit(*ptr)) { /* Reply code */
+	/* Reply code */
+	if (isdigit(*ptr)) {
 
 		if ((code = get_numeric_code(&ptr)) == -1)
 			goto rpl_error;
 
-		/* Cant parse until ':' because of 004, 005, 254, 255, etc */
-		if ((args = getarg_after(&ptr, ' ')) == NULL)
+		if (!getarg(&args, &ptr))
 			goto rpl_error;
-
-		/* So remove it here */
-		if (*ptr == ':')
-			ptr++;
 
 		if (!code) {
 			goto rpl_error;
@@ -993,23 +918,23 @@ do_recv(int soc)
 		} else {
 			goto rpl_error;
 		}
-	} else if ((args = cmdcmp("PRIVMSG", ptr))) {
-		err = recv_priv(prfx, args);
-	} else if ((args = cmdcmp("JOIN", ptr))) {
-		err = recv_join(prfx, args);
-	} else if ((args = cmdcmp("PART", ptr))) {
-		err = recv_part(prfx, args);
-	} else if ((args = cmdcmp("QUIT", ptr))) {
-		err = recv_quit(prfx, args);
-	} else if ((args = cmdcmp("NOTICE", ptr))) {
-		err = recv_note(prfx, args);
-	} else if ((args = cmdcmp("NICK", ptr))) {
-		err = recv_nick(prfx, args);
-	} else if ((args = cmdcmp("PING", ptr))) {
-		err = send_pong(args);
-	} else if ((args = cmdcmp("MODE", ptr))) {
-		err = recv_mode(prfx, args);
-	} else if ((args = cmdcmp("ERROR", ptr))) {
+	} else if (cmdcmp(&ptr, "PRIVMSG")) {
+		err = recv_priv(prfx, ptr);
+	} else if (cmdcmp(&ptr, "JOIN")) {
+		err = recv_join(prfx, ptr);
+	} else if (cmdcmp(&ptr, "PART")) {
+		err = recv_part(prfx, ptr);
+	} else if (cmdcmp(&ptr, "QUIT")) {
+		err = recv_quit(prfx, ptr);
+	} else if (cmdcmp(&ptr, "NOTICE")) {
+		err = recv_note(prfx, ptr);
+	} else if (cmdcmp(&ptr, "NICK")) {
+		err = recv_nick(prfx, ptr);
+	} else if (cmdcmp(&ptr, "PING")) {
+		err = send_pong(ptr);
+	} else if (cmdcmp(&ptr, "MODE")) {
+		err = recv_mode(prfx, ptr);
+	} else if (cmdcmp(&ptr, "ERROR")) {
 		newlinef(0, DEFAULT, 0, s[soc]->input, 0);
 	} else {
 		goto rpl_error;

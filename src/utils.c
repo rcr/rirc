@@ -17,7 +17,7 @@ node* node_insert(node*, char*);
 static jmp_buf jmpbuf;
 
 int
-getarg2(char **arg, char **str)
+getarg(char **arg, char **str)
 {
 	char *i = *str;
 
@@ -72,6 +72,25 @@ getargc(char **arg, char **str, char c)
 	*str = i;
 
 	return 1;
+}
+
+int
+cmdcmp(char **inp, char *cmd)
+{
+	char *i = *inp;
+
+	while (*cmd++ == *i++) {
+
+		if (*cmd == '\0' && (*i == '\0' || *i == ' ')) {
+
+			if (*i == ' ')
+				*i++ = '\0';
+
+			*inp = i;
+			return 1;
+		}
+	}
+	return 0;
 }
 
 node*
