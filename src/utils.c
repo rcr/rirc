@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <setjmp.h>
+#include <ctype.h>
 
 #include "common.h"
 
@@ -80,6 +81,25 @@ cmdcmp(char **inp, char *cmd)
 	char *i = *inp;
 
 	while (*cmd++ == *i++) {
+
+		if (*cmd == '\0' && (*i == '\0' || *i == ' ')) {
+
+			if (*i == ' ')
+				*i++ = '\0';
+
+			*inp = i;
+			return 1;
+		}
+	}
+	return 0;
+}
+
+int
+cmdcmpc(char **inp, char *cmd)
+{
+	char *i = *inp;
+
+	while (*cmd++ == toupper(*i++)) {
 
 		if (*cmd == '\0' && (*i == '\0' || *i == ' ')) {
 

@@ -13,7 +13,7 @@ int print_more(char*, char*, int);
 char* word_wrap(char*, char*);
 
 extern channel *ccur;
-extern channel *channels;
+extern channel *cfirst;
 
 struct winsize w;
 
@@ -69,7 +69,7 @@ draw_chans(void)
 	printf("\x1b[s"); /* save cursor location */
 	printf("\x1b[H\x1b[K");
 	int len, width = 0;
-	channel *c = channels;
+	channel *c = cfirst;
 	do {
 		len = strlen(c->name);
 		if (width + len + 4 < w.ws_col) {
@@ -79,7 +79,7 @@ draw_chans(void)
 			c = c->next;
 		}
 		else break;
-	} while (c != channels);
+	} while (c != cfirst);
 	printf("\x1b[u"); /* restore cursor location */
 }
 

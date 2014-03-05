@@ -45,14 +45,14 @@ esccmp(char *esc, char *inp)
 }
 
 void
-ready_send()
+ready_send(void)
 {
 	if (inp1 == 0)
 		return;
 	while (inp2 < MAXINPUT-1)
 		input_bar[inp1++] = input_bar[inp2++];
 	input_bar[inp1] = '\0';
-	send_mesg(input_bar, inp1-1);
+	send_mesg(input_bar, inp1);
 	inp1 = window = 0;
 	inp2 = MAXINPUT-1;
 }
@@ -68,9 +68,8 @@ input(char *inp, int count)
 			del_char(1);
 		else if (c == 0x0A) /* LF */
 			ready_send();
-		else if (c == 0x18) { /* ctrl-X */
+		else if (c == 0x18) /* ctrl-X */
 			channel_close();
-		}
 	} else if (count > 0 && *inp == 0x1B) { /* escape sequence */
 		inp++;
 		if (esccmp("[A", inp)) /* arrow up */

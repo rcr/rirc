@@ -9,7 +9,7 @@
 
 #include "common.h"
 
-void init_ui(void);
+void init(void);
 void cleanup(int);
 void main_loop(void);
 
@@ -21,7 +21,7 @@ struct pollfd fds[MAXSERVERS + 1] = {{0}};
 int
 main(int argc, char **argv)
 {
-	init_ui();
+	init();
 	main_loop();
 	cleanup(1);
 	return 0;
@@ -44,7 +44,7 @@ signal_sigwinch(int unused)
 }
 
 void
-init_ui(void)
+init(void)
 {
 	setbuf(stdout, NULL);
 

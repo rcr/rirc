@@ -22,7 +22,6 @@
 
 channel* get_channel(char*);
 channel* new_channel(char*, channel_t);
-char* cmdcasecmp(char*, char*);
 int get_numeric_code(char**);
 int recv_join(char*, char*);
 int recv_mode(char*, char*);
@@ -34,6 +33,7 @@ int recv_quit(char*, char*);
 int send_conn(char*);
 int send_join(char*);
 int send_nick(char*);
+int send_part(char*);
 int send_pong(char*);
 int send_priv(char*, int);
 server* new_server(char*, int, int);
@@ -47,7 +47,6 @@ void newlinef(channel*, line_t, char*, char*, ...);
 void recv_000(int, char*);
 void recv_200(int, char*);
 void recv_400(int, char*);
-void send_part(char*);
 void sendf(int, const char*, ...);
 
 int rplsoc;
@@ -59,8 +58,6 @@ server *s[MAXSERVERS + 3];
 /* Config Stuff */
 char *user_me = "rcr";
 char *realname = "Richard Robbins";
-/* server to connect to automatically on startup */
-char *autoconn = "";
 /* comma separated list of channels to join on connect*/
 char *autojoin = "#abc";
 /* comma and/or space separated list of nicks */
@@ -82,7 +79,7 @@ channel rirc = {
 };
 
 channel *ccur = &rirc;
-channel *channels = &rirc;
+channel *cfirst = &rirc;
 
 void
 channel_sw(int next)
@@ -130,8 +127,8 @@ con_server(char *hostname, int port)
 		ccur = new_channel(hostname, SERVER);
 		ss->channel = ccur;
 
-		if (channels == &rirc)
-			channels = ccur;
+		if (cfirst == &rirc)
+			cfirst = ccur;
 
 		fds[numfds++].fd = rplsoc;
 		draw_chans();
@@ -144,7 +141,7 @@ con_server(char *hostname, int port)
 void
 dis_server(server *s, int kill)
 {
-	if (channels == &rirc) {
+	if (cfirst == &rirc) {
 		newline(0, DEFAULT, "-!!-", "Cannot close main buffer", 0);
 		return;
 	}
@@ -160,31 +157,31 @@ dis_server(server *s, int kill)
 	fds[i] = fds[--numfds];
 
 	if (kill) {
-		channel *t, *c = channels;
+		channel *t, *c = cfirst;
 		do {
 			t = c;
-			if (t->server == s && t != channels)
+			if (t->server == s && t != cfirst)
 				free_channel(t);
 			c = c->next;
-		} while (c != channels);
+		} while (c != cfirst);
 
-		if (channels->server == s) {
-			t = channels;
-			if (channels->next == channels)
-				channels = &rirc;
+		if (cfirst->server == s) {
+			t = cfirst;
+			if (cfirst->next == cfirst)
+				cfirst = &rirc;
 			else
-				channels = channels->next;
+				cfirst = cfirst->next;
 			free_channel(t);
 		}
-		ccur = channels;
+		ccur = cfirst;
 		free(s);
 	} else {
-		channel *c = channels;
+		channel *c = cfirst;
 		do {
 			if (c->server == s)
 				newline(c, DEFAULT, "-!!-", "(disconnected)", 0);
 			c = c->next;
-		} while (c != channels);
+		} while (c != cfirst);
 		s->soc = 0;
 	}
 	draw_full();
@@ -200,312 +197,13 @@ con_lost(int socket)
 }
 
 void
-sendf(int soc, const char *fmt, ...)
-{
-	va_list args;
-	va_start(args, fmt);
-	char buff[BUFFSIZE];
-	int len = vsnprintf(buff, BUFFSIZE-1, fmt, args);
-	send(soc, buff, len, 0);
-	va_end(args);
-}
-
-void
-get_auto_nick(char **autonick, char *nick)
-{
-	char *p = *autonick;
-	while (*p == ' ' || *p == ',')
-		p++;
-
-	if (*p == '\0') { /* Autonicks exhausted, generate a random nick */
-		char *base = "rirc_";
-		char *cset = "0123456789";
-
-		strcpy(nick, base);
-		nick += strlen(base);
-
-		int i, len = strlen(cset);
-		for (i = 0; i < 4; i++)
-			*nick++ = cset[rand() % len];
-	} else {
-		int c = 0;
-		while (*p != ' ' && *p != ',' && *p != '\0' && c++ < 50)
-			*nick++ = *p++;
-		*autonick = p;
-	}
-	*nick = '\0';
-}
-
-char*
-cmdcasecmp(char *cmd, char *inp)
-{
-	while (*cmd++ == toupper(*inp++))
-		if (*cmd == '\0' && (*inp == '\0' || *inp == ' ')) return inp;
-	return 0;
-}
-
-int
-get_numeric_code(char **c)
-{
-	/* Codes are always three digits */
-	char *code = *c;
-	int sum = 0, factor = 100;
-	do {
-		sum += factor * (*code - '0');
-		factor /= 10;
-	} while (isdigit(*++code) && factor > 0);
-
-	if (*code != ' ' || factor > 0)
-		return -1;
-
-	*c = code + 1;
-	return sum;
-}
-
-channel*
-new_channel(char *name, channel_t type)
-{
-	channel *c;
-	if ((c = malloc(sizeof(channel))) == NULL)
-		fatal("new_channel");
-	c->type = type;
-	c->nick_pad = 0;
-	c->nick_count = 0;
-	c->nicklist = NULL;
-	c->cur_line = c->chat;
-	c->active = NONE;
-	c->server = s[rplsoc];
-	strncpy(c->name, name, 50);
-	memset(c->chat, 0, sizeof(c->chat));
-
-	/* Insert into linked list */
-	if (ccur == &rirc) {
-		c->prev = c;
-		c->next = c;
-	} else {
-		/* Skip to end of server channels */
-		if (type == SERVER)
-			ccur = channels;
-		while (ccur->next->type == SERVER && ccur->next != channels)
-			ccur = ccur->next;
-		c->prev = ccur;
-		c->next = ccur->next;
-		ccur->next->prev = c;
-		ccur->next = c;
-	}
-	return c;
-}
-
-server*
-new_server(char *name, int port, int soc)
-{
-	server *s;
-	if ((s = malloc(sizeof(server))) == NULL)
-		fatal("new_server");
-	s->reg = 0;
-	s->soc = soc;
-	s->port = port;
-	s->nptr = nicks;
-	s->iptr = s->input;
-	strncpy(s->name, name, 50);
-	return s;
-}
-
-int
-is_me(char *nick)
-{
-	char *n = s[rplsoc]->nick_me;
-	while (*n == *nick) {
-		if (*n == '\0')
-			return 1;
-		else
-			n++, nick++;
-	}
-	return 0;
-}
-
-channel*
-get_channel(char *chan)
-{
-	channel *c = channels;
-	do {
-		if (!strcmp(c->name, chan) && c->server->soc == rplsoc)
-			return c;
-		c = c->next;
-	} while (c != channels);
-	return NULL;
-}
-
-int
-send_priv(char *args, int to_chan)
-{
-	if (to_chan) {
-		if (ccur->type == SERVER)
-			newline(ccur, DEFAULT, "-!!-", "This is not a channel!", 0);
-		else {
-			newline(ccur, DEFAULT, ccur->server->nick_me, args, 0);
-			sendf(ccur->server->soc, "PRIVMSG %s :%s\r\n", ccur->name, args);
-		}
-	} else {
-		char *targ, *mesg;
-
-		if (!getarg(&targ, &args))
-			return 1;
-		if (!getarg(&mesg, &args))
-			return 1;
-
-		if (!(ccur = get_channel(targ)))
-			ccur = new_channel(targ, CHANNEL);
-
-		sendf(ccur->server->soc, "PRIVMSG %s :%s\r\n", targ, mesg);
-		newline(ccur, DEFAULT, ccur->server->nick_me, mesg, 0);
-		draw_full();
-	}
-
-	return 0;
-}
-
-int
-send_pong(char *ptr)
-{
-	if (!getarg(&ptr, &ptr))
-		return 1;
-	sendf(rplsoc, "PONG %s\r\n", ptr);
-	return 0;
-}
-
-int
-send_conn(char *ptr)
-{
-	int port = 6667;
-	char *hostname, *p;
-
-	if (!getargc(&hostname, &ptr, ':'))
-		return 1;
-
-	if (getarg(&p, &ptr)) {
-		/* Extract port number, max is 65535 */
-		int digits = port = 0, factor = 1;
-		while (*p != '\0' && isdigit(*p))
-			digits++, p++;
-		if (digits > 5) {
-			newline(0, DEFAULT, 0, "Invalid port number", 0);
-			return 0;
-		} else {
-			while (digits--) {
-				port += (*(--p) - '0') * factor;
-				factor *= 10;
-			}
-		}
-		if (port > 65535) {
-			newline(0, DEFAULT, 0, "Invalid port number", 0);
-			return 0;
-		}
-	}
-
-	con_server(hostname, port);
-	return 0;
-}
-
-int
-send_join(char *ptr)
-{
-	if (!getarg(&ptr, &ptr))
-		return 1;
-	sendf(ccur->server->soc, "JOIN %s\r\n", ptr);
-	return 0;
-}
-
-int
-send_nick(char *ptr)
-{
-	if (!getarg(&ptr, &ptr))
-		return 1;
-	sendf(ccur->server->soc, "NICK %s\r\n", ptr);
-	return 0;
-}
-
-void
-channel_close(void)
-{
-	if (ccur->type == SERVER) {
-		dis_server(ccur->server, 1);
-	} else {
-		channel *c = ccur;
-		sendf(ccur->server->soc, "PART %s\r\n", ccur->name);
-		ccur = (ccur->next == channels) ? ccur->prev : ccur->next;
-		free_channel(c);
-		draw_full();
-	}
-}
-
-void
-free_channel(channel *c)
-{
-	line *l = c->chat;
-	line *e = l + SCROLLBACK;
-	c->next->prev = c->prev;
-	c->prev->next = c->next;
-	while (l->len && l < e)
-		free((l++)->text);
-	free_nicklist(c->nicklist);
-	free(c);
-}
-
-void
-send_part(char *ptr)
-{
-	if (ccur == &rirc)
-		newline(0, DEFAULT, "-!!-", "Cannot execute 'part' on server", 0);
-	else {
-		newline(ccur, DEFAULT, "", "(disconnected)", 0);
-		sendf(ccur->server->soc, "PART %s\r\n", ccur->name);
-	}
-}
-
-void
-send_mesg(char *msg, int count)
-{
-	char *ptr;
-	int err = 0;
-	/* 512 bytes: Max IRC msg length */
-	if (*msg != '/') {
-		err = send_priv(msg, 1);
-	} else if ((ptr = cmdcasecmp("JOIN", ++msg))) {
-		err = send_join(ptr);
-	} else if ((ptr = cmdcasecmp("CONNECT", msg))) {
-		err = send_conn(ptr);
-	} else if ((ptr = cmdcasecmp("DISCONNECT", msg))) {
-		dis_server(ccur->server, 0);
-	} else if ((ptr = cmdcasecmp("CLOSE", msg))) {
-		channel_close();
-	} else if ((ptr = cmdcasecmp("PART", msg))) {
-		send_part(msg);
-	} else if ((ptr = cmdcasecmp("NICK", msg))) {
-		err = send_nick(ptr);
-	} else if ((ptr = cmdcasecmp("QUIT", msg))) {
-		run = 0;
-	} else if ((ptr = cmdcasecmp("MSG", msg))) {
-		err = send_priv(ptr, 0);
-	} else {
-		newlinef(ccur, DEFAULT, "-!!-", "Unknown command: %.*s%s",
-				15, msg, count > 15 ? "..." : "");
-		return;
-	}
-	if (err == 1)
-		newline(ccur, DEFAULT, "-!!-", "Insufficient arguments", 0);
-	if (err == 2)
-		newline(ccur, DEFAULT, "-!!-", "Incorrect arguments", 0);
-}
-
-void
 newline(channel *c, line_t type, char *from, char *mesg, int len)
 {
 	if (len == 0)
 		len = strlen(mesg);
 
 	if (c == 0) {
-		if (channels == &rirc)
+		if (cfirst == &rirc)
 			c = &rirc;
 		else
 			c = s[rplsoc]->channel;
@@ -557,6 +255,418 @@ newlinef(channel *c, line_t type, char *from, char *fmt, ...)
 	int len = vsnprintf(buff, BUFFSIZE-1, fmt, args);
 	newline(c, type, from, buff, len);
 	va_end(args);
+}
+
+void
+sendf(int soc, const char *fmt, ...)
+{
+	va_list args;
+	va_start(args, fmt);
+	char buff[BUFFSIZE];
+	int len = vsnprintf(buff, BUFFSIZE-1, fmt, args);
+	send(soc, buff, len, 0);
+	va_end(args);
+}
+
+void
+get_auto_nick(char **autonick, char *nick)
+{
+	char *p = *autonick;
+	while (*p == ' ' || *p == ',')
+		p++;
+
+	if (*p == '\0') { /* Autonicks exhausted, generate a random nick */
+		char *base = "rirc_";
+		char *cset = "0123456789";
+
+		strcpy(nick, base);
+		nick += strlen(base);
+
+		int i, len = strlen(cset);
+		for (i = 0; i < 4; i++)
+			*nick++ = cset[rand() % len];
+	} else {
+		int c = 0;
+		while (*p != ' ' && *p != ',' && *p != '\0' && c++ < 50)
+			*nick++ = *p++;
+		*autonick = p;
+	}
+	*nick = '\0';
+}
+
+int
+get_numeric_code(char **c)
+{
+	/* Codes are always three digits */
+	char *code = *c;
+	int sum = 0, factor = 100;
+	do {
+		sum += factor * (*code - '0');
+		factor /= 10;
+	} while (isdigit(*++code) && factor > 0);
+
+	if (*code != ' ' || factor > 0)
+		return -1;
+
+	*c = code + 1;
+	return sum;
+}
+
+channel*
+new_channel(char *name, channel_t type)
+{
+	channel *c;
+	if ((c = malloc(sizeof(channel))) == NULL)
+		fatal("new_channel");
+	c->type = type;
+	c->nick_pad = 0;
+	c->nick_count = 0;
+	c->nicklist = NULL;
+	c->cur_line = c->chat;
+	c->active = NONE;
+	c->server = s[rplsoc];
+	strncpy(c->name, name, 50);
+	memset(c->chat, 0, sizeof(c->chat));
+
+	/* Insert into linked list */
+	if (ccur == &rirc) {
+		c->prev = c;
+		c->next = c;
+	} else {
+		/* Skip to end of server channels */
+		if (type == SERVER)
+			ccur = cfirst;
+		while (ccur->next->type == SERVER && ccur->next != cfirst)
+			ccur = ccur->next;
+		c->prev = ccur;
+		c->next = ccur->next;
+		ccur->next->prev = c;
+		ccur->next = c;
+	}
+	return c;
+}
+
+server*
+new_server(char *name, int port, int soc)
+{
+	server *s;
+	if ((s = malloc(sizeof(server))) == NULL)
+		fatal("new_server");
+	s->reg = 0;
+	s->soc = soc;
+	s->port = port;
+	s->nptr = nicks;
+	s->iptr = s->input;
+	strncpy(s->name, name, 50);
+	return s;
+}
+
+int
+is_me(char *nick)
+{
+	char *n = s[rplsoc]->nick_me;
+	while (*n == *nick) {
+		if (*n == '\0')
+			return 1;
+		else
+			n++, nick++;
+	}
+	return 0;
+}
+
+channel*
+get_channel(char *chan)
+{
+	channel *c = cfirst;
+	do {
+		if (!strcmp(c->name, chan) && c->server->soc == rplsoc)
+			return c;
+		c = c->next;
+	} while (c != cfirst);
+	return NULL;
+}
+
+void
+channel_close(void)
+{
+	if (ccur->type == SERVER) {
+		dis_server(ccur->server, 1);
+	} else {
+		channel *c = ccur;
+		sendf(ccur->server->soc, "PART %s\r\n", ccur->name);
+		ccur = (ccur->next == cfirst) ? ccur->prev : ccur->next;
+		free_channel(c);
+		draw_full();
+	}
+}
+
+void
+free_channel(channel *c)
+{
+	line *l = c->chat;
+	line *e = l + SCROLLBACK;
+	c->next->prev = c->prev;
+	c->prev->next = c->next;
+	while (l->len && l < e)
+		free((l++)->text);
+	free_nicklist(c->nicklist);
+	free(c);
+}
+
+int
+send_conn(char *ptr)
+{
+	int port = 6667;
+	char *hostname, *p;
+
+	if (!getargc(&hostname, &ptr, ':'))
+		return 1;
+
+	if (getarg(&p, &ptr)) {
+		/* Extract port number, max is 65535 */
+		int digits = port = 0, factor = 1;
+		while (*p != '\0' && isdigit(*p))
+			digits++, p++;
+		if (digits > 5) {
+			newline(0, DEFAULT, 0, "Invalid port number", 0);
+			return 0;
+		} else {
+			while (digits--) {
+				port += (*(--p) - '0') * factor;
+				factor *= 10;
+			}
+		}
+		if (port > 65535) {
+			newline(0, DEFAULT, 0, "Invalid port number", 0);
+			return 0;
+		}
+	}
+
+	con_server(hostname, port);
+	return 0;
+}
+
+int
+send_join(char *ptr)
+{
+	sendf(ccur->server->soc, "JOIN %s\r\n", ptr);
+	return 0;
+}
+
+int
+send_nick(char *ptr)
+{
+	sendf(ccur->server->soc, "NICK %s\r\n", ptr);
+	return 0;
+}
+
+int
+send_part(char *ptr)
+{
+	if (ccur == &rirc)
+		newline(0, DEFAULT, "-!!-", "Cannot execute 'part' on server", 0);
+	else {
+		newline(ccur, DEFAULT, "", "(disconnected)", 0);
+		sendf(ccur->server->soc, "PART %s\r\n", ccur->name);
+	}
+	return 0;
+}
+
+int
+send_pong(char *ptr)
+{
+	sendf(rplsoc, "PONG %s\r\n", ptr);
+	return 0;
+}
+
+int
+send_priv(char *args, int to_chan)
+{
+	if (to_chan) {
+		if (ccur->type == SERVER)
+			newline(ccur, DEFAULT, "-!!-", "This is not a channel!", 0);
+		else {
+			newline(ccur, DEFAULT, ccur->server->nick_me, args, 0);
+			sendf(ccur->server->soc, "PRIVMSG %s :%s\r\n", ccur->name, args);
+		}
+	} else {
+		char *targ, *mesg;
+
+		if (!getarg(&targ, &args))
+			return 1;
+		if (!getarg(&mesg, &args))
+			return 1;
+
+		if (!(ccur = get_channel(targ)))
+			ccur = new_channel(targ, CHANNEL);
+
+		sendf(ccur->server->soc, "PRIVMSG %s :%s\r\n", targ, mesg);
+		newline(ccur, DEFAULT, ccur->server->nick_me, mesg, 0);
+		draw_full();
+	}
+
+	return 0;
+}
+
+void
+send_mesg(char *msg, int count)
+{
+	int err = 0;
+
+	if (*msg != '/') {
+		send_priv(msg, 1);
+		return;
+	}
+
+	msg++;
+	if (cmdcmpc(&msg, "JOIN")) {
+		err = send_join(msg);
+	} else if (cmdcmpc(&msg, "CONNECT")) {
+		err = send_conn(msg);
+	} else if (cmdcmpc(&msg, "DISCONNECT")) {
+		dis_server(ccur->server, 0);
+	} else if (cmdcmpc(&msg, "CLOSE")) {
+		channel_close();
+	} else if (cmdcmpc(&msg, "PART")) {
+		send_part(msg);
+	} else if (cmdcmpc(&msg, "NICK")) {
+		err = send_nick(msg);
+	} else if (cmdcmpc(&msg, "QUIT")) {
+		run = 0;
+	} else if (cmdcmpc(&msg, "MSG")) {
+		err = send_priv(msg, 0);
+	} else {
+		newlinef(ccur, DEFAULT, "-!!-", "Unknown command: %.*s%s",
+				15, msg, count > 15 ? "..." : "");
+		return;
+	}
+
+	if (err == 1)
+		newline(ccur, DEFAULT, "-!!-", "Insufficient arguments", 0);
+	if (err == 2)
+		newline(ccur, DEFAULT, "-!!-", "Incorrect arguments", 0);
+}
+
+int
+recv_join(char *prfx, char *args)
+{
+	/* :nick!user@hostname.domain JOIN :<channel> */
+
+	char *nick, *chan;
+	channel *c;
+
+	if (!getargc(&nick, &prfx, '!'))
+		return 1;
+
+	if (!getarg(&chan, &args))
+		return 1;
+
+	if (is_me(nick)) {
+		ccur = new_channel(chan, CHANNEL);
+		draw_full();
+	} else {
+		if ((c = get_channel(chan)) && nicklist_insert(&(c->nicklist), nick)) {
+			newlinef(c, JOINPART, ">", "%s has joined %s", nick, chan);
+			c->nick_count++;
+			draw_bar();
+		} else if (c == NULL) {
+			newlinef(0, DEFAULT, "ERR", "JOIN: channel %s not found", chan);
+		} else {
+			newlinef(0, DEFAULT, "ERR", "JOIN: %s already in %s", chan, nick);
+		}
+	}
+
+	return 0;
+}
+
+int
+recv_mode(char *prfx, char *args)
+{
+	/* TODO: */
+	newlinef(0, DEFAULT, "ERR", "MODE: %s %s", prfx, args);
+	return 0;
+}
+
+int
+recv_nick(char *prfx, char *args)
+{
+	/* :nick!user@hostname.domain NICK <new nick> */
+
+	char *cur_nick, *new_nick;
+
+	if (!getargc(&cur_nick, &prfx, '!'))
+		return 1;
+
+	if (!getarg(&new_nick, &args))
+		return 1;
+
+	if (is_me(cur_nick)) {
+		strncpy(s[rplsoc]->nick_me, new_nick, 50);
+		newlinef(ccur, NICK, "*", "You are now known as %s", new_nick);
+	} else {
+		channel *c = cfirst;
+		do {
+			if (c->server == s[rplsoc] && nicklist_delete(&c->nicklist, cur_nick)) {
+				nicklist_insert(&c->nicklist, new_nick);
+				newlinef(c, NICK, "*", "%s  >>  %s", cur_nick, new_nick);
+			}
+			c = c->next;
+		} while (c != cfirst);
+	}
+
+	return 0;
+}
+
+int
+recv_note(char *prfx, char *args)
+{
+	/* :nick.hostname.domain NOTICE <target> :<message> */
+
+	char *targ, *mesg;
+	channel *c;
+
+	if (!getarg(&targ, &args))
+		return 1;
+
+	if (!getarg(&mesg, &args))
+		return 1;
+
+	if ((c = get_channel(targ)) != NULL)
+		newline(c, DEFAULT, 0, mesg, 0);
+	else
+		newline(0, DEFAULT, 0, mesg, 0);
+
+	return 0;
+}
+
+int
+recv_part(char *prfx, char *args)
+{
+	/* :nick!user@hostname.domain PART <channel> <:optional message> */
+
+	char *nick, *chan, *mesg;
+	channel *c;
+
+	if (!getargc(&nick, &prfx, '!'))
+		return 1;
+
+	if (!getarg(&chan, &args))
+		return 1;
+
+	if (is_me(nick))
+		return 0;
+
+	if ((c = get_channel(chan)) && nicklist_delete(&c->nicklist, nick)) {
+		c->nick_count--;
+		if (getarg(&mesg, &args))
+			newlinef(c, JOINPART, "<", "%s left %s (%s)", nick, chan, mesg);
+		else
+			newlinef(c, JOINPART, "<", "%s left %s", nick, chan);
+	}
+
+	draw_bar();
+
+	return 0;
 }
 
 int
@@ -611,102 +721,12 @@ recv_priv(char *prfx, char *args)
 }
 
 int
-recv_note(char *prfx, char *args)
-{
-	/* :nick.hostname.domain NOTICE <target> :<message> */
-
-	char *targ, *mesg;
-	channel *c;
-
-	if (!getarg(&targ, &args))
-		return 1;
-
-	if (!getarg(&mesg, &args))
-		return 1;
-
-	if ((c = get_channel(targ)) != NULL)
-		newline(c, DEFAULT, 0, mesg, 0);
-	else
-		newline(0, DEFAULT, 0, mesg, 0);
-
-	return 0;
-}
-
-int
-recv_join(char *prfx, char *args)
-{
-	/* :nick!user@hostname.domain JOIN :<channel> */
-
-	char *nick, *chan;
-	channel *c;
-
-	if (!getargc(&nick, &prfx, '!'))
-		return 1;
-
-	if (!getarg(&chan, &args))
-		return 1;
-
-	if (is_me(nick)) {
-		ccur = new_channel(chan, CHANNEL);
-		draw_full();
-	} else {
-		if ((c = get_channel(chan)) && nicklist_insert(&(c->nicklist), nick)) {
-			newlinef(c, JOINPART, ">", "%s has joined %s", nick, chan);
-			c->nick_count++;
-			draw_bar();
-		} else if (c == NULL) {
-			newlinef(0, DEFAULT, "ERR", "JOIN: channel %s not found", chan);
-		} else {
-			newlinef(0, DEFAULT, "ERR", "JOIN: %s already in %s", chan, nick);
-		}
-	}
-
-	return 0;
-}
-
-int
-recv_mode(char *prfx, char *args)
-{
-	return 0;
-}
-
-int
-recv_nick(char *prfx, char *args)
-{
-	/* :nick!user@hostname.domain NICK <new nick> */
-
-	char *cur_nick, *new_nick;
-
-	if (!getargc(&cur_nick, &prfx, '!'))
-		return 1;
-
-	if (!getarg(&new_nick, &args))
-		return 1;
-
-	if (is_me(cur_nick)) {
-		strncpy(s[rplsoc]->nick_me, new_nick, 50);
-		newlinef(ccur, NICK, "*", "You are now known as %s", new_nick);
-	} else {
-		channel *c = channels;
-		do {
-			if (c->server == s[rplsoc] && nicklist_delete(&c->nicklist, cur_nick)) {
-				nicklist_insert(&c->nicklist, new_nick);
-				newlinef(c, NICK, "*", "%s  >>  %s", cur_nick, new_nick);
-			}
-			c = c->next;
-		} while (c != channels);
-	}
-
-	return 0;
-}
-
-int
 recv_quit(char *prfx, char *args)
 {
 	/* :nick!user@hostname.domain QUIT <:optional message> */
 
 	char *nick, *mesg;
-	channel *c = channels;
+	channel *c = cfirst;
 
 	if (!getargc(&nick, &prfx, '!'))
 		return 1;
@@ -723,37 +743,7 @@ recv_quit(char *prfx, char *args)
 				newlinef(c, JOINPART, "<", "%s has quit", nick);
 		}
 		c = c->next;
-	} while (c != channels);
-
-	draw_bar();
-
-	return 0;
-}
-
-int
-recv_part(char *prfx, char *args)
-{
-	/* :nick!user@hostname.domain PART <channel> <:optional message> */
-
-	char *nick, *chan, *mesg;
-	channel *c;
-
-	if (!getargc(&nick, &prfx, '!'))
-		return 1;
-
-	if (!getarg(&chan, &args))
-		return 1;
-
-	if (is_me(nick))
-		return 0;
-
-	if ((c = get_channel(chan)) && nicklist_delete(&c->nicklist, nick)) {
-		c->nick_count--;
-		if (getarg(&mesg, &args))
-			newlinef(c, JOINPART, "<", "%s left %s (%s)", nick, chan, mesg);
-		else
-			newlinef(c, JOINPART, "<", "%s left %s", nick, chan);
-	}
+	} while (c != cfirst);
 
 	draw_bar();
 
@@ -811,12 +801,6 @@ recv_200(int code, char *args)
 			draw_bar();
 			break;
 
-		case RPL_ENDOFNAMES:
-			break;
-
-		case RPL_NOTOPIC:
-			break;
-
 		/* <channel> :<topic> */
 		case RPL_TOPIC:
 
@@ -853,6 +837,13 @@ recv_200(int code, char *args)
 			newlinef(c, NUMRPL, "--", "Topic set by %s, %s", nick, time);
 			break;
 
+
+		case RPL_ENDOFNAMES:
+			break;
+
+		case RPL_NOTOPIC:
+			break;
+
 		default:
 			newlinef(0, NUMRPL, "INFO", "%d ::: %s", code, args);
 	}
@@ -883,6 +874,24 @@ recv_400(int code, char *mesg)
 		default:
 			newline(0, NUMRPL, "ERR", mesg, 0);
 	}
+}
+
+void
+recv_mesg(char *input, int count, int soc)
+{
+	char *i = s[soc]->iptr;
+	char *max = s[soc]->input + BUFFSIZE;
+
+	while (count--) {
+		if (*input == '\r') {
+			*i = '\0';
+			do_recv(soc);
+			i = s[soc]->input;
+		} else if (i < max && *input != '\n')
+			*i++ = *input;
+		input++;
+	}
+	s[soc]->iptr = i;
 }
 
 void
@@ -945,22 +954,4 @@ do_recv(int soc)
 
 rpl_error:
 	newlinef(0, DEFAULT, 0, "RPL ERROR: %s", s[soc]->input);
-}
-
-void
-recv_mesg(char *input, int count, int soc)
-{
-	char *i = s[soc]->iptr;
-	char *max = s[soc]->input + BUFFSIZE;
-
-	while (count--) {
-		if (*input == '\r') {
-			*i = '\0';
-			do_recv(soc);
-			i = s[soc]->input;
-		} else if (i < max && *input != '\n')
-			*i++ = *input;
-		input++;
-	}
-	s[soc]->iptr = i;
 }

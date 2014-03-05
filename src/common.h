@@ -81,6 +81,7 @@ void input(char*, int);
 
 /* utils.c */
 int cmdcmp(char**, char*);
+int cmdcmpc(char**, char*);
 int getarg(char**, char**);
 int getargc(char**, char**, char);
 int nicklist_insert(node**, char*);
