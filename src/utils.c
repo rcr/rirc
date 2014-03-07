@@ -77,40 +77,20 @@ getargc(char **arg, char **str, char c)
 }
 
 int
-cmdcmp(char **inp, char *cmd)
+cmdcmp(char *i, char *cmd)
 {
-	char *i = *inp;
-
-	while (*cmd++ == *i++) {
-
-		if (*cmd == '\0' && (*i == '\0' || *i == ' ')) {
-
-			if (*i == ' ')
-				*i++ = '\0';
-
-			*inp = i;
+	while (*cmd++ == *i++)
+		if (*cmd == '\0' && (*i == '\0' || *i == ' '))
 			return 1;
-		}
-	}
 	return 0;
 }
 
 int
-cmdcmpc(char **inp, char *cmd)
+cmdcmpc(char *i, char *cmd)
 {
-	char *i = *inp;
-
-	while (*cmd++ == toupper(*i++)) {
-
-		if (*cmd == '\0' && (*i == '\0' || *i == ' ')) {
-
-			if (*i == ' ')
-				*i++ = '\0';
-
-			*inp = i;
+	while (*cmd++ == toupper(*i++))
+		if (*cmd == '\0' && (*i == '\0' || *i == ' '))
 			return 1;
-		}
-	}
 	return 0;
 }
 

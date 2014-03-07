@@ -509,35 +509,35 @@ send_priv(char *args, int to_chan)
 }
 
 void
-send_mesg(char *msg, int count)
+send_mesg(char *mesg)
 {
+	char *cmd;
 	int err = 0;
 
-	if (*msg != '/') {
-		send_priv(msg, 1);
-		return;
-	}
-
-	msg++;
-	if (cmdcmpc(&msg, "JOIN")) {
-		err = send_join(msg);
-	} else if (cmdcmpc(&msg, "CONNECT")) {
-		err = send_conn(msg);
-	} else if (cmdcmpc(&msg, "DISCONNECT")) {
+	if (*mesg != '/') {
+		send_priv(mesg, 1);
+	} else if (mesg++ && !getarg(&cmd, &mesg)) {
+		; /* Error */
+	} else if (cmdcmpc(cmd, "JOIN")) {
+		err = send_join(mesg);
+	} else if (cmdcmpc(cmd, "CONNECT")) {
+		err = send_conn(mesg);
+	} else if (cmdcmpc(cmd, "DISCONNECT")) {
 		dis_server(ccur->server, 0);
-	} else if (cmdcmpc(&msg, "CLOSE")) {
+	} else if (cmdcmpc(cmd, "CLOSE")) {
 		channel_close();
-	} else if (cmdcmpc(&msg, "PART")) {
-		send_part(msg);
-	} else if (cmdcmpc(&msg, "NICK")) {
-		err = send_nick(msg);
-	} else if (cmdcmpc(&msg, "QUIT")) {
+	} else if (cmdcmpc(cmd, "PART")) {
+		send_part(mesg);
+	} else if (cmdcmpc(cmd, "NICK")) {
+		err = send_nick(mesg);
+	} else if (cmdcmpc(cmd, "QUIT")) {
 		run = 0;
-	} else if (cmdcmpc(&msg, "MSG")) {
-		err = send_priv(msg, 0);
+	} else if (cmdcmpc(cmd, "MSG")) {
+		err = send_priv(mesg, 0);
 	} else {
+		int len = strlen(cmd);
 		newlinef(ccur, DEFAULT, "-!!-", "Unknown command: %.*s%s",
-				15, msg, count > 15 ? "..." : "");
+				15, cmd, len > 15 ? "..." : "");
 		return;
 	}
 
@@ -900,7 +900,7 @@ do_recv(int soc)
 	rplsoc = soc;
 
 	int code, err = 0;
-	char *args, *prfx;
+	char *args, *prfx, *cmd;
 	char *ptr = s[soc]->input;
 
 	/* Check for message prefix */
@@ -927,23 +927,25 @@ do_recv(int soc)
 		} else {
 			goto rpl_error;
 		}
-	} else if (cmdcmp(&ptr, "PRIVMSG")) {
+	} else if (!getarg(&cmd, &ptr)) {
+		err = 1;
+	} else if (cmdcmp(cmd, "PRIVMSG")) {
 		err = recv_priv(prfx, ptr);
-	} else if (cmdcmp(&ptr, "JOIN")) {
+	} else if (cmdcmp(cmd, "JOIN")) {
 		err = recv_join(prfx, ptr);
-	} else if (cmdcmp(&ptr, "PART")) {
+	} else if (cmdcmp(cmd, "PART")) {
 		err = recv_part(prfx, ptr);
-	} else if (cmdcmp(&ptr, "QUIT")) {
+	} else if (cmdcmp(cmd, "QUIT")) {
 		err = recv_quit(prfx, ptr);
-	} else if (cmdcmp(&ptr, "NOTICE")) {
+	} else if (cmdcmp(cmd, "NOTICE")) {
 		err = recv_note(prfx, ptr);
-	} else if (cmdcmp(&ptr, "NICK")) {
+	} else if (cmdcmp(cmd, "NICK")) {
 		err = recv_nick(prfx, ptr);
-	} else if (cmdcmp(&ptr, "PING")) {
+	} else if (cmdcmp(cmd, "PING")) {
 		err = send_pong(ptr);
-	} else if (cmdcmp(&ptr, "MODE")) {
+	} else if (cmdcmp(cmd, "MODE")) {
 		err = recv_mode(prfx, ptr);
-	} else if (cmdcmp(&ptr, "ERROR")) {
+	} else if (cmdcmp(cmd, "ERROR")) {
 		newlinef(0, DEFAULT, 0, s[soc]->input, 0);
 	} else {
 		goto rpl_error;
