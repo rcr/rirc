@@ -699,17 +699,19 @@ recv_priv(char *prfx, char *args)
 		newlinef(0, DEFAULT, "ERR", "PRIVMSG: target %s not found", targ);
 
 	/* Check for markup */
-	if (*mesg == 0x01) {
+	if (*mesg == 0x1) {
+		mesg++;
 
-		char *cmd, *ptr = ++mesg;
-
+		char *cmd;
 		if (!getarg(&cmd, &mesg))
 			return 1;
 
-		if (!getargc(&ptr, &ptr, 0x01))
-			return 1;
+		char *ptr = mesg;
+		while (*ptr != '\0' && *ptr != 0x1)
+			ptr++;
+		*ptr = '\0';
 
-		if (cmdcmp(&cmd, "ACTION"))
+		if (cmdcmp(cmd, "ACTION"))
 			newlinef(c, ACTION, "*", "%s %s", from, mesg);
 		else
 			newlinef(0, DEFAULT, "ERR", "PRIVMSG: unknown command %s", cmd);
