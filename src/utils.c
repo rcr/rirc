@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <setjmp.h>
@@ -109,6 +110,35 @@ cmdcmpc(char **inp, char *cmd)
 			*inp = i;
 			return 1;
 		}
+	}
+	return 0;
+}
+
+int
+check_pinged(char *mesg, char *nick)
+{
+	char *n;
+
+	while (*mesg != '\0') {
+
+		n = nick;
+		while (*n == *mesg) {
+			n++, mesg++;
+
+			if (*n == '\0') {
+				if (!isalnum(*mesg)) {
+					putchar(0x7); /* BEL character */
+					return 1;
+				}
+				break;
+			}
+		}
+
+		while (*mesg != ' ' && *mesg != '\0')
+			mesg++;
+
+		while (*mesg == ' ' && *mesg != '\0')
+			mesg++;
 	}
 	return 0;
 }
