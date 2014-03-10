@@ -22,7 +22,7 @@
 
 channel* get_channel(char*);
 channel* new_channel(char*, channel_t);
-int get_numeric_code(char**);
+int get_numeric_code(char*);
 int recv_join(char*, char*);
 int recv_mode(char*, char*);
 int recv_nick(char*, char*);
@@ -295,20 +295,18 @@ get_auto_nick(char **autonick, char *nick)
 }
 
 int
-get_numeric_code(char **c)
+get_numeric_code(char *code)
 {
 	/* Codes are always three digits */
-	char *code = *c;
 	int sum = 0, factor = 100;
-	do {
-		sum += factor * (*code - '0');
+	while (isdigit(*code) && factor > 0) {
+		sum += factor * (*code++ - '0');
 		factor /= 10;
-	} while (isdigit(*++code) && factor > 0);
+	}
 
-	if (*code != ' ' || factor > 0)
-		return -1;
+	if (*code != '\0' || factor > 0)
+		return 0;
 
-	*c = code + 1;
 	return sum;
 }
 
@@ -909,11 +907,11 @@ do_recv(int soc)
 	if (*ptr == ':' && !getargc(&prfx, &ptr, ' '))
 		goto rpl_error;
 
-	/* Reply code */
-	if (isdigit(*ptr)) {
+	if (!getarg(&cmd, &ptr))
+		goto rpl_error;
 
-		if ((code = get_numeric_code(&ptr)) == -1)
-			goto rpl_error;
+	/* Reply code */
+	if ((code = get_numeric_code(cmd))) {
 
 		if (!getarg(&args, &ptr))
 			goto rpl_error;
@@ -929,8 +927,6 @@ do_recv(int soc)
 		} else {
 			goto rpl_error;
 		}
-	} else if (!getarg(&cmd, &ptr)) {
-		err = 1;
 	} else if (cmdcmp(cmd, "PRIVMSG")) {
 		err = recv_priv(prfx, ptr);
 	} else if (cmdcmp(cmd, "JOIN")) {
