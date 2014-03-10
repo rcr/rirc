@@ -11,12 +11,29 @@
 
 #include "common.h"
 
+/* Numeric Reply Codes */
 #define RPL_WELCOME            1
+#define RPL_YOURHOST           2
+#define RPL_CREATED            3
+#define RPL_MYINFO             4
+#define RPL_ISUPPORT           5
+#define RPL_STATSCONN        250
+#define RPL_LUSERCLIENT      251
+#define RPL_LUSEROP          252
+#define RPL_LUSERUNKNOWN     253
+#define RPL_LUSERCHANNELS    254
+#define RPL_LUSERME          255
+#define RPL_LOCALUSERS       265
+#define RPL_GLOBALUSERS      266
+#define RPL_CHANNEL_URL      328
 #define RPL_NOTOPIC          331
 #define RPL_TOPIC            332
 #define RPL_TOPICWHOTIME     333
 #define RPL_NAMREPLY         353
 #define RPL_ENDOFNAMES       366
+#define RPL_MOTD             372
+#define RPL_MOTDSTART        375
+#define RPL_ENDOFMOTD        376
 #define ERR_NICKNAMEINUSE    433
 #define ERR_ERRONEUSNICKNAME 432
 
@@ -751,7 +768,7 @@ recv_quit(char *prfx, char *args)
 }
 
 void
-recv_000(int code, char *mesg)
+recv_000(int code, char *args)
 {
 	switch(code) {
 		case RPL_WELCOME:
@@ -760,17 +777,27 @@ recv_000(int code, char *mesg)
 				sendf(rplsoc, "JOIN %s\r\n", autojoin);
 			s[rplsoc]->nptr = nicks;
 			s[rplsoc]->reg = 1;
-			newline(s[rplsoc]->channel, DEFAULT, "CON", mesg, 0);
+			newline(s[rplsoc]->channel, DEFAULT, "CON", args, 0);
 			break;
+
+		case RPL_YOURHOST:
+		case RPL_CREATED:
+		case RPL_MYINFO:
+		case RPL_ISUPPORT:
+			if (*args == ':')
+				args++;
+			newlinef(0, NUMRPL, "CON", args, 0);
+			break;
+
 		default:
-			newline(0, NUMRPL, "CON", mesg, 0);
+			newlinef(0, NUMRPL, "UNHANDLED", "%d ::: %s", code, args);
 	}
 }
 
 void
 recv_200(int code, char *args)
 {
-	char *chan, *nick, *type, *time;
+	char *chan, *nick, *mesg, *time, *type;
 	channel *c;
 
 	switch(code) {
@@ -837,42 +864,74 @@ recv_200(int code, char *args)
 			newlinef(c, NUMRPL, "--", "Topic set by %s, %s", nick, time);
 			break;
 
+		/* <channel> :<url> */
+		case RPL_CHANNEL_URL:
 
-		case RPL_ENDOFNAMES:
+			if (!getarg(&chan, &args))
+				goto error;
+
+			if (!getarg(&mesg, &args))
+				goto error;
+
+			if ((c = get_channel(chan)) == NULL)
+				goto error;
+
+			newlinef(c, NUMRPL, "--", "URL: %s", mesg);
 			break;
 
+		/* Print */
+		case RPL_STATSCONN:
+		case RPL_LUSERCLIENT:
+		case RPL_LUSEROP:
+		case RPL_LUSERUNKNOWN:
+		case RPL_LUSERCHANNELS:
+		case RPL_LUSERME:
+		case RPL_LOCALUSERS:
+		case RPL_GLOBALUSERS:
+		case RPL_MOTDSTART:
+		case RPL_MOTD:
+			if (*args == ':')
+				args++;
+			newlinef(0, NUMRPL, "INFO", args, 0);
+			break;
+
+		/* No Print */
+		case RPL_ENDOFMOTD:
+		case RPL_ENDOFNAMES:
 		case RPL_NOTOPIC:
 			break;
 
 		default:
-			newlinef(0, NUMRPL, "INFO", "%d ::: %s", code, args);
+			newlinef(0, NUMRPL, "UNHANDLED", "%d ::: %s", code, args);
 	}
 	return;
+
 error:
 	newlinef(0, NUMRPL, "INFO", "%d ::: %s", code, args);
 }
 
 void
-recv_400(int code, char *mesg)
+recv_400(int code, char *args)
 {
 	switch(code) {
 
 		/* <nick> :Nickname is already in use */
 		case ERR_NICKNAMEINUSE:
 			if (!s[rplsoc]->reg) {
+				newlinef(0, DEFAULT, 0, "nick '%s' in use",s[rplsoc]->nick_me);
 				get_auto_nick(&(s[rplsoc]->nptr), s[rplsoc]->nick_me);
 				sendf(rplsoc, "NICK %s\r\n", s[rplsoc]->nick_me);
 			} else
-				newline(0, NUMRPL, "--", mesg, 0);
+				newline(0, NUMRPL, "--", args, 0);
 			break;
 
 		/* <nick> :Erroneous nickname */
 		case ERR_ERRONEUSNICKNAME:
-			newline(0, NUMRPL, "--", mesg, 0);
+			newline(0, NUMRPL, "--", args, 0);
 			break;
 
 		default:
-			newline(0, NUMRPL, "ERR", mesg, 0);
+			newlinef(0, NUMRPL, "UNHANDLED", "%d ::: %s", code, args);
 	}
 }
 

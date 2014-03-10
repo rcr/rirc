@@ -52,7 +52,7 @@ ready_send(void)
 	while (inp2 < MAXINPUT-1)
 		input_bar[inp1++] = input_bar[inp2++];
 	input_bar[inp1] = '\0';
-	send_mesg(input_bar, inp1);
+	send_mesg(input_bar);
 	inp1 = window = 0;
 	inp2 = MAXINPUT-1;
 }

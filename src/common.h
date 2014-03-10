@@ -62,7 +62,7 @@ void fatal(char*);
 void con_lost(int);
 void channel_sw(int);
 void channel_close(void);
-void send_mesg(char*, int);
+void send_mesg(char*);
 void recv_mesg(char*, int, int);
 
 /* ui.c */
@@ -80,8 +80,9 @@ char input_bar[SENDBUFF];
 void input(char*, int);
 
 /* utils.c */
-int cmdcmp(char**, char*);
-int cmdcmpc(char**, char*);
+int check_pinged(char*, char*);
+int cmdcmp(char*, char*);
+int cmdcmpc(char*, char*);
 int getarg(char**, char**);
 int getargc(char**, char**, char);
 int nicklist_insert(node**, char*);
