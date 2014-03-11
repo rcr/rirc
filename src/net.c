@@ -505,18 +505,19 @@ send_priv(char *args, int to_chan)
 			sendf(ccur->server->soc, "PRIVMSG %s :%s\r\n", ccur->name, args);
 		}
 	} else {
-		char *targ, *mesg;
+		char *targ;
 
 		if (!getarg(&targ, &args))
 			return 1;
-		if (!getarg(&mesg, &args))
+
+		if (*args == '\0')
 			return 1;
 
-		if (!(ccur = get_channel(targ)))
-			ccur = new_channel(targ, CHANNEL);
+		channel *c;
+		ccur = (c = get_channel(targ)) ? c : new_channel(targ, CHANNEL);
 
-		sendf(ccur->server->soc, "PRIVMSG %s :%s\r\n", targ, mesg);
-		newline(ccur, DEFAULT, ccur->server->nick_me, mesg, 0);
+		sendf(ccur->server->soc, "PRIVMSG %s :%s\r\n", targ, args);
+		newline(ccur, DEFAULT, ccur->server->nick_me, args, 0);
 		draw_full();
 	}
 
@@ -833,6 +834,8 @@ recv_000(int code, char *args)
 				sendf(rplsoc, "JOIN %s\r\n", autojoin);
 			s[rplsoc]->nptr = nicks;
 			s[rplsoc]->reg = 1;
+			if (*args == ':')
+				args++;
 			newline(s[rplsoc]->channel, DEFAULT, "CON", args, 0);
 			break;
 
@@ -842,7 +845,7 @@ recv_000(int code, char *args)
 		case RPL_ISUPPORT:
 			if (*args == ':')
 				args++;
-			newlinef(0, NUMRPL, "CON", args, 0);
+			newline(0, NUMRPL, "CON", args, 0);
 			break;
 
 		default:
@@ -948,7 +951,7 @@ recv_200(int code, char *args)
 		case RPL_MOTD:
 			if (*args == ':')
 				args++;
-			newlinef(0, NUMRPL, "INFO", args, 0);
+			newline(0, NUMRPL, "INFO", args, 0);
 			break;
 
 		/* No Print */
@@ -974,7 +977,7 @@ recv_400(int code, char *args)
 		/* <nick> :Nickname is already in use */
 		case ERR_NICKNAMEINUSE:
 			if (!s[rplsoc]->reg) {
-				newlinef(0, DEFAULT, 0, "nick '%s' in use",s[rplsoc]->nick_me);
+				newlinef(0, DEFAULT, "--", "nick '%s' in use", s[rplsoc]->nick_me);
 				get_auto_nick(&(s[rplsoc]->nptr), s[rplsoc]->nick_me);
 				sendf(rplsoc, "NICK %s\r\n", s[rplsoc]->nick_me);
 			} else
@@ -1059,7 +1062,7 @@ do_recv(int soc)
 	} else if (cmdcmp(cmd, "MODE")) {
 		err = recv_mode(prfx, ptr);
 	} else if (cmdcmp(cmd, "ERROR")) {
-		newlinef(0, DEFAULT, 0, s[soc]->input, 0);
+		newline(0, DEFAULT, 0, s[soc]->input, 0);
 	} else {
 		goto rpl_error;
 	}
