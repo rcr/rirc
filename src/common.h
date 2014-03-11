@@ -9,6 +9,15 @@ typedef enum {SERVER, CHANNEL} channel_t;
 typedef enum {NONE, ACTIVE, PINGED, ACTV_SIZE} activity_t;
 typedef enum {DEFAULT, JOINPART, NICK, ACTION, NUMRPL} line_t;
 
+/* User modes */
+#define UMODE_a (1 << 0) /* away */
+#define UMODE_i (1 << 1) /* invisible */
+#define UMODE_w (1 << 2) /* receiving wallops */
+#define UMODE_r (1 << 3) /* restricted user connection */
+#define UMODE_o (1 << 4) /* operator */
+#define UMODE_O (1 << 5) /* local operator */
+#define UMODE_s (1 << 6) /* receiving server notices */
+
 typedef struct node {
 	int height;
 	struct node *l;
@@ -51,6 +60,7 @@ typedef struct server
 	int port;
 	int reg;
 	int soc;
+	int usermode;
 	struct channel *channel;
 } server;
 

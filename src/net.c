@@ -597,8 +597,64 @@ recv_join(char *prfx, char *args)
 int
 recv_mode(char *prfx, char *args)
 {
-	/* TODO: */
-	newlinef(0, DEFAULT, "ERR", "MODE: %s %s", prfx, args);
+	/* :nick MODE <nick> :<flags> */
+
+	char *nick, *flags;
+
+	int *usermode = &s[rplsoc]->usermode;
+
+	if (!getarg(&nick, &args))
+		return 1;
+
+	if (!getarg(&flags, &args))
+		return 1;
+
+	int modebit;
+	char plusminus = '\0';
+
+	newlinef(0, DEFAULT, "--", "User '%s' mode [%s]", nick, flags);
+
+	do {
+		if (*flags == '+' || *flags == '-')
+			plusminus = *flags;
+		else if (plusminus == '\0') {
+			return 1; /* error, flag not set */
+		} else {
+			switch(*flags) {
+				case 'a':
+					modebit = UMODE_a;
+					break;
+				case 'i':
+					modebit = UMODE_i;
+					break;
+				case 'w':
+					modebit = UMODE_w;
+					break;
+				case 'r':
+					modebit = UMODE_r;
+					break;
+				case 'o':
+					modebit = UMODE_o;
+					break;
+				case 'O':
+					modebit = UMODE_O;
+					break;
+				case 's':
+					modebit = UMODE_s;
+					break;
+				default:
+					modebit = 0;
+					newlinef(0, DEFAULT, "-!!-", "Unknown mode '%c'", *flags);
+			}
+			if (!modebit)
+				continue;
+			else if (plusminus == '+')
+				*usermode |= modebit;
+			else
+				*usermode &= ~modebit;
+		}
+	} while (*(++flags) != '\0');
+
 	return 0;
 }
 
