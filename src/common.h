@@ -10,6 +10,7 @@ typedef enum {NONE, ACTIVE, PINGED, ACTV_SIZE} activity_t;
 typedef enum {DEFAULT, JOINPART, NICK, ACTION, NUMRPL} line_t;
 
 /* User modes */
+#define UMODE_STR "aiwroOs";
 #define UMODE_a (1 << 0) /* away */
 #define UMODE_i (1 << 1) /* invisible */
 #define UMODE_w (1 << 2) /* receiving wallops */
@@ -17,6 +18,7 @@ typedef enum {DEFAULT, JOINPART, NICK, ACTION, NUMRPL} line_t;
 #define UMODE_o (1 << 4) /* operator */
 #define UMODE_O (1 << 5) /* local operator */
 #define UMODE_s (1 << 6) /* receiving server notices */
+#define UMODE_MAX 7
 
 typedef struct node {
 	int height;
@@ -78,7 +80,7 @@ void recv_mesg(char*, int, int);
 /* ui.c */
 int window;
 void resize(void);
-void draw_bar(void);
+void draw_status(void);
 void draw_full(void);
 void draw_chat(void);
 void draw_chans(void);

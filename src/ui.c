@@ -35,22 +35,47 @@ resize(void)
 	for (i = 0; i < w.ws_col; i++) /* Upper separator */
 		printf("―");
 
-	printf("\x1b[%d;1H\x1b[2K", w.ws_row-1);
-	for (i = 0; i < w.ws_col; i++) /* Lower separator */
-		printf("―");
-
-	draw_bar();
+	draw_status(); /* Status bar and lower separator */
 
 	printf("\x1b[%d;1H\x1b[2K >>> "C(250), w.ws_row); /* bottom bar */
 	draw_full();
 }
 
 void
-draw_bar()
+draw_status()
 {
 	printf("\x1b[s"); /* save cursor location */
-	printf("\x1b[%d;2H"C(239), w.ws_row-1);
-	printf("[%d]―――――", ccur->nick_count);
+	printf("\x1b[%d;1H\x1b[2K"C(239), w.ws_row-1);
+
+	int i = 0;
+	if (ccur->type == SERVER) {
+		for (; i < w.ws_col; i++)
+			printf("―");
+	} else {
+
+		char umode_str[] = UMODE_STR;
+		int j = 0, mode = ccur->server->usermode;
+
+		i += printf("――") - 4;
+
+		if (mode) {
+			i += printf("[+");
+
+			for (; j < UMODE_MAX; j++) {
+				if (mode & (1 << j))
+				putchar(umode_str[j]);
+				i++;
+			}
+
+			i += printf("]―") - 2;
+		}
+
+		i += printf("[%d]", ccur->nick_count);
+
+		for (; i < w.ws_col; i++)
+			printf("―");
+	}
+
 	printf("\x1b[u"); /* restore cursor location */
 }
 
@@ -59,7 +84,7 @@ draw_full(void)
 {
 	draw_chans();
 	draw_chat();
-	draw_bar();
+	draw_status();
 	draw_input();
 }
 

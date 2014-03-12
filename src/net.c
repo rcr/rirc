@@ -371,6 +371,7 @@ new_server(char *name, int port, int soc)
 	s->soc = soc;
 	s->port = port;
 	s->nptr = nicks;
+	s->usermode = 0;
 	s->iptr = s->input;
 	strncpy(s->name, name, 50);
 	return s;
@@ -584,7 +585,7 @@ recv_join(char *prfx, char *args)
 		if ((c = get_channel(chan)) && nicklist_insert(&(c->nicklist), nick)) {
 			newlinef(c, JOINPART, ">", "%s has joined %s", nick, chan);
 			c->nick_count++;
-			draw_bar();
+			draw_status();
 		} else if (c == NULL) {
 			newlinef(0, DEFAULT, "ERR", "JOIN: channel %s not found", chan);
 		} else {
@@ -736,7 +737,7 @@ recv_part(char *prfx, char *args)
 			newlinef(c, JOINPART, "<", "%s left %s", nick, chan);
 	}
 
-	draw_bar();
+	draw_status();
 
 	return 0;
 }
@@ -819,7 +820,7 @@ recv_quit(char *prfx, char *args)
 		c = c->next;
 	} while (c != cfirst);
 
-	draw_bar();
+	draw_status();
 
 	return 0;
 }
@@ -884,7 +885,7 @@ recv_200(int code, char *args)
 				if (nicklist_insert(&c->nicklist, nick))
 					c->nick_count++;
 			}
-			draw_bar();
+			draw_status();
 			break;
 
 		/* <channel> :<topic> */
