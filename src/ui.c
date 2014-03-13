@@ -41,40 +41,54 @@ resize(void)
 	draw_full();
 }
 
+/* Statusbar:
+ *
+ * server / private chat:
+ * --[usermodes]---
+ *
+ * channel:
+ * --[usermodes]--[chantype chanmodes chancount]---
+ * */
 void
 draw_status()
 {
 	printf("\x1b[s"); /* save cursor location */
 	printf("\x1b[%d;1H\x1b[2K"C(239), w.ws_row-1);
 
-	int i = 0;
-	if (ccur->type == SERVER) {
-		for (; i < w.ws_col; i++)
-			printf("―");
-	} else {
+	int i = 0, j, mode;
+	char umode_str[] = UMODE_STR;
+	char cmode_str[] = CMODE_STR;
 
-		char umode_str[] = UMODE_STR;
-		int j = 0, mode = ccur->server->usermode;
-
-		i += printf("――") - 4;
-
-		if (mode) {
-			i += printf("[+");
-
-			for (; j < UMODE_MAX; j++) {
-				if (mode & (1 << j))
+	/* usermodes */
+	if (ccur->server && (mode = ccur->server->usermode)) {
+		i += printf("―[+") - 2;
+		for (j = 0; j < UMODE_MAX; j++) {
+			if (mode & (1 << j)) {
 				putchar(umode_str[j]);
 				i++;
 			}
-
-			i += printf("]―") - 2;
 		}
-
-		i += printf("[%d]", ccur->nick_count);
-
-		for (; i < w.ws_col; i++)
-			printf("―");
+		i += printf("]");
 	}
+
+	/* chantype, chanmodes, chancount */
+	if (ccur->type) {
+		i += printf("―[%c", ccur->type) - 2;
+
+		if ((mode = ccur->chanmode)) {
+			i += printf(" +");
+			for (j = 0; j < CMODE_MAX; j++) {
+				if (mode & (1 << j)) {
+					putchar(cmode_str[j]);
+					i++;
+				}
+			}
+		}
+		i += printf(" %d]", ccur->nick_count);
+	}
+
+	for (; i < w.ws_col; i++)
+		printf("―");
 
 	printf("\x1b[u"); /* restore cursor location */
 }

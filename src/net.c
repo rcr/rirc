@@ -38,7 +38,7 @@
 #define ERR_ERRONEUSNICKNAME 432
 
 channel* get_channel(char*);
-channel* new_channel(char*, channel_t);
+channel* new_channel(char*);
 int get_numeric_code(char*);
 int recv_join(char*, char*);
 int recv_mode(char*, char*);
@@ -90,7 +90,7 @@ channel rirc = {
 	.name = "rirc",
 	.chat = {{0}},
 	.server = 0,
-	.type = SERVER,
+	.type = '\0',
 	.prev = &rirc,
 	.next = &rirc,
 };
@@ -141,7 +141,9 @@ con_server(char *hostname, int port)
 
 		get_auto_nick(&(ss->nptr), ss->nick_me);
 
-		ccur = new_channel(hostname, SERVER);
+		/* Keep server channel buffers at front of list */
+		ccur = cfirst;
+		ccur = new_channel(hostname);
 		ss->channel = ccur;
 
 		if (cfirst == &rirc)
@@ -328,12 +330,12 @@ get_numeric_code(char *code)
 }
 
 channel*
-new_channel(char *name, channel_t type)
+new_channel(char *name)
 {
 	channel *c;
 	if ((c = malloc(sizeof(channel))) == NULL)
 		fatal("new_channel");
-	c->type = type;
+	c->type = '\0';
 	c->nick_pad = 0;
 	c->nick_count = 0;
 	c->nicklist = NULL;
@@ -349,9 +351,7 @@ new_channel(char *name, channel_t type)
 		c->next = c;
 	} else {
 		/* Skip to end of server channels */
-		if (type == SERVER)
-			ccur = cfirst;
-		while (ccur->next->type == SERVER && ccur->next != cfirst)
+		while (!ccur->next->type && ccur->next != cfirst)
 			ccur = ccur->next;
 		c->prev = ccur;
 		c->next = ccur->next;
@@ -405,7 +405,7 @@ get_channel(char *chan)
 void
 channel_close(void)
 {
-	if (ccur->type == SERVER) {
+	if (!ccur->type) {
 		dis_server(ccur->server, 1);
 	} else {
 		channel *c = ccur;
@@ -499,7 +499,7 @@ int
 send_priv(char *args, int to_chan)
 {
 	if (to_chan) {
-		if (ccur->type == SERVER)
+		if (!ccur->type)
 			newline(ccur, DEFAULT, "-!!-", "This is not a channel!", 0);
 		else {
 			newline(ccur, DEFAULT, ccur->server->nick_me, args, 0);
@@ -515,7 +515,7 @@ send_priv(char *args, int to_chan)
 			return 1;
 
 		channel *c;
-		ccur = (c = get_channel(targ)) ? c : new_channel(targ, CHANNEL);
+		ccur = (c = get_channel(targ)) ? c : new_channel(targ);
 
 		sendf(ccur->server->soc, "PRIVMSG %s :%s\r\n", targ, args);
 		newline(ccur, DEFAULT, ccur->server->nick_me, args, 0);
@@ -579,7 +579,7 @@ recv_join(char *prfx, char *args)
 		return 1;
 
 	if (is_me(nick)) {
-		ccur = new_channel(chan, CHANNEL);
+		ccur = new_channel(chan);
 		draw_full();
 	} else {
 		if ((c = get_channel(chan)) && nicklist_insert(&(c->nicklist), nick)) {
@@ -599,13 +599,11 @@ recv_join(char *prfx, char *args)
 int
 recv_mode(char *prfx, char *args)
 {
-	/* :nick MODE <nick> :<flags> */
+	/* :nick MODE <targ> :<flags> */
 
-	char *nick, *flags;
+	char *targ, *flags;
 
-	int *usermode = &s[rplsoc]->usermode;
-
-	if (!getarg(&nick, &args))
+	if (!getarg(&targ, &args))
 		return 1;
 
 	if (!getarg(&flags, &args))
@@ -614,48 +612,136 @@ recv_mode(char *prfx, char *args)
 	int modebit;
 	char plusminus = '\0';
 
-	newlinef(0, DEFAULT, "--", "User '%s' mode [%s]", nick, flags);
+	channel *c;
+	if ((c = get_channel(targ))) {
 
-	do {
-		if (*flags == '+' || *flags == '-')
-			plusminus = *flags;
-		else if (plusminus == '\0') {
-			return 1; /* error, flag not set */
-		} else {
-			switch(*flags) {
-				case 'a':
-					modebit = UMODE_a;
-					break;
-				case 'i':
-					modebit = UMODE_i;
-					break;
-				case 'w':
-					modebit = UMODE_w;
-					break;
-				case 'r':
-					modebit = UMODE_r;
-					break;
-				case 'o':
-					modebit = UMODE_o;
-					break;
-				case 'O':
-					modebit = UMODE_O;
-					break;
-				case 's':
-					modebit = UMODE_s;
-					break;
-				default:
-					modebit = 0;
-					newlinef(0, DEFAULT, "-!!-", "Unknown mode '%c'", *flags);
+		newlinef(c, DEFAULT, "--", "%s chanmode: [%s]", targ, flags);
+
+		int *chanmode = &c->chanmode;
+
+		/* Chanmodes */
+		do {
+			if (*flags == '+' || *flags == '-')
+				plusminus = *flags;
+			else if (plusminus == '\0') {
+				return 1; /* error, flag not set */
+			} else {
+				switch(*flags) {
+					case 'O':
+						modebit = CMODE_O;
+						break;
+					case 'o':
+						modebit = CMODE_o;
+						break;
+					case 'v':
+						modebit = CMODE_v;
+						break;
+					case 'a':
+						modebit = CMODE_a;
+						break;
+					case 'i':
+						modebit = CMODE_i;
+						break;
+					case 'm':
+						modebit = CMODE_m;
+						break;
+					case 'n':
+						modebit = CMODE_n;
+						break;
+					case 'q':
+						modebit = CMODE_q;
+						break;
+					case 'p':
+						modebit = CMODE_p;
+						break;
+					case 's':
+						modebit = CMODE_s;
+						break;
+					case 'r':
+						modebit = CMODE_r;
+						break;
+					case 't':
+						modebit = CMODE_t;
+						break;
+					case 'k':
+						modebit = CMODE_k;
+						break;
+					case 'l':
+						modebit = CMODE_l;
+						break;
+					case 'b':
+						modebit = CMODE_b;
+						break;
+					case 'e':
+						modebit = CMODE_e;
+						break;
+					case 'I':
+						modebit = CMODE_I;
+						break;
+					default:
+						modebit = 0;
+						newlinef(0, DEFAULT, "-!!-", "Unknown mode '%c'", *flags);
+				}
+				if (!modebit)
+					continue;
+				else if (plusminus == '+')
+					*chanmode |= modebit;
+				else
+					*chanmode &= ~modebit;
 			}
-			if (!modebit)
-				continue;
-			else if (plusminus == '+')
-				*usermode |= modebit;
-			else
-				*usermode &= ~modebit;
-		}
-	} while (*(++flags) != '\0');
+		} while (*(++flags) != '\0');
+	}
+
+	if (is_me(targ)) {
+
+		newlinef(0, DEFAULT, "--", "%s usermode: [%s]", targ, flags);
+
+		int *usermode = &s[rplsoc]->usermode;
+
+		/* Usermodes */
+		do {
+			if (*flags == '+' || *flags == '-')
+				plusminus = *flags;
+			else if (plusminus == '\0') {
+				return 1; /* error, flag not set */
+			} else {
+				switch(*flags) {
+					case 'a':
+						modebit = UMODE_a;
+						break;
+					case 'i':
+						modebit = UMODE_i;
+						break;
+					case 'w':
+						modebit = UMODE_w;
+						break;
+					case 'r':
+						modebit = UMODE_r;
+						break;
+					case 'o':
+						modebit = UMODE_o;
+						break;
+					case 'O':
+						modebit = UMODE_O;
+						break;
+					case 's':
+						modebit = UMODE_s;
+						break;
+					default:
+						modebit = 0;
+						newlinef(0, DEFAULT, "-!!-", "Unknown mode '%c'", *flags);
+				}
+				if (!modebit)
+					continue;
+				else if (plusminus == '+')
+					*usermode |= modebit;
+				else
+					*usermode &= ~modebit;
+			}
+		} while (*(++flags) != '\0');
+
+		draw_status();
+	}
 
 	return 0;
 }
@@ -762,7 +848,7 @@ recv_priv(char *prfx, char *args)
 	if (is_me(targ)) {
 
 		if ((c = get_channel(from)) == NULL)
-			c = new_channel(from, CHANNEL);
+			c = new_channel(from);
 
 		if (c != ccur)
 			c->active = PINGED;
@@ -865,7 +951,7 @@ recv_200(int code, char *args)
 		/* "("="/"*"/"@") <channel> :*([ "@" / "+" ] <nick>) */
 		case RPL_NAMREPLY:
 
-			/* TODO: channel type */
+			/* @:secret   *:private   =:public */
 			if (!getarg(&type, &args))
 				goto error;
 
@@ -877,6 +963,8 @@ recv_200(int code, char *args)
 
 			if (!getarg(&args, &args))
 				goto error;
+
+			c->type = *type;
 
 			while (getarg(&nick, &args)) {
 				/* TODO: ops status */
