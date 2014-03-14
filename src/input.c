@@ -68,17 +68,17 @@ input(char *inp, int count)
 			del_char(1);
 		else if (c == 0x0A) /* LF */
 			ready_send();
-		else if (c == 0x18) /* ctrl-X */
+		else if (c == 0x18) /* ctrl-x */
 			channel_close();
 	} else if (count > 0 && *inp == 0x1B) { /* escape sequence */
 		inp++;
-		if (esccmp("[A", inp)) /* arrow up */
-			channel_sw(0); /* FIXME: testing channel switching */
-		if (esccmp("[B", inp)) /* arrow down */
+		if (esccmp("[A", inp))  /* arrow up */
+			channel_sw(0);
+		if (esccmp("[B", inp))  /* arrow down */
 			channel_sw(1);
-		if (esccmp("[C", inp)) /* arrow right */
+		if (esccmp("[C", inp))  /* arrow right */
 			cur_lr(0);
-		if (esccmp("[D", inp)) /* arrow left */
+		if (esccmp("[D", inp))  /* arrow left */
 			cur_lr(1);
 		if (esccmp("[3~", inp)) /* delete */
 			del_char(0);

@@ -338,6 +338,7 @@ new_channel(char *name)
 		fatal("new_channel");
 	c->type = '\0';
 	c->nick_pad = 0;
+	c->chanmode = 0;
 	c->nick_count = 0;
 	c->nicklist = NULL;
 	c->cur_line = c->chat;

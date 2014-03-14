@@ -18,7 +18,6 @@ extern channel *cfirst;
 struct winsize w;
 
 int tw = 0;  /* text width */
-int nlw = 3; /* nicklist width */
 
 int nick_cols[] = {1, 2, 3, 4, 5, 6, 7, 8, 9};
 int actv_cols[ACTV_SIZE] = {239, 247, 3};
@@ -50,7 +49,7 @@ resize(void)
  * --[usermodes]--[chantype chanmodes chancount]---
  * */
 void
-draw_status()
+draw_status(void)
 {
 	printf("\x1b[s"); /* save cursor location */
 	printf("\x1b[%d;1H\x1b[2K"C(239), w.ws_row-1);
@@ -149,9 +148,9 @@ word_wrap(char *start, char *end)
 			return wrap + 1;
 		else
 			return wrap;
-	} else {
-		return NULL;
 	}
+
+	return NULL;
 }
 
 void
@@ -173,7 +172,7 @@ print_line(int row, line *l)
 	if (!l->len || l == ccur->cur_line)
 		return 3;
 
-	tw = w.ws_col - ccur->nick_pad - nlw - 13;
+	tw = w.ws_col - ccur->nick_pad - 16;
 
 	int count = 1;
 	char *ptr1, *ptr2, *wrap;
