@@ -48,6 +48,7 @@ int recv_part(char*, char*);
 int recv_priv(char*, char*);
 int recv_quit(char*, char*);
 int send_conn(char*);
+int send_emot(char*);
 int send_join(char*);
 int send_nick(char*);
 int send_part(char*);
@@ -463,6 +464,18 @@ send_conn(char *ptr)
 }
 
 int
+send_emot(char *ptr)
+{
+	if (!ccur->type)
+		newline(ccur, DEFAULT, "-!!-", "This is not a channel!", 0);
+	else {
+		newlinef(ccur, ACTION, "*", "%s %s", ccur->server->nick_me, ptr);
+		sendf(ccur->server->soc, "PRIVMSG %s :ACTION %s\r\n", ccur->name, ptr);
+	}
+	return 0;
+}
+
+int
 send_join(char *ptr)
 {
 	sendf(ccur->server->soc, "JOIN %s\r\n", ptr);
@@ -551,6 +564,8 @@ send_mesg(char *mesg)
 		run = 0;
 	} else if (cmdcmpc(cmd, "MSG")) {
 		err = send_priv(mesg, 0);
+	} else if (cmdcmpc(cmd, "ME")) {
+		err = send_emot(mesg);
 	} else {
 		int len = strlen(cmd);
 		newlinef(ccur, DEFAULT, "-!!-", "Unknown command: %.*s%s",
