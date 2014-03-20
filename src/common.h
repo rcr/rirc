@@ -3,7 +3,6 @@
 #define NICKSIZE 50 /* TODO */
 #define MAXSERVERS 10
 #define SCROLLBACK 300
-#define SENDBUFF MAXINPUT + 3
 
 typedef enum {NONE, ACTIVE, PINGED, ACTV_SIZE} activity_t;
 typedef enum {DEFAULT, JOINPART, NICK, ACTION, NUMRPL} line_t;
@@ -40,6 +39,7 @@ typedef enum {DEFAULT, JOINPART, NICK, ACTION, NUMRPL} line_t;
 #define UMODE_s (1 << 6) /* receiving server notices */
 #define UMODE_MAX 7
 
+/* Nicklist AVL tree node */
 typedef struct node {
 	int height;
 	struct node *l;
@@ -47,6 +47,7 @@ typedef struct node {
 	char nick[NICKSIZE];
 } node;
 
+/* Chat buffer line */
 typedef struct line
 {
 	int len;
@@ -57,6 +58,16 @@ typedef struct line
 	line_t type;
 } line;
 
+/* Channel inputs */
+typedef struct input
+{
+	char *head;
+	char *tail;
+	char text[MAXINPUT+1];
+	char *window;
+} input;
+
+/* Channel buffer */
 typedef struct channel
 {
 	activity_t active;
@@ -71,8 +82,10 @@ typedef struct channel
 	struct line chat[SCROLLBACK];
 	struct node *nicklist;
 	struct server *server;
+	struct input *input;
 } channel;
 
+/* Server */
 typedef struct server
 {
 	char *iptr;
@@ -99,7 +112,6 @@ void send_mesg(char*);
 void recv_mesg(char*, int, int);
 
 /* ui.c */
-int window;
 void resize(void);
 void draw_full(void);
 void draw_chat(void);
@@ -108,9 +120,7 @@ void draw_input(void);
 void draw_status(void);
 
 /* input.c */
-int inp1, inp2;
-char input_bar[SENDBUFF];
-void input(char*, int);
+void inputc(char*, int);
 
 /* utils.c */
 int check_pinged(char*, char*);

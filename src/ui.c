@@ -5,7 +5,6 @@
 #include "common.h"
 
 #define C(x) "\x1b[38;5;"#x"m"
-#define MAXINPUT 200
 
 int nick_col(char*);
 int print_line(int, line*);
@@ -157,6 +156,9 @@ void
 draw_chat(void)
 {
 	printf("\x1b[s"); /* save cursor location */
+
+	tw = w.ws_col - ccur->nick_pad - 12;
+
 	int r = print_line(w.ws_row - 2, ccur->cur_line - 1);
 	while (r < w.ws_row - 1)
 		printf("\x1b[%d;1H\x1b[2K", r++);
@@ -171,8 +173,6 @@ print_line(int row, line *l)
 
 	if (!l->len || l == ccur->cur_line)
 		return 3;
-
-	tw = w.ws_col - ccur->nick_pad - 16;
 
 	int count = 1;
 	char *ptr1, *ptr2, *wrap;
@@ -232,21 +232,29 @@ draw_input(void)
 {
 	int winsz = w.ws_col / 3;
 
-	if (inp1 - window > (w.ws_col - 6))
-		window += winsz;
-	else if (inp1 == window - 1)
-		window -= (winsz > window) ? window : winsz;
+	input *in = ccur->input;
+
+	/* Reframe the input bar window */
+	if (in->head > (in->window + w.ws_col - 6))
+		in->window += winsz;
+	else if (in->head == in->window - 1)
+		in->window = (in->window - winsz > in->text)
+			? in->window - winsz : in->text;
 
 	printf(C(239)"\x1b[%d;6H\x1b[K"C(250), w.ws_row);
 
-	int p = window;
-	while (p < inp1)
-		putchar(input_bar[p++]);
+	char *p = in->window;
+	while (p < in->head)
+		putchar(*p++);
 
-	p = inp2;
-	int num = w.ws_col - inp1 + window - 5;
-	while (num-- > 0 && p < MAXINPUT-1)
-		putchar(input_bar[p++]);
+	p = in->tail;
 
-	printf("\x1b[%d;%dH", w.ws_row, inp1 - window + 6);
+	char *end = in->tail + w.ws_col - 5 - (in->head - in->window);
+
+	while (p < end && p < in->text + MAXINPUT)
+		putchar(*p++);
+
+	int col = (in->head - in->window);
+
+	printf("\x1b[%d;%dH", w.ws_row, col + 6);
 }

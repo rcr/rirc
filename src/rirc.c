@@ -88,7 +88,7 @@ main_loop(void)
 
 		if (ret == 0) { /* timed out check input buffer */
 			if (count > 0) {
-				input(buf, count);
+				inputc(buf, count);
 				count = 0;
 			}
 			time = 200;

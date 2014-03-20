@@ -84,6 +84,11 @@ char *nicks = "rcr, rcr_, rcr__";
 time_t raw_t;
 struct tm *t;
 
+input rircinput = {
+	.head = rircinput.text,
+	.tail = rircinput.text + MAXINPUT,
+	.window = rircinput.text,
+};
 channel rirc = {
 	.active = NONE,
 	.cur_line = rirc.chat,
@@ -94,6 +99,7 @@ channel rirc = {
 	.type = '\0',
 	.prev = &rirc,
 	.next = &rirc,
+	.input = &rircinput,
 };
 
 channel *ccur = &rirc;
@@ -333,9 +339,19 @@ get_numeric_code(char *code)
 channel*
 new_channel(char *name)
 {
+	input *i;
+	if ((i = malloc(sizeof(input))) == NULL)
+		fatal("new_channel");
+
 	channel *c;
 	if ((c = malloc(sizeof(channel))) == NULL)
 		fatal("new_channel");
+
+	i->head = i->text;
+	i->tail = i->text + MAXINPUT;
+	i->window = i->text;
+
+	c->input = i;
 	c->type = '\0';
 	c->nick_pad = 0;
 	c->chanmode = 0;
@@ -344,6 +360,7 @@ new_channel(char *name)
 	c->cur_line = c->chat;
 	c->active = NONE;
 	c->server = s[rplsoc];
+
 	strncpy(c->name, name, 50);
 	memset(c->chat, 0, sizeof(c->chat));
 
@@ -421,6 +438,7 @@ channel_close(void)
 void
 free_channel(channel *c)
 {
+	free(c->input);
 	line *l = c->chat;
 	line *e = l + SCROLLBACK;
 	c->next->prev = c->prev;
@@ -471,7 +489,7 @@ send_emot(char *ptr)
 		newline(ccur, DEFAULT, "-!!-", "This is not a channel!", 0);
 	else {
 		newlinef(ccur, ACTION, "*", "%s %s", ccur->server->nick_me, ptr);
-		sendf(ccur->server->soc, "PRIVMSG %s :ACTION %s\r\n", ccur->name, ptr);
+		sendf(ccur->server->soc, "PRIVMSG %s :\x01""ACTION %s\x01\r\n", ccur->name, ptr);
 	}
 	return 0;
 }
@@ -698,12 +716,12 @@ recv_mode(char *prfx, char *args)
 						modebit = 0;
 						newlinef(0, DEFAULT, "-!!-", "Unknown mode '%c'", *flags);
 				}
-				if (!modebit)
-					continue;
-				else if (plusminus == '+')
-					*chanmode |= modebit;
-				else
-					*chanmode &= ~modebit;
+				if (modebit) {
+					if (plusminus == '+')
+						*chanmode |= modebit;
+					else
+						*chanmode &= ~modebit;
+				}
 			}
 		} while (*(++flags) != '\0');
 	}
@@ -747,12 +765,12 @@ recv_mode(char *prfx, char *args)
 						modebit = 0;
 						newlinef(0, DEFAULT, "-!!-", "Unknown mode '%c'", *flags);
 				}
-				if (!modebit)
-					continue;
-				else if (plusminus == '+')
-					*usermode |= modebit;
-				else
-					*usermode &= ~modebit;
+				if (modebit) {
+					if (plusminus == '+')
+						*usermode |= modebit;
+					else
+						*usermode &= ~modebit;
+				}
 			}
 		} while (*(++flags) != '\0');
 
@@ -874,7 +892,7 @@ recv_priv(char *prfx, char *args)
 		newlinef(0, DEFAULT, "ERR", "PRIVMSG: target %s not found", targ);
 
 	/* Check for markup */
-	if (*mesg == 0x1) {
+	if (*mesg == 0x01) {
 		mesg++;
 
 		char *cmd;
@@ -882,7 +900,7 @@ recv_priv(char *prfx, char *args)
 			return 1;
 
 		char *ptr = mesg;
-		while (*ptr != '\0' && *ptr != 0x1)
+		while (*ptr != '\0' && *ptr != 0x01)
 			ptr++;
 		*ptr = '\0';
 

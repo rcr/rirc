@@ -2,8 +2,8 @@
 
 #include "common.h"
 
-int inp1 = 0;
-int inp2 = MAXINPUT-1;
+extern channel *ccur;
+input *in;
 
 void cur_lr(int);
 void del_char(int);
@@ -14,26 +14,26 @@ int esccmp(char*, char*);
 void
 ins_char(char c)
 {
-	if (inp1 < inp2)
-		input_bar[inp1++] = c;
+	if (in->head < in->tail)
+		*in->head++ = c;
 }
 
 void
 del_char(int left)
 {
-	if (left && inp1 > 0)
-		inp1--;
-	else if (!left && inp2 < MAXINPUT-1)
-		inp2++;
+	if (left && in->head > in->text)
+		in->head--;
+	else if (!left && in->tail < in->text + MAXINPUT)
+		in->tail++;
 }
 
 void
 cur_lr(int left)
 {
-	if (left && inp1 > 0)
-		input_bar[--inp2] = input_bar[--inp1];
-	else if (!left && inp2 < MAXINPUT-1)
-		input_bar[inp1++] = input_bar[inp2++];
+	if (left && in->head > in->text)
+		*--in->tail = *--in->head;
+	else if (!left && in->tail < in->text + MAXINPUT)
+		*in->head++ = *in->tail++;
 }
 
 int
@@ -47,19 +47,27 @@ esccmp(char *esc, char *inp)
 void
 ready_send(void)
 {
-	if (inp1 == 0)
+	char *head = in->head, *tail = in->tail, *end = in->text + MAXINPUT;
+
+	if (head == in->text && tail == end)
 		return;
-	while (inp2 < MAXINPUT-1)
-		input_bar[inp1++] = input_bar[inp2++];
-	input_bar[inp1] = '\0';
-	send_mesg(input_bar);
-	inp1 = window = 0;
-	inp2 = MAXINPUT-1;
+
+	while (tail < end)
+		*head++ = *tail++;
+	*head = '\0';
+
+	send_mesg(in->text);
+
+	in->head = in->text;
+	in->tail = in->text + MAXINPUT;
+	in->window = in->text;
 }
 
 void
-input(char *inp, int count)
+inputc(char *inp, int count)
 {
+	in = ccur->input;
+
 	if (count == 1) {
 		char c = *inp;
 		if (isprint(c))
