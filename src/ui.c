@@ -11,9 +11,6 @@ int print_line(int, line*);
 int print_more(char*, char*, int);
 char* word_wrap(char*, char*);
 
-extern channel *ccur;
-extern channel *cfirst;
-
 struct winsize w;
 
 int tw = 0;  /* text width */

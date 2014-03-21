@@ -2,7 +2,6 @@
 
 #include "common.h"
 
-extern channel *ccur;
 input *in;
 
 void cur_lr(int);

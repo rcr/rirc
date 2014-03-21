@@ -59,6 +59,8 @@ init(void)
 
 	srand(time(NULL));
 
+	rirc = cfirst = ccur = new_channel("rirc");
+
 	/* Set sigwinch, init draw */
 	signal_sigwinch(0);
 }
@@ -67,7 +69,11 @@ void
 cleanup(int clear)
 {
 	tcsetattr(0, TCSADRAIN, &oterm);
-	if (clear) printf("\x1b[H\x1b[J");
+
+	free_channel(rirc);
+
+	if (clear)
+		printf("\x1b[H\x1b[J");
 }
 
 void

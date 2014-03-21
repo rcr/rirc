@@ -38,7 +38,6 @@
 #define ERR_ERRONEUSNICKNAME 432
 
 channel* get_channel(char*);
-channel* new_channel(char*);
 int get_numeric_code(char*);
 int recv_join(char*, char*);
 int recv_mode(char*, char*);
@@ -58,7 +57,6 @@ server* new_server(char*, int, int);
 void con_server(char*, int);
 void dis_server(server*, int);
 void do_recv(int);
-void free_channel(channel*);
 void get_auto_nick(char**, char*);
 void newline(channel*, line_t, char*, char*, int);
 void newlinef(channel*, line_t, char*, char*, ...);
@@ -67,7 +65,7 @@ void recv_200(int, char*);
 void recv_400(int, char*);
 void sendf(int, const char*, ...);
 
-int rplsoc;
+int rplsoc = 0;
 int numfds = 1; /* 1 for stdin */
 extern struct pollfd fds[MAXSERVERS + 1];
 /* For server indexing by socket. 3 for stdin/out/err unused */
@@ -83,27 +81,6 @@ char *nicks = "rcr, rcr_, rcr__";
 
 time_t raw_t;
 struct tm *t;
-
-input rircinput = {
-	.head = rircinput.text,
-	.tail = rircinput.text + MAXINPUT,
-	.window = rircinput.text,
-};
-channel rirc = {
-	.active = NONE,
-	.cur_line = rirc.chat,
-	.nick_pad = 0,
-	.name = "rirc",
-	.chat = {{0}},
-	.server = 0,
-	.type = '\0',
-	.prev = &rirc,
-	.next = &rirc,
-	.input = &rircinput,
-};
-
-channel *ccur = &rirc;
-channel *cfirst = &rirc;
 
 void
 channel_sw(int next)
@@ -153,7 +130,7 @@ con_server(char *hostname, int port)
 		ccur = new_channel(hostname);
 		ss->channel = ccur;
 
-		if (cfirst == &rirc)
+		if (cfirst == rirc)
 			cfirst = ccur;
 
 		fds[numfds++].fd = rplsoc;
@@ -167,7 +144,7 @@ con_server(char *hostname, int port)
 void
 dis_server(server *s, int kill)
 {
-	if (cfirst == &rirc) {
+	if (cfirst == rirc) {
 		newline(0, DEFAULT, "-!!-", "Cannot close main buffer", 0);
 		return;
 	}
@@ -194,7 +171,7 @@ dis_server(server *s, int kill)
 		if (cfirst->server == s) {
 			t = cfirst;
 			if (cfirst->next == cfirst)
-				cfirst = &rirc;
+				cfirst = rirc;
 			else
 				cfirst = cfirst->next;
 			free_channel(t);
@@ -229,8 +206,8 @@ newline(channel *c, line_t type, char *from, char *mesg, int len)
 		len = strlen(mesg);
 
 	if (c == 0) {
-		if (cfirst == &rirc)
-			c = &rirc;
+		if (cfirst == rirc)
+			c = rirc;
 		else
 			c = s[rplsoc]->channel;
 	}
@@ -339,19 +316,10 @@ get_numeric_code(char *code)
 channel*
 new_channel(char *name)
 {
-	input *i;
-	if ((i = malloc(sizeof(input))) == NULL)
-		fatal("new_channel");
-
 	channel *c;
 	if ((c = malloc(sizeof(channel))) == NULL)
 		fatal("new_channel");
 
-	i->head = i->text;
-	i->tail = i->text + MAXINPUT;
-	i->window = i->text;
-
-	c->input = i;
 	c->type = '\0';
 	c->nick_pad = 0;
 	c->chanmode = 0;
@@ -361,14 +329,17 @@ new_channel(char *name)
 	c->active = NONE;
 	c->server = s[rplsoc];
 
+	c->input = c->input_scrollback;
+	c->input->head = c->input->text;
+	c->input->tail = c->input->text + MAXINPUT;
+	c->input->window = c->input->text;
+
 	strncpy(c->name, name, 50);
 	memset(c->chat, 0, sizeof(c->chat));
 
-	/* Insert into linked list */
-	if (ccur == &rirc) {
-		c->prev = c;
-		c->next = c;
-	} else {
+	if (ccur == rirc || rplsoc == 0)
+		c->prev = c->next = c;
+	else {
 		/* Skip to end of server channels */
 		while (!ccur->next->type && ccur->next != cfirst)
 			ccur = ccur->next;
@@ -438,7 +409,6 @@ channel_close(void)
 void
 free_channel(channel *c)
 {
-	free(c->input);
 	line *l = c->chat;
 	line *e = l + SCROLLBACK;
 	c->next->prev = c->prev;
@@ -511,7 +481,7 @@ send_nick(char *ptr)
 int
 send_part(char *ptr)
 {
-	if (ccur == &rirc)
+	if (ccur == rirc)
 		newline(0, DEFAULT, "-!!-", "Cannot execute 'part' on server", 0);
 	else {
 		newline(ccur, DEFAULT, "", "(disconnected)", 0);

@@ -3,6 +3,7 @@
 #define NICKSIZE 50 /* TODO */
 #define MAXSERVERS 10
 #define SCROLLBACK 300
+#define SCROLLBACK_INPUT 10
 
 typedef enum {NONE, ACTIVE, PINGED, ACTV_SIZE} activity_t;
 typedef enum {DEFAULT, JOINPART, NICK, ACTION, NUMRPL} line_t;
@@ -82,6 +83,7 @@ typedef struct channel
 	struct line chat[SCROLLBACK];
 	struct node *nicklist;
 	struct server *server;
+	struct input input_scrollback[SCROLLBACK_INPUT];
 	struct input *input;
 } channel;
 
@@ -103,8 +105,13 @@ typedef struct server
 /* rirc.c */
 int run;
 void fatal(char*);
+struct channel *rirc;
+struct channel *ccur;
+struct channel *cfirst;
 
 /* net.c */
+channel* new_channel(char*);
+void free_channel(channel*);
 void con_lost(int);
 void channel_sw(int);
 void channel_close(void);
