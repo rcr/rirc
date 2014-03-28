@@ -328,11 +328,7 @@ new_channel(char *name)
 	c->cur_line = c->chat;
 	c->active = NONE;
 	c->server = s[rplsoc];
-
-	c->input = c->input_scrollback;
-	c->input->head = c->input->text;
-	c->input->tail = c->input->text + MAXINPUT;
-	c->input->window = c->input->text;
+	c->input = new_input();
 
 	strncpy(c->name, name, 50);
 	memset(c->chat, 0, sizeof(c->chat));
@@ -416,6 +412,7 @@ free_channel(channel *c)
 	while (l->len && l < e)
 		free((l++)->text);
 	free_nicklist(c->nicklist);
+	free_input(c->input);
 	free(c);
 }
 

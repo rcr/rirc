@@ -59,13 +59,25 @@ typedef struct line
 	line_t type;
 } line;
 
-/* Channel inputs */
+/* Channel input line */
+typedef struct input_l
+{
+	char *end;
+	char text[MAXINPUT+1];
+	struct input_l *prev;
+	struct input_l *next;
+} input_l;
+
+/* Channel input */
 typedef struct input
 {
+	int count;
 	char *head;
 	char *tail;
-	char text[MAXINPUT+1];
 	char *window;
+	struct input_l *list_head;
+	struct input_l *list_tail;
+	struct input_l *input_line;
 } input;
 
 /* Channel buffer */
@@ -83,7 +95,6 @@ typedef struct channel
 	struct line chat[SCROLLBACK];
 	struct node *nicklist;
 	struct server *server;
-	struct input input_scrollback[SCROLLBACK_INPUT];
 	struct input *input;
 } channel;
 
@@ -127,6 +138,8 @@ void draw_input(void);
 void draw_status(void);
 
 /* input.c */
+input* new_input(void);
+void free_input(input*);
 void inputc(char*, int);
 
 /* utils.c */

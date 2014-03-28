@@ -235,8 +235,8 @@ draw_input(void)
 	if (in->head > (in->window + w.ws_col - 6))
 		in->window += winsz;
 	else if (in->head == in->window - 1)
-		in->window = (in->window - winsz > in->text)
-			? in->window - winsz : in->text;
+		in->window = (in->window - winsz > in->input_line->text)
+			? in->window - winsz : in->input_line->text;
 
 	printf(C(239)"\x1b[%d;6H\x1b[K"C(250), w.ws_row);
 
@@ -248,7 +248,7 @@ draw_input(void)
 
 	char *end = in->tail + w.ws_col - 5 - (in->head - in->window);
 
-	while (p < end && p < in->text + MAXINPUT)
+	while (p < end && p < in->input_line->text + MAXINPUT)
 		putchar(*p++);
 
 	int col = (in->head - in->window);
