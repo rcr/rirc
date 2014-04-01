@@ -552,6 +552,8 @@ send_mesg(char *mesg)
 		err = send_priv(mesg, 0);
 	} else if (cmdcmpc(cmd, "ME")) {
 		err = send_emot(mesg);
+	} else if (cmdcmpc(cmd, "RAW")) {
+		sendf(rplsoc, "%s\r\n", mesg);
 	} else {
 		int len = strlen(cmd);
 		newlinef(ccur, DEFAULT, "-!!-", "Unknown command: %.*s%s",
