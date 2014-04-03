@@ -76,8 +76,7 @@ typedef struct input
 	char *tail;
 	char *window;
 	struct input_l *list_head;
-	struct input_l *list_tail;
-	struct input_l *input_line;
+	struct input_l *line;
 } input;
 
 /* Channel buffer */

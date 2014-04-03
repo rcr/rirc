@@ -1,8 +1,10 @@
 #include <ctype.h>
 #include <stdlib.h>
+#include <sys/ioctl.h>
 
 #include "common.h"
 
+extern struct winsize w;
 input *in;
 
 void cur_lr(int);
@@ -15,16 +17,23 @@ int esccmp(char*, char*);
 void
 scroll_input(int back)
 {
-	if (back && in->input_line->prev)
-		in->input_line = in->input_line->prev;
-	else if (!back && in->input_line->next)
-		in->input_line = in->input_line->next;
+	/* Reset the line */
+	char *head = in->head, *tail = in->tail, *end = in->line->text + MAXINPUT;
+	while (tail < end)
+		*head++ = *tail++;
+	*head = '\0';
+	in->line->end = head;
 
-	in->head = in->input_line->end;
-	in->tail = in->input_line->text + MAXINPUT;
-	in->window = in->input_line->text - 15;
-	if (in->window < in->input_line->text)
-		in->window = in->input_line->text;
+	if (back && in->line->prev != in->list_head)
+		in->line = in->line->prev;
+	else if (!back && in->line != in->list_head)
+		in->line = in->line->next;
+
+	in->head = in->line->end;
+	in->tail = in->line->text + MAXINPUT;
+	in->window = in->head - (2 * w.ws_col / 3);
+	if (in->window < in->line->text)
+		in->window = in->line->text;
 }
 
 input_l*
@@ -34,12 +43,12 @@ new_inputl(input_l *prev)
 	if ((l = malloc(sizeof(input_l))) == NULL)
 		fatal("new_input");
 
-	if (prev)
-		prev->next = l;
-
 	l->end = l->text;
-	l->next = NULL;
-	l->prev = prev;
+	l->prev = prev ? prev : l;
+	l->next = prev ? prev->next : l;
+
+	if (prev)
+		prev->next = prev->next->prev = l;
 
 	return l;
 }
@@ -52,12 +61,11 @@ new_input(void)
 		fatal("new_input");
 
 	i->count = 0;
-	i->input_line = new_inputl(NULL);
-	i->list_head = i->input_line;
-	i->list_tail = i->input_line;
-	i->head = i->input_line->text;
-	i->tail = i->input_line->text + MAXINPUT;
-	i->window = i->input_line->text;
+	i->line = new_inputl(NULL);
+	i->list_head = i->line;
+	i->head = i->line->text;
+	i->tail = i->line->text + MAXINPUT;
+	i->window = i->line->text;
 
 	return i;
 }
@@ -68,9 +76,9 @@ free_input(input *i)
 	input_l *t, *l = i->list_head;
 	do {
 		t = l;
-		l = l->prev;
+		l = l->next;
 		free(t);
-	} while (l);
+	} while (l != i->list_head);
 	free(i);
 }
 
@@ -84,18 +92,18 @@ ins_char(char c)
 void
 del_char(int left)
 {
-	if (left && in->head > in->input_line->text)
+	if (left && in->head > in->line->text)
 		in->head--;
-	else if (!left && in->tail < in->input_line->text + MAXINPUT)
+	else if (!left && in->tail < in->line->text + MAXINPUT)
 		in->tail++;
 }
 
 void
 cur_lr(int left)
 {
-	if (left && in->head > in->input_line->text)
+	if (left && in->head > in->line->text)
 		*--in->tail = *--in->head;
-	else if (!left && in->tail < in->input_line->text + MAXINPUT)
+	else if (!left && in->tail < in->line->text + MAXINPUT)
 		*in->head++ = *in->tail++;
 }
 
@@ -110,35 +118,46 @@ esccmp(char *esc, char *inp)
 void
 ready_send(void)
 {
-	char *head = in->head, *tail = in->tail, *end = in->input_line->text + MAXINPUT;
+	char *head = in->head, *tail = in->tail, *end = in->line->text + MAXINPUT;
 
-	if (head == in->input_line->text && tail == end)
+	if (head == in->line->text && tail == end)
 		return;
 
 	while (tail < end)
 		*head++ = *tail++;
 	*head = '\0';
+	in->line->end = head;
 
-	send_mesg(in->input_line->text);
+	send_mesg(in->line->text);
 
-	in->input_line->end = head;
 
-	if (in->input_line == in->list_head) {
+	if (in->line == in->list_head) {
 		if (in->count < SCROLLBACK_INPUT)
 			in->count++;
 		else {
-			input_l *t = in->list_tail;
-			in->list_tail = in->list_tail->next;
-			in->list_tail->prev = NULL;
+			input_l *t = in->list_head->next;
+			in->list_head->next = t->next;
+			t->next->prev = in->list_head;
 			free(t);
 		}
-		in->input_line = in->list_head = new_inputl(in->list_head);
+		in->line = in->list_head = new_inputl(in->list_head);
 	} else {
-		in->input_line = in->list_head;
+		/* Remove from list */
+		in->line->next->prev = in->line->prev;
+		in->line->prev->next = in->line->next;
+
+		/* Insert second from head */
+		in->list_head->prev->next = in->line;
+		in->line->prev = in->list_head->prev;
+		in->list_head->prev = in->line;
+		in->line->next = in->list_head;
+
+		/* Reset */
+		in->line = in->list_head;
 	}
-	in->head = in->input_line->text;
-	in->tail = in->input_line->text + MAXINPUT;
-	in->window = in->input_line->text;
+	in->head = in->line->text;
+	in->tail = in->line->text + MAXINPUT;
+	in->window = in->line->text;
 }
 
 void
