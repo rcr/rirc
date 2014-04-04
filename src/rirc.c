@@ -70,6 +70,11 @@ cleanup(int clear)
 {
 	tcsetattr(0, TCSADRAIN, &oterm);
 
+	ccur = cfirst;
+	do {
+		channel_close();
+	} while (cfirst != rirc);
+
 	free_channel(rirc);
 
 	if (clear)
