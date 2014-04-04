@@ -163,9 +163,9 @@ dis_server(server *s, int kill)
 		channel *t, *c = cfirst;
 		do {
 			t = c;
+			c = c->next;
 			if (t->server == s && t != cfirst)
 				free_channel(t);
-			c = c->next;
 		} while (c != cfirst);
 
 		if (cfirst->server == s) {
