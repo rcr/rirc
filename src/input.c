@@ -1,9 +1,12 @@
 #include <ctype.h>
+#include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/ioctl.h>
 
 #include "common.h"
 
+char *confirm_paste;
 extern struct winsize w;
 input *in;
 
@@ -161,11 +164,86 @@ ready_send(void)
 }
 
 void
+send_paste()
+{
+	int len = (in->head - in->tail + MAXINPUT) / sizeof(*in->head);
+
+	char *tmp = confirm_paste;
+
+	while(*tmp) {
+		if (len == MAXINPUT) {
+			len = 0;
+			ready_send();
+		}
+		if (*tmp == '\n') {
+			if (len)
+				ready_send();
+			tmp++;
+		} else if (isprint(*tmp)) {
+			len++;
+			*in->head++ = *tmp++;
+		}
+	}
+
+	confirm = 0;
+	free(confirm_paste);
+}
+
+void
+split_paste(char *inp, int count)
+{
+	int line_count = 0;
+	int len = (in->head - in->tail + MAXINPUT) / sizeof(*in->head);
+
+	int tmp = count;
+	char *ptr = inp;
+
+	/* Calulate lines needed */
+	while (tmp--) {
+		if (len == MAXINPUT) {
+			len = 0;
+			line_count++;
+		}
+		if (*ptr == '\n') {
+			if (len) {
+				len = 0;
+				line_count++;
+			}
+			ptr++;
+		} else if (isprint(*ptr)) {
+			len++;
+			ptr++;
+		}
+	}
+
+	/* Confirm auto send */
+	if (line_count) {
+		confirm = line_count;
+		if ((confirm_paste = malloc(count + 1)) == NULL)
+			fatal("inputc");
+		strncpy(confirm_paste, inp, count);
+		*(confirm_paste + count) = '\0';
+	} else {
+		while (count--) {
+			if (isprint(*inp))
+				*in->head++ = *inp++;
+		}
+	}
+}
+
+void
 inputc(char *inp, int count)
 {
 	in = ccur->input;
 
-	if (count == 1) {
+	if (confirm) {
+		if (*inp == 'y') {
+			send_paste();
+		} else if (*inp == 'n') {
+			confirm = 0;
+			free(confirm_paste);
+		}
+	} else if (count == 1) {
 		char c = *inp;
 		if (isprint(c))
 			ins_char(c);
@@ -179,23 +257,20 @@ inputc(char *inp, int count)
 		inp++;
 		if (esccmp("[A", inp))  /* arrow up */
 			scroll_input(1);
-		if (esccmp("[B", inp))  /* arrow down */
+		else if (esccmp("[B", inp))  /* arrow down */
 			scroll_input(0);
-		if (esccmp("[C", inp))  /* arrow right */
+		else if (esccmp("[C", inp))  /* arrow right */
 			cur_lr(0);
-		if (esccmp("[D", inp))  /* arrow left */
+		else if (esccmp("[D", inp))  /* arrow left */
 			cur_lr(1);
-		if (esccmp("[3~", inp)) /* delete */
+		else if (esccmp("[3~", inp)) /* delete */
 			del_char(0);
-		if (esccmp("[5~", inp)) /* page up */
+		else if (esccmp("[5~", inp)) /* page up */
 			channel_sw(0);
-		if (esccmp("[6~", inp)) /* page down */
+		else if (esccmp("[6~", inp)) /* page down */
 			channel_sw(1);
 	} else {
-		;
-		/* Got paste, confirm length with user, call warn_paste(int)
-		 * then:
-		 * while count-- , inp, send if max length */
+		split_paste(inp, count);
 	}
 	draw_input();
 }

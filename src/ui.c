@@ -227,6 +227,12 @@ print_more(char *start, char *end, int row)
 void
 draw_input(void)
 {
+	if (confirm) {
+		printf(C(239)"\x1b[%d;6H\x1b[K"C(250), w.ws_row);
+		printf("Confirm sending %d lines? (y/n)", confirm);
+		return;
+	}
+
 	int winsz = w.ws_col / 3;
 
 	input *in = ccur->input;

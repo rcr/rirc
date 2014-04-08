@@ -41,7 +41,8 @@ typedef enum {DEFAULT, JOINPART, NICK, ACTION, NUMRPL} line_t;
 #define UMODE_MAX 7
 
 /* Nicklist AVL tree node */
-typedef struct node {
+typedef struct node
+{
 	int height;
 	struct node *l;
 	struct node *r;
@@ -137,6 +138,7 @@ void draw_input(void);
 void draw_status(void);
 
 /* input.c */
+int confirm;
 input* new_input(void);
 void free_input(input*);
 void inputc(char*, int);

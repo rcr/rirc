@@ -59,6 +59,8 @@ init(void)
 
 	srand(time(NULL));
 
+	confirm = 0;
+
 	rirc = cfirst = ccur = new_channel("rirc");
 
 	/* Set sigwinch, init draw */
