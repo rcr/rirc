@@ -10,12 +10,14 @@ char *confirm_paste;
 extern struct winsize w;
 input *in;
 
+int esccmp(char*, char*);
 void cur_lr(int);
 void del_char(int);
 void ins_char(char);
 void ready_send(void);
 void scroll_input(int);
-int esccmp(char*, char*);
+void send_paste(void);
+void split_paste(char*, int);
 
 void
 scroll_input(int back)
@@ -24,13 +26,14 @@ scroll_input(int back)
 	char *head = in->head, *tail = in->tail, *end = in->line->text + MAXINPUT;
 	while (tail < end)
 		*head++ = *tail++;
-	*head = '\0';
 	in->line->end = head;
 
 	if (back && in->line->prev != in->list_head)
 		in->line = in->line->prev;
 	else if (!back && in->line != in->list_head)
 		in->line = in->line->next;
+	else
+		return;
 
 	in->head = in->line->end;
 	in->tail = in->line->text + MAXINPUT;
@@ -44,7 +47,7 @@ new_inputl(input_l *prev)
 {
 	input_l *l;
 	if ((l = malloc(sizeof(input_l))) == NULL)
-		fatal("new_input");
+		fatal("new_inputl");
 
 	l->end = l->text;
 	l->prev = prev ? prev : l;
@@ -164,7 +167,7 @@ ready_send(void)
 }
 
 void
-send_paste()
+send_paste(void)
 {
 	int len = (in->head - in->tail + MAXINPUT) / sizeof(*in->head);
 

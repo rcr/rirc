@@ -553,7 +553,7 @@ send_mesg(char *mesg)
 	} else if (cmdcmpc(cmd, "ME")) {
 		err = send_emot(mesg);
 	} else if (cmdcmpc(cmd, "RAW")) {
-		sendf(rplsoc, "%s\r\n", mesg);
+		sendf(ccur->server->soc, "%s\r\n", mesg);
 	} else {
 		int len = strlen(cmd);
 		newlinef(ccur, DEFAULT, "-!!-", "Unknown command: %.*s%s",
@@ -1117,16 +1117,13 @@ do_recv(int soc)
 	if (*ptr == ':' && !getargc(&prfx, &ptr, ' '))
 		goto rpl_error;
 
-	if (!getarg(&cmd, &ptr))
+	if (!getarg(&cmd, &ptr)) {
 		goto rpl_error;
 
 	/* Reply code */
-	if ((code = get_numeric_code(cmd))) {
+	} else if ((code = get_numeric_code(cmd))) {
 
-		if (!getarg(&args, &ptr))
-			goto rpl_error;
-
-		if (!code) {
+		if (!getarg(&args, &ptr)) {
 			goto rpl_error;
 		} else if (code < 200) {
 			recv_000(code, ptr);
