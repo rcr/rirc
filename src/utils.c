@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <setjmp.h>
+#include <stdarg.h>
 #include <ctype.h>
 
 #include "common.h"
@@ -16,7 +17,19 @@ node* rotate_r(node*);
 node* node_delete(node*, char*);
 node* node_insert(node*, char*);
 
+char errbuff[BUFFSIZE];
+
 static jmp_buf jmpbuf;
+
+char*
+errf(const char *fmt, ...)
+{
+	va_list args;
+	va_start(args, fmt);
+	vsnprintf(errbuff, BUFFSIZE-1, fmt, args);
+	va_end(args);
+	return errbuff;
+}
 
 int
 getarg(char **arg, char **str)

@@ -144,6 +144,7 @@ void free_input(input*);
 void inputc(char*, int);
 
 /* utils.c */
+char* errf(const char*, ...);
 int check_pinged(char*, char*);
 int cmdcmp(char*, char*);
 int cmdcmpc(char*, char*);
