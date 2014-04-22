@@ -4,6 +4,7 @@
 #define MAXSERVERS 10
 #define SCROLLBACK 300
 #define SCROLLBACK_INPUT 10
+#define JOINPART_THRESHOLD 100
 
 typedef enum {NONE, ACTIVE, PINGED, ACTV_SIZE} activity_t;
 typedef enum {DEFAULT, JOINPART, NICK, ACTION, NUMRPL} line_t;

@@ -586,7 +586,8 @@ recv_join(char *prfx, char *args)
 		draw_full();
 	} else {
 		if ((c = get_channel(chan)) && nicklist_insert(&(c->nicklist), nick)) {
-			newlinef(c, JOINPART, ">", "%s has joined %s", nick, chan);
+			if (c->nick_count < JOINPART_THRESHOLD)
+				newlinef(c, JOINPART, ">", "%s has joined %s", nick, chan);
 			c->nick_count++;
 			draw_status();
 		} else if (c == NULL) {
@@ -820,10 +821,12 @@ recv_part(char *prfx, char *args)
 
 	if ((c = get_channel(chan)) && nicklist_delete(&c->nicklist, nick)) {
 		c->nick_count--;
-		if (getarg(&mesg, &args))
-			newlinef(c, JOINPART, "<", "%s left %s (%s)", nick, chan, mesg);
-		else
-			newlinef(c, JOINPART, "<", "%s left %s", nick, chan);
+		if (c->nick_count < JOINPART_THRESHOLD) {
+			if (getarg(&mesg, &args))
+				newlinef(c, JOINPART, "<", "%s left %s (%s)", nick, chan, mesg);
+			else
+				newlinef(c, JOINPART, "<", "%s left %s", nick, chan);
+		}
 	}
 
 	draw_status();
@@ -901,10 +904,12 @@ recv_quit(char *prfx, char *args)
 	do {
 		if (c->server == s[rplsoc] && nicklist_delete(&c->nicklist, nick)) {
 			c->nick_count--;
-			if (mesg != NULL)
-				newlinef(c, JOINPART, "<", "%s has quit (%s)", nick, mesg);
-			else
-				newlinef(c, JOINPART, "<", "%s has quit", nick);
+			if (c->nick_count < JOINPART_THRESHOLD) {
+				if (mesg != NULL)
+					newlinef(c, JOINPART, "<", "%s has quit (%s)", nick, mesg);
+				else
+					newlinef(c, JOINPART, "<", "%s has quit", nick);
+			}
 		}
 		c = c->next;
 	} while (c != cfirst);
