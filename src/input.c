@@ -272,6 +272,10 @@ inputc(char *inp, int count)
 			channel_sw(0);
 		else if (esccmp("[6~", inp)) /* page down */
 			channel_sw(1);
+		else if (esccmp("[M`", inp)) /* mousewheel up */
+			channel_sw(0); /* TODO: scroll buffer up */
+		else if (esccmp("[Ma", inp)) /* mousewheel down */
+			channel_sw(1); /* TODO: scroll buffer down */
 	} else {
 		split_paste(inp, count);
 	}

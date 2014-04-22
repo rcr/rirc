@@ -48,7 +48,7 @@ init(void)
 {
 	setbuf(stdout, NULL);
 
-	/* set terminal to raw mode */
+	/* Set terminal to raw mode */
 	tcgetattr(0, &oterm);
 	memcpy(&nterm, &oterm, sizeof(struct termios));
 	nterm.c_lflag &= ~(ECHO | ICANON | ISIG);
@@ -56,6 +56,9 @@ init(void)
 	nterm.c_cc[VTIME] = 0;
 	if (tcsetattr(0, TCSADRAIN, &nterm) < 0)
 		fatal("tcsetattr");
+
+	/* Set mousewheel event handling */
+	printf("\x1b[?1000h");
 
 	srand(time(NULL));
 
@@ -71,6 +74,9 @@ void
 cleanup(int clear)
 {
 	tcsetattr(0, TCSADRAIN, &oterm);
+
+	/* Reset mousewheel event handling */
+	printf("\x1b[?1000l");
 
 	ccur = cfirst;
 	do {
