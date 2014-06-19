@@ -19,6 +19,8 @@ void scroll_input(int);
 void send_paste(void);
 void split_paste(char*, int);
 
+char sendbuff[BUFFSIZE];
+
 void
 scroll_input(int back)
 {
@@ -126,6 +128,7 @@ ready_send(void)
 {
 	char *head = in->head, *tail = in->tail, *end = in->line->text + MAXINPUT;
 
+	/* Empty input */
 	if (head == in->line->text && tail == end)
 		return;
 
@@ -134,8 +137,8 @@ ready_send(void)
 	*head = '\0';
 	in->line->end = head;
 
-	send_mesg(in->line->text);
-
+	/* strcpy is safe here since MAXINPUT < BUFFSIZE */
+	strcpy(sendbuff, in->line->text);
 
 	if (in->line == in->list_head) {
 		if (in->count < SCROLLBACK_INPUT)
@@ -148,22 +151,24 @@ ready_send(void)
 		}
 		in->line = in->list_head = new_inputl(in->list_head);
 	} else {
-		/* Remove from list */
+		/* Resending an input scrollback */
+
+		/* Move from list to head */
 		in->line->next->prev = in->line->prev;
 		in->line->prev->next = in->line->next;
 
-		/* Insert second from head */
 		in->list_head->prev->next = in->line;
 		in->line->prev = in->list_head->prev;
 		in->list_head->prev = in->line;
 		in->line->next = in->list_head;
 
-		/* Reset */
 		in->line = in->list_head;
 	}
 	in->head = in->line->text;
 	in->tail = in->line->text + MAXINPUT;
 	in->window = in->line->text;
+
+	send_mesg(sendbuff);
 }
 
 void
