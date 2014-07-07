@@ -114,6 +114,16 @@ typedef struct server
 	struct channel *channel;
 } server;
 
+/* Parsed IRC message */
+typedef struct parsed_mesg
+{
+	char *from;
+	char *hostinfo;
+	char *command;
+	char *params;
+	char *trailing;
+} parsed_mesg;
+
 /* rirc.c */
 int run;
 void fatal(char*);
@@ -145,6 +155,10 @@ void free_input(input*);
 void inputc(char*, int);
 
 /* utils.c */
+parsed_mesg parsed;
+char* getarg_(char**, int);
+struct parsed_mesg* parse(char *mesg);
+
 char* errf(const char*, ...);
 int check_pinged(char*, char*);
 int cmdcmp(char*, char*);

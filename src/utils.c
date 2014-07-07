@@ -89,6 +89,85 @@ getargc(char **arg, char **str, char c)
 	return 1;
 }
 
+/* TODO: replacing getarg */
+char*
+getarg_(char **mesg, int set_null)
+{
+	char *ret, *ptr = *mesg;
+
+	while (*ptr && *ptr == ' ')
+		ptr++;
+
+	ret = ptr;
+
+	while (*ptr && *ptr != ' ')
+		ptr++;
+
+	if (set_null && *ptr == ' ')
+		*ptr++ = '\0';
+
+	*mesg = ptr;
+
+	return ret;
+}
+
+struct parsed_mesg*
+parse(char *mesg)
+{
+	/* RFC 2812, section 2.3.1 */
+	/* message = [ ":" prefix SPACE ] command [ params ] crlf */
+	/* nospcrlfcl =  %x01-09 / %x0B-0C / %x0E-1F / %x21-39 / %x3B-FF */
+	/* middle =  nospcrlfcl *( ":" / nospcrlfcl ) */
+
+	/* prefix = servername / ( nickname [ [ "!" user ] "@" host ] ) */
+	parsed.from = parsed.hostinfo = NULL;
+	if (*mesg == ':') {
+		parsed.from = ++mesg;
+
+		while (*mesg) {
+			if (*mesg == '!') {
+				*mesg++ = '\0';
+				parsed.hostinfo = mesg;
+			} else if (*mesg == '@' && !parsed.hostinfo) {
+				*mesg++ = '\0';
+				parsed.hostinfo = mesg;
+			} else if (*mesg == ' ') {
+				*mesg++ = '\0';
+				break;
+			}
+			mesg++;
+		}
+	}
+
+	/* command = 1*letter / 3digit */
+	parsed.command = getarg_(&mesg, 1);
+
+	/* params = *14( SPACE middle ) [ SPACE ":" trailing ] */
+	/* params =/ 14( SPACE middle ) [ SPACE [ ":" ] trailing ] */
+	/* trailing   =  *( ":" / " " / nospcrlfcl ) */
+	char *param;
+	if ((param = getarg_(&mesg, 0))) {
+		if (*param == ':') {
+			parsed.params = NULL;
+			*param++ = '\0';
+			parsed.trailing = param;
+		} else {
+			parsed.params = param;
+
+			int paramcount = 1;
+			while ((param = getarg_(&mesg, 0))) {
+				if (paramcount == 14 || *param == ':') {
+					*param++ = '\0';
+					parsed.trailing = param;
+					break;
+				}
+				paramcount++;
+			}
+		}
+	}
+
+	return &parsed;
+}
 int
 cmdcmp(char *i, char *cmd)
 {
@@ -140,9 +219,9 @@ node*
 rotate_r(node *x)
 {
 	node *y = x->l;
-	node *T2 = y->r;
+	node *z = y->r;
 	y->r = x;
-	x->l = T2;
+	x->l = z;
 
 	x->height = MAX(H(x->l), H(x->r)) + 1;
 	y->height = MAX(H(y->l), H(y->r)) + 1;
@@ -154,9 +233,9 @@ node*
 rotate_l(node *x)
 {
 	node *y = x->r;
-	node *T2 = y->l;
+	node *z = y->l;
 	y->l = x;
-	x->r = T2;
+	x->r = z;
 
 	x->height = MAX(H(x->l), H(x->r)) + 1;
 	y->height = MAX(H(y->l), H(y->r)) + 1;
