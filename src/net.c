@@ -1102,8 +1102,10 @@ recv_mesg(char *input, int count, int soc)
 			*i = '\0';
 			do_recv(soc);
 			i = s[soc]->input;
-		} else if (i < max && *input != '\n')
+		/* Don't accept unprintable characters unless space or ctcp markup */
+		} else if (i < max && (isgraph(*input) || *input == ' ' || *input == 0x01))
 			*i++ = *input;
+
 		input++;
 	}
 	s[soc]->iptr = i;
