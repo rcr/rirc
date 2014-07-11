@@ -1,17 +1,32 @@
-ODIR = bld
-SDIR = src
 CFLAGS = -std=c99 -Wall -pedantic -g
 
-_OBJS = rirc.o input.o net.o ui.o utils.o
+SDIR = src
+TDIR = test
 
-OBJS = $(patsubst %,$(ODIR)/%,$(_OBJS))
+# Source and object files
+SRC = $(wildcard $(SDIR)/*.c)
+OBJ = $(patsubst $(SDIR)%.c,$(SDIR_O)%.o,$(SRC))
+SDIR_O = $(SDIR)/bld
 
-rirc : $(OBJS)
+# Test source and executable files
+SRC_T = $(wildcard $(TDIR)/*.c)
+OBJ_T = $(patsubst $(TDIR)%.c,$(TDIR_O)%.test,$(SRC_T))
+TDIR_O = $(TDIR)/bld
+
+rirc: $(OBJ)
 	cc $(CFLAGS) -o $@ $^
 
-$(ODIR)/%.o : $(SDIR)/%.c $(SDIR)/common.h
+$(SDIR_O)/%.o: $(SDIR)/%.c
 	cc $(CFLAGS) -c -o $@ $<
 
-.PHONY : clean
+test: $(OBJ_T)
+	@for test in $(OBJ_T); do ./$$test; done
+
+$(TDIR_O)/%.test: $(TDIR)/%.c
+	@cc $(CFLAGS) -o $@ $<
+
 clean:
-	-@rm -f rirc $(ODIR)/*.o
+	@echo cleaning
+	@rm -f rirc $(SDIR_O)/*.o $(TDIR_O)/*.test
+
+.PHONY: clean

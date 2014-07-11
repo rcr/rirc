@@ -1,0 +1,12 @@
+#include <stdio.h>
+#include <stdlib.h>
+
+#define fail(msg) \
+	do {printf(__FILE__"\t\tFAIL: %s\n", msg), exit(EXIT_FAILURE);} while (0);
+
+int
+main(void)
+{
+	puts(__FILE__"\t\tOK");
+	return 0;
+}
