@@ -128,7 +128,6 @@ typedef struct parsed_mesg
 } parsed_mesg;
 
 /* rirc.c */
-int run;
 channel *rirc;
 channel *ccur;
 channel *cfirst;

@@ -547,7 +547,7 @@ send_mesg(char *mesg)
 	} else if (cmdcmpc(cmd, "NICK")) {
 		err = send_nick(mesg);
 	} else if (cmdcmpc(cmd, "QUIT")) {
-		run = 0;
+		exit(EXIT_SUCCESS);
 	} else if (cmdcmpc(cmd, "MSG")) {
 		err = send_priv(mesg, 0);
 	} else if (cmdcmpc(cmd, "ME")) {

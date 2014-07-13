@@ -92,9 +92,8 @@ main_loop(void)
 	for (i = 0; i < MAXSERVERS + 1; i++)
 		fds[i].events = POLLIN;
 
-	run = 1;
 
-	while (run) {
+	while (1) {
 
 		ret = poll(fds, numfds, time);
 
