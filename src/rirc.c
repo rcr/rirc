@@ -9,8 +9,8 @@
 
 #include "common.h"
 
-void init(void);
-void cleanup(int);
+void startup(void);
+void cleanup(void);
 void main_loop(void);
 
 extern int numfds;
@@ -21,18 +21,10 @@ struct pollfd fds[MAXSERVERS + 1] = {{0}};
 int
 main(int argc, char **argv)
 {
-	init();
+	startup();
 	main_loop();
-	cleanup(1);
-	return 0;
-}
-
-void
-fatal(char *e)
-{
-	perror(e);
-	cleanup(0);
-	exit(1);
+	printf("\x1b[H\x1b[J"); /* Clear */
+	return EXIT_SUCCESS;
 }
 
 void
@@ -44,7 +36,7 @@ signal_sigwinch(int unused)
 }
 
 void
-init(void)
+startup(void)
 {
 	setbuf(stdout, NULL);
 
@@ -68,11 +60,15 @@ init(void)
 
 	/* Set sigwinch, init draw */
 	signal_sigwinch(0);
+
+	/* Register cleanup for exit */
+	atexit(cleanup);
 }
 
 void
-cleanup(int clear)
+cleanup(void)
 {
+	/* Reset terminal modes */
 	tcsetattr(0, TCSADRAIN, &oterm);
 
 	/* Reset mousewheel event handling */
@@ -84,9 +80,6 @@ cleanup(int clear)
 	} while (cfirst != rirc);
 
 	free_channel(rirc);
-
-	if (clear)
-		printf("\x1b[H\x1b[J");
 }
 
 void

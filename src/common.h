@@ -41,6 +41,9 @@ typedef enum {DEFAULT, JOINPART, NICK, ACTION, NUMRPL} line_t;
 #define UMODE_s (1 << 6) /* receiving server notices */
 #define UMODE_MAX 7
 
+#define fatal(mesg) \
+	do {perror(mesg); exit(EXIT_FAILURE);} while (0);
+
 /* Nicklist AVL tree node */
 typedef struct node
 {
@@ -126,10 +129,9 @@ typedef struct parsed_mesg
 
 /* rirc.c */
 int run;
-void fatal(char*);
-struct channel *rirc;
-struct channel *ccur;
-struct channel *cfirst;
+channel *rirc;
+channel *ccur;
+channel *cfirst;
 
 /* net.c */
 channel* new_channel(char*);
@@ -156,8 +158,8 @@ void inputc(char*, int);
 
 /* utils.c */
 parsed_mesg parsed;
+parsed_mesg* parse(char *mesg);
 char* getarg_(char**, int);
-struct parsed_mesg* parse(char *mesg);
 
 char* errf(const char*, ...);
 int check_pinged(char*, char*);
