@@ -111,7 +111,6 @@ typedef struct server
 	char name[50];
 	char nick_me[NICKSIZE];
 	int port;
-	int reg;
 	int soc;
 	int usermode;
 	struct channel *channel;
@@ -136,7 +135,7 @@ channel *cfirst;
 channel* new_channel(char*);
 void free_channel(channel*);
 void con_lost(int);
-void channel_sw(int);
+void channel_switch(int);
 void channel_close(void);
 void send_mesg(char*);
 void recv_mesg(char*, int, int);
@@ -156,16 +155,12 @@ void free_input(input*);
 void inputc(char*, int);
 
 /* utils.c */
-parsed_mesg parsed;
-parsed_mesg* parse(char *mesg);
-char* getarg_(char**, int);
-
 char* errf(const char*, ...);
+char* getarg(char**, int);
 int check_pinged(char*, char*);
-int cmdcmp(char*, char*);
-int cmdcmpc(char*, char*);
-int getarg(char**, char**);
-int getargc(char**, char**, char);
-int nicklist_insert(node**, char*);
 int nicklist_delete(node**, char*);
+int nicklist_insert(node**, char*);
+int streq(const char*, const char*);
+int streqi(const char*, const char*);
+parsed_mesg* parse(char *mesg);
 void free_nicklist(node*);

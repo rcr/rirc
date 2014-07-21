@@ -17,9 +17,11 @@ node* rotate_r(node*);
 node* node_delete(node*, char*);
 node* node_insert(node*, char*);
 
-char errbuff[BUFFSIZE];
+static char errbuff[BUFFSIZE];
 
 static jmp_buf jmpbuf;
+
+static parsed_mesg parsed;
 
 char*
 errf(const char *fmt, ...)
@@ -31,74 +33,22 @@ errf(const char *fmt, ...)
 	return errbuff;
 }
 
-int
-getarg(char **arg, char **str)
-{
-	char *i = *str;
-
-	while (*i == ' ')
-		i++;
-
-	if (*i == '\0')
-		return 0;
-
-	if (*i == ':') {
-		i++;
-		if (*i == '\0')
-			return 0;
-		else {
-			*arg = i;
-			return 2;
-		}
-	}
-
-	*arg = i;
-
-	while (*i != ' ' && *i != '\0')
-		i++;
-
-	if (*i == ' ')
-		*i++ = '\0';
-
-	*str = i;
-
-	return 1;
-}
-
-int
-getargc(char **arg, char **str, char c)
-{
-	char *i = *str;
-
-	while (*i == ' ' || *i == ':')
-		i++;
-
-	if (*i == '\0')
-		return 0;
-
-	*arg = i;
-
-	while (*i != c && *i != '\0')
-		i++;
-
-	if (*i == c)
-		*i++ = '\0';
-
-	*str = i;
-
-	return 1;
-}
-
-/* TODO: replacing getarg */
+/* TODO: Tests for this function */
 char*
-getarg_(char **mesg, int set_null)
+getarg(char **str, int set_null)
 {
-	char *ret, *ptr = *mesg;
+	char *ptr, *ret;
 
-	while (*ptr && *ptr == ' ')
+	/* Check that str isnt pointing to NULL */
+	if (!(ptr = *str))
+		return NULL;
+	else while (*ptr && *ptr == ' ')
 		ptr++;
 
-	ret = ptr;
+	if (*ptr)
+		ret = ptr;
+	else
+		return NULL;
 
 	while (*ptr && *ptr != ' ')
 		ptr++;
@@ -106,7 +56,7 @@ getarg_(char **mesg, int set_null)
 	if (set_null && *ptr == ' ')
 		*ptr++ = '\0';
 
-	*mesg = ptr;
+	*str = ptr;
 
 	return ret;
 }
@@ -121,14 +71,13 @@ parse(char *mesg)
 
 	/* prefix = servername / ( nickname [ [ "!" user ] "@" host ] ) */
 	parsed.from = parsed.hostinfo = NULL;
+
 	if (*mesg == ':') {
+
 		parsed.from = ++mesg;
 
 		while (*mesg) {
-			if (*mesg == '!') {
-				*mesg++ = '\0';
-				parsed.hostinfo = mesg;
-			} else if (*mesg == '@' && !parsed.hostinfo) {
+			if (*mesg == '!' || (*mesg == '@' && !parsed.hostinfo)) {
 				*mesg++ = '\0';
 				parsed.hostinfo = mesg;
 			} else if (*mesg == ' ') {
@@ -140,13 +89,17 @@ parse(char *mesg)
 	}
 
 	/* command = 1*letter / 3digit */
-	parsed.command = getarg_(&mesg, 1);
+	if (!(parsed.command = getarg(&mesg, 1)))
+		return NULL;
 
 	/* params = *14( SPACE middle ) [ SPACE ":" trailing ] */
 	/* params =/ 14( SPACE middle ) [ SPACE [ ":" ] trailing ] */
 	/* trailing   =  *( ":" / " " / nospcrlfcl ) */
+
+	parsed.trailing = NULL;
+
 	char *param;
-	if ((param = getarg_(&mesg, 0))) {
+	if ((param = getarg(&mesg, 0))) {
 		if (*param == ':') {
 			parsed.params = NULL;
 			*param++ = '\0';
@@ -155,7 +108,7 @@ parse(char *mesg)
 			parsed.params = param;
 
 			int paramcount = 1;
-			while ((param = getarg_(&mesg, 0))) {
+			while ((param = getarg(&mesg, 0))) {
 				if (paramcount == 14 || *param == ':') {
 					*param++ = '\0';
 					parsed.trailing = param;
@@ -168,22 +121,29 @@ parse(char *mesg)
 
 	return &parsed;
 }
+
+/* TODO: Tests for this function */
 int
-cmdcmp(char *i, char *cmd)
+streq(const char *p, const char *q)
 {
-	while (*cmd++ == *i++)
-		if (*cmd == '\0' && (*i == '\0' || *i == ' '))
-			return 1;
-	return 0;
+	do {
+		if (*p != *q++)
+			return 0;
+	} while (*p++);
+
+	return 1;
 }
 
+/* TODO: Tests for this function */
 int
-cmdcmpc(char *i, char *cmd)
+streqi(const char *p, const char *q)
 {
-	while (*cmd++ == toupper(*i++))
-		if (*cmd == '\0' && (*i == '\0' || *i == ' '))
-			return 1;
-	return 0;
+	do {
+		if (toupper(*p) != toupper(*q++))
+			return 0;
+	} while (*p++);
+
+	return 1;
 }
 
 int
@@ -269,7 +229,7 @@ free_nicklist(node *n)
 int
 nick_cmp(char *n1, char *n2)
 {
-	while (*n1 == *n2 && *n1 != '\0')
+	while (*n1 && *n1 == *n2 && *n1 != '\0')
 		n1++, n2++;
 
 	if (*n1 > *n2)

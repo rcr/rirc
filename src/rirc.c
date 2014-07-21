@@ -85,7 +85,7 @@ cleanup(void)
 void
 main_loop(void)
 {
-	char buf[BUFFSIZE];
+	char buff[BUFFSIZE];
 	int i, ret, count = 0, time = 200;
 
 	fds[0].fd = 0; /* stdin */
@@ -97,23 +97,26 @@ main_loop(void)
 
 		ret = poll(fds, numfds, time);
 
-		if (ret == 0) { /* timed out check input buffer */
-			if (count > 0) {
-				inputc(buf, count);
+		/* Poll timeout */
+		if (ret == 0) {
+			if (count) {
+				buff[count] = '\0'; /* FIXME, temporary fix */
+				inputc(buff, count);
 				count = 0;
 			}
 			time = 200;
+		/* Check input on stdin */
 		} else if (fds[0].revents & POLLIN) {
-			count = read(0, buf, BUFFSIZE);
+			count = read(0, buff, BUFFSIZE);
 			time = 0;
-		/* Loop through all open sockets */
+		/* Check all open server sockets */
 		} else {
 			for (i = 1; i < numfds; i++) {
 				if (fds[i].revents & POLLIN) {
-					if ((count = read(fds[i].fd, buf, BUFFSIZE)) == 0)
+					if ((count = read(fds[i].fd, buff, BUFFSIZE)) == 0)
 						con_lost(fds[i].fd);
 					else
-						recv_mesg(buf, count, fds[i].fd);
+						recv_mesg(buff, count, fds[i].fd);
 					time = count = 0;
 				}
 			}

@@ -10,7 +10,6 @@ char *confirm_paste;
 extern struct winsize w;
 input *in;
 
-int esccmp(char*, char*);
 void cur_lr(int);
 void del_char(int);
 void ins_char(char);
@@ -113,14 +112,6 @@ cur_lr(int left)
 		*--in->tail = *--in->head;
 	else if (!left && in->tail < in->line->text + MAXINPUT)
 		*in->head++ = *in->tail++;
-}
-
-int
-esccmp(char *esc, char *inp)
-{
-	while (*esc++ == *inp++)
-		if (*esc == '\0') return 1;
-	return 0;
 }
 
 void
@@ -261,26 +252,26 @@ inputc(char *inp, int count)
 			ready_send();
 		else if (c == 0x18) /* ctrl-x */
 			channel_close();
-	} else if (count > 0 && *inp == 0x1B) { /* escape sequence */
+	} else if (count && *inp == 0x1b) { /* escape sequence */
 		inp++;
-		if (esccmp("[A", inp))  /* arrow up */
+		if (streq(inp, "[A"))  /* arrow up */
 			scroll_input(1);
-		else if (esccmp("[B", inp))  /* arrow down */
+		else if (streq(inp, "[B"))  /* arrow down */
 			scroll_input(0);
-		else if (esccmp("[C", inp))  /* arrow right */
+		else if (streq(inp, "[C"))  /* arrow right */
 			cur_lr(0);
-		else if (esccmp("[D", inp))  /* arrow left */
+		else if (streq(inp, "[D"))  /* arrow left */
 			cur_lr(1);
-		else if (esccmp("[3~", inp)) /* delete */
+		else if (streq(inp, "[3~")) /* delete */
 			del_char(0);
-		else if (esccmp("[5~", inp)) /* page up */
-			channel_sw(0);
-		else if (esccmp("[6~", inp)) /* page down */
-			channel_sw(1);
-		else if (esccmp("[M`", inp)) /* mousewheel up */
-			channel_sw(0); /* TODO: scroll buffer up */
-		else if (esccmp("[Ma", inp)) /* mousewheel down */
-			channel_sw(1); /* TODO: scroll buffer down */
+		else if (streq(inp, "[5~")) /* page up */
+			channel_switch(0);
+		else if (streq(inp, "[6~")) /* page down */
+			channel_switch(1);
+		else if (streq(inp, "[M`")) /* mousewheel up */
+			channel_switch(0); /* TODO: scroll buffer up */
+		else if (streq(inp, "[Ma")) /* mousewheel down */
+			channel_switch(1); /* TODO: scroll buffer down */
 	} else {
 		split_paste(inp, count);
 	}
