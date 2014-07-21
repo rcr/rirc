@@ -1,4 +1,5 @@
-CFLAGS = -std=c99 -Wall -pedantic -g
+CC = cc
+CFLAGS = -std=c99 -Wall -pedantic -O3 -g
 
 SDIR = src
 TDIR = test
@@ -14,16 +15,16 @@ OBJ_T = $(patsubst $(TDIR)%.c,$(TDIR_O)%.test,$(SRC_T))
 TDIR_O = $(TDIR)/bld
 
 rirc: $(OBJ)
-	cc $(CFLAGS) -o $@ $^
+	$(CC) $(CFLAGS) -o $@ $^
 
 $(SDIR_O)/%.o: $(SDIR)/%.c
-	cc $(CFLAGS) -c -o $@ $<
+	$(CC) $(CFLAGS) -c -o $@ $<
 
 test: $(OBJ_T)
 	@for test in $(OBJ_T); do ./$$test; done
 
 $(TDIR_O)/%.test: $(TDIR)/%.c
-	@cc $(CFLAGS) -o $@ $<
+	@$(CC) $(CFLAGS) -o $@ $<
 
 clean:
 	@echo cleaning
