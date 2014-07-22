@@ -867,24 +867,24 @@ recv_nick(parsed_mesg *p)
 	char *nick;
 
 	if (!p->from)
-		return "NICK: nick is null";
+		return "NICK: old nick is null";
 
-	if (!(nick = getarg(&p->params, 1)))
-		return "NICK: message target is null";
+	/* Check params first, then trailing */
+	if (!(nick = getarg(&p->params, 1)) && !(nick = getarg(&p->trailing, 1)))
+		return "NICK: new nick is null";
 
-	if (is_me(p->from)) {
-		strncpy(s[rplsoc]->nick_me, nick, 50);
-		newlinef(ccur, NICK, "*", "You are now known as %s", nick);
-	} else {
-		channel *c = cfirst;
-		do {
-			if (c->server == s[rplsoc] && nicklist_delete(&c->nicklist, p->from)) {
-				nicklist_insert(&c->nicklist, nick);
-				newlinef(c, NICK, "*", "%s  >>  %s", p->from, nick);
-			}
-			c = c->next;
-		} while (c != cfirst);
-	}
+	if (is_me(p->from))
+		strncpy(s[rplsoc]->nick_me, nick, NICKSIZE-1);
+
+	channel *c = cfirst;
+
+	do {
+		if (c->server == s[rplsoc] && nicklist_delete(&c->nicklist, p->from)) {
+			nicklist_insert(&c->nicklist, nick);
+			newlinef(c, NICK, "--", "%s  >>  %s", p->from, nick);
+		}
+		c = c->next;
+	} while (c != cfirst);
 
 	return NULL;
 }
