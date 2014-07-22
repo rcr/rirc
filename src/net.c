@@ -37,8 +37,6 @@
 #define ERR_NICKNAMEINUSE    433
 #define ERR_ERRONEUSNICKNAME 432
 
-channel* get_channel(char*);
-int get_numeric_code(char*);
 
 char* recv_ctcp(parsed_mesg *p);
 char* recv_error(parsed_mesg *p);
@@ -61,6 +59,8 @@ void send_part(char*);
 void send_ping(char*);
 void send_priv(char*, int);
 
+channel* get_channel(char*);
+int get_numeric_code(char*);
 server* new_server(char*, int, int);
 void con_server(char*, int);
 void dis_server(server*, int);
@@ -79,9 +79,11 @@ server *s[MAXSERVERS + 3];
 char *user_me = "rcr";
 char *realname = "Richard Robbins";
 /* comma separated list of channels to join on connect*/
-char *autojoin = "#abc";
+char *autojoin = "##rirc_test";
 /* comma and/or space separated list of nicks */
 char *nicks = "rcr, rcr_, rcr__";
+/* version number */
+char *rirc_version = "0.0.1";
 
 time_t raw_t;
 struct tm *t;
@@ -635,12 +637,12 @@ recv_mesg(char *inp, int count, int soc)
 			else if (streq(p->command, "ERROR"))
 				err = recv_error(p);
 			else
-				err = "Message type unknown";
+				err = errf("Message type '%s' unknown", p->command);
 
 			if (err) {
-				newline(0, 0, 0, err, 0);
+				newline(0, DEFAULT, "-!!-", err, 0);
 				/* TODO: reset the inserted nulls in s[soc]->input from parsing */
-				newlinef(0, DEFAULT, 0, "RPL ERROR: %s", s[soc]->input);
+				newlinef(0, DEFAULT, "-!!-", "RPL ERROR: %s", s[soc]->input);
 			}
 
 			ptr = s[soc]->input;
@@ -658,9 +660,55 @@ recv_mesg(char *inp, int count, int soc)
 char*
 recv_ctcp(parsed_mesg *p)
 {
-	/* CTCP extension: trailing = 0x01<target> <command> <arguments>0x01 */
+	/* CTCP extension: trailing = 0x01<command> <arguments>0x01 */
 
-	/* TODO */
+	char *targ, *cmd;
+
+	if (!p->from)
+		return "CTCP: sender's nick is null";
+
+	if (!(targ = getarg(&p->params, 1)))
+		return "CTCP: target is null";
+
+	/* Validate markup */
+	if (*p->trailing != 0x01)
+		return "CTCP: Invalid markup";
+
+	char *ptr = ++p->trailing;
+
+	while (*ptr && *ptr != 0x01)
+		ptr++;
+
+	if (*ptr != 0x01)
+		return "CTCP: Invalid markup";
+	else
+		*ptr = '\0';
+
+	channel *c;
+
+	if (is_me(targ)) {
+		c = ccur;
+	} else if ((c = get_channel(targ)) == NULL)
+		return errf("CTCP: channel '%s' not found", targ);
+
+	if (!(cmd = getarg(&p->trailing, 1))) {
+		return "CTCP: command is null";
+	} else if (streq(cmd, "ACTION")) {
+		;
+	} else if (streq(cmd, "USERINFO")) {
+		;
+	} else if (streq(cmd, "VERSION")) {
+		newlinef(c, 0, p->from, "CTCP VERSION from %s", p->from);
+		sendf(rplsoc, "NOTICE %s :rirc version %s\r\n", p->from, rirc_version);
+		sendf(rplsoc, "NOTICE %s :http://rcr.io/rirc\r\n", p->from);
+	} else if (streq(cmd, "TIME")) {
+		;
+	} else if (streq(cmd, "PING")) {
+		;
+	} else {
+		; /* Unknown action */
+	}
+
 	return NULL;
 }
 
@@ -674,17 +722,17 @@ recv_error(parsed_mesg *p)
 char*
 recv_join(parsed_mesg *p)
 {
-	/* :nick!user@hostname.domain JOIN <channel> */
+	/* :nick!user@hostname.domain JOIN [:]<channel> */
 
 	char *chan;
 	channel *c;
 
 	if (!p->from)
-		return "JOIN: nick is null";
+		return "JOIN: sender's nick is null";
 
-	/* Some servers put the JOIN target in the trailing */
-	if (!(chan = getarg(&p->trailing, 1)) && !(chan = getarg(&p->params, 1)))
-		return "JOIN: target is null";
+	/* Check params first, then trailing */
+	if (!(chan = getarg(&p->params, 1)) && !(chan = getarg(&p->trailing, 1)))
+		return "JOIN: channel is null";
 
 	if (is_me(p->from)) {
 		ccur = new_channel(chan);
@@ -862,7 +910,7 @@ recv_mode(parsed_mesg *p)
 char*
 recv_nick(parsed_mesg *p)
 {
-	/* :nick!user@hostname.domain NICK <new nick> */
+	/* :nick!user@hostname.domain NICK [:]<new nick> */
 
 	char *nick;
 
@@ -898,7 +946,7 @@ recv_notice(parsed_mesg *p)
 	channel *c;
 
 	if (!(targ = getarg(&p->params, 1)))
-		return "NOTICE: message target is null";
+		return "NOTICE: target is null";
 
 	if (!p->trailing)
 		return "NOTICE: message is null";
@@ -977,7 +1025,7 @@ num_200:
 			return "RPL_CHANNEL_URL: channel is null";
 
 		if ((c = get_channel(chan)) == NULL)
-			return "RPL_CHANNEL_URL: channel not found";
+			return errf("RPL_CHANNEL_URL: channel '%s' not found", chan);
 
 		newlinef(c, NUMRPL, "--", "URL for %s is: \"%s\"", chan, p->trailing);
 		return NULL;
@@ -990,7 +1038,7 @@ num_200:
 			return "RPL_TOPIC: channel is null";
 
 		if ((c = get_channel(chan)) == NULL)
-			return "RPL_TOPIC: channel not found";
+			return errf("RPL_TOPIC: channel '%s' not found", chan);
 
 		newlinef(c, NUMRPL, "--", "Topic for %s is \"%s\"", chan, p->trailing);
 		return NULL;
@@ -1009,7 +1057,7 @@ num_200:
 			return "RPL_TOPICWHOTIME: time is null";
 
 		if ((c = get_channel(chan)) == NULL)
-			return "RPL_TOPICWHOTIME: channel not found";
+			return errf("RPL_TOPICWHOTIME: channel '%s' not found", chan);
 
 		time_t raw_time = atoi(time);
 		time = ctime(&raw_time);
@@ -1029,7 +1077,7 @@ num_200:
 			return "RPL_NAMEREPLY: channel is null";
 
 		if ((c = get_channel(chan)) == NULL)
-			return "RPL_NAMEREPLY: channel not found";
+			return errf("RPL_NAMEREPLY: channel '%s' not found", chan);
 
 		c->type = *type;
 
@@ -1124,13 +1172,13 @@ num_400:
 char*
 recv_part(parsed_mesg *p)
 {
-	/* :nick!user@hostname.domain PART <channel> <:optional message> */
+	/* :nick!user@hostname.domain PART <channel> [:message] */
 
 	char *targ;
 	channel *c;
 
 	if (!p->from)
-		return "PART: from is null";
+		return "PART: sender's nick is null";
 
 	if (is_me(p->from))
 		return NULL;
@@ -1156,8 +1204,10 @@ recv_part(parsed_mesg *p)
 char*
 recv_ping(parsed_mesg *p)
 {
+	/* PING :<server name> */
+
 	if (!p->trailing)
-		return "PING: trailing is null";
+		return "PING: servername is null";
 
 	sendf(rplsoc, "PONG %s\r\n", p->trailing);
 
@@ -1171,14 +1221,17 @@ recv_priv(parsed_mesg *p)
 
 	char *targ;
 
-	if (!p->from)
-		return "PRIVMSG: sender's name is null";
-
 	if (!p->trailing)
 		return "PRIVMSG: message is null";
 
+	if (*p->trailing == 0x01)
+		return recv_ctcp(p);
+
+	if (!p->from)
+		return "PRIVMSG: sender's nick is null";
+
 	if (!(targ = getarg(&p->params, 1)))
-		return "PRIVMSG: message target is null";
+		return "PRIVMSG: target is null";
 
 	channel *c;
 
@@ -1193,13 +1246,9 @@ recv_priv(parsed_mesg *p)
 		draw_chans();
 
 	} else if ((c = get_channel(targ)) == NULL)
-		newlinef(0, DEFAULT, "ERR", "PRIVMSG: target %s not found", targ);
+		return errf("PRIVMSG: chan '%s' not found", targ);
 
-	/* CTCP Markup */
-	if (*p->trailing == 0x01)
-		recv_ctcp(p);
-	else
-		newline(c, DEFAULT, p->from, p->trailing, 0);
+	newline(c, DEFAULT, p->from, p->trailing, 0);
 
 	return NULL;
 }
@@ -1207,7 +1256,7 @@ recv_priv(parsed_mesg *p)
 char*
 recv_quit(parsed_mesg *p)
 {
-	/* :nick!user@hostname.domain QUIT <:optional message> */
+	/* :nick!user@hostname.domain QUIT [:message] */
 
 	channel *c = cfirst;
 
