@@ -66,8 +66,11 @@ draw_status(void)
 		i += printf("]");
 	}
 
+	/* private chat */
+	if (ccur->type == 'p') {
+		i += printf("―[priv]") - 2;
 	/* chantype, chanmodes, chancount */
-	if (ccur->type) {
+	} else if (ccur->type) {
 		i += printf("―[%c", ccur->type) - 2;
 
 		if ((mode = ccur->chanmode)) {
