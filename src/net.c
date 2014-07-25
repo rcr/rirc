@@ -37,6 +37,8 @@
 #define ERR_NICKNAMEINUSE    433
 #define ERR_ERRONEUSNICKNAME 432
 
+#define is_me(X) streq(X, s[rplsoc]->nick_me)
+
 char* recv_ctcp_req(parsed_mesg*);
 char* recv_ctcp_rpl(parsed_mesg*);
 char* recv_error(parsed_mesg*);
@@ -60,7 +62,6 @@ void send_ping(char*);
 void send_priv(char*, int);
 
 channel* get_channel(char*);
-int get_numeric_code(char*);
 server* new_server(char*, int, int);
 void con_server(char*, int);
 void dis_server(server*, int);
@@ -303,22 +304,6 @@ get_auto_nick(char **autonick, char *nick)
 	*nick = '\0';
 }
 
-int
-get_numeric_code(char *code)
-{
-	/* Codes are always three digits */
-	int sum = 0, factor = 100;
-	while (isdigit(*code) && factor > 0) {
-		sum += factor * (*code++ - '0');
-		factor /= 10;
-	}
-
-	if (*code != '\0' || factor > 0)
-		return 0;
-
-	return sum;
-}
-
 channel*
 new_channel(char *name)
 {
@@ -366,19 +351,6 @@ new_server(char *name, int port, int soc)
 	s->iptr = s->input;
 	strncpy(s->name, name, 50);
 	return s;
-}
-
-int
-is_me(char *nick)
-{
-	char *n = s[rplsoc]->nick_me;
-	while (*n == *nick) {
-		if (*n == '\0')
-			return 1;
-		else
-			n++, nick++;
-	}
-	return 0;
 }
 
 channel*
@@ -451,6 +423,8 @@ send_mesg(char *mesg)
 		send_priv(mesg, 0);
 	else if (streqi(cmd, "ME"))
 		send_emot(mesg);
+	else if (streqi(cmd, "VERSION"))
+		send_version(mesg);
 	else if (streqi(cmd, "RAW"))
 		sendf(ccur->server->soc, "%s\r\n", mesg);
 	else {
@@ -990,7 +964,6 @@ recv_notice(parsed_mesg *p)
 char*
 recv_numeric(parsed_mesg *p)
 {
-
 	/* Numeric types: https://www.alien.net.au/irc/irc2numerics.html */
 
 	channel *c;
@@ -999,13 +972,21 @@ recv_numeric(parsed_mesg *p)
 	/* First parameter in numerics is always your nick */
 	char *nick = getarg(&p->params, 1);
 
-	int code;
-	if (!(code = get_numeric_code(p->command)))
-		return "NUMERIC: code is unknown or null";
+	/* Extract numeric code */
+	int code = 0;
+	do {
+		code = code * 10 + (*p->command++ - '0');
+
+		if (code > 999)
+			return "NUMERIC: greater than 999";
+
+	} while (isdigit(*p->command));
 
 	/* Shortcuts */
-	if (code > 400) goto num_400;
-	if (code > 200) goto num_200;
+	if (!code)
+		return "NUMERIC: code is null";
+	else if (code > 400) goto num_400;
+	else if (code > 200) goto num_200;
 
 	/* Numeric types (000, 200) */
 	switch (code) {
