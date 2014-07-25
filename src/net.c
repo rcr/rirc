@@ -546,6 +546,20 @@ send_quit(char *ptr)
 }
 
 void
+send_version(char *ptr)
+{
+	char *targ;
+
+	if ((targ = getarg(&ptr, 1))) {
+		newlinef(ccur, 0, "CTCP", "%s - VERSION", targ);
+		sendf(ccur->server->soc, "PRIVMSG %s :\x01""VERSION\x01""\r\n", targ);
+	} else {
+		/* Server version */
+		sendf(ccur->server->soc, "VERSION\r\n");
+	}
+}
+
+void
 send_part(char *ptr)
 {
 	if (ccur == rirc)
