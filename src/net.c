@@ -34,8 +34,9 @@
 #define RPL_MOTD             372
 #define RPL_MOTDSTART        375
 #define RPL_ENDOFMOTD        376
-#define ERR_NICKNAMEINUSE    433
+#define ERR_CANNOTSENDTOCHAN 404
 #define ERR_ERRONEUSNICKNAME 432
+#define ERR_NICKNAMEINUSE    433
 
 #define is_me(X) streq(X, s[rplsoc]->nick_me)
 
@@ -56,10 +57,10 @@ void send_conn(char*);
 void send_emot(char*);
 void send_join(char*);
 void send_nick(char*);
-void send_quit(char*);
 void send_part(char*);
 void send_ping(char*);
 void send_priv(char*, int);
+void send_quit(char*);
 
 channel* get_channel(char*);
 server* new_server(char*, int, int);
@@ -1148,14 +1149,31 @@ num_400:
 	/* Numeric types (400, 600) */
 	switch (code) {
 
+	case ERR_CANNOTSENDTOCHAN:  /* <channel> :<reason> */
+
+		if (!(chan = getarg(&p->params, 1)))
+			return "ERR_CANNOTSENDTOCHAN: channel is null";
+
+		channel *c;
+
+		if ((c = get_channel(chan)))
+			newline(c, DEFAULT, 0, p->trailing, 0);
+		else
+			newline(0, DEFAULT, 0, p->trailing, 0);
+
+		if (p->trailing)
+			newlinef(c, NUMRPL, "--", "Cannot send to '%s' - %s", chan, p->trailing);
+		else
+			newlinef(c, NUMRPL, "--", "Cannot send to '%s'", chan);
+
+
 	case ERR_ERRONEUSNICKNAME:  /* 432 <nick> :Erroneous nickname */
 
 		if (!(nick = getarg(&p->params, 1)))
-			return "RPL_ERRONEUSNICKNAME: nick is null";
+			return "ERR_ERRONEUSNICKNAME: nick is null";
 
 		newlinef(0, NUMRPL, "-!!-", "Erroneous nickname: '%s'", nick);
 		return NULL;
-
 
 	case ERR_NICKNAMEINUSE:  /* 433 <nick> :Nickname is already in use */
 
