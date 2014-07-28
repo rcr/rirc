@@ -61,6 +61,7 @@ void send_part(char*);
 void send_ping(char*);
 void send_priv(char*, int);
 void send_quit(char*);
+void send_version(char*);
 
 channel* get_channel(char*);
 server* new_server(char*, int, int);
@@ -1007,12 +1008,14 @@ recv_numeric(parsed_mesg *p)
 
 	case RPL_YOURHOST:  /* 002 <nick> :<Host info, server version, etc> */
 	case RPL_CREATED:   /* 003 <nick> :<Server creation date message> */
+
 		newline(0, NUMRPL, "--", p->trailing, 0);
 		return NULL;
 
 
 	case RPL_MYINFO:    /* 004 <nick> <params> :Are supported by this server */
 	case RPL_ISUPPORT:  /* 005 <nick> <params> :Are supported by this server */
+
 		newlinef(0, NUMRPL, "--", "%s ~ %s", p->params, p->trailing);
 		return NULL;
 
@@ -1135,6 +1138,7 @@ num_200:
 	case RPL_NOTOPIC:     /* 331 <chan> :<Message> */
 	case RPL_ENDOFNAMES:  /* 366 <chan> :<Message> */
 	case RPL_ENDOFMOTD:   /* 376 :<Message> */
+
 		return NULL;
 
 
@@ -1279,6 +1283,11 @@ recv_priv(parsed_mesg *p)
 		return errf("PRIVMSG: channel '%s' not found", targ);
 
 	newline(c, DEFAULT, p->from, p->trailing, 0);
+
+	if (check_pinged(p->trailing, s[rplsoc]->nick_me) && c != ccur) {
+		c->active = PINGED;
+		draw_chans();
+	}
 
 	return NULL;
 }

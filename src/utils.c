@@ -146,6 +146,10 @@ streqi(const char *p, const char *q)
 	return 1;
 }
 
+/* TODO:
+ * Consider cleaning up the policy here. Ideally a match should be:
+ * match = nick *[chars] (space / null)
+ * chars = Any printable characters not allowed in a nick by this server */
 int
 check_pinged(char *mesg, char *nick)
 {
