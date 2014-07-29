@@ -9,6 +9,7 @@
 
 #include "common.h"
 
+void usage(void);
 void startup(void);
 void cleanup(void);
 void main_loop(void);
@@ -17,6 +18,32 @@ extern int numfds;
 
 struct termios oterm, nterm;
 struct pollfd fds[MAXSERVERS + 1] = {{0}};
+
+void
+usage(void)
+{
+	puts(
+	"Usage:\n"
+	"  rirc [OPTIONS]\n"
+	"\n"
+	"Help:\n"
+	"  -?, --help                Print this message\n"
+	"\n"
+	"Options:\n"
+	"  -c, --connect=SERVER      Connect to SERVER\n"
+	"  -p, --port=PORT           Connect using PORT\n"
+	"  -c, --channels=CHANNELS   Comma separated list of channels to join\n"
+	"  -n, --nicks=NICKS         Comma/space separated list of nicks to use\n"
+	"  -h, --host=HOST           Set your hostname\n"
+	"  -v, --version             Print rirc version\n"
+	"\n"
+	"Example:\n"
+	"  rirc -h irc.server.tld -p 1234 -c '#chan1,#chan2' -n 'nick, nick_, nick__'\n"
+	"\n"
+	);
+
+	exit(EXIT_SUCCESS);
+}
 
 int
 main(int argc, char **argv)
