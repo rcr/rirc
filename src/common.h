@@ -1,3 +1,22 @@
+#define VERSION "v0.0.1"
+
+struct
+{
+	/* TODO: assert some of these are never null */
+
+	char *username;
+	char *realname;
+	char *nicks;
+
+	char *auto_conn;
+	char *auto_join;
+	int auto_port;
+
+} config;
+
+
+
+/* TODO: some of these things are configs */
 #define BUFFSIZE 512
 #define MAXINPUT 200
 #define NICKSIZE 50 /* TODO */

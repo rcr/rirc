@@ -6,52 +6,160 @@
 #include <poll.h>
 #include <time.h>
 #include <termios.h>
+#include <getopt.h>
 
 #include "common.h"
 
-void usage(void);
 void startup(void);
 void cleanup(void);
 void main_loop(void);
+void usage(void);
+void getopts(int, char**);
+void signal_sigwinch(int);
 
 extern int numfds;
 
 struct termios oterm, nterm;
 struct pollfd fds[MAXSERVERS + 1] = {{0}};
 
+int
+main(int argc, char **argv)
+{
+	getopts(argc, argv);
+	startup();
+	main_loop();
+
+	return EXIT_SUCCESS;
+}
+
 void
 usage(void)
 {
 	puts(
+	"\n"
+	"rirc " VERSION " ~ Richard C. Robbins <mail@rcr.io>\n"
+	"\n"
 	"Usage:\n"
-	"  rirc [OPTIONS]\n"
+	"  rirc [-c server [OPTIONS]]\n"
 	"\n"
 	"Help:\n"
-	"  -?, --help                Print this message\n"
+	"  -h, --help             Print this message\n"
 	"\n"
 	"Options:\n"
-	"  -c, --connect=SERVER      Connect to SERVER\n"
-	"  -p, --port=PORT           Connect using PORT\n"
-	"  -c, --channels=CHANNELS   Comma separated list of channels to join\n"
-	"  -n, --nicks=NICKS         Comma/space separated list of nicks to use\n"
-	"  -h, --host=HOST           Set your hostname\n"
-	"  -v, --version             Print rirc version\n"
+	"  -c, --connect=SERVER   Connect to SERVER\n"
+	"  -p, --port=PORT        Connect using PORT\n"
+	"  -j, --join=CHANNELS    Comma separated list of channels to join\n"
+	"  -n, --nicks=NICKS      Comma/space separated list of nicks to use\n"
+	"  -v, --version          Print rirc version and exit\n"
 	"\n"
-	"Example:\n"
-	"  rirc -h irc.server.tld -p 1234 -c '#chan1,#chan2' -n 'nick, nick_, nick__'\n"
-	"\n"
+	"Examples:\n"
+	"  rirc -c server.tld -j '#chan' -n nick\n"
+	"  rirc -c server.tld -p 1234 -j '#chan1,#chan2' -n 'nick, nick_, nick__'\n"
 	);
-
-	exit(EXIT_SUCCESS);
 }
 
-int
-main(int argc, char **argv)
+void
+getopts(int argc, char **argv)
 {
-	startup();
-	main_loop();
-	printf("\x1b[H\x1b[J"); /* Clear */
-	return EXIT_SUCCESS;
+	config.auto_conn = NULL;
+	config.auto_port = 6667;
+	config.auto_join = NULL;
+
+	int c, opt_i = 0;
+
+	static struct option long_opts[] =
+	{
+		{"connect", required_argument, 0, 'c'},
+		{"port",    required_argument, 0, 'p'},
+		{"join",    required_argument, 0, 'j'},
+		{"nick",    required_argument, 0, 'n'},
+		{"version", no_argument,       0, 'v'},
+		{"help",    no_argument,       0, 'h'},
+		{0, 0, 0, 0}
+	};
+
+	while ((c = getopt_long(argc, argv, "c:p:n:j:vh", long_opts, &opt_i))) {
+
+		if (c == -1)
+			break;
+
+		switch(c) {
+
+			/* Connect to server */
+			case 'c':
+				if (*optarg == '-') {
+					puts("-c/--connect requires an argument");
+					exit(EXIT_FAILURE);
+				} else {
+					config.auto_conn = optarg;
+				}
+				break;
+
+			/* Connect using port */
+			case 'p':
+				if (*optarg == '-') {
+					puts("-p/--port requires an argument");
+					exit(EXIT_FAILURE);
+				} else {
+					/* parse out the port */
+					int port = 0;
+					char *ptr = optarg;
+
+					while (*ptr) {
+						if (!isdigit(*ptr)) {
+							fprintf(stderr, "Invalid port number: %s\n",
+								optarg);
+							exit(EXIT_FAILURE);
+						}
+
+						port = port * 10 + (*ptr++ - '0');
+
+						if (port > 65534) {
+							fprintf(stderr, "Port number out of range: %s\n",
+								optarg);
+							exit(EXIT_FAILURE);
+						}
+					}
+
+					config.auto_port = port;
+				}
+				break;
+
+			/* Comma/space separated list of nicks to use */
+			case 'n':
+				if (*optarg == '-') {
+					puts("-n/--nick requires an argument");
+					exit(EXIT_FAILURE);
+				} else {
+					config.nicks = optarg;
+				}
+				break;
+
+			/*Comma separated list of channels to join */
+			case 'j':
+				if (*optarg == '-') {
+					puts("-j/--join requires an argument");
+					exit(EXIT_FAILURE);
+				} else {
+					config.auto_join = optarg;
+				}
+				break;
+
+			/* Print rirc version and exit */
+			case 'v':
+				puts("rirc version " VERSION );
+				exit(EXIT_SUCCESS);
+
+			/* Print rirc usage and exit */
+			case 'h':
+				usage();
+				exit(EXIT_SUCCESS);
+
+			default:
+				printf("%s --help for usage\n", argv[0]);
+				exit(EXIT_FAILURE);
+		}
+	}
 }
 
 void
@@ -66,6 +174,12 @@ void
 startup(void)
 {
 	setbuf(stdout, NULL);
+
+	/* Initialize the fds for polling */
+	int i;
+	fds[0].fd = 0; /* stdin */
+	for (i = 0; i < MAXSERVERS + 1; i++)
+		fds[i].events = POLLIN;
 
 	/* Set terminal to raw mode */
 	tcgetattr(0, &oterm);
@@ -90,6 +204,9 @@ startup(void)
 
 	/* Register cleanup for exit */
 	atexit(cleanup);
+
+	/* TODO: if config.auto_conn
+	 *	auto connect to server */
 }
 
 void
@@ -114,11 +231,6 @@ main_loop(void)
 {
 	char buff[BUFFSIZE];
 	int i, ret, count = 0, time = 200;
-
-	fds[0].fd = 0; /* stdin */
-	for (i = 0; i < MAXSERVERS + 1; i++)
-		fds[i].events = POLLIN;
-
 
 	while (1) {
 
