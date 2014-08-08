@@ -6,7 +6,7 @@ While still under development, it currently supports
 many features which you would expect from a basic
 irc client.
 
-[More info](http://rcr.io.rirc)
+[More info](http://rcr.io/rirc.html)
 
 Screenshots:
 ![image](https://raw.github.com/robbinsr/rirc/master/rirc.png?raw=true)
