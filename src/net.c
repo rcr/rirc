@@ -85,8 +85,6 @@ char *realname = "Richard Robbins";
 char *autojoin = "##rirc_test";
 /* comma and/or space separated list of nicks */
 char *nicks = "rcr, rcr_, rcr__";
-/* version number */
-char *rirc_version = "0.0.1";
 
 time_t raw_t;
 struct tm *t;
@@ -159,7 +157,7 @@ dis_server(server *s, int kill)
 	}
 
 	if (s->soc != 0) {
-		sendf(s->soc, "QUIT :rirc %s\r\n", rirc_version);
+		sendf(s->soc, "QUIT :rirc %s\r\n", VERSION);
 		close(s->soc);
 	}
 
@@ -693,7 +691,7 @@ recv_ctcp_req(parsed_mesg *p)
 			c = s[rplsoc]->channel;
 
 		newlinef(c, 0, "--", "CTCP VERSION from %s", p->from);
-		sendf(rplsoc, "NOTICE %s :\x01""VERSION rirc version %s\x01""\r\n", p->from, rirc_version);
+		sendf(rplsoc, "NOTICE %s :\x01""VERSION rirc version %s\x01""\r\n", p->from, VERSION);
 		sendf(rplsoc, "NOTICE %s :\x01""VERSION http://rcr.io/rirc\x01""\r\n", p->from);
 		return NULL;
 	}

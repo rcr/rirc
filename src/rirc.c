@@ -3,6 +3,7 @@
 #include <string.h>
 #include <signal.h>
 #include <unistd.h>
+#include <ctype.h>
 #include <poll.h>
 #include <time.h>
 #include <termios.h>
