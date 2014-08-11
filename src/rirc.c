@@ -11,8 +11,18 @@
 
 #include "common.h"
 
+/* Values parsed from getopts */
+struct
+{
+	int port;
+	char *connect;
+	char *join;
+	char *nicks;
+} opts;
+
 void startup(void);
 void cleanup(void);
+void configure(void);
 void main_loop(void);
 void usage(void);
 void getopts(int, char**);
@@ -27,6 +37,7 @@ int
 main(int argc, char **argv)
 {
 	getopts(argc, argv);
+	configure();
 	startup();
 	main_loop();
 
@@ -62,9 +73,10 @@ usage(void)
 void
 getopts(int argc, char **argv)
 {
-	config.auto_conn = NULL;
-	config.auto_port = 6667;
-	config.auto_join = NULL;
+	opts.port = 0;
+	opts.connect = NULL;
+	opts.join    = NULL;
+	opts.nicks   = NULL;
 
 	int c, opt_i = 0;
 
@@ -92,7 +104,7 @@ getopts(int argc, char **argv)
 					puts("-c/--connect requires an argument");
 					exit(EXIT_FAILURE);
 				} else {
-					config.auto_conn = optarg;
+					opts.connect = optarg;
 				}
 				break;
 
@@ -122,7 +134,7 @@ getopts(int argc, char **argv)
 						}
 					}
 
-					config.auto_port = port;
+					opts.port = port;
 				}
 				break;
 
@@ -132,7 +144,7 @@ getopts(int argc, char **argv)
 					puts("-n/--nick requires an argument");
 					exit(EXIT_FAILURE);
 				} else {
-					config.nicks = optarg;
+					opts.nicks = optarg;
 				}
 				break;
 
@@ -142,7 +154,7 @@ getopts(int argc, char **argv)
 					puts("-j/--join requires an argument");
 					exit(EXIT_FAILURE);
 				} else {
-					config.auto_join = optarg;
+					opts.join = optarg;
 				}
 				break;
 
@@ -161,6 +173,28 @@ getopts(int argc, char **argv)
 				exit(EXIT_FAILURE);
 		}
 	}
+}
+
+void
+configure(void)
+{
+	if (opts.connect) {
+		config.auto_connect = opts.connect;
+		config.auto_port = opts.port ? opts.port : 6667;
+		config.auto_join = opts.join;
+		config.nicks = opts.nicks ? opts.nicks : "";
+	} else {
+		/* TODO: parse a configuration file. for now set defaults here */
+		config.auto_connect = NULL;
+		config.auto_port = 0;
+		config.auto_join = NULL;
+		config.nicks = "";
+	}
+
+	/* TODO: parse a configuration file. for now set defaults here */
+	config.username = "rirc_" VERSION;
+	config.realname = "rirc " VERSION;
+	config.join_part_quit_threshold = 100;
 }
 
 void
@@ -206,8 +240,10 @@ startup(void)
 	/* Register cleanup for exit */
 	atexit(cleanup);
 
-	/* TODO: if config.auto_conn
-	 *	auto connect to server */
+	exit_fatal = 0;
+
+	if (config.auto_connect)
+		con_server(config.auto_connect, config.auto_port);
 }
 
 void
@@ -225,6 +261,10 @@ cleanup(void)
 	} while (cfirst != rirc);
 
 	free_channel(rirc);
+
+	/* Don't clear screen on fatal exit to preserve error message */
+	if (!exit_fatal)
+		printf("\x1b[H\x1b[J");
 }
 
 void

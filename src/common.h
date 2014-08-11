@@ -1,29 +1,11 @@
 #define VERSION "v0.0.1"
 
-struct
-{
-	/* TODO: assert some of these are never null */
-
-	char *username;
-	char *realname;
-	char *nicks;
-
-	char *auto_conn;
-	char *auto_join;
-	int auto_port;
-
-} config;
-
-
-
-/* TODO: some of these things are configs */
+#define SCROLLBACK_BUFFER 200
+#define SCROLLBACK_INPUT 15
+#define MAXSERVERS 10
 #define BUFFSIZE 512
 #define MAXINPUT 200
 #define NICKSIZE 50 /* TODO */
-#define MAXSERVERS 10
-#define SCROLLBACK 300
-#define SCROLLBACK_INPUT 10
-#define JOINPART_THRESHOLD 100
 
 typedef enum {NONE, ACTIVE, PINGED, ACTV_SIZE} activity_t;
 typedef enum {DEFAULT, JOINPART, NICK, ACTION, NUMRPL} line_t;
@@ -60,8 +42,21 @@ typedef enum {DEFAULT, JOINPART, NICK, ACTION, NUMRPL} line_t;
 #define UMODE_s (1 << 6) /* receiving server notices */
 #define UMODE_MAX 7
 
+int exit_fatal;
 #define fatal(mesg) \
-	do {perror(mesg); exit(EXIT_FAILURE);} while (0);
+	do {exit_fatal = 1; perror(mesg); exit(EXIT_FAILURE);} while (0);
+
+/* Global configuration */
+struct config
+{
+	int auto_port;
+	int join_part_quit_threshold;
+	char *username;
+	char *realname;
+	char *nicks;
+	char *auto_connect;
+	char *auto_join;
+} config;
 
 /* Nicklist AVL tree node */
 typedef struct node
@@ -115,7 +110,7 @@ typedef struct channel
 	struct channel *next;
 	struct channel *prev;
 	struct line *cur_line;
-	struct line chat[SCROLLBACK];
+	struct line chat[SCROLLBACK_BUFFER];
 	struct node *nicklist;
 	struct server *server;
 	struct input *input;
@@ -154,6 +149,7 @@ channel *cfirst;
 channel* new_channel(char*);
 void free_channel(channel*);
 void con_lost(int);
+void con_server(char*, int);
 void channel_switch(int);
 void channel_close(void);
 void send_mesg(char*);

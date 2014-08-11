@@ -65,7 +65,6 @@ void send_version(char*);
 
 channel* get_channel(char*);
 server* new_server(char*, int, int);
-void con_server(char*, int);
 void dis_server(server*, int);
 void get_auto_nick(char**, char*);
 void newline(channel*, line_t, char*, char*, int);
@@ -77,14 +76,6 @@ int numfds = 1; /* 1 for stdin */
 extern struct pollfd fds[MAXSERVERS + 1];
 /* For server indexing by socket. 3 for stdin/out/err unused */
 server *s[MAXSERVERS + 3];
-
-/* Config Stuff */
-char *user_me = "rcr";
-char *realname = "Richard Robbins";
-/* comma separated list of channels to join on connect*/
-char *autojoin = "##rirc_test";
-/* comma and/or space separated list of nicks */
-char *nicks = "rcr, rcr_, rcr__";
 
 time_t raw_t;
 struct tm *t;
@@ -144,7 +135,7 @@ con_server(char *hostname, int port)
 		draw_chans();
 
 		sendf(rplsoc, "NICK %s\r\n", ss->nick_me);
-		sendf(rplsoc, "USER %s 8 * :%s\r\n", user_me, realname);
+		sendf(rplsoc, "USER %s 8 * :%s\r\n", config.username, config.realname);
 	}
 }
 
@@ -245,7 +236,7 @@ newline(channel *c, line_t type, char *from, char *mesg, int len)
 	if ((len_from = strlen(l->from)) > c->nick_pad)
 		c->nick_pad = len_from;
 
-	if (c->cur_line == &c->chat[SCROLLBACK])
+	if (c->cur_line == &c->chat[SCROLLBACK_BUFFER])
 		c->cur_line = c->chat;
 
 	if (c == ccur)
@@ -346,7 +337,7 @@ new_server(char *name, int port, int soc)
 		fatal("new_server");
 	s->soc = soc;
 	s->port = port;
-	s->nptr = nicks;
+	s->nptr = config.nicks;
 	s->usermode = 0;
 	s->iptr = s->input;
 	strncpy(s->name, name, 50);
@@ -383,7 +374,7 @@ void
 free_channel(channel *c)
 {
 	line *l = c->chat;
-	line *e = l + SCROLLBACK;
+	line *e = l + SCROLLBACK_BUFFER;
 	c->next->prev = c->prev;
 	c->prev->next = c->next;
 	while (l->len && l < e)
@@ -743,7 +734,7 @@ recv_join(parsed_mesg *p)
 		if (nicklist_insert(&(c->nicklist), p->from)) {
 			c->nick_count++;
 
-			if (c->nick_count < JOINPART_THRESHOLD)
+			if (c->nick_count < config.join_part_quit_threshold)
 				newlinef(c, JOINPART, ">", "%s has joined %s", p->from, chan);
 
 			draw_status();
@@ -995,10 +986,10 @@ recv_numeric(parsed_mesg *p)
 	case RPL_WELCOME:
 
 		/* Reset list of auto nicks */
-		s[rplsoc]->nptr = nicks;
+		s[rplsoc]->nptr = config.nicks;
 
-		if (*autojoin)
-			sendf(rplsoc, "JOIN %s\r\n", autojoin);
+		if (config.auto_join)
+			sendf(rplsoc, "JOIN %s\r\n", config.auto_join);
 
 		newline(0, NUMRPL, "--", p->trailing, 0);
 		return NULL;
@@ -1217,7 +1208,7 @@ recv_part(parsed_mesg *p)
 
 	if ((c = get_channel(targ)) && nicklist_delete(&c->nicklist, p->from)) {
 		c->nick_count--;
-		if (c->nick_count < JOINPART_THRESHOLD) {
+		if (c->nick_count < config.join_part_quit_threshold) {
 			if (p->trailing)
 				newlinef(c, JOINPART, "<", "%s left %s (%s)", p->from, targ, p->trailing);
 			else
@@ -1303,7 +1294,7 @@ recv_quit(parsed_mesg *p)
 	do {
 		if (c->server == s[rplsoc] && nicklist_delete(&c->nicklist, p->from)) {
 			c->nick_count--;
-			if (c->nick_count < JOINPART_THRESHOLD) {
+			if (c->nick_count < config.join_part_quit_threshold) {
 				if (p->trailing)
 					newlinef(c, JOINPART, "<", "%s has quit (%s)", p->from, p->trailing);
 				else

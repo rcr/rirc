@@ -169,7 +169,7 @@ int
 print_line(int row, line *l)
 {
 	if (l < ccur->chat)
-		l += SCROLLBACK;
+		l += SCROLLBACK_BUFFER;
 
 	if (!l->len || l == ccur->cur_line)
 		return 3;
