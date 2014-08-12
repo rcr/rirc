@@ -301,5 +301,9 @@ main_loop(void)
 				}
 			}
 		}
+
+		/* Skip if no draw bits set */
+		if (draw)
+			redraw();
 	}
 }

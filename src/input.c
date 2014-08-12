@@ -275,5 +275,6 @@ inputc(char *inp, int count)
 	} else {
 		split_paste(inp, count);
 	}
-	draw_input();
+
+	draw(D_INPUT);
 }

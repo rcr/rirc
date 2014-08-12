@@ -31,5 +31,5 @@ Examples:
 ##More info
 [rcr.io/rirc](http://rcr.io/rirc)
 
-Screenshots:
+##Screenshots:
 ![image](https://raw.github.com/robbinsr/rirc/master/rirc.png?raw=true)

@@ -162,10 +162,13 @@ check_pinged(char *mesg, char *nick)
 			n++, mesg++;
 
 			if (*n == '\0') {
+
 				if (!isalnum(*mesg)) {
-					putchar(0x7); /* BEL character */
+					/* raise terminal BEL character */
+					putchar(0x07);
 					return 1;
 				}
+
 				break;
 			}
 		}
@@ -176,6 +179,7 @@ check_pinged(char *mesg, char *nick)
 		while (*mesg == ' ' && *mesg != '\0')
 			mesg++;
 	}
+
 	return 0;
 }
 

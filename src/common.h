@@ -7,9 +7,6 @@
 #define MAXINPUT 200
 #define NICKSIZE 50 /* TODO */
 
-typedef enum {NONE, ACTIVE, PINGED, ACTV_SIZE} activity_t;
-typedef enum {DEFAULT, JOINPART, NICK, ACTION, NUMRPL} line_t;
-
 /* Chan modes */
 #define CMODE_STR "OovaimnqpsrtklbeI"
 #define CMODE_O (1 << 0) /* give "channel creator" status */
@@ -45,6 +42,27 @@ typedef enum {DEFAULT, JOINPART, NICK, ACTION, NUMRPL} line_t;
 int exit_fatal;
 #define fatal(mesg) \
 	do {exit_fatal = 1; perror(mesg); exit(EXIT_FAILURE);} while (0);
+
+/* Channel bar activity types */
+typedef enum {
+	ACTIVITY_DEFAULT,
+	ACTIVITY_ACTIVE,
+	ACTIVITY_PINGED,
+	ACTIVITY_T_SIZE
+} activity_t;
+
+/* Buffer line types */
+typedef enum {
+	LINE_DEFAULT,
+	LINE_NICK,
+	LINE_JOIN,
+	LINE_PART,
+	LINE_QUIT,
+	LINE_NUMRPL,
+	LINE_PINGED,
+	LINE_ACTION,
+	LINE_T_SIZE
+} line_t;
 
 /* Global configuration */
 struct config
@@ -155,13 +173,16 @@ void channel_close(void);
 void send_mesg(char*);
 void recv_mesg(char*, int, int);
 
-/* ui.c */
+/* draw.c */
 void resize(void);
-void draw_full(void);
-void draw_chat(void);
-void draw_chans(void);
-void draw_input(void);
-void draw_status(void);
+void redraw(void);
+unsigned int draw;
+#define D_FULL   0xFF
+#define D_CHAT   (1 << 0)
+#define D_CHANS  (1 << 1)
+#define D_INPUT  (1 << 2)
+#define D_STATUS (1 << 3)
+#define draw(X) draw |= X
 
 /* input.c */
 int confirm;
