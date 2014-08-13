@@ -64,6 +64,7 @@ redraw(void)
 	if (draw & D_CHANS)  draw_chans();
 	if (draw & D_INPUT)  draw_input();
 	if (draw & D_STATUS) draw_status();
+	draw = 0;
 }
 
 /* Statusbar:
