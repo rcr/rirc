@@ -1,16 +1,17 @@
 #include <stdio.h>
+#include <ctype.h>
 #include <stdlib.h>
-#include <string.h>
 #include <setjmp.h>
 #include <stdarg.h>
-#include <ctype.h>
+#include <string.h>
+#include <strings.h>
 
 #include "common.h"
 
 #define H(n) (n == NULL ? 0 : n->height)
 #define MAX(a, b) (a > b ? a : b)
 
-int nick_cmp(char*, char*);
+int comp;
 node* new_node(char*);
 node* rotate_l(node*);
 node* rotate_r(node*);
@@ -235,20 +236,6 @@ free_nicklist(node *n)
 }
 
 int
-nick_cmp(char *n1, char *n2)
-{
-	while (*n1 && *n1 == *n2 && *n1 != '\0')
-		n1++, n2++;
-
-	if (*n1 > *n2)
-		return 1;
-	if (*n1 < *n2)
-		return 0;
-
-	return -1;
-}
-
-int
 nicklist_insert(node **n, char *nick)
 {
 	if (!setjmp(jmpbuf))
@@ -276,10 +263,9 @@ node_insert(node *n, char *nick)
 	if (n == NULL)
 		return new_node(nick);
 
-	int comp;
-	if ((comp = nick_cmp(nick, n->nick)) == -1)
+	if (!(comp = strcasecmp(nick, n->nick)))
 		longjmp(jmpbuf, 1);
-	else if (comp)
+	else if (comp > 1)
 		n->r = node_insert(n->r, nick);
 	else
 		n->l = node_insert(n->l, nick);
@@ -290,13 +276,13 @@ node_insert(node *n, char *nick)
 
 	/* Rebalance */
 	if (balance > 1) {
-		if (nick_cmp(nick, n->l->nick))
+		if (strcasecmp(nick, n->l->nick) > 1)
 			n->l = rotate_l(n->l);
 
 		return rotate_r(n);
 	}
 	if (balance < -1) {
-		if (nick_cmp(n->r->nick, nick))
+		if (strcasecmp(n->r->nick, nick) > 1)
 			n->r = rotate_r(n->r);
 
 		return rotate_l(n);
@@ -311,8 +297,7 @@ node_delete(node *n, char *nick)
 	if (n == NULL)
 		longjmp(jmpbuf, 1);
 
-	int comp;
-	if ((comp = nick_cmp(nick, n->nick)) == -1) {
+	if (!(comp = strcasecmp(nick, n->nick))) {
 
 		if (n->l && n->r) {
 
@@ -337,7 +322,7 @@ node_delete(node *n, char *nick)
 			free(temp);
 		}
 	}
-	else if(comp)
+	else if(comp > 1)
 		n->r = node_delete(n->r, nick);
 	else
 		n->l = node_delete(n->l, nick);
