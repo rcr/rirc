@@ -68,8 +68,6 @@ channel* get_channel(char*);
 server* new_server(char*, int, int);
 void dis_server(server*, int);
 void get_auto_nick(char**, char*);
-void newline(channel*, line_t, char*, char*, int);
-void newlinef(channel*, line_t, char*, char*, ...);
 void sendf(int, const char*, ...);
 
 int rplsoc = 0;

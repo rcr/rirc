@@ -172,6 +172,8 @@ void channel_switch(int);
 void channel_close(void);
 void send_mesg(char*);
 void recv_mesg(char*, int, int);
+void newline(channel*, line_t, char*, char*, int);
+void newlinef(channel*, line_t, char*, char*, ...);
 
 /* draw.c */
 void resize(void);

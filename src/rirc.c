@@ -20,6 +20,7 @@ struct
 	char *nicks;
 } opts;
 
+void splash(void);
 void startup(void);
 void cleanup(void);
 void configure(void);
@@ -68,6 +69,18 @@ usage(void)
 	"  rirc -c server.tld -j '#chan' -n nick\n"
 	"  rirc -c server.tld -p 1234 -j '#chan1,#chan2' -n 'nick, nick_, nick__'\n"
 	);
+}
+
+void
+splash(void)
+{
+	newline(rirc, 0, "--", "      _          ", 0);
+	newline(rirc, 0, "--", " _ __(_)_ __ ___ ", 0);
+	newline(rirc, 0, "--", "| '__| | '__/ __|", 0);
+	newline(rirc, 0, "--", "| |  | | | | (__ ", 0);
+	newline(rirc, 0, "--", "|_|  |_|_|  \\___|", 0);
+	newline(rirc, 0, "--", " ", 0);
+	newline(rirc, 0, "--", " - version " VERSION, 0);
 }
 
 void
@@ -233,6 +246,8 @@ startup(void)
 	confirm = 0;
 
 	rirc = cfirst = ccur = new_channel("rirc");
+
+	splash();
 
 	/* Set sigwinch, init draw */
 	signal_sigwinch(0);
