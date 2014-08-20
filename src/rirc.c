@@ -50,7 +50,7 @@ usage(void)
 {
 	puts(
 	"\n"
-	"rirc " VERSION " ~ Richard C. Robbins <mail@rcr.io>\n"
+	"rirc version " VERSION " ~ Richard C. Robbins <mail@rcr.io>\n"
 	"\n"
 	"Usage:\n"
 	"  rirc [-c server [OPTIONS]]\n"
@@ -205,8 +205,8 @@ configure(void)
 	}
 
 	/* TODO: parse a configuration file. for now set defaults here */
-	config.username = "rirc_" VERSION;
-	config.realname = "rirc " VERSION;
+	config.username = "rirc_v" VERSION;
+	config.realname = "rirc v" VERSION;
 	config.join_part_quit_threshold = 100;
 }
 

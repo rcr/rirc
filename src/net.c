@@ -144,12 +144,12 @@ void
 dis_server(server *s, int kill)
 {
 	if (cfirst == rirc) {
-		newline(0, 0, "-!!-", "Cannot close main buffer", 0);
+		newline(0, 0, "-!!-", "Cannot close main buffer. Enter /quit to exit", 0);
 		return;
 	}
 
 	if (s->soc != 0) {
-		sendf(s->soc, "QUIT :rirc %s\r\n", VERSION);
+		sendf(s->soc, "QUIT :rirc v%s\r\n", VERSION);
 		close(s->soc);
 	}
 
