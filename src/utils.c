@@ -154,30 +154,22 @@ streqi(const char *p, const char *q)
 int
 check_pinged(char *mesg, char *nick)
 {
-	char *n;
+	int len = strlen(nick);
 
-	while (*mesg != '\0') {
+	while (*mesg) {
 
-		n = nick;
-		while (*n == *mesg) {
-			n++, mesg++;
-
-			if (*n == '\0') {
-
-				if (!isalnum(*mesg)) {
-					/* raise terminal BEL character */
-					putchar(0x07);
-					return 1;
-				}
-
-				break;
-			}
-		}
-
-		while (*mesg != ' ' && *mesg != '\0')
+		/* skip to next word */
+		while (*mesg == ' ')
 			mesg++;
 
-		while (*mesg == ' ' && *mesg != '\0')
+		/* nick prefixes the word, following character is space or symbol */
+		if (!strncasecmp(mesg, nick, len) && !isalnum(*(mesg + len))) {
+			putchar('\a');
+			return 1;
+		}
+
+		/* skip to end of word */
+		while (*mesg && *mesg != ' ')
 			mesg++;
 	}
 
