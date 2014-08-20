@@ -123,30 +123,6 @@ parse(char *mesg)
 	return &parsed;
 }
 
-/* TODO: Tests for this function */
-int
-streq(const char *p, const char *q)
-{
-	do {
-		if (*p != *q++)
-			return 0;
-	} while (*p++);
-
-	return 1;
-}
-
-/* TODO: Tests for this function */
-int
-streqi(const char *p, const char *q)
-{
-	do {
-		if (toupper(*p) != toupper(*q++))
-			return 0;
-	} while (*p++);
-
-	return 1;
-}
-
 /* TODO:
  * Consider cleaning up the policy here. Ideally a match should be:
  * match = nick *[chars] (space / null)

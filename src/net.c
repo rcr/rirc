@@ -1,11 +1,12 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
-#include <netdb.h>
-#include <ctype.h>
 #include <time.h>
 #include <poll.h>
+#include <stdio.h>
+#include <netdb.h>
+#include <ctype.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <string.h>
+#include <strings.h>
 #include <stdarg.h>
 #include <arpa/inet.h>
 
@@ -38,7 +39,7 @@
 #define ERR_ERRONEUSNICKNAME 432
 #define ERR_NICKNAMEINUSE    433
 
-#define is_me(X) streq(X, s[rplsoc]->nick_me)
+#define is_me(X) !strcmp(X, s[rplsoc]->nick_me)
 
 char* recv_ctcp_req(parsed_mesg*);
 char* recv_ctcp_rpl(parsed_mesg*);
@@ -399,27 +400,27 @@ send_mesg(char *mesg)
 		send_priv(mesg, 1);
 	else if (*++mesg && !(cmd = getarg(&mesg, 1)))
 		; /* "/" only message, do nothing */
-	else if (streqi(cmd, "JOIN"))
+	else if (!strcasecmp(cmd, "JOIN"))
 		send_join(mesg);
-	else if (streqi(cmd, "CONNECT"))
+	else if (!strcasecmp(cmd, "CONNECT"))
 		send_conn(mesg);
-	else if (streqi(cmd, "DISCONNECT"))
+	else if (!strcasecmp(cmd, "DISCONNECT"))
 		dis_server(ccur->server, 0);
-	else if (streqi(cmd, "CLOSE"))
+	else if (!strcasecmp(cmd, "CLOSE"))
 		channel_close();
-	else if (streqi(cmd, "PART"))
+	else if (!strcasecmp(cmd, "PART"))
 		send_part(mesg);
-	else if (streqi(cmd, "NICK"))
+	else if (!strcasecmp(cmd, "NICK"))
 		send_nick(mesg);
-	else if (streqi(cmd, "QUIT"))
+	else if (!strcasecmp(cmd, "QUIT"))
 		send_quit(mesg);
-	else if (streqi(cmd, "MSG"))
+	else if (!strcasecmp(cmd, "MSG"))
 		send_priv(mesg, 0);
-	else if (streqi(cmd, "ME"))
+	else if (!strcasecmp(cmd, "ME"))
 		send_emot(mesg);
-	else if (streqi(cmd, "VERSION"))
+	else if (!strcasecmp(cmd, "VERSION"))
 		send_version(mesg);
-	else if (streqi(cmd, "RAW"))
+	else if (!strcasecmp(cmd, "RAW"))
 		sendf(ccur->server->soc, "%s\r\n", mesg);
 	else {
 		int len = strlen(cmd);
@@ -599,23 +600,23 @@ recv_mesg(char *inp, int count, int soc)
 				err = "Failed to parse message";
 			else if (isdigit(*p->command))
 				err = recv_numeric(p);
-			else if (streq(p->command, "PRIVMSG"))
+			else if (!strcmp(p->command, "PRIVMSG"))
 				err = recv_priv(p);
-			else if (streq(p->command, "JOIN"))
+			else if (!strcmp(p->command, "JOIN"))
 				err = recv_join(p);
-			else if (streq(p->command, "PART"))
+			else if (!strcmp(p->command, "PART"))
 				err = recv_part(p);
-			else if (streq(p->command, "QUIT"))
+			else if (!strcmp(p->command, "QUIT"))
 				err = recv_quit(p);
-			else if (streq(p->command, "NOTICE"))
+			else if (!strcmp(p->command, "NOTICE"))
 				err = recv_notice(p);
-			else if (streq(p->command, "NICK"))
+			else if (!strcmp(p->command, "NICK"))
 				err = recv_nick(p);
-			else if (streq(p->command, "PING"))
+			else if (!strcmp(p->command, "PING"))
 				err = recv_ping(p);
-			else if (streq(p->command, "MODE"))
+			else if (!strcmp(p->command, "MODE"))
 				err = recv_mode(p);
-			else if (streq(p->command, "ERROR"))
+			else if (!strcmp(p->command, "ERROR"))
 				err = recv_error(p);
 			else
 				err = errf("Message type '%s' unknown", p->command);
@@ -668,7 +669,7 @@ recv_ctcp_req(parsed_mesg *p)
 	if (!(cmd = getarg(&p->trailing, 1)))
 		return "CTCP: command is null";
 
-	if (streq(cmd, "ACTION")) {
+	if (!strcmp(cmd, "ACTION")) {
 
 		if ((c = get_channel(p->from)) == NULL) {
 			c = new_channel(p->from);
@@ -679,14 +680,14 @@ recv_ctcp_req(parsed_mesg *p)
 		return NULL;
 	}
 
-	if (streq(cmd, "VERSION")) {
+	if (!strcmp(cmd, "VERSION")) {
 
 		if ((c = get_channel(p->from)) == NULL)
 			c = s[rplsoc]->channel;
 
 		newlinef(c, 0, "--", "CTCP VERSION from %s", p->from);
 		sendf(rplsoc, "NOTICE %s :\x01""VERSION rirc version %s\x01""\r\n", p->from, VERSION);
-		sendf(rplsoc, "NOTICE %s :\x01""VERSION http://rcr.io/rirc\x01""\r\n", p->from);
+		sendf(rplsoc, "NOTICE %s :\x01""VERSION http://rcr.io/rirc.html\x01""\r\n", p->from);
 		return NULL;
 	}
 

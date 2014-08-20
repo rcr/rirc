@@ -254,23 +254,23 @@ inputc(char *inp, int count)
 			channel_close();
 	} else if (count && *inp == 0x1b) { /* escape sequence */
 		inp++;
-		if (streq(inp, "[A"))  /* arrow up */
+		if (!strcmp(inp, "[A"))  /* arrow up */
 			scroll_input(1);
-		else if (streq(inp, "[B"))  /* arrow down */
+		else if (!strcmp(inp, "[B"))  /* arrow down */
 			scroll_input(0);
-		else if (streq(inp, "[C"))  /* arrow right */
+		else if (!strcmp(inp, "[C"))  /* arrow right */
 			cur_lr(0);
-		else if (streq(inp, "[D"))  /* arrow left */
+		else if (!strcmp(inp, "[D"))  /* arrow left */
 			cur_lr(1);
-		else if (streq(inp, "[3~")) /* delete */
+		else if (!strcmp(inp, "[3~")) /* delete */
 			del_char(0);
-		else if (streq(inp, "[5~")) /* page up */
+		else if (!strcmp(inp, "[5~")) /* page up */
 			channel_switch(0);
-		else if (streq(inp, "[6~")) /* page down */
+		else if (!strcmp(inp, "[6~")) /* page down */
 			channel_switch(1);
-		else if (streq(inp, "[M`")) /* mousewheel up */
+		else if (!strcmp(inp, "[M`")) /* mousewheel up */
 			channel_switch(0); /* TODO: scroll buffer up */
-		else if (streq(inp, "[Ma")) /* mousewheel down */
+		else if (!strcmp(inp, "[Ma")) /* mousewheel down */
 			channel_switch(1); /* TODO: scroll buffer down */
 	} else {
 		split_paste(inp, count);
