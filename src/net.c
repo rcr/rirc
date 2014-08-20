@@ -41,6 +41,7 @@
 
 #define is_me(X) !strcmp(X, s[rplsoc]->nick_me)
 
+/* Message receiving handlers */
 char* recv_ctcp_req(parsed_mesg*);
 char* recv_ctcp_rpl(parsed_mesg*);
 char* recv_error(parsed_mesg*);
@@ -54,13 +55,15 @@ char* recv_ping(parsed_mesg*);
 char* recv_priv(parsed_mesg*);
 char* recv_quit(parsed_mesg*);
 
-void send_conn(char*);
-void send_emot(char*);
+/* Message sending handlers */
+void send_connect(char*);
+void send_default(char*);
+void send_emote(char*);
 void send_join(char*);
 void send_nick(char*);
 void send_part(char*);
 void send_ping(char*);
-void send_priv(char*, int);
+void send_priv(char*);
 void send_quit(char*);
 void send_version(char*);
 
@@ -394,41 +397,47 @@ void
 send_mesg(char *mesg)
 {
 	char *cmd;
+
 	if (*mesg != '/')
-		send_priv(mesg, 1);
-	else if (*++mesg && !(cmd = getarg(&mesg, 1)))
-		; /* "/" only message, do nothing */
-	else if (!strcasecmp(cmd, "JOIN"))
-		send_join(mesg);
-	else if (!strcasecmp(cmd, "CONNECT"))
-		send_conn(mesg);
-	else if (!strcasecmp(cmd, "DISCONNECT"))
-		dis_server(ccur->server, 0);
-	else if (!strcasecmp(cmd, "CLOSE"))
-		channel_close();
-	else if (!strcasecmp(cmd, "PART"))
-		send_part(mesg);
-	else if (!strcasecmp(cmd, "NICK"))
-		send_nick(mesg);
-	else if (!strcasecmp(cmd, "QUIT"))
-		send_quit(mesg);
-	else if (!strcasecmp(cmd, "MSG"))
-		send_priv(mesg, 0);
-	else if (!strcasecmp(cmd, "ME"))
-		send_emot(mesg);
-	else if (!strcasecmp(cmd, "VERSION"))
-		send_version(mesg);
-	else if (!strcasecmp(cmd, "RAW"))
-		sendf(ccur->server->soc, "%s\r\n", mesg);
+		send_default(mesg);
 	else {
-		int len = strlen(cmd);
-		newlinef(ccur, 0, "-!!-", "Unknown command: %.*s%s",
-				15, cmd, len > 15 ? "..." : "");
+		mesg++;
+		if (!(cmd = getarg(&mesg, 1)))
+			; /* message == "/", do nothing */
+		else if (!strcasecmp(cmd, "JOIN"))
+			send_join(mesg);
+		else if (!strcasecmp(cmd, "CONNECT"))
+			send_connect(mesg);
+		else if (!strcasecmp(cmd, "DISCONNECT"))
+			dis_server(ccur->server, 0);
+		else if (!strcasecmp(cmd, "CLOSE"))
+			channel_close();
+		else if (!strcasecmp(cmd, "PART"))
+			send_part(mesg);
+		else if (!strcasecmp(cmd, "NICK"))
+			send_nick(mesg);
+		else if (!strcasecmp(cmd, "QUIT"))
+			send_quit(mesg);
+		else if (!strcasecmp(cmd, "MSG"))
+			send_priv(mesg);
+		else if (!strcasecmp(cmd, "PRIV"))
+			send_priv(mesg);
+		else if (!strcasecmp(cmd, "ME"))
+			send_emote(mesg);
+		else if (!strcasecmp(cmd, "VERSION"))
+			send_version(mesg);
+		else if (!strcasecmp(cmd, "RAW"))
+			sendf(ccur->server->soc, "%s\r\n", mesg);
+		else {
+			int len = strlen(cmd);
+			newlinef(ccur, 0, "-!!-", "Unknown command: %.*s%s",
+					15, cmd, len > 15 ? "..." : "");
+		}
 	}
 }
 
 void
-send_conn(char *ptr)
+send_connect(char *ptr)
 {
 	char *hostname, *p;
 
@@ -481,58 +490,70 @@ send_conn(char *ptr)
 }
 
 void
-send_emot(char *ptr)
+send_default(char *mesg)
 {
 	if (!ccur->type)
 		newline(ccur, 0, "-!!-", "This is not a channel!", 0);
+	else if (!ccur->server->soc)
+		newline(ccur, 0, "-!!-", "Disconnected from server", 0);
+	else {
+		newline(ccur, 0, ccur->server->nick_me, mesg, 0);
+		sendf(ccur->server->soc, "PRIVMSG %s :%s\r\n", ccur->name, mesg);
+	}
+}
+
+void
+send_emote(char *ptr)
+{
+	if (!ccur->type)
+		newline(ccur, 0, "-!!-", "This is not a channel!", 0);
+	else if (!ccur->server->soc)
+		newline(ccur, 0, "-!!-", "Disconnected from server", 0);
 	else {
 		newlinef(ccur, LINE_ACTION, "*", "%s %s", ccur->server->nick_me, ptr);
-		sendf(ccur->server->soc, "PRIVMSG %s :\x01""ACTION %s\x01""\r\n", ccur->name, ptr);
+		sendf(ccur->server->soc,
+				"PRIVMSG %s :\x01""ACTION %s\x01""\r\n", ccur->name, ptr);
 	}
 }
 
 void
 send_join(char *ptr)
 {
-	sendf(ccur->server->soc, "JOIN %s\r\n", ptr);
+	if (ccur == rirc)
+		newline(ccur, 0, "-!!-", "Cannot execute 'join' on main buffer", 0);
+	else if (!ccur->server->soc)
+		newline(ccur, 0, "-!!-", "Disconnected from server", 0);
+	else
+		sendf(ccur->server->soc, "JOIN %s\r\n", ptr);
 }
 
 void
 send_nick(char *ptr)
 {
-	sendf(ccur->server->soc, "NICK %s\r\n", ptr);
-}
-
-void
-send_quit(char *ptr)
-{
-	/* TODO: send the quitting message to all servers
-	 * use ptr, it it exists, otherwise use the default */
-	printf("\x1b[H\x1b[J"); /* Clear */
-	exit(EXIT_SUCCESS);
-}
-
-void
-send_version(char *ptr)
-{
-	char *targ;
-
-	if ((targ = getarg(&ptr, 1))) {
-		newlinef(ccur, 0, "CTCP", "%s - VERSION", targ);
-		sendf(ccur->server->soc, "PRIVMSG %s :\x01""VERSION\x01""\r\n", targ);
-	} else {
-		/* Server version */
-		sendf(ccur->server->soc, "VERSION\r\n");
-	}
+	if (ccur == rirc)
+		newline(ccur, 0, "-!!-", "Cannot execute 'nick' on main buffer", 0);
+	else if (!ccur->server->soc)
+		newline(ccur, 0, "-!!-", "Disconnected from server", 0);
+	else
+		sendf(ccur->server->soc, "NICK %s\r\n", ptr);
 }
 
 void
 send_part(char *ptr)
 {
-	if (ccur == rirc)
-		newline(0, 0, "-!!-", "Cannot execute 'part' on server", 0);
+	/* TODO: part message from ptr */
+
+	if (!ccur->type)
+		newline(ccur, 0, "-!!-", "This is not a channel!", 0);
+	else if (!ccur->server->soc)
+		newline(ccur, 0, "-!!-", "Disconnected from server", 0);
 	else {
-		newline(ccur, 0, "", "(disconnected)", 0);
+		/* TODO: this should set a 'parted' flag for this channel.
+		 * Users should be able to send to a parted channel.
+		 * '/join' with no argument should attemp to rejoin this channel
+		 * if parted. recv_join should look for open channels with that name
+		 * before opening a new one */
+		newline(ccur, 0, "--", "(disconnected)", 0);
 		sendf(ccur->server->soc, "PART %s\r\n", ccur->name);
 	}
 }
@@ -544,33 +565,56 @@ send_ping(char *ptr)
 }
 
 void
-send_priv(char *args, int to_chan)
+send_priv(char *ptr)
 {
-	/* TODO: clean all of this up...  */
+	char *targ;
+	channel *c;
 
-	if (to_chan) {
-		if (!ccur->type)
-			newline(ccur, 0, "-!!-", "This is not a channel!", 0);
-		else {
-			newline(ccur, 0, ccur->server->nick_me, args, 0);
-			sendf(ccur->server->soc, "PRIVMSG %s :%s\r\n", ccur->name, args);
-		}
+	if (!(targ = getarg(&ptr, 1))) {
+		newline(ccur, 0, "-!!-", "Private messages require a target", 0);
+		return;
+	} else if (*ptr == '\0') {
+		newline(ccur, 0, "-!!-", "Private message was null", 0);
+		return;
+	}
+
+	if ((c = get_channel(targ))) {
+		newline(c, 0, ccur->server->nick_me, ptr, 0);
+		sendf(c->server->soc, "PRIVMSG %s :%s\r\n", targ, ptr);
 	} else {
-		char *targ;
+		;
+		/* TODO: should a new channel be created as soon as I send this?
+		 * or should it be printed to ccur with a markup to denote its
+		 * being sent to a new channel? */
+	}
+}
 
-		/* TODO THIS IS A MESS NOW */
-		if (!(args = getarg(&targ, 1)))
-			return; /* TODO: error? */
+void
+send_quit(char *ptr)
+{
+	/* XXX: exit calls cleanup() which frees everything
+	 * and sends a default quit message to each server.
+	 *
+	 * It should be possible to take a message from ptr and
+	 * use that instead of the default quit message. */
 
-		if (*args == '\0')
-			return; /* TODO: error? */
+	printf("\x1b[2J");
+	exit(EXIT_SUCCESS);
+}
 
-		channel *c;
-		ccur = (c = get_channel(targ)) ? c : new_channel(targ);
+void
+send_version(char *ptr)
+{
+	char *targ;
 
-		sendf(ccur->server->soc, "PRIVMSG %s :%s\r\n", targ, args);
-		newline(ccur, 0, ccur->server->nick_me, args, 0);
-		draw(D_FULL);
+	if (ccur == rirc) {
+		newline(ccur, 0, "--", "rirc version " VERSION, 0);
+		newline(ccur, 0, "--", "http://rcr.io/rirc.html", 0);
+	} else if ((targ = getarg(&ptr, 1))) {
+		newlinef(ccur, 0, "--", "Sending CTCP VERSION request to %s", targ);
+		sendf(ccur->server->soc, "PRIVMSG %s :\x01""VERSION\x01""\r\n", targ);
+	} else {
+		sendf(ccur->server->soc, "VERSION\r\n");
 	}
 }
 
@@ -683,7 +727,7 @@ recv_ctcp_req(parsed_mesg *p)
 		if ((c = get_channel(p->from)) == NULL)
 			c = s[rplsoc]->channel;
 
-		newlinef(c, 0, "--", "CTCP VERSION from %s", p->from);
+		newlinef(c, 0, "--", "Received CTCP VERSION from %s", p->from);
 		sendf(rplsoc, "NOTICE %s :\x01""VERSION rirc version %s\x01""\r\n", p->from, VERSION);
 		sendf(rplsoc, "NOTICE %s :\x01""VERSION http://rcr.io/rirc.html\x01""\r\n", p->from);
 		return NULL;
