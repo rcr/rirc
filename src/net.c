@@ -1034,8 +1034,11 @@ recv_numeric(parsed_mesg *p)
 		/* Reset list of auto nicks */
 		s[rplsoc]->nptr = config.nicks;
 
-		if (config.auto_join)
+		/* Only send the autojoin on command-line connect */
+		if (config.auto_join) {
 			sendf(rplsoc, "JOIN %s\r\n", config.auto_join);
+			config.auto_join = NULL;
+		}
 
 		newline(0, LINE_NUMRPL, "--", p->trailing, 0);
 		return NULL;
