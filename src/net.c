@@ -62,8 +62,8 @@ void send_emote(char*);
 void send_join(char*);
 void send_nick(char*);
 void send_part(char*);
-void send_ping(char*);
 void send_priv(char*);
+void send_raw(char*);
 void send_quit(char*);
 void send_version(char*);
 
@@ -281,7 +281,8 @@ get_auto_nick(char **autonick, char *nick)
 	while (*p == ' ' || *p == ',')
 		p++;
 
-	if (*p == '\0') { /* Autonicks exhausted, generate a random nick */
+	if (*p == '\0') {
+		/* Autonicks exhausted, generate a random nick */
 		char *base = "rirc_";
 		char *cset = "0123456789";
 
@@ -331,33 +332,42 @@ new_channel(char *name)
 		ccur->next->prev = c;
 		ccur->next = c;
 	}
+
+	draw(D_CHANS);
+
 	return c;
 }
 
-server*
-new_server(char *name, int port, int soc)
+void
+free_channel(channel *c)
 {
-	server *s;
-	if ((s = malloc(sizeof(server))) == NULL)
-		fatal("new_server");
-	s->soc = soc;
-	s->port = port;
-	s->nptr = config.nicks;
-	s->usermode = 0;
-	s->iptr = s->input;
-	strncpy(s->name, name, 50);
-	return s;
+	/* Remove from linked list */
+	c->next->prev = c->prev;
+	c->prev->next = c->next;
+
+	/* Free all chat lines and everything else */
+	line *l = c->chat;
+	line *e = l + SCROLLBACK_BUFFER;
+	while (l->len && l < e)
+		free((l++)->text);
+	free_nicklist(c->nicklist);
+	free_input(c->input);
+	free(c);
+
+	draw(D_CHANS);
 }
 
 channel*
 get_channel(char *chan)
 {
 	channel *c = cfirst;
+
 	do {
 		if (!strcmp(c->name, chan) && c->server->soc == rplsoc)
 			return c;
 		c = c->next;
 	} while (c != cfirst);
+
 	return NULL;
 }
 
@@ -427,7 +437,7 @@ send_mesg(char *mesg)
 		else if (!strcasecmp(cmd, "VERSION"))
 			send_version(mesg);
 		else if (!strcasecmp(cmd, "RAW"))
-			sendf(ccur->server->soc, "%s\r\n", mesg);
+			send_raw(mesg);
 		else {
 			int len = strlen(cmd);
 			newlinef(ccur, 0, "-!!-", "Unknown command: %.*s%s",
@@ -559,18 +569,15 @@ send_part(char *ptr)
 }
 
 void
-send_ping(char *ptr)
-{
-	/* TODO: */
-}
-
-void
 send_priv(char *ptr)
 {
 	char *targ;
 	channel *c;
 
-	if (!(targ = getarg(&ptr, 1))) {
+	if (ccur == rirc) {
+		newline(ccur, 0, "-!!-", "Cannot send messages on main buffer", 0);
+		return;
+	} else if (!(targ = getarg(&ptr, 1))) {
 		newline(ccur, 0, "-!!-", "Private messages require a target", 0);
 		return;
 	} else if (*ptr == '\0') {
@@ -578,15 +585,24 @@ send_priv(char *ptr)
 		return;
 	}
 
-	if ((c = get_channel(targ))) {
+	if ((c = get_channel(targ)))
 		newline(c, 0, ccur->server->nick_me, ptr, 0);
-		sendf(c->server->soc, "PRIVMSG %s :%s\r\n", targ, ptr);
-	} else {
+	else
 		;
 		/* TODO: should a new channel be created as soon as I send this?
 		 * or should it be printed to ccur with a markup to denote its
 		 * being sent to a new channel? */
-	}
+
+	sendf(c->server->soc, "PRIVMSG %s :%s\r\n", targ, ptr);
+}
+
+void
+send_raw(char *ptr)
+{
+	if (ccur == rirc)
+		newline(ccur, 0, "-!!-", "Cannot execute 'raw' on main buffer", 0);
+	else
+		sendf(ccur->server->soc, "%s\r\n", ptr);
 }
 
 void
@@ -663,11 +679,8 @@ recv_mesg(char *inp, int count, int soc)
 			else
 				err = errf("Message type '%s' unknown", p->command);
 
-			if (err) {
+			if (err)
 				newline(0, 0, "-!!-", err, 0);
-				/* TODO: reset the inserted nulls in s[soc]->input from parsing */
-				newlinef(0, 0, "-!!-", "RPL ERROR: %s", s[soc]->input);
-			}
 
 			ptr = s[soc]->input;
 
@@ -956,8 +969,10 @@ recv_nick(parsed_mesg *p)
 	if (!(nick = getarg(&p->params, 1)) && !(nick = getarg(&p->trailing, 1)))
 		return "NICK: new nick is null";
 
-	if (is_me(p->from))
+	if (is_me(p->from)) {
 		strncpy(s[rplsoc]->nick_me, nick, NICKSIZE-1);
+		newlinef(0, 0, "--", "You are now known as %s", nick);
+	}
 
 	channel *c = cfirst;
 
