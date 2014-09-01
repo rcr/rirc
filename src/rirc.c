@@ -14,8 +14,8 @@
 /* Values parsed from getopts */
 struct
 {
-	int port;
 	char *connect;
+	char *port;
 	char *join;
 	char *nicks;
 } opts;
@@ -86,7 +86,7 @@ splash(void)
 void
 getopts(int argc, char **argv)
 {
-	opts.port = 0;
+	opts.port    = NULL;
 	opts.connect = NULL;
 	opts.join    = NULL;
 	opts.nicks   = NULL;
@@ -127,27 +127,7 @@ getopts(int argc, char **argv)
 					puts("-p/--port requires an argument");
 					exit(EXIT_FAILURE);
 				} else {
-					/* parse out the port */
-					int port = 0;
-					char *ptr = optarg;
-
-					while (*ptr) {
-						if (!isdigit(*ptr)) {
-							fprintf(stderr, "Invalid port number: %s\n",
-								optarg);
-							exit(EXIT_FAILURE);
-						}
-
-						port = port * 10 + (*ptr++ - '0');
-
-						if (port > 65534) {
-							fprintf(stderr, "Port number out of range: %s\n",
-								optarg);
-							exit(EXIT_FAILURE);
-						}
-					}
-
-					opts.port = port;
+					opts.port = optarg;
 				}
 				break;
 
@@ -193,13 +173,13 @@ configure(void)
 {
 	if (opts.connect) {
 		config.auto_connect = opts.connect;
-		config.auto_port = opts.port ? opts.port : 6667;
+		config.auto_port = opts.port ? opts.port : "6667";
 		config.auto_join = opts.join;
 		config.nicks = opts.nicks ? opts.nicks : "";
 	} else {
 		/* TODO: parse a configuration file. for now set defaults here */
 		config.auto_connect = NULL;
-		config.auto_port = 0;
+		config.auto_port = NULL;
 		config.auto_join = NULL;
 		config.nicks = "";
 	}
@@ -245,7 +225,7 @@ startup(void)
 
 	confirm = 0;
 
-	rirc = cfirst = ccur = new_channel("rirc");
+	rirc = cfirst = ccur = new_channel("rirc", NULL);
 
 	splash();
 
@@ -254,8 +234,6 @@ startup(void)
 
 	/* Register cleanup for exit */
 	atexit(cleanup);
-
-	exit_fatal = 0;
 
 	if (config.auto_connect)
 		con_server(config.auto_connect, config.auto_port);
@@ -276,10 +254,6 @@ cleanup(void)
 	} while (cfirst != rirc);
 
 	free_channel(rirc);
-
-	/* Don't clear screen on fatal exit to preserve error message */
-	if (!exit_fatal)
-		printf("\x1b[H\x1b[J");
 }
 
 void
@@ -308,7 +282,7 @@ main_loop(void)
 		} else {
 			for (i = 1; i < numfds; i++) {
 				if (fds[i].revents & POLLIN) {
-					if ((count = read(fds[i].fd, buff, BUFFSIZE)) == 0)
+					if ((count = read(fds[i].fd, buff, BUFFSIZE)) <= 0)
 						con_lost(fds[i].fd);
 					else
 						recv_mesg(buff, count, fds[i].fd);
@@ -318,7 +292,6 @@ main_loop(void)
 		}
 
 		/* Skip if no draw bits set */
-		if (draw)
-			redraw();
+		if (draw) redraw();
 	}
 }

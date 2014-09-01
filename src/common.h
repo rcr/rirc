@@ -39,9 +39,8 @@
 #define UMODE_s (1 << 6) /* receiving server notices */
 #define UMODE_MAX 7
 
-int exit_fatal;
 #define fatal(mesg) \
-	do {exit_fatal = 1; perror(mesg); exit(EXIT_FAILURE);} while (0);
+	do {perror(mesg); exit(EXIT_FAILURE);} while (0);
 
 /* Channel bar activity types */
 typedef enum {
@@ -67,12 +66,12 @@ typedef enum {
 /* Global configuration */
 struct config
 {
-	int auto_port;
 	int join_part_quit_threshold;
 	char *username;
 	char *realname;
 	char *nicks;
 	char *auto_connect;
+	char *auto_port;
 	char *auto_join;
 } config;
 
@@ -140,9 +139,9 @@ typedef struct server
 	char *iptr;
 	char *nptr;
 	char input[BUFFSIZE];
-	char name[50];
+	char host[50];
+	char port[6];
 	char nick_me[NICKSIZE];
-	int port;
 	int soc;
 	int usermode;
 	struct channel *channel;
@@ -164,10 +163,10 @@ channel *ccur;
 channel *cfirst;
 
 /* net.c */
-channel* new_channel(char*);
+channel* new_channel(char*, server*);
 void free_channel(channel*);
 void con_lost(int);
-void con_server(char*, int);
+void con_server(char*, char*);
 void channel_switch(int);
 void channel_close(void);
 void send_mesg(char*);

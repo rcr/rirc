@@ -1,14 +1,19 @@
+/* Needed so gcc will use POSIX addrinfo and friends */
+#define _POSIX_C_SOURCE 200112L
+
 #include <time.h>
 #include <poll.h>
 #include <stdio.h>
-#include <netdb.h>
 #include <ctype.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
 #include <strings.h>
 #include <stdarg.h>
+#include <netdb.h>
 #include <arpa/inet.h>
+#include <sys/types.h>
+#include <sys/socket.h>
 
 #include "common.h"
 
@@ -68,7 +73,7 @@ void send_quit(char*);
 void send_version(char*);
 
 channel* get_channel(char*);
-server* new_server(char*, int, int);
+server* new_server(char*, char*, int);
 void dis_server(server*, int);
 void get_auto_nick(char**, char*);
 void sendf(int, const char*, ...);
@@ -83,64 +88,66 @@ time_t raw_t;
 struct tm *t;
 
 void
-channel_switch(int next)
+con_server(char *host, char *port)
 {
-	if (ccur->next == ccur)
+	int ret, soc;
+	void *addr;
+	char ipstr[INET6_ADDRSTRLEN];
+	struct addrinfo hints, *servinfo, *p;
+
+	memset(&hints, 0, sizeof(hints));
+
+	/* IPv4 and/or IPv6 */
+	hints.ai_family = AF_UNSPEC;
+	hints.ai_socktype = SOCK_STREAM;
+	hints.ai_flags = AI_PASSIVE;
+
+	/* Resolve host */
+	if ((ret = getaddrinfo(host, port, &hints, &servinfo)) != 0) {
+		newlinef(0, 0, "-!!-", "Could not resolve '%s': %s",
+				host, (char*) gai_strerror(ret));
 		return;
-	else if (next)
-		ccur = ccur->next;
+	}
+
+	/* Attempt to connect to all address results */
+	for (p = servinfo; p != NULL; p = p->ai_next) {
+
+		if ((soc = socket(p->ai_family, p->ai_socktype, p->ai_protocol)) < 0)
+			continue;
+
+		/* Break on success */
+		if (connect(soc, p->ai_addr, p->ai_addrlen) == 0)
+			break;
+
+		close(soc);
+	}
+
+	/* Check for failure to connect */
+	if (p == NULL) {
+		newlinef(0, 0, "-!!-", "Could not connect to '%s' port %s", host, port);
+		freeaddrinfo(servinfo);
+		return;
+	}
+
+	fds[numfds++].fd = rplsoc = soc;
+
+	/* Get IPv4 or IPv6 address string */
+	if (p->ai_family == AF_INET)
+		addr = &(((struct sockaddr_in *)p->ai_addr)->sin_addr);
 	else
-		ccur = ccur->prev;
-	ccur->active = ACTIVITY_DEFAULT;
+		addr = &(((struct sockaddr_in6 *)p->ai_addr)->sin6_addr);
 
-	draw(D_FULL);
-}
+	inet_ntop(p->ai_family, addr, ipstr, sizeof(ipstr));
 
-void
-con_server(char *hostname, int port)
-{
-	struct hostent *host;
-	struct in_addr h_addr;
-	if ((host = gethostbyname(hostname)) == NULL) {
-		newlinef(0, 0, "-!!-", "Error while resolving: %s", hostname);
-		return;
-	}
+	freeaddrinfo(servinfo);
 
-	h_addr.s_addr = *((unsigned long *) host->h_addr_list[0]);
+	s[soc] = new_server(host, port, soc);
 
-	struct sockaddr_in s_addr;
-	if ((rplsoc = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0)
-		fatal("socket");
+	newlinef(0, 0, "--", "Connected to '%s' [%s] - port %s",
+			host, ipstr, port);
 
-	memset(&s_addr, 0, sizeof(s_addr));
-	s_addr.sin_family = AF_INET;
-	s_addr.sin_addr.s_addr = inet_addr(inet_ntoa(h_addr));
-	s_addr.sin_port = htons(port);
-	if (connect(rplsoc, (struct sockaddr *) &s_addr, sizeof(s_addr)) < 0) {
-		newlinef(0, 0, "-!!-", "Error connecting to: %s", hostname);
-		close(rplsoc);
-		return;
-	} else {
-		server *ss = new_server(hostname, port, rplsoc);
-		s[rplsoc] = ss;
-
-		get_auto_nick(&(ss->nptr), ss->nick_me);
-
-		/* Keep server channel buffers at front of list */
-		ccur = cfirst;
-		ccur = new_channel(hostname);
-		ss->channel = ccur;
-
-		if (cfirst == rirc)
-			cfirst = ccur;
-
-		fds[numfds++].fd = rplsoc;
-
-		draw(D_CHANS);
-
-		sendf(rplsoc, "NICK %s\r\n", ss->nick_me);
-		sendf(rplsoc, "USER %s 8 * :%s\r\n", config.username, config.realname);
-	}
+	sendf(soc, "NICK %s\r\n", s[soc]->nick_me);
+	sendf(soc, "USER %s 8 * :%s\r\n", config.username, config.realname);
 }
 
 void
@@ -298,11 +305,35 @@ get_auto_nick(char **autonick, char *nick)
 			*nick++ = *p++;
 		*autonick = p;
 	}
+
 	*nick = '\0';
 }
 
+server*
+new_server(char *host, char *port, int soc)
+{
+	server *s;
+	if ((s = malloc(sizeof(server))) == NULL)
+		fatal("new_server");
+
+	s->soc = soc;
+	s->usermode = 0;
+	s->iptr = s->input;
+	s->nptr = config.nicks;
+	strncpy(s->host, host, sizeof(s->host));
+	strncpy(s->port, port, sizeof(s->port));
+	get_auto_nick(&(s->nptr), s->nick_me);
+
+	if (ccur == rirc)
+		ccur = NULL;
+
+	s->channel = new_channel(host, s);
+
+	return s;
+}
+
 channel*
-new_channel(char *name)
+new_channel(char *name, server *server)
 {
 	channel *c;
 	if ((c = malloc(sizeof(channel))) == NULL)
@@ -313,17 +344,17 @@ new_channel(char *name)
 	c->chanmode = 0;
 	c->nick_count = 0;
 	c->nicklist = NULL;
+	c->server = server;
 	c->cur_line = c->chat;
 	c->active = ACTIVITY_DEFAULT;
-	c->server = s[rplsoc];
 	c->input = new_input();
-
 	strncpy(c->name, name, 50);
 	memset(c->chat, 0, sizeof(c->chat));
 
-	if (ccur == rirc || rplsoc == 0)
+	if (ccur == NULL) {
+		cfirst = ccur = c;
 		c->prev = c->next = c;
-	else {
+	} else {
 		/* Skip to end of server channels */
 		while (!ccur->next->type && ccur->next != cfirst)
 			ccur = ccur->next;
@@ -381,22 +412,24 @@ channel_close(void)
 		sendf(ccur->server->soc, "PART %s\r\n", ccur->name);
 		ccur = (ccur->next == cfirst) ? ccur->prev : ccur->next;
 		free_channel(c);
-		draw(D_FULL);
 	}
+
+	draw(D_FULL);
 }
 
 void
-free_channel(channel *c)
+channel_switch(int next)
 {
-	line *l = c->chat;
-	line *e = l + SCROLLBACK_BUFFER;
-	c->next->prev = c->prev;
-	c->prev->next = c->next;
-	while (l->len && l < e)
-		free((l++)->text);
-	free_nicklist(c->nicklist);
-	free_input(c->input);
-	free(c);
+	if (ccur->next == ccur)
+		return;
+	else if (next)
+		ccur = ccur->next;
+	else
+		ccur = ccur->prev;
+
+	ccur->active = ACTIVITY_DEFAULT;
+
+	draw(D_FULL);
 }
 
 /*
@@ -449,54 +482,23 @@ send_mesg(char *mesg)
 void
 send_connect(char *ptr)
 {
-	char *hostname, *p;
+	char *host, *port;
 
-	/* Default IRC port */
-	int port = 6667;
+	/* Accept <host> || <host:port> || <hostport> */
+	if (!(host= strtok(ptr, " :"))) {
 
-	if (!(hostname = getarg(&ptr, 1)))
-		; /* TODO check if disconnected, send reconnect */
-	else {
+		/* TODO: if current server is disconnected, attempt to reconnect
+		 * if no arguments are given*/
 
-		/* Check for port */
-		/* TODO can this be simplified */
-		for (p = hostname; *p; p++) {
-			if (*p == ':') {
-				*p++ = '\0';
-				break;
-			}
-		}
-
-		/* TODO: while is digit, *10, add digit */
-
-		if (*p) {
-
-			int digits = port = 0, factor = 1;
-
-			while (*p) {
-
-				if (!(isdigit(*p++))) {
-					newline(0, 0, "-!!-", "Invalid Port number", 0);
-					return;
-				} else if (++digits > 5) {
-					newline(0, 0, "-!!-", "Port number out of range", 0);
-					return;
-				}
-			}
-
-			while (digits--) {
-				port += (*(--p) - '0') * factor;
-				factor *= 10;
-			}
-
-			if (port > 65534) {
-				newline(0, 0, "-!!-", "Port number out of range", 0);
-				return;
-			}
-		}
+		newline(ccur, 0, "-!!-", "connect requires a hostname argument", 0);
+		return;
 	}
 
-	con_server(hostname, port);
+	/* Check for port */
+	if (!(port = strtok(NULL, " ")))
+		port = "6667";
+
+	con_server(host, port);
 }
 
 void
@@ -614,7 +616,8 @@ send_quit(char *ptr)
 	 * It should be possible to take a message from ptr and
 	 * use that instead of the default quit message. */
 
-	printf("\x1b[2J");
+	printf("\x1b[H\x1b[J");
+
 	exit(EXIT_SUCCESS);
 }
 
@@ -727,7 +730,7 @@ recv_ctcp_req(parsed_mesg *p)
 	if (!strcmp(cmd, "ACTION")) {
 
 		if ((c = get_channel(p->from)) == NULL) {
-			c = new_channel(p->from);
+			c = new_channel(p->from, s[rplsoc]);
 			c->type = 'p';
 		}
 
@@ -783,7 +786,7 @@ recv_join(parsed_mesg *p)
 		return "JOIN: channel is null";
 
 	if (is_me(p->from)) {
-		ccur = new_channel(chan);
+		ccur = new_channel(chan, s[rplsoc]);
 		draw(D_FULL);
 	} else {
 
@@ -1323,7 +1326,7 @@ recv_priv(parsed_mesg *p)
 	if (is_me(targ)) {
 
 		if ((c = get_channel(p->from)) == NULL) {
-			c = new_channel(p->from);
+			c = new_channel(p->from, s[rplsoc]);
 			c->type = 'p';
 		}
 
