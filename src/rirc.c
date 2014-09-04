@@ -11,15 +11,6 @@
 
 #include "common.h"
 
-/* Values parsed from getopts */
-struct
-{
-	char *connect;
-	char *port;
-	char *join;
-	char *nicks;
-} opts;
-
 void splash(void);
 void startup(void);
 void cleanup(void);
@@ -28,6 +19,15 @@ void main_loop(void);
 void usage(void);
 void getopts(int, char**);
 void signal_sigwinch(int);
+
+/* Values parsed from getopts */
+struct
+{
+	char *connect;
+	char *port;
+	char *join;
+	char *nicks;
+} opts;
 
 extern int numfds;
 
@@ -79,7 +79,7 @@ splash(void)
 	newline(rirc, 0, "--", "| '__| | '__/ __|", 0);
 	newline(rirc, 0, "--", "| |  | | | | (__ ", 0);
 	newline(rirc, 0, "--", "|_|  |_|_|  \\___|", 0);
-	newline(rirc, 0, "--", " ", 0);
+	newline(rirc, 0, "--", "                 ", 0);
 	newline(rirc, 0, "--", " - version " VERSION, 0);
 }
 
@@ -175,7 +175,7 @@ configure(void)
 		config.auto_connect = opts.connect;
 		config.auto_port = opts.port ? opts.port : "6667";
 		config.auto_join = opts.join;
-		config.nicks = opts.nicks ? opts.nicks : "";
+		config.nicks = opts.nicks ? opts.nicks : getenv("USER");
 	} else {
 		/* TODO: parse a configuration file. for now set defaults here */
 		config.auto_connect = NULL;
