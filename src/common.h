@@ -192,6 +192,7 @@ void free_input(input*);
 void inputc(char*, int);
 
 /* utils.c */
+char* strdup(const char*);
 char* errf(const char*, ...);
 char* getarg(char**, int);
 int check_pinged(char*, char*);

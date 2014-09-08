@@ -62,6 +62,19 @@ getarg(char **str, int set_null)
 	return ret;
 }
 
+char*
+strdup(const char *str)
+{
+	char *ret;
+
+	if ((ret = malloc(strlen(str))) == NULL)
+		fatal("strdup - malloc");
+
+	strcpy(ret, str);
+
+	return ret;
+}
+
 struct parsed_mesg*
 parse(char *mesg)
 {
