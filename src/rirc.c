@@ -291,6 +291,9 @@ main_loop(void)
 			}
 		}
 
+		/* Check the progress of connecting threads */
+		connection_progress();
+
 		/* Skip if no draw bits set */
 		if (draw) redraw();
 	}

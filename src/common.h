@@ -163,6 +163,7 @@ channel *ccur;
 channel *cfirst;
 
 /* net.c */
+void connection_progress(void);
 channel* new_channel(char*, server*);
 void free_channel(channel*);
 void con_lost(int);

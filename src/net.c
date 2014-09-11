@@ -10,6 +10,7 @@
 #include <string.h>
 #include <strings.h>
 #include <stdarg.h>
+#include <pthread.h>
 #include <netdb.h>
 #include <arpa/inet.h>
 #include <sys/types.h>
@@ -73,19 +74,121 @@ void send_quit(char*);
 void send_version(char*);
 
 channel* get_channel(char*);
-server* new_server(char*, char*, int);
+server* new_server(char*, char*);
 void dis_server(server*, int);
 void get_auto_nick(char**, char*);
 void sendf(int, const char*, ...);
 
 int rplsoc = 0;
 int numfds = 1; /* 1 for stdin */
+
 extern struct pollfd fds[MAXSERVERS + 1];
 /* For server indexing by socket. 3 for stdin/out/err unused */
 server *s[MAXSERVERS + 3];
 
 time_t raw_t;
 struct tm *t;
+
+
+
+/* TODO: rewriting server connections to be threaded */
+
+/* Connection thread info */
+typedef struct connection_info {
+	int connected;
+	char *host;
+	char *port;
+	pthread_t tid;
+	struct connection_info *next;
+} connection_info;
+
+connection_info *connecting;
+
+/* Number of threads currently connecting */
+int num_connecting = 0;
+
+void server_connect(char*, char*);
+void server_connected(connection_info*);
+
+static void* threaded_connect(void*);
+
+void
+server_connect(char *host, char *port)
+{
+	connection_info *ci;
+
+	if (numfds + num_connecting > MAXSERVERS) {
+		newline(ccur, 0, "-!!-", "Error: MAXSERVERS exceeded", 0);
+		return;
+	}
+
+	if ((ci = malloc(sizeof(connection_info))) == NULL)
+		fatal("server_connect - malloc");
+
+	ci->connected = 0;
+	ci->host = strdup(host);
+	ci->port = strdup(port);
+
+	if ((pthread_create(&ci->tid, NULL, threaded_connect, ci)))
+		fatal("server_connect - pthread_create");
+
+	/* Add to LL of connecting threads */
+	if (connecting)
+		ci->next = connecting->next;
+	connecting = ci;
+	
+	num_connecting++;
+}
+
+void
+server_connected(connection_info *ci)
+{
+	if ((pthread_join(ci->tid, NULL)))
+		fatal("server_connected - pthread_join");
+
+	newlinef(0, 0, "---", "Connected to %s : %s", ci->host, ci->port);
+
+	free(ci->host);
+	free(ci->port);
+	free(ci);
+
+	num_connecting--;
+}
+
+static void*
+threaded_connect(void *arg)
+{
+	connection_info *ci = (connection_info *)arg;
+
+	ci->connected = 1;
+
+	return NULL;
+}
+
+void
+connection_progress(void)
+{
+	connection_info *ci_1, *ci_2;
+	for (ci_1 = connecting; ci_1; ci_1 = ci_1->next) {
+
+		ci_2 = ci_1;
+
+		if (ci_1->connected) {
+
+			/* Remove from linked list */
+			if (ci_1 == connecting)
+				connecting = connecting->next;
+			else
+				ci_2->next = ci_1->next;
+
+			server_connected(ci_1);
+
+			break;
+		}
+	}
+}
+
+
 
 void
 con_server(char *host, char *port)
@@ -141,7 +244,8 @@ con_server(char *host, char *port)
 
 	freeaddrinfo(servinfo);
 
-	s[soc] = new_server(host, port, soc);
+	s[soc] = new_server(host, port);
+	s[soc]->soc = soc;
 
 	newlinef(0, 0, "--", "Connected to '%s' [%s] - port %s",
 			host, ipstr, port);
@@ -310,13 +414,13 @@ get_auto_nick(char **autonick, char *nick)
 }
 
 server*
-new_server(char *host, char *port, int soc)
+new_server(char *host, char *port)
 {
 	server *s;
 	if ((s = malloc(sizeof(server))) == NULL)
 		fatal("new_server");
 
-	s->soc = soc;
+	s->soc = 0;
 	s->usermode = 0;
 	s->iptr = s->input;
 	s->nptr = config.nicks;
