@@ -75,6 +75,22 @@ strdup(const char *str)
 	return ret;
 }
 
+char*
+strdupf(const char *fmt, ...)
+{
+	char *ret;
+
+	if ((ret = malloc(BUFFSIZE)) == NULL)
+		fatal("strdupf - malloc");
+
+	va_list args;
+	va_start(args, fmt);
+	vsnprintf(ret, BUFFSIZE-1, fmt, args);
+	va_end(args);
+
+	return ret;
+}
+
 struct parsed_mesg*
 parse(char *mesg)
 {
