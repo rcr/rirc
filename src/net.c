@@ -12,6 +12,7 @@
 #include <stdarg.h>
 #include <pthread.h>
 #include <netdb.h>
+#include <errno.h>
 #include <arpa/inet.h>
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -96,38 +97,54 @@ struct tm *t;
 /* Connection thread info */
 typedef struct connection_info {
 	int connected;
-	char *host;
-	char *port;
-	pthread_t tid;
+	char *error;
+	char *ipstr;
+	struct server *server;
 	struct connection_info *next;
+	pthread_t tid;
 } connection_info;
 
+/* Global pointer to LL of connecting threads */
 connection_info *connecting;
-
-/* Number of threads currently connecting */
-int num_connecting = 0;
 
 void server_connect(char*, char*);
 void server_connected(connection_info*);
 
 static void* threaded_connect(void*);
+static void* threaded_connect_cleanup(void*);
+
+static void free_connection_info(connection_info*);
+
+/* The only exit points for a thread */
+void connection_progress(void);
+void connection_cancel(connection_info*);
+
+
+int numservers;
+int numconnected;
 
 void
 server_connect(char *host, char *port)
 {
 	connection_info *ci;
 
-	if (numfds + num_connecting > MAXSERVERS) {
-		newline(ccur, 0, "-!!-", "Error: MAXSERVERS exceeded", 0);
+	if (numservers == MAXSERVERS) {
+		newline(ccur, 0, "-!!-", "Error: MAXSERVERS", 0);
 		return;
 	}
+
+	numservers++;
 
 	if ((ci = malloc(sizeof(connection_info))) == NULL)
 		fatal("server_connect - malloc");
 
+	ci->error = NULL;
+	ci->ipstr = NULL;
 	ci->connected = 0;
-	ci->host = strdup(host);
-	ci->port = strdup(port);
+	ci->server = new_server(host, port);
+
+	newlinef(ci->server->channel, 0, "--",
+			"Connecting to '%s' port %s", host, port);
 
 	if ((pthread_create(&ci->tid, NULL, threaded_connect, ci)))
 		fatal("server_connect - pthread_create");
@@ -136,8 +153,6 @@ server_connect(char *host, char *port)
 	if (connecting)
 		ci->next = connecting->next;
 	connecting = ci;
-	
-	num_connecting++;
 }
 
 void
@@ -146,21 +161,84 @@ server_connected(connection_info *ci)
 	if ((pthread_join(ci->tid, NULL)))
 		fatal("server_connected - pthread_join");
 
-	newlinef(0, 0, "---", "Connected to %s : %s", ci->host, ci->port);
+	newlinef(ci->server->channel, 0, "--", "Connected [%s]", ci->ipstr);
 
-	free(ci->host);
-	free(ci->port);
-	free(ci);
+	/* TODO: add server's socket to list of polling fds */
+	/* TODO: send the irc init messages */
 
-	num_connecting--;
+	numconnected++;
+
+	free_connection_info(ci);
 }
 
 static void*
 threaded_connect(void *arg)
 {
+	void *addr;
+	int ret, soc;
+	char ipstr[INET6_ADDRSTRLEN];
+	struct addrinfo hints, *p, *servinfo = NULL;
+
+	/* Thread cleanup on error or external thread cancel */
+	pthread_cleanup_push(threaded_connect_cleanup, servinfo);
+
+	memset(&hints, 0, sizeof(hints));
+
+	/* IPv4 and/or IPv6 */
+	hints.ai_family = AF_UNSPEC;
+	hints.ai_flags = AI_PASSIVE;
+	hints.ai_socktype = SOCK_STREAM;
+
 	connection_info *ci = (connection_info *)arg;
 
+	server *s = ci->server;
+
+	/* Resolve host */
+	if ((ret = getaddrinfo(s->host, s->port, &hints, &servinfo)) != 0) {
+		ci->error = strdupf("Error resolving host: %s", gai_strerror(ret));
+		pthread_exit(NULL);
+	}
+
+	/* Attempt to connect to all address results */
+	for (p = servinfo; p != NULL; p = p->ai_next) {
+
+		if ((soc = socket(p->ai_family, p->ai_socktype, p->ai_protocol)) < 0)
+			continue;
+
+		/* Break on success */
+		if (connect(soc, p->ai_addr, p->ai_addrlen) == 0)
+			break;
+
+		close(soc);
+	}
+
+	/* Check for failure to connect */
+	if (p == NULL) {
+		ci->error = strdupf("Error connecting: %s", strerror(errno));
+		pthread_exit(NULL);
+	}
+
+	/* Get IPv4 or IPv6 address string */
+	if (p->ai_family == AF_INET)
+		addr = &(((struct sockaddr_in *)p->ai_addr)->sin_addr);
+	else
+		addr = &(((struct sockaddr_in6 *)p->ai_addr)->sin6_addr);
+
+	ci->ipstr = strdup(inet_ntop(p->ai_family, addr, ipstr, sizeof(ipstr)));
+
 	ci->connected = 1;
+
+	pthread_cleanup_pop(1);
+	return NULL;
+}
+
+static void*
+threaded_connect_cleanup(void* arg)
+{
+	struct addrinfo *servinfo = (struct addrinfo *)arg;
+
+	if (servinfo)
+		freeaddrinfo(servinfo);
 
 	return NULL;
 }
@@ -168,24 +246,44 @@ threaded_connect(void *arg)
 void
 connection_progress(void)
 {
-	connection_info *ci_1, *ci_2;
-	for (ci_1 = connecting; ci_1; ci_1 = ci_1->next) {
+	connection_info *ci;
 
-		ci_2 = ci_1;
+	for (ci = connecting; ci; ci = ci->next) {
 
-		if (ci_1->connected) {
+		if (ci->error) {
+			newline(ci->server->channel, 0, "-!!-", ci->error, 0);
+			free_connection_info(ci);
+		}
 
-			/* Remove from linked list */
-			if (ci_1 == connecting)
-				connecting = connecting->next;
-			else
-				ci_2->next = ci_1->next;
-
-			server_connected(ci_1);
-
-			break;
+		if (ci->connected) {
+			server_connected(ci);
+			free_connection_info(ci);
 		}
 	}
+}
+
+void
+connection_cancel(connection_info *ci)
+{
+	if ((pthread_cancel(ci->tid)))
+		fatal("connection_cancel - pthread_cancel");
+
+	free_connection_info(ci);
+}
+
+static void
+free_connection_info(connection_info *ci)
+{
+	connection_info *prev;
+
+	/* Remove it from the linked list */
+	for(prev = connecting; prev->next != ci; prev = prev->next)
+		;
+	prev->next = ci->next;
+
+	free(ci->error);
+	free(ci->ipstr);
+	free(ci);
 }
 
 
@@ -290,6 +388,8 @@ dis_server(server *s, int kill)
 			free_channel(t);
 		}
 		ccur = cfirst;
+		free(s->host);
+		free(s->port);
 		free(s);
 	} else {
 		channel *c = cfirst;
@@ -328,8 +428,7 @@ newline(channel *c, line_t type, char *from, char *mesg, int len)
 
 	line *l = c->cur_line++;
 
-	if (l->len)
-		free(l->text);
+	free(l->text);
 
 	l->len = len;
 	if ((l->text = malloc(len)) == NULL)
@@ -424,8 +523,8 @@ new_server(char *host, char *port)
 	s->usermode = 0;
 	s->iptr = s->input;
 	s->nptr = config.nicks;
-	strncpy(s->host, host, sizeof(s->host));
-	strncpy(s->port, port, sizeof(s->port));
+	s->host = strdup(host);
+	s->port = strdup(host);
 	get_auto_nick(&(s->nptr), s->nick_me);
 
 	if (ccur == rirc)

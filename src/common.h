@@ -139,8 +139,8 @@ typedef struct server
 	char *iptr;
 	char *nptr;
 	char input[BUFFSIZE];
-	char host[50];
-	char port[6];
+	char *host;
+	char *port;
 	char nick_me[NICKSIZE];
 	int soc;
 	int usermode;
