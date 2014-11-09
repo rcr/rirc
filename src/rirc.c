@@ -3,7 +3,6 @@
 #include <string.h>
 #include <signal.h>
 #include <unistd.h>
-#include <ctype.h>
 #include <poll.h>
 #include <time.h>
 #include <termios.h>
@@ -29,10 +28,7 @@ struct
 	char *nicks;
 } opts;
 
-extern int numfds;
-
 struct termios oterm, nterm;
-struct pollfd fds[MAXSERVERS + 1] = {{0}};
 
 int
 main(int argc, char **argv)
@@ -203,12 +199,6 @@ startup(void)
 {
 	setbuf(stdout, NULL);
 
-	/* Initialize the fds for polling */
-	int i;
-	fds[0].fd = 0; /* stdin */
-	for (i = 0; i < MAXSERVERS + 1; i++)
-		fds[i].events = POLLIN;
-
 	/* Set terminal to raw mode */
 	tcgetattr(0, &oterm);
 	memcpy(&nterm, &oterm, sizeof(struct termios));
@@ -236,7 +226,7 @@ startup(void)
 	atexit(cleanup);
 
 	if (config.auto_connect)
-		con_server(config.auto_connect, config.auto_port);
+		server_connect(config.auto_connect, config.auto_port);
 }
 
 void
@@ -260,41 +250,30 @@ void
 main_loop(void)
 {
 	char buff[BUFFSIZE];
-	int i, ret, count = 0, time = 200;
+	int count = 0, time = 200;
+
+	struct pollfd poll_stdin[] = {{ .fd = STDIN_FILENO, .events = POLLIN }};
 
 	while (1) {
 
-		ret = poll(fds, numfds, time);
-
-		/* Poll timeout */
-		if (ret == 0) {
+		/* TODO: move this to input.c -> check_inputs(), select/pselect */
+		/* TODO: the input 200ms wait is causing server input to be delayed */
+		if (!poll(poll_stdin, 1, time)) {
 			if (count) {
 				buff[count] = '\0'; /* FIXME, temporary fix */
 				inputc(buff, count);
 				count = 0;
 			}
 			time = 200;
-		/* Check input on stdin */
-		} else if (fds[0].revents & POLLIN) {
+		} else if (poll_stdin[0].revents & POLLIN) {
 			count = read(0, buff, BUFFSIZE);
 			time = 0;
-		/* Check all open server sockets */
-		} else {
-			for (i = 1; i < numfds; i++) {
-				if (fds[i].revents & POLLIN) {
-					if ((count = read(fds[i].fd, buff, BUFFSIZE)) <= 0)
-						con_lost(fds[i].fd);
-					else
-						recv_mesg(buff, count, fds[i].fd);
-					time = count = 0;
-				}
-			}
 		}
 
-		/* Check the progress of connecting threads */
-		connection_progress();
+		/* For each server, check connection status, and input */
+		check_servers();
 
-		/* Skip if no draw bits set */
-		if (draw) redraw();
+		/* Redraw the ui (skipped if nothing has changed) */
+		redraw();
 	}
 }

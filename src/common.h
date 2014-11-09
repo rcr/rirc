@@ -2,6 +2,7 @@
 
 #define SCROLLBACK_BUFFER 200
 #define SCROLLBACK_INPUT 15
+/* TODO: removing this limit, switching to linked list of servers */
 #define MAXSERVERS 10
 #define BUFFSIZE 512
 #define MAXINPUT 200
@@ -145,6 +146,7 @@ typedef struct server
 	int soc;
 	int usermode;
 	struct channel *channel;
+	void *connecting;
 } server;
 
 /* Parsed IRC message */
@@ -163,7 +165,8 @@ channel *ccur;
 channel *cfirst;
 
 /* net.c */
-void connection_progress(void);
+void check_servers(void);
+void server_connect(char*, char*);
 channel* new_channel(char*, server*);
 void free_channel(channel*);
 void con_lost(int);
@@ -171,7 +174,6 @@ void con_server(char*, char*);
 void channel_switch(int);
 void channel_close(void);
 void send_mesg(char*);
-void recv_mesg(char*, int, int);
 void newline(channel*, line_t, char*, char*, int);
 void newlinef(channel*, line_t, char*, char*, ...);
 
