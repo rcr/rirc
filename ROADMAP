@@ -1,0 +1,70 @@
+TODO (in no particular order):
+---------------------------
+/TOPIC [message]
+	set/get channel topic
+
+/HELP [type]
+	show available commands.
+	if [type] is given, show more specific help
+
+/CLEAR, ctrl+l
+	clear the current channel buffer
+
+/NICKS
+	print the current nicks to the channel
+
+/NOTICE
+
+CTCP (at a minimum):
+	CLIENTINFO, TIME, PING
+
+Channel buffer scrollback. Probably requires rewrite of buffer
+drawing logic.
+
+Input tab complete.
+	For commands if input[0] == '/'
+	For nicks (in order of last spoken in channel?)
+
+A whole bunch of numeric replies. Implementing them as I encounter them.
+
+Make sure all the thread related code is using thread-safe functions,
+and that proper cancellation points are used. Make sure no resources
+can be left hanging (eg: sockets left open when a thread is canceled?)
+
+Reconnection routine for non-explicit disconnect. Exponential backoff
+for repeated attempts, with some maximum number of tries.
+
+A configuration file and parser
+
+'Parted' flag for channels. Cant send to parted buffers. '/join'
+on a parted buffer to rejoin it.
+
+Investigate SIGIO as alternative to server socket polling loop
+
+Parsing 004/005 numeric for server specific configuration
+
+buffer logging
+
+Nickserv stuff
+
+
+FIXME:
+---------------------------
+Moving from static buffer of server pointers to a linked list.
+	removing server limit, static references to servers or their fds
+
+numeric 004, the trailing is null on some servers... is it null on freenode?
+	<server info> ~ (null)    as oppose to   "is supported by this server"
+	maybe a blanket thing that checks if trailing is null and doesnt print it
+
+emotes are being received as privmesgs and opening their own channel lol
+
+channel name case issues. eg: /join #aBc. Replies refer to #abc
+
+
+MAYBE (Probably never):
+---------------------------
+Client/daemon mode:
+	with -d, --daemon mode, rirc stays open in the background
+	when the user closes the client. draw()s are ignored, etc.
+	when a client connects to the daemon, send SIGWINCH, open pipes, etc
