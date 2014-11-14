@@ -52,7 +52,9 @@
  * TODO: 402, no such server
  * TODO: 435, cannot change nickname while banned
  *            (eg unregistered in channel and trying to /nick)
- * TODO: 403, :no such channel */
+ * TODO: 403, :no such channel
+ * TODO: 451, :Connection not registered
+ *            (eg sending a join before registering) */
 
 #define IS_ME(X) !strcmp(X, s[rplsoc]->nick_me)
 
@@ -269,6 +271,7 @@ check_servers(void)
 				newline(servers[i]->channel, 0, "-!!-", ct->error, 0);
 				free_connection_info(ct);
 				servers[i]->connecting = NULL;
+				continue;
 			}
 
 			if (ct->socket >= 0) {
@@ -371,8 +374,8 @@ server_disconnected(server *s)
 void
 newline(channel *c, line_t type, char *from, char *mesg, int len)
 {
-	time_t raw_t;
-	struct tm *t;
+	static time_t raw_t;
+	static struct tm *t;
 
 	if (len == 0)
 		len = strlen(mesg);
@@ -457,7 +460,7 @@ get_auto_nick(char **autonick, char *nick)
 	if (*p == '\0') {
 		/* Autonicks exhausted, generate a random nick */
 		char *base = "rirc_";
-		char *cset = "0123456789";
+		char *cset = "0123456789ABCDEF";
 
 		strcpy(nick, base);
 		nick += strlen(base);
@@ -509,6 +512,7 @@ new_channel(char *name, server *server)
 		fatal("new_channel");
 
 	c->type = '\0';
+	c->parted = 0;
 	c->nick_pad = 0;
 	c->chanmode = 0;
 	c->nick_count = 0;
@@ -596,7 +600,10 @@ get_channel(char *chan)
 void
 channel_close(void)
 {
+	/* Closing a server buffer */
 	if (!ccur->type) {
+		/* TODO: Confirm closing a server? */
+		/* TODO: Kill and free the server */
 		server_disconnect(ccur->server);
 	} else {
 		channel *c = ccur;
@@ -698,7 +705,9 @@ send_default(char *mesg)
 	if (!ccur->type)
 		newline(ccur, 0, "-!!-", "This is not a channel!", 0);
 	else if (ccur->server->soc < 0)
-		newline(ccur, 0, "-!!-", "Disconnected from server", 0);
+		newline(ccur, 0, "-!!-", "Not connected to server", 0);
+	else if (ccur->parted)
+		newline(ccur, 0, "-!!-", "Parted from channel", 0);
 	else {
 		newline(ccur, 0, ccur->server->nick_me, mesg, 0);
 		sendf(ccur->server->soc, "PRIVMSG %s :%s\r\n", ccur->name, mesg);
@@ -711,7 +720,9 @@ send_emote(char *ptr)
 	if (!ccur->type)
 		newline(ccur, 0, "-!!-", "This is not a channel!", 0);
 	else if (ccur->server->soc < 0)
-		newline(ccur, 0, "-!!-", "Disconnected from server", 0);
+		newline(ccur, 0, "-!!-", "Not connected to server", 0);
+	else if (ccur->parted)
+		newline(ccur, 0, "-!!-", "Parted from channel", 0);
 	else {
 		newlinef(ccur, LINE_ACTION, "*", "%s %s", ccur->server->nick_me, ptr);
 		sendf(ccur->server->soc,
@@ -719,13 +730,17 @@ send_emote(char *ptr)
 	}
 }
 
+/* TODO: if get_channel ccur = channel and draw */
+/* FIXME: dont attempt re-join on private chat buffers */
 void
 send_join(char *ptr)
 {
 	if (ccur == rirc)
 		newline(ccur, 0, "-!!-", "Cannot execute 'join' on main buffer", 0);
 	else if (ccur->server->soc < 0)
-		newline(ccur, 0, "-!!-", "Disconnected from server", 0);
+		newline(ccur, 0, "-!!-", "Not connected to server", 0);
+	else if (!strtok(ptr, " ") && ccur->parted)
+		sendf(ccur->server->soc, "JOIN %s\r\n", ccur->name);
 	else
 		sendf(ccur->server->soc, "JOIN %s\r\n", ptr);
 }
@@ -736,28 +751,30 @@ send_nick(char *ptr)
 	if (ccur == rirc)
 		newline(ccur, 0, "-!!-", "Cannot execute 'nick' on main buffer", 0);
 	else if (ccur->server->soc < 0)
-		newline(ccur, 0, "-!!-", "Disconnected from server", 0);
+		newline(ccur, 0, "-!!-", "Not connected to server", 0);
 	else
 		sendf(ccur->server->soc, "NICK %s\r\n", ptr);
 }
 
+/* FIXME: dont part private chats buffers */
 void
 send_part(char *ptr)
 {
-	/* TODO: part message from ptr */
-
 	if (!ccur->type)
 		newline(ccur, 0, "-!!-", "This is not a channel!", 0);
 	else if (ccur->server->soc < 0)
-		newline(ccur, 0, "-!!-", "Disconnected from server", 0);
+		newline(ccur, 0, "-!!-", "Not connected to server", 0);
+	else if (ccur->parted)
+		newline(ccur, 0, "-!!-", "Parted from channel", 0);
 	else {
-		/* TODO: this should set a 'parted' flag for this channel.
-		 * Users should be able to send to a parted channel.
-		 * '/join' with no argument should attemp to rejoin this channel
-		 * if parted. recv_join should look for open channels with that name
-		 * before opening a new one */
-		newline(ccur, 0, "--", "(disconnected)", 0);
-		sendf(ccur->server->soc, "PART %s\r\n", ccur->name);
+
+		ccur->parted = 1;
+		newlinef(ccur, LINE_PART, "<", "Leaving %s", ccur->name);
+
+		if (strtok(ptr, ":"))
+			sendf(ccur->server->soc, "PART %s :%s\r\n", ccur->name, ptr);
+		else
+			sendf(ccur->server->soc, "PART %s\r\n", ccur->name);
 	}
 }
 
@@ -767,25 +784,23 @@ send_priv(char *ptr)
 	char *targ;
 	channel *c;
 
-	if (ccur == rirc) {
+	if (ccur == rirc)
 		newline(ccur, 0, "-!!-", "Cannot send messages on main buffer", 0);
-		return;
-	} else if (!(targ = getarg(&ptr, 1))) {
+	else if (ccur->server->soc < 0)
+		newline(ccur, 0, "-!!-", "Not connected to server", 0);
+	else if (!(targ = getarg(&ptr, 1)))
 		newline(ccur, 0, "-!!-", "Private messages require a target", 0);
-		return;
-	} else if (*ptr == '\0') {
+	else if (*ptr == '\0')
 		newline(ccur, 0, "-!!-", "Private message was null", 0);
-		return;
+	else {
+		if ((c = get_channel(targ)))
+			newline(c, 0, ccur->server->nick_me, ptr, 0);
+		/* else: */
+		/* TODO: either open a new channel or print it to ccur with some
+		 * indication that its a send privmesg */
+
+		sendf(ccur->server->soc, "PRIVMSG %s :%s\r\n", targ, ptr);
 	}
-
-	if ((c = get_channel(targ)))
-		newline(c, 0, ccur->server->nick_me, ptr, 0);
-	/* else: */
-		/* TODO: should a new channel be created as soon as I send this?
-		 * or should it be printed to ccur with a markup to denote its
-		 * being sent to a new channel? */
-
-	sendf(c->server->soc, "PRIVMSG %s :%s\r\n", targ, ptr);
 }
 
 void
@@ -820,7 +835,7 @@ send_version(char *ptr)
 	char *targ;
 
 	if (ccur == rirc) {
-		newline(ccur, 0, "--", "rirc version " VERSION, 0);
+		newline(ccur, 0, "--", "rirc version "VERSION, 0);
 		newline(ccur, 0, "--", "http://rcr.io/rirc.html", 0);
 	} else if ((targ = getarg(&ptr, 1))) {
 		newlinef(ccur, 0, "--", "Sending CTCP VERSION request to %s", targ);
@@ -940,7 +955,7 @@ recv_ctcp_req(parsed_mesg *p)
 			c = s[rplsoc]->channel;
 
 		newlinef(c, 0, "--", "Received CTCP VERSION from %s", p->from);
-		sendf(rplsoc, "NOTICE %s :\x01""VERSION rirc version %s\x01""\r\n", p->from, VERSION);
+		sendf(rplsoc, "NOTICE %s :\x01""VERSION rirc version "VERSION"\x01""\r\n", p->from);
 		sendf(rplsoc, "NOTICE %s :\x01""VERSION http://rcr.io/rirc.html\x01""\r\n", p->from);
 		return NULL;
 	}
@@ -982,7 +997,12 @@ recv_join(parsed_mesg *p)
 		return "JOIN: channel is null";
 
 	if (IS_ME(p->from)) {
-		ccur = new_channel(chan, s[rplsoc]);
+		if ((c = get_channel(chan)) == NULL)
+			ccur = new_channel(chan, s[rplsoc]);
+		else {
+			c->parted = 0;
+			newlinef(c, LINE_JOIN, ">", "You have rejoined %s", chan);
+		}
 		draw(D_FULL);
 	} else {
 
@@ -1248,10 +1268,19 @@ recv_numeric(parsed_mesg *p)
 		/* Reset list of auto nicks */
 		s[rplsoc]->nptr = config.nicks;
 
-		/* Only send the autojoin on command-line connect */
 		if (config.auto_join) {
+			/* Only send the autojoin on command-line connect */
 			sendf(rplsoc, "JOIN %s\r\n", config.auto_join);
 			config.auto_join = NULL;
+		} else {
+			/* If reconnecting to server, join any non-parted channels */
+			c = cfirst;
+			do {
+				/* FIXME: dont rejoin private chat channels... */
+				if (c->type && c->server == s[rplsoc] && !c->parted)
+					sendf(rplsoc, "JOIN %s\r\n", c->name);
+				c = c->next;
+			} while (c != cfirst);
 		}
 
 		newline(0, LINE_NUMRPL, "--", p->trailing, 0);
@@ -1376,11 +1405,11 @@ num_200:
 		return NULL;
 
 
-	case RPL_LUSERME:       /* 255 :I have <int> clients and <int> servers */
-	case RPL_LOCALUSERS:    /* 265 <int> <int> :Local users <int>, max <int> */
-	case RPL_GLOBALUSERS:   /* 266 <int> <int> :Global users <int>, max <int> */
-	case RPL_MOTD:          /* 372 : - <Message> */
-	case RPL_MOTDSTART:     /* 375 :<server> Message of the day */
+	case RPL_LUSERME:      /* 255 :I have <int> clients and <int> servers */
+	case RPL_LOCALUSERS:   /* 265 <int> <int> :Local users <int>, max <int> */
+	case RPL_GLOBALUSERS:  /* 266 <int> <int> :Global users <int>, max <int> */
+	case RPL_MOTD:         /* 372 : - <Message> */
+	case RPL_MOTDSTART:    /* 375 :<server> Message of the day */
 
 		newline(0, LINE_NUMRPL, "--", p->trailing, 0);
 		return NULL;

@@ -125,6 +125,7 @@ typedef struct channel
 	int chanmode;
 	int nick_pad;
 	int nick_count;
+	int parted;
 	struct channel *next;
 	struct channel *prev;
 	struct line *cur_line;

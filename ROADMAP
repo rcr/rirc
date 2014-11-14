@@ -36,9 +36,6 @@ for repeated attempts, with some maximum number of tries.
 
 A configuration file and parser
 
-'Parted' flag for channels. Cant send to parted buffers. '/join'
-on a parted buffer to rejoin it.
-
 Investigate SIGIO as alternative to server socket polling loop
 
 Parsing 004/005 numeric for server specific configuration

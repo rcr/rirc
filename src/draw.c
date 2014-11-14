@@ -70,6 +70,7 @@ redraw(void)
 	draw = 0;
 }
 
+/* TODO (Disconnected) and (Parted) on the status bar */
 /* Statusbar:
  *
  * server / private chat:
