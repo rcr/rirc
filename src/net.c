@@ -128,9 +128,35 @@ server_connect(char *host, char *port)
 		return;
 	}
 
-	/* TODO: check for existing server mathing host:port
-	 * before creating a new one */
-	server *s = new_server(host, port);
+	/* TODO: cleanup */
+	server *s = NULL;
+	channel *c = cfirst;
+
+	/* If connecting to an existing buffer.
+	 * We know all server buffers are before any channel buffers */
+	do {
+		if (cfirst == rirc || c->type)
+			break;
+
+		if (!strcmp(c->server->host, host) && !strcmp(c->server->port, port)) {
+			s = c->server;
+
+			if (s->soc >= 0) {
+				newlinef(s->channel, 0, "-!!-",
+						"Already connected to %s:%s", host, port);
+				return;
+			}
+
+			break;
+		}
+		c = c->next;
+	} while (c != cfirst);
+
+	if (s == NULL)
+		s = new_server(host, port);
+
+	/* TODO: set ccur = either the new server channel,
+	 * or the existing found server channel */
 
 	if ((ct = malloc(sizeof(connection_thread))) == NULL)
 		fatal("server_connect - malloc");
@@ -348,16 +374,37 @@ server_disconnect(server *s)
 
 		/* TODO
 		 *	set server/user/channel modes to 0?
+		 *
 		 *	reset nick_ptr? or is that done elsewhere
+		 *	reset my own nick? is that also done elsewhere?
+		 *
+		 *	reset nick_count for all channels
+		 *	free the nicklists for all channels.
+		 *		Make sure that on rejoin the nicklists are re-initiated
+		 *
 		 *	etc
 		 * */
+	} else {
+		; /* TODO: dont disconnect from already disconnected server message? */
 	}
 }
 
 static void
 server_disconnected(server *s)
 {
-	;
+	/* FIXME: testing */
+	channel *c = cfirst;
+
+	do {
+		if (c->server == s)
+			newline(c, 0, "-!!-", "(disconnected)", 0);
+		c = c->next;
+	} while (c != cfirst);
+
+	close(s->soc);
+
+	s->soc = -1;
+
 	/* TODO: remote connection closed/lost.
 	 * Similar to server_disconnect, but:
 	 *	dont send a quit message
@@ -680,20 +727,21 @@ send_mesg(char *mesg)
 void
 send_connect(char *ptr)
 {
+	/* Accepts null || <host> || <host:port> || <hostport> */
 	char *host, *port;
 
-	/* Accept <host> || <host:port> || <hostport> */
-	if (!(host= strtok(ptr, " :"))) {
+	if (!(host = strtok(ptr, " :"))) {
 
-		/* TODO: if current server is disconnected, attempt to reconnect
-		 * if no arguments are given*/
+		if (ccur->server->soc >= 0 || ccur->server->connecting) {
+			newline(ccur, 0, "-!!-", "Connect requires a hostname argument", 0);
+			return;
+		}
 
-		newline(ccur, 0, "-!!-", "connect requires a hostname argument", 0);
-		return;
-	}
+		/* If no hostname arg and server is diconnected, attempt to reconnect */
+		host = ccur->server->host;
+		port = ccur->server->port;
 
-	/* Check for port */
-	if (!(port = strtok(NULL, " ")))
+	} else if (!(port = strtok(NULL, " ")))
 		port = "6667";
 
 	server_connect(host, port);
