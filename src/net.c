@@ -56,30 +56,30 @@
  * TODO: 451, :Connection not registered
  *            (eg sending a join before registering) */
 
-#define IS_ME(X) !strcmp(X, s[rplsoc]->nick_me)
+#define IS_ME(X) !strcmp(X, s->nick_me)
 
 /* Connection thread info */
 typedef struct connection_thread {
 	int socket;
-	char *error;   /* Thread's error message */
-	char *ipstr;   /* IPv4/6 address string */
+	char *error;  /* Thread's error message */
+	char *ipstr;  /* IPv4/6 address string */
 	struct server *server;
 	pthread_t tid;
 } connection_thread;
 
 /* Message receiving handlers */
-char* recv_ctcp_req(parsed_mesg*);
+char* recv_ctcp_req(parsed_mesg*, server*);
 char* recv_ctcp_rpl(parsed_mesg*);
 char* recv_error(parsed_mesg*);
-char* recv_join(parsed_mesg*);
-char* recv_mode(parsed_mesg*);
-char* recv_nick(parsed_mesg*);
-char* recv_notice(parsed_mesg*);
-char* recv_numeric(parsed_mesg*);
-char* recv_part(parsed_mesg*);
-char* recv_ping(parsed_mesg*);
-char* recv_priv(parsed_mesg*);
-char* recv_quit(parsed_mesg*);
+char* recv_join(parsed_mesg*, server*);
+char* recv_mode(parsed_mesg*, server*);
+char* recv_nick(parsed_mesg*, server*);
+char* recv_notice(parsed_mesg*, server*);
+char* recv_numeric(parsed_mesg*, server*);
+char* recv_part(parsed_mesg*, server*);
+char* recv_ping(parsed_mesg*, server*);
+char* recv_priv(parsed_mesg*, server*);
+char* recv_quit(parsed_mesg*, server*);
 
 /* Message sending handlers */
 void send_connect(char*);
@@ -93,17 +93,12 @@ void send_raw(char*);
 void send_quit(char*);
 void send_version(char*);
 
-channel* get_channel(char*);
+channel* get_channel(char*, server*);
 server* new_server(char*, char*);
-void free_server(server *s);
+void free_server(server*);
 void get_auto_nick(char**, char*);
-void sendf(int, const char*, ...);
 void recv_mesg(char*, int, server*);
-
-/* TODO: remove these.. useless global state,
- * pass server* to recv handlers */
-int rplsoc = 0;
-server *s[MAXSERVERS + 3];
+void sendf(int, const char*, ...);
 
 int numservers;
 static struct pollfd pollfds[MAXSERVERS];
@@ -291,7 +286,7 @@ check_servers(void)
 	for (i = 0; i < numservers; i++) {
 		if (servers[i]->connecting) {
 
-			connection_thread *ct = (connection_thread*) servers[i]->connecting;
+			connection_thread *ct = (connection_thread*)servers[i]->connecting;
 
 			if (ct->error) {
 				newline(servers[i]->channel, 0, "-!!-", ct->error, 0);
@@ -319,14 +314,11 @@ check_servers(void)
 	if (poll(pollfds, numservers, 0)) {
 		for (i = 0; i < numservers; i++) {
 			if (pollfds[i].revents & POLLIN) {
+				/* FIXME: <= 0??? not just 0 or <0?  */
 				if ((count = read(pollfds[i].fd, buff, BUFFSIZE)) <= 0)
 					server_disconnected(servers[i]);
-				else {
-					/* FIXME: temp. removing rplsoc next */
-					s[servers[i]->soc] = servers[i];
-
+				else
 					recv_mesg(buff, count, servers[i]);
-				}
 
 				count = 0;
 			}
@@ -426,17 +418,6 @@ newline(channel *c, line_t type, char *from, char *mesg, int len)
 
 	if (len == 0)
 		len = strlen(mesg);
-
-	if (c == 0) {
-		if (cfirst == rirc)
-			c = rirc;
-		else
-			/* FIXME: with the new servers[] buffer, wrong,
-			 * might not even be possible to use this distinction
-			 * anymore. probably for the best */
-			/* XXX: maybe newline with no channel shouldnt be possible... */
-			c = s[rplsoc]->channel;
-	}
 
 	line *l = c->cur_line++;
 
@@ -631,12 +612,12 @@ free_channel(channel *c)
 }
 
 channel*
-get_channel(char *chan)
+get_channel(char *chan, server *s)
 {
 	channel *c = cfirst;
 
 	do {
-		if (!strcmp(c->name, chan) && c->server->soc == rplsoc)
+		if (!strcmp(c->name, chan) && c->server == s)
 			return c;
 		c = c->next;
 	} while (c != cfirst);
@@ -841,7 +822,7 @@ send_priv(char *ptr)
 	else if (*ptr == '\0')
 		newline(ccur, 0, "-!!-", "Private message was null", 0);
 	else {
-		if ((c = get_channel(targ)))
+		if ((c = get_channel(targ, ccur->server)))
 			newline(c, 0, ccur->server->nick_me, ptr, 0);
 		/* else: */
 		/* TODO: either open a new channel or print it to ccur with some
@@ -908,38 +889,36 @@ recv_mesg(char *inp, int count, server *s)
 
 			*ptr = '\0';
 
-			rplsoc = s->soc;
-
 			parsed_mesg *p;
 
 			char *err = NULL;
 			if (!(p = parse(s->input)))
 				err = "Failed to parse message";
 			else if (isdigit(*p->command))
-				err = recv_numeric(p);
+				err = recv_numeric(p, s);
 			else if (!strcmp(p->command, "PRIVMSG"))
-				err = recv_priv(p);
+				err = recv_priv(p, s);
 			else if (!strcmp(p->command, "JOIN"))
-				err = recv_join(p);
+				err = recv_join(p, s);
 			else if (!strcmp(p->command, "PART"))
-				err = recv_part(p);
+				err = recv_part(p, s);
 			else if (!strcmp(p->command, "QUIT"))
-				err = recv_quit(p);
+				err = recv_quit(p, s);
 			else if (!strcmp(p->command, "NOTICE"))
-				err = recv_notice(p);
+				err = recv_notice(p, s);
 			else if (!strcmp(p->command, "NICK"))
-				err = recv_nick(p);
+				err = recv_nick(p, s);
 			else if (!strcmp(p->command, "PING"))
-				err = recv_ping(p);
+				err = recv_ping(p, s);
 			else if (!strcmp(p->command, "MODE"))
-				err = recv_mode(p);
+				err = recv_mode(p, s);
 			else if (!strcmp(p->command, "ERROR"))
 				err = recv_error(p);
 			else
 				err = errf("Message type '%s' unknown", p->command);
 
 			if (err)
-				newline(0, 0, "-!!-", err, 0);
+				newline(s->channel, 0, "-!!-", err, 0);
 
 			ptr = s->input;
 
@@ -954,7 +933,7 @@ recv_mesg(char *inp, int count, server *s)
 }
 
 char*
-recv_ctcp_req(parsed_mesg *p)
+recv_ctcp_req(parsed_mesg *p, server *s)
 {
 	/* CTCP Requests:
 	 * PRIVMSG <target> :0x01<command> <arguments>0x01 */
@@ -988,8 +967,8 @@ recv_ctcp_req(parsed_mesg *p)
 		/* FIXME: wrong??? shouldnt this be p->from?
 		 * it should be from the message target... */
 		/* FIXME: right now this opens a new private chat channel */
-		if ((c = get_channel(p->from)) == NULL) {
-			c = new_channel(p->from, s[rplsoc]);
+		if ((c = get_channel(p->from, s)) == NULL) {
+			c = new_channel(p->from, s);
 			c->type = 'p';
 		}
 
@@ -999,16 +978,16 @@ recv_ctcp_req(parsed_mesg *p)
 
 	if (!strcmp(cmd, "VERSION")) {
 
-		if ((c = get_channel(p->from)) == NULL)
-			c = s[rplsoc]->channel;
+		if ((c = get_channel(p->from, s)) == NULL)
+			c = s->channel;
 
 		newlinef(c, 0, "--", "Received CTCP VERSION from %s", p->from);
-		sendf(rplsoc, "NOTICE %s :\x01""VERSION rirc version "VERSION"\x01""\r\n", p->from);
-		sendf(rplsoc, "NOTICE %s :\x01""VERSION http://rcr.io/rirc.html\x01""\r\n", p->from);
+		sendf(s->soc, "NOTICE %s :\x01""VERSION rirc version "VERSION"\x01""\r\n", p->from);
+		sendf(s->soc, "NOTICE %s :\x01""VERSION http://rcr.io/rirc.html\x01""\r\n", p->from);
 		return NULL;
 	}
 
-	sendf(rplsoc, "NOTICE %s :\x01""ERRMSG %s\x01""\r\n", p->from, cmd);
+	sendf(s->soc, "NOTICE %s :\x01""ERRMSG %s\x01""\r\n", p->from, cmd);
 	return errf("CTCP: unknown command '%s'", cmd);
 }
 
@@ -1030,7 +1009,7 @@ recv_error(parsed_mesg *p)
 }
 
 char*
-recv_join(parsed_mesg *p)
+recv_join(parsed_mesg *p, server *s)
 {
 	/* :nick!user@hostname.domain JOIN [:]<channel> */
 
@@ -1045,8 +1024,8 @@ recv_join(parsed_mesg *p)
 		return "JOIN: channel is null";
 
 	if (IS_ME(p->from)) {
-		if ((c = get_channel(chan)) == NULL)
-			ccur = new_channel(chan, s[rplsoc]);
+		if ((c = get_channel(chan, s)) == NULL)
+			ccur = new_channel(chan, s);
 		else {
 			c->parted = 0;
 			newlinef(c, LINE_JOIN, ">", "You have rejoined %s", chan);
@@ -1054,7 +1033,7 @@ recv_join(parsed_mesg *p)
 		draw(D_FULL);
 	} else {
 
-		if ((c = get_channel(chan)) == NULL)
+		if ((c = get_channel(chan, s)) == NULL)
 			return errf("JOIN: channel '%s' not found", chan);
 
 		if (nicklist_insert(&(c->nicklist), p->from)) {
@@ -1073,7 +1052,7 @@ recv_join(parsed_mesg *p)
 }
 
 char*
-recv_mode(parsed_mesg *p)
+recv_mode(parsed_mesg *p, server *s)
 {
 	/* :nick MODE <targ> :<flags> */
 
@@ -1089,7 +1068,7 @@ recv_mode(parsed_mesg *p)
 	char plusminus = '\0';
 
 	channel *c;
-	if ((c = get_channel(targ))) {
+	if ((c = get_channel(targ, s))) {
 
 		newlinef(c, 0, "--", "%s chanmode: [%s]", targ, flags);
 
@@ -1156,7 +1135,7 @@ recv_mode(parsed_mesg *p)
 						break;
 					default:
 						modebit = 0;
-						newlinef(0, 0, "-!!-", "Unknown mode '%c'", *flags);
+						newlinef(s->channel, 0, "-!!-", "Unknown mode '%c'", *flags);
 				}
 				if (modebit) {
 					if (plusminus == '+')
@@ -1170,9 +1149,9 @@ recv_mode(parsed_mesg *p)
 
 	if (IS_ME(targ)) {
 
-		newlinef(0, 0, "--", "%s usermode: [%s]", targ, flags);
+		newlinef(s->channel, 0, "--", "%s usermode: [%s]", targ, flags);
 
-		int *usermode = &s[rplsoc]->usermode;
+		int *usermode = &s->usermode;
 
 		/* Usermodes */
 		do {
@@ -1205,7 +1184,7 @@ recv_mode(parsed_mesg *p)
 						break;
 					default:
 						modebit = 0;
-						newlinef(0, 0, "-!!-", "Unknown mode '%c'", *flags);
+						newlinef(s->channel, 0, "-!!-", "Unknown mode '%c'", *flags);
 				}
 				if (modebit) {
 					if (plusminus == '+')
@@ -1223,7 +1202,7 @@ recv_mode(parsed_mesg *p)
 }
 
 char*
-recv_nick(parsed_mesg *p)
+recv_nick(parsed_mesg *p, server *s)
 {
 	/* :nick!user@hostname.domain NICK [:]<new nick> */
 
@@ -1237,14 +1216,14 @@ recv_nick(parsed_mesg *p)
 		return "NICK: new nick is null";
 
 	if (IS_ME(p->from)) {
-		strncpy(s[rplsoc]->nick_me, nick, NICKSIZE-1);
-		newlinef(0, 0, "--", "You are now known as %s", nick);
+		strncpy(s->nick_me, nick, NICKSIZE-1);
+		newlinef(s->channel, 0, "--", "You are now known as %s", nick);
 	}
 
 	channel *c = cfirst;
 
 	do {
-		if (c->server == s[rplsoc] && nicklist_delete(&c->nicklist, p->from)) {
+		if (c->server == s && nicklist_delete(&c->nicklist, p->from)) {
 			nicklist_insert(&c->nicklist, nick);
 			newlinef(c, LINE_NICK, "--", "%s  >>  %s", p->from, nick);
 		}
@@ -1255,7 +1234,7 @@ recv_nick(parsed_mesg *p)
 }
 
 char*
-recv_notice(parsed_mesg *p)
+recv_notice(parsed_mesg *p, server *s)
 {
 	/* :nick.hostname.domain NOTICE <target> :<message> */
 
@@ -1272,16 +1251,16 @@ recv_notice(parsed_mesg *p)
 	if (!(targ = getarg(&p->params, 1)))
 		return "NOTICE: target is null";
 
-	if ((c = get_channel(targ)))
+	if ((c = get_channel(targ, s)))
 		newline(c, 0, 0, p->trailing, 0);
 	else
-		newline(0, 0, 0, p->trailing, 0);
+		newline(s->channel, 0, 0, p->trailing, 0);
 
 	return NULL;
 }
 
 char*
-recv_numeric(parsed_mesg *p)
+recv_numeric(parsed_mesg *p, server *s)
 {
 	/* Numeric types: https://www.alien.net.au/irc/irc2numerics.html */
 
@@ -1314,44 +1293,44 @@ recv_numeric(parsed_mesg *p)
 	case RPL_WELCOME:
 
 		/* Reset list of auto nicks */
-		s[rplsoc]->nptr = config.nicks;
+		s->nptr = config.nicks;
 
 		if (config.auto_join) {
 			/* Only send the autojoin on command-line connect */
-			sendf(rplsoc, "JOIN %s\r\n", config.auto_join);
+			sendf(s->soc, "JOIN %s\r\n", config.auto_join);
 			config.auto_join = NULL;
 		} else {
 			/* If reconnecting to server, join any non-parted channels */
 			c = cfirst;
 			do {
 				/* FIXME: dont rejoin private chat channels... */
-				if (c->type && c->server == s[rplsoc] && !c->parted)
-					sendf(rplsoc, "JOIN %s\r\n", c->name);
+				if (c->type && c->server == s && !c->parted)
+					sendf(s->soc, "JOIN %s\r\n", c->name);
 				c = c->next;
 			} while (c != cfirst);
 		}
 
-		newline(0, LINE_NUMRPL, "--", p->trailing, 0);
+		newline(s->channel, LINE_NUMRPL, "--", p->trailing, 0);
 		return NULL;
 
 
 	case RPL_YOURHOST:  /* 002 <nick> :<Host info, server version, etc> */
 	case RPL_CREATED:   /* 003 <nick> :<Server creation date message> */
 
-		newline(0, LINE_NUMRPL, "--", p->trailing, 0);
+		newline(s->channel, LINE_NUMRPL, "--", p->trailing, 0);
 		return NULL;
 
 
 	case RPL_MYINFO:    /* 004 <nick> <params> :Are supported by this server */
 	case RPL_ISUPPORT:  /* 005 <nick> <params> :Are supported by this server */
 
-		newlinef(0, LINE_NUMRPL, "--", "%s ~ %s", p->params, p->trailing);
+		newlinef(s->channel, LINE_NUMRPL, "--", "%s ~ %s", p->params, p->trailing);
 		return NULL;
 
 
 	default:
 
-		newlinef(0, LINE_NUMRPL, "UNHANDLED", "%d %s :%s", code, p->params, p->trailing);
+		newlinef(s->channel, LINE_NUMRPL, "UNHANDLED", "%d %s :%s", code, p->params, p->trailing);
 		return NULL;
 	}
 
@@ -1366,7 +1345,7 @@ num_200:
 		if (!(chan = getarg(&p->params, 1)))
 			return "RPL_CHANNEL_URL: channel is null";
 
-		if ((c = get_channel(chan)) == NULL)
+		if ((c = get_channel(chan, s)) == NULL)
 			return errf("RPL_CHANNEL_URL: channel '%s' not found", chan);
 
 		newlinef(c, LINE_NUMRPL, "--", "URL for %s is: \"%s\"", chan, p->trailing);
@@ -1379,7 +1358,7 @@ num_200:
 		if (!(chan = getarg(&p->params, 1)))
 			return "RPL_TOPIC: channel is null";
 
-		if ((c = get_channel(chan)) == NULL)
+		if ((c = get_channel(chan, s)) == NULL)
 			return errf("RPL_TOPIC: channel '%s' not found", chan);
 
 		newlinef(c, LINE_NUMRPL, "--", "Topic for %s is \"%s\"", chan, p->trailing);
@@ -1398,7 +1377,7 @@ num_200:
 		if (!(time = getarg(&p->params, 1)))
 			return "RPL_TOPICWHOTIME: time is null";
 
-		if ((c = get_channel(chan)) == NULL)
+		if ((c = get_channel(chan, s)) == NULL)
 			return errf("RPL_TOPICWHOTIME: channel '%s' not found", chan);
 
 		time_t raw_time = atoi(time);
@@ -1418,7 +1397,7 @@ num_200:
 		if (!(chan = getarg(&p->params, 1)))
 			return "RPL_NAMEREPLY: channel is null";
 
-		if ((c = get_channel(chan)) == NULL)
+		if ((c = get_channel(chan, s)) == NULL)
 			return errf("RPL_NAMEREPLY: channel '%s' not found", chan);
 
 		c->type = *type;
@@ -1438,7 +1417,7 @@ num_200:
 	case RPL_STATSCONN:    /* 250 :<Message> */
 	case RPL_LUSERCLIENT:  /* 251 :<Message> */
 
-		newline(0, LINE_NUMRPL, "--", p->trailing, 0);
+		newline(s->channel, LINE_NUMRPL, "--", p->trailing, 0);
 		return NULL;
 
 
@@ -1449,7 +1428,7 @@ num_200:
 		if (!(num = getarg(&p->params, 1)))
 			num = "NULL";
 
-		newlinef(0, LINE_NUMRPL, "--", "%s %s", num, p->trailing);
+		newlinef(s->channel, LINE_NUMRPL, "--", "%s %s", num, p->trailing);
 		return NULL;
 
 
@@ -1459,7 +1438,7 @@ num_200:
 	case RPL_MOTD:         /* 372 : - <Message> */
 	case RPL_MOTDSTART:    /* 375 :<server> Message of the day */
 
-		newline(0, LINE_NUMRPL, "--", p->trailing, 0);
+		newline(s->channel, LINE_NUMRPL, "--", p->trailing, 0);
 		return NULL;
 
 
@@ -1473,7 +1452,7 @@ num_200:
 
 	default:
 
-		newlinef(0, LINE_NUMRPL, "UNHANDLED", "%d %s :%s", code, p->params, p->trailing);
+		newlinef(s->channel, LINE_NUMRPL, "UNHANDLED", "%d %s :%s", code, p->params, p->trailing);
 		return NULL;
 	}
 
@@ -1489,10 +1468,10 @@ num_400:
 
 		channel *c;
 
-		if ((c = get_channel(chan)))
+		if ((c = get_channel(chan, s)))
 			newline(c, LINE_NUMRPL, 0, p->trailing, 0);
 		else
-			newline(0, LINE_NUMRPL, 0, p->trailing, 0);
+			newline(s->channel, LINE_NUMRPL, 0, p->trailing, 0);
 
 		if (p->trailing)
 			newlinef(c, LINE_NUMRPL, "--", "Cannot send to '%s' - %s", chan, p->trailing);
@@ -1505,24 +1484,24 @@ num_400:
 		if (!(nick = getarg(&p->params, 1)))
 			return "ERR_ERRONEUSNICKNAME: nick is null";
 
-		newlinef(0, LINE_NUMRPL, "-!!-", "Erroneous nickname: '%s'", nick);
+		newlinef(s->channel, LINE_NUMRPL, "-!!-", "Erroneous nickname: '%s'", nick);
 		return NULL;
 
 	case ERR_NICKNAMEINUSE:  /* 433 <nick> :Nickname is already in use */
 
-		newlinef(0, LINE_NUMRPL, "-!!-", "Nick '%s' in use", s[rplsoc]->nick_me);
+		newlinef(s->channel, LINE_NUMRPL, "-!!-", "Nick '%s' in use", s->nick_me);
 
-		get_auto_nick(&(s[rplsoc]->nptr), s[rplsoc]->nick_me);
+		get_auto_nick(&(s->nptr), s->nick_me);
 
-		newlinef(0, LINE_NUMRPL, "-!!-", "Trying again with '%s'", s[rplsoc]->nick_me);
+		newlinef(s->channel, LINE_NUMRPL, "-!!-", "Trying again with '%s'", s->nick_me);
 
-		sendf(rplsoc, "NICK %s\r\n", s[rplsoc]->nick_me);
+		sendf(s->soc, "NICK %s\r\n", s->nick_me);
 		return NULL;
 
 
 	default:
 
-		newlinef(0, LINE_NUMRPL, "UNHANDLED", "%d %s :%s", code, p->params, p->trailing);
+		newlinef(s->channel, LINE_NUMRPL, "UNHANDLED", "%d %s :%s", code, p->params, p->trailing);
 		return NULL;
 	}
 
@@ -1530,7 +1509,7 @@ num_400:
 }
 
 char*
-recv_part(parsed_mesg *p)
+recv_part(parsed_mesg *p, server *s)
 {
 	/* :nick!user@hostname.domain PART <channel> [:message] */
 
@@ -1546,7 +1525,7 @@ recv_part(parsed_mesg *p)
 	if (!(targ = getarg(&p->params, 1)))
 		return "PART: target is null";
 
-	if ((c = get_channel(targ)) && nicklist_delete(&c->nicklist, p->from)) {
+	if ((c = get_channel(targ, s)) && nicklist_delete(&c->nicklist, p->from)) {
 		c->nick_count--;
 		if (c->nick_count < config.join_part_quit_threshold) {
 			if (p->trailing)
@@ -1562,20 +1541,20 @@ recv_part(parsed_mesg *p)
 }
 
 char*
-recv_ping(parsed_mesg *p)
+recv_ping(parsed_mesg *p, server *s)
 {
 	/* PING :<server name> */
 
 	if (!p->trailing)
 		return "PING: servername is null";
 
-	sendf(rplsoc, "PONG %s\r\n", p->trailing);
+	sendf(s->soc, "PONG %s\r\n", p->trailing);
 
 	return NULL;
 }
 
 char*
-recv_priv(parsed_mesg *p)
+recv_priv(parsed_mesg *p, server *s)
 {
 	/* :nick!user@hostname.domain PRIVMSG <target> :<message> */
 
@@ -1586,7 +1565,7 @@ recv_priv(parsed_mesg *p)
 
 	/* CTCP request */
 	if (*p->trailing == 0x01)
-		return recv_ctcp_req(p);
+		return recv_ctcp_req(p, s);
 
 	if (!p->from)
 		return "PRIVMSG: sender's nick is null";
@@ -1598,8 +1577,8 @@ recv_priv(parsed_mesg *p)
 
 	if (IS_ME(targ)) {
 
-		if ((c = get_channel(p->from)) == NULL) {
-			c = new_channel(p->from, s[rplsoc]);
+		if ((c = get_channel(p->from, s)) == NULL) {
+			c = new_channel(p->from, s);
 			c->type = 'p';
 		}
 
@@ -1608,10 +1587,10 @@ recv_priv(parsed_mesg *p)
 
 		draw(D_CHANS);
 
-	} else if ((c = get_channel(targ)) == NULL)
+	} else if ((c = get_channel(targ, s)) == NULL)
 		return errf("PRIVMSG: channel '%s' not found", targ);
 
-	if (check_pinged(p->trailing, s[rplsoc]->nick_me)) {
+	if (check_pinged(p->trailing, s->nick_me)) {
 
 		if (c != ccur)
 			c->active = ACTIVITY_PINGED;
@@ -1627,7 +1606,7 @@ recv_priv(parsed_mesg *p)
 }
 
 char*
-recv_quit(parsed_mesg *p)
+recv_quit(parsed_mesg *p, server *s)
 {
 	/* :nick!user@hostname.domain QUIT [:message] */
 
@@ -1637,7 +1616,7 @@ recv_quit(parsed_mesg *p)
 		return "QUIT: sender's nick is null";
 
 	do {
-		if (c->server == s[rplsoc] && nicklist_delete(&c->nicklist, p->from)) {
+		if (c->server == s && nicklist_delete(&c->nicklist, p->from)) {
 			c->nick_count--;
 			if (c->nick_count < config.join_part_quit_threshold) {
 				if (p->trailing)
