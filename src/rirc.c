@@ -187,7 +187,7 @@ configure(void)
 }
 
 void
-signal_sigwinch(int unused)
+signal_sigwinch(int unused __attribute__((unused)))
 {
 	resize();
 	if (signal(SIGWINCH, signal_sigwinch) == SIG_ERR)

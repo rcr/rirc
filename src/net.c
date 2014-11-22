@@ -842,7 +842,7 @@ send_raw(char *ptr)
 }
 
 void
-send_quit(char *ptr)
+send_quit(char *ptr __attribute__((unused)))
 {
 	/* XXX: exit calls cleanup() which frees everything
 	 * and sends a default quit message to each server.
@@ -992,7 +992,7 @@ recv_ctcp_req(parsed_mesg *p, server *s)
 }
 
 char*
-recv_ctcp_rpl(parsed_mesg *p)
+recv_ctcp_rpl(parsed_mesg *p __attribute__((unused)))
 {
 	/* CTCP replies:
 	 * NOTICE <target> :0x01<command> <arguments>0x01 */
@@ -1002,7 +1002,7 @@ recv_ctcp_rpl(parsed_mesg *p)
 }
 
 char*
-recv_error(parsed_mesg *p)
+recv_error(parsed_mesg *p __attribute__((unused)))
 {
 	/* TODO */
 	return NULL;
