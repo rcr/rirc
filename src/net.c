@@ -70,7 +70,7 @@ typedef struct connection_thread {
 /* Message receiving handlers */
 char* recv_ctcp_req(parsed_mesg*, server*);
 char* recv_ctcp_rpl(parsed_mesg*);
-char* recv_error(parsed_mesg*);
+char* recv_error(parsed_mesg*, server*);
 char* recv_join(parsed_mesg*, server*);
 char* recv_mode(parsed_mesg*, server*);
 char* recv_nick(parsed_mesg*, server*);
@@ -913,7 +913,7 @@ recv_mesg(char *inp, int count, server *s)
 			else if (!strcmp(p->command, "MODE"))
 				err = recv_mode(p, s);
 			else if (!strcmp(p->command, "ERROR"))
-				err = recv_error(p);
+				err = recv_error(p, s);
 			else
 				err = errf("Message type '%s' unknown", p->command);
 
@@ -1002,9 +1002,15 @@ recv_ctcp_rpl(parsed_mesg *p __attribute__((unused)))
 }
 
 char*
-recv_error(parsed_mesg *p __attribute__((unused)))
+recv_error(parsed_mesg *p, server *s)
 {
-	/* TODO */
+	/* ERROR :<message> */
+
+	if (p->trailing)
+		newlinef(s->channel, 0, "ERROR", "%s", p->trailing);
+
+	server_disconnect(s);
+
 	return NULL;
 }
 
