@@ -251,7 +251,7 @@ inputc(char *inp, int count)
 		else if (c == 0x0A) /* LF */
 			ready_send();
 		else if (c == 0x18) /* ctrl-x */
-			channel_close();
+			ccur = channel_close(ccur);
 	} else if (count && *inp == 0x1b) { /* escape sequence */
 		inp++;
 		if (!strcmp(inp, "[A"))  /* arrow up */
@@ -265,13 +265,13 @@ inputc(char *inp, int count)
 		else if (!strcmp(inp, "[3~")) /* delete */
 			del_char(0);
 		else if (!strcmp(inp, "[5~")) /* page up */
-			channel_switch(0);
+			ccur = channel_switch(ccur, 0);
 		else if (!strcmp(inp, "[6~")) /* page down */
-			channel_switch(1);
+			ccur = channel_switch(ccur, 1);
 		else if (!strcmp(inp, "[M`")) /* mousewheel up */
-			channel_switch(0); /* TODO: scroll buffer up */
+			ccur = channel_switch(ccur, 0); /* TODO: scroll buffer up */
 		else if (!strcmp(inp, "[Ma")) /* mousewheel down */
-			channel_switch(1); /* TODO: scroll buffer down */
+			ccur = channel_switch(ccur, 1); /* TODO: scroll buffer down */
 	} else {
 		split_paste(inp, count);
 	}

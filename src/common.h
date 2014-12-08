@@ -2,8 +2,6 @@
 
 #define SCROLLBACK_BUFFER 200
 #define SCROLLBACK_INPUT 15
-/* TODO: removing this limit, switching to linked list of servers */
-#define MAXSERVERS 10
 #define BUFFSIZE 512
 #define MAXINPUT 200
 #define NICKSIZE 50 /* TODO */
@@ -147,6 +145,8 @@ typedef struct server
 	int soc;
 	int usermode;
 	struct channel *channel;
+	struct server *next;
+	struct server *prev;
 	void *connecting;
 } server;
 
@@ -163,31 +163,27 @@ typedef struct parsed_mesg
 /* rirc.c */
 channel *rirc;
 channel *ccur;
-channel *cfirst;
 
 /* net.c */
 void check_servers(void);
 void server_connect(char*, char*);
-channel* new_channel(char*, server*);
-void free_channel(channel*);
-void con_lost(int);
-void con_server(char*, char*);
-void channel_switch(int);
-void channel_close(void);
+channel* new_channel(char*, server*, channel*);
+channel* channel_close(channel*);
+channel* channel_switch(channel*, int);
 void send_mesg(char*);
 void newline(channel*, line_t, char*, char*, int);
 void newlinef(channel*, line_t, char*, char*, ...);
 
 /* draw.c */
-void resize(void);
 void redraw(void);
 unsigned int draw;
-#define D_FULL   0xFF
-#define D_CHAT   (1 << 0)
-#define D_CHANS  (1 << 1)
-#define D_INPUT  (1 << 2)
-#define D_STATUS (1 << 3)
 #define draw(X) draw |= X
+#define D_RESIZE (1 << 0)
+#define D_CHAT   (1 << 1)
+#define D_CHANS  (1 << 2)
+#define D_INPUT  (1 << 3)
+#define D_STATUS (1 << 4)
+#define D_FULL ~((draw & 0) | D_RESIZE);
 
 /* input.c */
 int confirm;

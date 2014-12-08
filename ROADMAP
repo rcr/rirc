@@ -47,8 +47,8 @@ Nickserv stuff
 
 FIXME:
 ---------------------------
-Moving from static buffer of server pointers to a linked list.
-	removing server limit, static references to servers or their fds
+when erroneous nickname on connect (eg too long) goes into infinite loop
+for some reason
 
 numeric 004, the trailing is null on some servers... is it null on freenode?
 	<server info> ~ (null)    as oppose to   "is supported by this server"

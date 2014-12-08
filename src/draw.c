@@ -19,15 +19,16 @@
 #define CLEAR_LINE "\x1b[2K"
 #define MOVE(X, Y) "\x1b["#X";"#Y"H"
 
-void draw_chat(void);
-void draw_chans(void);
-void draw_input(void);
-void draw_status(void);
+static void resize(void);
+static void draw_chat(void);
+static void draw_chans(void);
+static void draw_input(void);
+static void draw_status(void);
 
-int nick_col(char*);
-int print_line(int, line*);
-int print_more(char*, char*, int);
-char* word_wrap(char*, char*);
+static int nick_col(char*);
+static int print_line(int, line*);
+static int print_more(char*, char*, int);
+static char* word_wrap(char*, char*);
 
 struct winsize w;
 
@@ -38,6 +39,21 @@ static int nick_cols[] = {1, 2, 3, 4, 5, 6, 7, 8, 9};
 static int actv_cols[ACTIVITY_T_SIZE] = {239, 247, 3};
 
 void
+redraw(void)
+{
+	if (!draw) return;
+
+	if (draw & D_RESIZE) resize();
+
+	if (draw & D_CHAT)   draw_chat();
+	if (draw & D_CHANS)  draw_chans();
+	if (draw & D_INPUT)  draw_input();
+	if (draw & D_STATUS) draw_status();
+
+	draw = 0;
+}
+
+static void
 resize(void)
 {
 	/* Get terminal dimensions */
@@ -57,19 +73,6 @@ resize(void)
 	draw(D_FULL);
 }
 
-void
-redraw(void)
-{
-	if (!draw)
-		return;
-
-	if (draw & D_CHAT)   draw_chat();
-	if (draw & D_CHANS)  draw_chans();
-	if (draw & D_INPUT)  draw_input();
-	if (draw & D_STATUS) draw_status();
-	draw = 0;
-}
-
 /* TODO (Disconnected) and (Parted) on the status bar */
 /* Statusbar:
  *
@@ -79,7 +82,7 @@ redraw(void)
  * channel:
  * --[usermodes]--[chantype chanmodes chancount]---
  * */
-void
+static void
 draw_status(void)
 {
 	printf("\x1b[s"); /* save cursor location */
@@ -126,7 +129,7 @@ draw_status(void)
 	printf("\x1b[u"); /* restore cursor location */
 }
 
-void
+static void
 draw_chans(void)
 {
 	printf("\x1b[s"); /* save cursor location */
@@ -134,7 +137,9 @@ draw_chans(void)
 	printf("\x1b[H\x1b[K");
 
 	int len, width = 0;
-	channel *c = cfirst;
+
+	/* FIXME: temporary fix */
+	channel *c = (ccur == rirc) ? ccur : ccur->server->channel;
 
 	do {
 		len = strlen(c->name);
@@ -147,13 +152,14 @@ draw_chans(void)
 			c = c->next;
 		}
 		else break;
-	} while (c != cfirst);
+	/* FIXME: temporary fix */
+	} while (c != rirc && c != ccur->server->channel);
 
 	/* Restore cursor location */
 	printf("\x1b[u");
 }
 
-int
+static int
 nick_col(char *nick)
 {
 	int col = 0;
@@ -162,7 +168,7 @@ nick_col(char *nick)
 	return nick_cols[col % sizeof(nick_cols)/sizeof(nick_cols[0])];
 }
 
-char*
+static char*
 word_wrap(char *start, char *end)
 {
 	char *wrap;
@@ -185,7 +191,7 @@ word_wrap(char *start, char *end)
 	return NULL;
 }
 
-void
+static void
 draw_chat(void)
 {
 	printf("\x1b[s"); /* save cursor location */
@@ -198,7 +204,7 @@ draw_chat(void)
 	printf("\x1b[u"); /* restore cursor location */
 }
 
-int
+static int
 print_line(int row, line *l)
 {
 	if (l < ccur->chat)
@@ -248,7 +254,7 @@ print_line(int row, line *l)
 	return row + count;
 }
 
-int
+static int
 print_more(char *start, char *end, int row)
 {
 	char *wrap;
@@ -267,7 +273,7 @@ print_more(char *start, char *end, int row)
 	return row - 1;
 }
 
-void
+static void
 draw_input(void)
 {
 	if (confirm) {

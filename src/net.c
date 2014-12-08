@@ -1,4 +1,4 @@
-/* Needed so gcc will use POSIX addrinfo and friends */
+/* For addrinfo, getaddrinfo, getnameinfo */
 #define _POSIX_C_SOURCE 200112L
 
 #include <time.h>
@@ -56,14 +56,17 @@
  * TODO: 451, :Connection not registered
  *            (eg sending a join before registering) */
 
+#define DEFAULT_QUIT_MESG "rirc v" VERSION
+
 #define IS_ME(X) !strcmp(X, s->nick_me)
 
 /* Connection thread info */
 typedef struct connection_thread {
 	int socket;
+	char *host;
+	char *port;
 	char *error;  /* Thread's error message */
 	char *ipstr;  /* IPv4/6 address string */
-	struct server *server;
 	pthread_t tid;
 } connection_thread;
 
@@ -84,84 +87,92 @@ char* recv_quit(parsed_mesg*, server*);
 /* Message sending handlers */
 void send_connect(char*);
 void send_default(char*);
+void send_disconnect(char*);
 void send_emote(char*);
 void send_join(char*);
 void send_nick(char*);
 void send_part(char*);
 void send_priv(char*);
-void send_raw(char*);
 void send_quit(char*);
+void send_raw(char*);
 void send_version(char*);
 
-channel* get_channel(char*, server*);
+channel* channel_get(char*, server*);
 server* new_server(char*, char*);
+void free_channel(channel*);
 void free_server(server*);
 void get_auto_nick(char**, char*);
 void recv_mesg(char*, int, server*);
 void sendf(int, const char*, ...);
 
-int numservers;
-static struct pollfd pollfds[MAXSERVERS];
-static struct server *servers[MAXSERVERS];
-
-static void free_connection_info(connection_thread*);
-
 static void server_connected(server*);
-static void server_disconnect(server*);
-static void server_disconnected(server*);
+static void server_disconnect(server*, char*, char*);
 
 static void* threaded_connect(void*);
-static void* threaded_connect_cleanup(void*);
+static void* threaded_connect_cleanup(void**);
+static void free_connection_info(connection_thread*);
+
+static server *server_head;
+
+/* Doubly linked list macros */
+#define DLL_NEW(L, N) ((L) = (N)->next = (N)->prev = (N))
+
+#define DLL_ADD(L, N) \
+	do { \
+		if ((L) == NULL) \
+			DLL_NEW(L, N); \
+		else { \
+			((L)->next)->prev = (N); \
+			(N)->next = ((L)->next); \
+			(N)->prev = (L); \
+			(L)->next = (N); \
+		} \
+	} while (0)
+
+#define DLL_DEL(L, N) \
+	do { \
+		if (((N)->next) == (N)) \
+			(L) = NULL; \
+		else { \
+			((N)->next)->prev = ((N)->prev); \
+			((N)->prev)->next = ((N)->next); \
+		} \
+	} while (0)
 
 void
 server_connect(char *host, char *port)
 {
 	connection_thread *ct;
+	server *s;
 
-	if (numservers == MAXSERVERS) {
-		newline(ccur, 0, "-!!-", "Error: MAXSERVERS", 0);
+	/* Check if a server matching host:port already exists */
+	if ((s = server_head)) do {
+		if (!strcmp(s->host, host) && !strcmp(s->port, port))
+			break;
+
+		s = s->next;
+	} while (s != server_head || (s = NULL));
+
+	if (s && s->soc >= 0) {
+		newlinef((ccur = s->channel), 0, "-!!-","Already connected to %s:%s", host, port);
+		draw(D_STATUS);
 		return;
 	}
 
-	/* TODO: cleanup */
-	server *s = NULL;
-	channel *c = cfirst;
+	ccur = s ? s->channel : (s = new_server(host, port))->channel;
 
-	/* If connecting to an existing buffer.
-	 * We know all server buffers are before any channel buffers */
-	do {
-		if (cfirst == rirc || c->type)
-			break;
-
-		if (!strcmp(c->server->host, host) && !strcmp(c->server->port, port)) {
-			s = c->server;
-
-			if (s->soc >= 0) {
-				newlinef(s->channel, 0, "-!!-",
-						"Already connected to %s:%s", host, port);
-				return;
-			}
-
-			break;
-		}
-		c = c->next;
-	} while (c != cfirst);
-
-	if (s == NULL)
-		s = new_server(host, port);
-
-	/* TODO: set ccur = either the new server channel,
-	 * or the existing found server channel */
+	DLL_ADD(server_head, s);
 
 	if ((ct = malloc(sizeof(connection_thread))) == NULL)
 		fatal("server_connect - malloc");
 
-	s->connecting = ct;
-
+	ct->socket = -1;
+	ct->host = s->host;
+	ct->port = s->port;
 	ct->error = NULL;
 	ct->ipstr = NULL;
-	ct->socket = -1;
-	ct->server = s;
+
+	s->connecting = ct;
 
 	newlinef(s->channel, 0, "--", "Connecting to '%s' port %s", host, port);
 
@@ -183,10 +194,12 @@ server_connected(server *s)
 
 	s->soc = ct->socket;
 
-	sendf(ct->socket, "NICK %s\r\n", ct->server->nick_me);
-	sendf(ct->socket, "USER %s 8 * :%s\r\n", config.username, config.realname);
+	sendf(s->soc, "NICK %s\r\n", s->nick_me);
+	sendf(s->soc, "USER %s 8 * :%s\r\n", config.username, config.realname);
 }
 
+/* FIXME: there's a potential memory leak here somewhere. I think it's when a thread
+ * fails to connect. */
 static void*
 threaded_connect(void *arg)
 {
@@ -196,7 +209,7 @@ threaded_connect(void *arg)
 	struct addrinfo hints, *p, *servinfo = NULL;
 
 	/* Thread cleanup on error or external thread cancel */
-	pthread_cleanup_push(threaded_connect_cleanup, servinfo);
+	pthread_cleanup_push(threaded_connect_cleanup, &servinfo);
 
 	memset(&hints, 0, sizeof(hints));
 
@@ -207,10 +220,8 @@ threaded_connect(void *arg)
 
 	connection_thread *ct = (connection_thread *)arg;
 
-	server *s = ct->server;
-
 	/* Resolve host */
-	if ((ret = getaddrinfo(s->host, s->port, &hints, &servinfo)) != 0) {
+	if ((ret = getaddrinfo(ct->host, ct->port, &hints, &servinfo)) != 0) {
 		ct->error = strdupf("Error resolving host: %s", gai_strerror(ret));
 		pthread_exit(NULL);
 	}
@@ -249,9 +260,9 @@ threaded_connect(void *arg)
 }
 
 static void*
-threaded_connect_cleanup(void* arg)
+threaded_connect_cleanup(void **arg)
 {
-	struct addrinfo *servinfo = (struct addrinfo *)arg;
+	struct addrinfo *servinfo = (struct addrinfo *)(*arg);
 
 	if (servinfo)
 		freeaddrinfo(servinfo);
@@ -270,77 +281,64 @@ free_connection_info(connection_thread *ct)
 void
 check_servers(void)
 {
-	/* FIXME:
-	 * this whole function is a mess while i rewrite how servers are polled
-	 * to remove server limit restriction and make things more flexible in
-	 * general. Keeping server ordered as global state is becoming messy
-	 * and problematic. Polling servers individually is a slight
-	 * performance hit but cleans things up significantly.
-	 * Once all the connected stuff is proven to work perfectly
-	 * this can be revisited.
-	 * */
+	int ret, count;
 
-	int i, count;
-	char buff[BUFFSIZE];
+	static char recv_buff[BUFFSIZE];
 
-	for (i = 0; i < numservers; i++) {
-		if (servers[i]->connecting) {
+	static struct pollfd pfd[] = {{ .events = POLLIN }};
 
-			connection_thread *ct = (connection_thread*)servers[i]->connecting;
+	server *s = server_head;
+	do {
+		if (s == NULL)
+			return;
 
-			if (ct->error) {
-				newline(servers[i]->channel, 0, "-!!-", ct->error, 0);
-				free_connection_info(ct);
-				servers[i]->connecting = NULL;
-				continue;
-			}
+		pfd[0].fd = s->soc;
 
-			if (ct->socket >= 0) {
-				server_connected(servers[i]);
-				free_connection_info(ct);
-				servers[i]->connecting = NULL;
-			}
-		}
-	}
+		if (s->connecting) {
 
-	/* TODO: iterate over servers and poll individually to eliminate
-	 * the need to keep fds and servers ordered
-	 * temp: repacking FDs on every call */
-	for (i = 0; i < numservers; i++) {
-		pollfds[i].fd = servers[i]->soc;
-		pollfds[i].events = POLLIN;
-	}
+			connection_thread *ct = (connection_thread*)s->connecting;
 
-	if (poll(pollfds, numservers, 0)) {
-		for (i = 0; i < numservers; i++) {
-			if (pollfds[i].revents & POLLIN) {
-				/* FIXME: <= 0??? not just 0 or <0?  */
-				if ((count = read(pollfds[i].fd, buff, BUFFSIZE)) <= 0)
-					server_disconnected(servers[i]);
+			if (ct->error || ct->socket >= 0) {
+
+				if (ct->error)
+					newline(s->channel, 0, "-!!-", ct->error, 0);
 				else
-					recv_mesg(buff, count, servers[i]);
+					server_connected(s);
 
-				count = 0;
+				free_connection_info(ct);
+				s->connecting = NULL;
 			}
+		} else while (s->soc > 0 && (ret = poll(pfd, 1, 0)) > 0) {
+			if ((count = read(s->soc, recv_buff, BUFFSIZE)) < 0)
+				; /* TODO: error in read() */
+			else if (count == 0)
+				server_disconnect(s, "Remote hangup", NULL);
+			else
+				recv_mesg(recv_buff, count, s);
 		}
-	}
+
+		if (ret < 0) {
+			; /* TODO: error in poll() */
+		}
+
+		s = s->next;
+	} while (s != server_head);
 }
 
-/* FIXME: this is an infinite loop when rirc exists because
- * we're not freeing the servers */
 static void
-server_disconnect(server *s)
+server_disconnect(server *s, char *err, char *mesg)
 {
-	/* TODO: make sure thread cancellation closes
-	 * any sockets. See: pthread cancellation points.
-	 * man 7 pthreads */
+	/* When err is not null:
+	 *   Disconnect initiated by remote host
+	 *
+	 * When mesg is not null:
+	 *   Disconnect initiated by user */
+
 	if (s->connecting) {
-		/* Connection thread in progress, cancel the pthread */
-
+		/* TODO: make sure thread cancellation closes
+		 * any sockets. See: pthread cancellation points.
+		 * man 7 pthreads */
 		connection_thread *ct = s->connecting;
-
-		newlinef(s->channel, 0, "--", "Connection to '%s' port %s canceled",
-				s->host, s->port);
 
 		if ((pthread_cancel(ct->tid)))
 			fatal("threaded_connect_cancel - pthread_cancel");
@@ -348,60 +346,40 @@ server_disconnect(server *s)
 		free_connection_info(ct);
 
 		s->connecting = NULL;
-	} else if (s->soc >= 0) {
 
-		channel *c = cfirst;
+		newlinef(s->channel, 0, "--", "Connection to '%s' port %s canceled",
+				s->host, s->port);
 
-		sendf(ccur->server->soc, "QUIT :rirc v"VERSION"\r\n");
+		return;
+	}
 
-		do {
-			if (c->server == s)
-				newline(c, 0, "-!!-", "(disconnected)", 0);
-			c = c->next;
-		} while (c != cfirst);
+	if (s->soc >= 0) {
+
+		if (err)
+			newlinef(s->channel, 0, "ERROR", "%s", err);
+
+		if (mesg)
+			sendf(s->soc, "QUIT :%s\r\n", mesg);
 
 		close(s->soc);
 
+		/* Set all server attributes back to default */
+		s->usermode = 0;
 		s->soc = -1;
 
-		/* TODO
-		 *	set server/user/channel modes to 0?
-		 *
-		 *	reset nick_ptr? or is that done elsewhere
-		 *	reset my own nick? is that also done elsewhere?
-		 *
-		 *	reset nick_count for all channels
-		 *	free the nicklists for all channels.
-		 *		Make sure that on rejoin the nicklists are re-initiated
-		 *
-		 *	etc
-		 * */
-	} else {
-		; /* TODO: dont disconnect from already disconnected server message? */
-	}
-}
-
-static void
-server_disconnected(server *s)
-{
-	/* FIXME: testing */
-	channel *c = cfirst;
-
-	do {
-		if (c->server == s)
+		channel *c = s->channel;
+		do {
 			newline(c, 0, "-!!-", "(disconnected)", 0);
-		c = c->next;
-	} while (c != cfirst);
 
-	close(s->soc);
+			c->chanmode = 0;
+			c->nick_count = 0;
 
-	s->soc = -1;
+			free_nicklist(c->nicklist);
+			c->nicklist = NULL;
 
-	/* TODO: remote connection closed/lost.
-	 * Similar to server_disconnect, but:
-	 *	dont send a quit message
-	 *	print error message
-	 *	we never kill the server in this case */
+			c = c->next;
+		} while (c != s->channel);
+	}
 }
 
 /* FIXME: some clients can actually send a null message.
@@ -413,8 +391,8 @@ server_disconnected(server *s)
 void
 newline(channel *c, line_t type, char *from, char *mesg, int len)
 {
-	static time_t raw_t;
-	static struct tm *t;
+	time_t raw_t;
+	struct tm *t;
 
 	if (len == 0)
 		len = strlen(mesg);
@@ -520,20 +498,16 @@ new_server(char *host, char *port)
 	s->host = strdup(host);
 	s->port = strdup(port);
 	s->connecting = NULL;
+
 	get_auto_nick(&(s->nptr), s->nick_me);
 
-	if (ccur == rirc)
-		ccur = NULL;
-
-	s->channel = new_channel(host, s);
-
-	servers[numservers++] = s;
+	s->channel = ccur = new_channel(host, s, NULL);
 
 	return s;
 }
 
 channel*
-new_channel(char *name, server *server)
+new_channel(char *name, server *server, channel *chanlist)
 {
 	channel *c;
 	if ((c = malloc(sizeof(channel))) == NULL)
@@ -552,20 +526,9 @@ new_channel(char *name, server *server)
 	strncpy(c->name, name, 50);
 	memset(c->chat, 0, sizeof(c->chat));
 
-	if (ccur == NULL) {
-		cfirst = ccur = c;
-		c->prev = c->next = c;
-	} else {
-		/* Skip to end of server channels */
-		while (!ccur->next->type && ccur->next != cfirst)
-			ccur = ccur->next;
-		c->prev = ccur;
-		c->next = ccur->next;
-		ccur->next->prev = c;
-		ccur->next = c;
-	}
+	DLL_ADD(chanlist, c);
 
-	draw(D_CHANS);
+	draw(D_FULL);
 
 	return c;
 }
@@ -573,19 +536,15 @@ new_channel(char *name, server *server)
 void
 free_server(server *s)
 {
-	/* TODO: does this have to check if the server has
-	 * a connection in progress? */
-	int i;
-	for (i = 0; i < numservers; i++)
-		if (s == servers[i])
-			break;
+	/* TODO: s->connecting??? */
+	/* TODO: close the socket? send_quit is expected me to? */
 
-	/* Shuffle the server/socket lists */
-	servers[i] = servers[numservers--];
-
-	/* TODO: free all channels that point to this server */
-	/* TODO: update ccur if applicable */
-	/* TODO: actually call this function when killing a server */
+	channel *t, *c = s->channel;
+	do {
+		t = c;
+		c = c->next;
+		free_channel(t);
+	} while (c != s->channel);
 
 	free(s->host);
 	free(s->port);
@@ -595,67 +554,89 @@ free_server(server *s)
 void
 free_channel(channel *c)
 {
-	/* Remove from linked list */
-	c->next->prev = c->prev;
-	c->prev->next = c->next;
+	line *l;
+	for (l = c->chat; l < c->chat + SCROLLBACK_BUFFER; l++)
+		free(l->text);
 
-	/* Free all chat lines and everything else */
-	line *l = c->chat;
-	line *e = l + SCROLLBACK_BUFFER;
-	while (l->len && l < e)
-		free((l++)->text);
 	free_nicklist(c->nicklist);
 	free_input(c->input);
 	free(c);
-
-	draw(D_CHANS);
 }
 
 channel*
-get_channel(char *chan, server *s)
+channel_get(char *chan, server *s)
 {
-	channel *c = cfirst;
+	channel *c = s->channel;
 
 	do {
-		if (!strcmp(c->name, chan) && c->server == s)
+		if (!strcmp(c->name, chan))
 			return c;
 		c = c->next;
-	} while (c != cfirst);
+	} while (c != s->channel);
 
 	return NULL;
 }
 
-void
-channel_close(void)
+/* Close a channel buffer/server and return the next channel */
+channel*
+channel_close(channel *c)
 {
-	/* Closing a server buffer */
-	if (!ccur->type) {
-		/* TODO: Confirm closing a server? */
-		/* TODO: Kill and free the server */
-		server_disconnect(ccur->server);
+	channel *ret;
+
+	/* c in this case is the main buffer */
+	if (c->server == NULL)
+		return c;
+
+	if (!c->type) {
+
+		/* If closing the last server */
+		if ((ret = c->server->next->channel) == c->server->channel)
+			ret = rirc;
+
+		server_disconnect(c->server, NULL, DEFAULT_QUIT_MESG);
+		DLL_DEL(server_head, c->server);
+		free_server(c->server);
 	} else {
-		channel *c = ccur;
-		sendf(ccur->server->soc, "PART %s\r\n", ccur->name);
-		ccur = (ccur->next == cfirst) ? ccur->prev : ccur->next;
+
+		if (c->server->soc)
+			sendf(c->server->soc, "PART %s\r\n", c->name);
+
+		ret = channel_switch(c, 1);
+		DLL_DEL(c->server->channel, c);
 		free_channel(c);
 	}
 
 	draw(D_FULL);
+
+	return ret;
 }
 
-void
-channel_switch(int next)
+/* Get a channel's next/previous, taking into account server wraparound */
+channel*
+channel_switch(channel *c, int next)
 {
-	if (ccur->next == ccur)
-		return;
-	else if (next)
-		ccur = ccur->next;
-	else
-		ccur = ccur->prev;
+	channel *ret;
 
-	ccur->active = ACTIVITY_DEFAULT;
+	/* c in this case is the main buffer */
+	if (c->server == NULL)
+		return c;
+
+	/* TODO: ex:    server chan1 chan2 chan3    close on chan3 should go back to chan2
+	 * currently it goes to server... Or even the next server's channel??? */
+	if (next)
+		/* If wrapping around forwards, get next server's first channel */
+        ret = !(c->next == c->server->channel) ?
+			c->next : c->server->next->channel;
+	else
+		/* If wrapping around backwards, get previous server's last channel */
+		ret = !(c == c->server->channel) ?
+			c->prev : c->server->prev->channel->prev;
+
+	ret->active = ACTIVITY_DEFAULT;
 
 	draw(D_FULL);
+
+	return ret;
 }
 
 /*
@@ -678,9 +659,9 @@ send_mesg(char *mesg)
 		else if (!strcasecmp(cmd, "CONNECT"))
 			send_connect(mesg);
 		else if (!strcasecmp(cmd, "DISCONNECT"))
-			server_disconnect(ccur->server);
+			send_disconnect(mesg);
 		else if (!strcasecmp(cmd, "CLOSE"))
-			channel_close();
+			ccur = channel_close(ccur);
 		else if (!strcasecmp(cmd, "PART"))
 			send_part(mesg);
 		else if (!strcasecmp(cmd, "NICK"))
@@ -741,6 +722,15 @@ send_default(char *mesg)
 		newline(ccur, 0, ccur->server->nick_me, mesg, 0);
 		sendf(ccur->server->soc, "PRIVMSG %s :%s\r\n", ccur->name, mesg);
 	}
+}
+
+void
+send_disconnect(char *ptr)
+{
+	while (*ptr && *ptr == ' ')
+		ptr++;
+
+	server_disconnect(ccur->server, NULL, (ptr) ? ptr : DEFAULT_QUIT_MESG);
 }
 
 void
@@ -822,7 +812,7 @@ send_priv(char *ptr)
 	else if (*ptr == '\0')
 		newline(ccur, 0, "-!!-", "Private message was null", 0);
 	else {
-		if ((c = get_channel(targ, ccur->server)))
+		if ((c = channel_get(targ, ccur->server)))
 			newline(c, 0, ccur->server->nick_me, ptr, 0);
 		/* else: */
 		/* TODO: either open a new channel or print it to ccur with some
@@ -842,17 +832,32 @@ send_raw(char *ptr)
 }
 
 void
-send_quit(char *ptr __attribute__((unused)))
+send_quit(char *ptr)
 {
-	/* XXX: exit calls cleanup() which frees everything
-	 * and sends a default quit message to each server.
-	 *
-	 * It should be possible to take a message from ptr and
-	 * use that instead of the default quit message. */
+	while (*ptr && *ptr == ' ')
+		ptr++;
+
+	server *s, *t;
+	if ((s = server_head)) do {
+
+		if (s->soc >= 0) {
+			sendf(ccur->server->soc, "QUIT :%s\r\n", (*ptr) ? ptr : DEFAULT_QUIT_MESG);
+			close(s->soc);
+		}
+
+		t = s;
+		s = s->next;
+		free_server(t);
+	} while (s != server_head);
+
+	free_channel(rirc);
 
 	/* /quit is the only time we clear the screen: */
 	/* TODO: there's a simpler form of this that clears the entire screen? */
 	/* Should actually just 'restore screen' to before rirc was invoked */
+
+
+	/* TODO: move this to cleanup? */
 	printf("\x1b[H\x1b[J");
 
 	exit(EXIT_SUCCESS);
@@ -864,7 +869,7 @@ send_version(char *ptr)
 	char *targ;
 
 	if (ccur == rirc) {
-		newline(ccur, 0, "--", "rirc version "VERSION, 0);
+		newline(ccur, 0, "--", "rirc version " VERSION, 0);
 		newline(ccur, 0, "--", "http://rcr.io/rirc.html", 0);
 	} else if ((targ = getarg(&ptr, 1))) {
 		newlinef(ccur, 0, "--", "Sending CTCP VERSION request to %s", targ);
@@ -967,8 +972,8 @@ recv_ctcp_req(parsed_mesg *p, server *s)
 		/* FIXME: wrong??? shouldnt this be p->from?
 		 * it should be from the message target... */
 		/* FIXME: right now this opens a new private chat channel */
-		if ((c = get_channel(p->from, s)) == NULL) {
-			c = new_channel(p->from, s);
+		if ((c = channel_get(p->from, s)) == NULL) {
+			c = new_channel(p->from, s, s->channel);
 			c->type = 'p';
 		}
 
@@ -978,7 +983,7 @@ recv_ctcp_req(parsed_mesg *p, server *s)
 
 	if (!strcmp(cmd, "VERSION")) {
 
-		if ((c = get_channel(p->from, s)) == NULL)
+		if ((c = channel_get(p->from, s)) == NULL)
 			c = s->channel;
 
 		newlinef(c, 0, "--", "Received CTCP VERSION from %s", p->from);
@@ -1006,10 +1011,7 @@ recv_error(parsed_mesg *p, server *s)
 {
 	/* ERROR :<message> */
 
-	if (p->trailing)
-		newlinef(s->channel, 0, "ERROR", "%s", p->trailing);
-
-	server_disconnect(s);
+	server_disconnect(s, p->trailing ? p->trailing : "Remote hangup", NULL);
 
 	return NULL;
 }
@@ -1030,8 +1032,8 @@ recv_join(parsed_mesg *p, server *s)
 		return "JOIN: channel is null";
 
 	if (IS_ME(p->from)) {
-		if ((c = get_channel(chan, s)) == NULL)
-			ccur = new_channel(chan, s);
+		if ((c = channel_get(chan, s)) == NULL)
+			ccur = new_channel(chan, s, ccur);
 		else {
 			c->parted = 0;
 			newlinef(c, LINE_JOIN, ">", "You have rejoined %s", chan);
@@ -1039,7 +1041,7 @@ recv_join(parsed_mesg *p, server *s)
 		draw(D_FULL);
 	} else {
 
-		if ((c = get_channel(chan, s)) == NULL)
+		if ((c = channel_get(chan, s)) == NULL)
 			return errf("JOIN: channel '%s' not found", chan);
 
 		if (nicklist_insert(&(c->nicklist), p->from)) {
@@ -1074,7 +1076,7 @@ recv_mode(parsed_mesg *p, server *s)
 	char plusminus = '\0';
 
 	channel *c;
-	if ((c = get_channel(targ, s))) {
+	if ((c = channel_get(targ, s))) {
 
 		newlinef(c, 0, "--", "%s chanmode: [%s]", targ, flags);
 
@@ -1217,7 +1219,7 @@ recv_nick(parsed_mesg *p, server *s)
 	if (!p->from)
 		return "NICK: old nick is null";
 
-	/* Check params first, then trailing */
+	/* Some servers seem to send the new nick in the trailing */
 	if (!(nick = getarg(&p->params, 1)) && !(nick = getarg(&p->trailing, 1)))
 		return "NICK: new nick is null";
 
@@ -1226,15 +1228,14 @@ recv_nick(parsed_mesg *p, server *s)
 		newlinef(s->channel, 0, "--", "You are now known as %s", nick);
 	}
 
-	channel *c = cfirst;
-
+	channel *c = s->channel;
 	do {
-		if (c->server == s && nicklist_delete(&c->nicklist, p->from)) {
+		if (nicklist_delete(&c->nicklist, p->from)) {
 			nicklist_insert(&c->nicklist, nick);
 			newlinef(c, LINE_NICK, "--", "%s  >>  %s", p->from, nick);
 		}
 		c = c->next;
-	} while (c != cfirst);
+	} while (c != s->channel);
 
 	return NULL;
 }
@@ -1257,7 +1258,7 @@ recv_notice(parsed_mesg *p, server *s)
 	if (!(targ = getarg(&p->params, 1)))
 		return "NOTICE: target is null";
 
-	if ((c = get_channel(targ, s)))
+	if ((c = channel_get(targ, s)))
 		newline(c, 0, 0, p->trailing, 0);
 	else
 		newline(s->channel, 0, 0, p->trailing, 0);
@@ -1307,13 +1308,13 @@ recv_numeric(parsed_mesg *p, server *s)
 			config.auto_join = NULL;
 		} else {
 			/* If reconnecting to server, join any non-parted channels */
-			c = cfirst;
+			c = s->channel;
 			do {
 				/* FIXME: dont rejoin private chat channels... */
-				if (c->type && c->server == s && !c->parted)
+				if (c->type && !c->parted)
 					sendf(s->soc, "JOIN %s\r\n", c->name);
 				c = c->next;
-			} while (c != cfirst);
+			} while (c != s->channel);
 		}
 
 		newline(s->channel, LINE_NUMRPL, "--", p->trailing, 0);
@@ -1351,7 +1352,7 @@ num_200:
 		if (!(chan = getarg(&p->params, 1)))
 			return "RPL_CHANNEL_URL: channel is null";
 
-		if ((c = get_channel(chan, s)) == NULL)
+		if ((c = channel_get(chan, s)) == NULL)
 			return errf("RPL_CHANNEL_URL: channel '%s' not found", chan);
 
 		newlinef(c, LINE_NUMRPL, "--", "URL for %s is: \"%s\"", chan, p->trailing);
@@ -1364,7 +1365,7 @@ num_200:
 		if (!(chan = getarg(&p->params, 1)))
 			return "RPL_TOPIC: channel is null";
 
-		if ((c = get_channel(chan, s)) == NULL)
+		if ((c = channel_get(chan, s)) == NULL)
 			return errf("RPL_TOPIC: channel '%s' not found", chan);
 
 		newlinef(c, LINE_NUMRPL, "--", "Topic for %s is \"%s\"", chan, p->trailing);
@@ -1383,7 +1384,7 @@ num_200:
 		if (!(time = getarg(&p->params, 1)))
 			return "RPL_TOPICWHOTIME: time is null";
 
-		if ((c = get_channel(chan, s)) == NULL)
+		if ((c = channel_get(chan, s)) == NULL)
 			return errf("RPL_TOPICWHOTIME: channel '%s' not found", chan);
 
 		time_t raw_time = atoi(time);
@@ -1403,7 +1404,7 @@ num_200:
 		if (!(chan = getarg(&p->params, 1)))
 			return "RPL_NAMEREPLY: channel is null";
 
-		if ((c = get_channel(chan, s)) == NULL)
+		if ((c = channel_get(chan, s)) == NULL)
 			return errf("RPL_NAMEREPLY: channel '%s' not found", chan);
 
 		c->type = *type;
@@ -1474,7 +1475,7 @@ num_400:
 
 		channel *c;
 
-		if ((c = get_channel(chan, s)))
+		if ((c = channel_get(chan, s)))
 			newline(c, LINE_NUMRPL, 0, p->trailing, 0);
 		else
 			newline(s->channel, LINE_NUMRPL, 0, p->trailing, 0);
@@ -1531,7 +1532,7 @@ recv_part(parsed_mesg *p, server *s)
 	if (!(targ = getarg(&p->params, 1)))
 		return "PART: target is null";
 
-	if ((c = get_channel(targ, s)) && nicklist_delete(&c->nicklist, p->from)) {
+	if ((c = channel_get(targ, s)) && nicklist_delete(&c->nicklist, p->from)) {
 		c->nick_count--;
 		if (c->nick_count < config.join_part_quit_threshold) {
 			if (p->trailing)
@@ -1583,8 +1584,8 @@ recv_priv(parsed_mesg *p, server *s)
 
 	if (IS_ME(targ)) {
 
-		if ((c = get_channel(p->from, s)) == NULL) {
-			c = new_channel(p->from, s);
+		if ((c = channel_get(p->from, s)) == NULL) {
+			c = new_channel(p->from, s, s->channel);
 			c->type = 'p';
 		}
 
@@ -1593,7 +1594,7 @@ recv_priv(parsed_mesg *p, server *s)
 
 		draw(D_CHANS);
 
-	} else if ((c = get_channel(targ, s)) == NULL)
+	} else if ((c = channel_get(targ, s)) == NULL)
 		return errf("PRIVMSG: channel '%s' not found", targ);
 
 	if (check_pinged(p->trailing, s->nick_me)) {
@@ -1616,13 +1617,12 @@ recv_quit(parsed_mesg *p, server *s)
 {
 	/* :nick!user@hostname.domain QUIT [:message] */
 
-	channel *c = cfirst;
-
 	if (!p->from)
 		return "QUIT: sender's nick is null";
 
+	channel *c = s->channel;
 	do {
-		if (c->server == s && nicklist_delete(&c->nicklist, p->from)) {
+		if (nicklist_delete(&c->nicklist, p->from)) {
 			c->nick_count--;
 			if (c->nick_count < config.join_part_quit_threshold) {
 				if (p->trailing)
@@ -1632,7 +1632,7 @@ recv_quit(parsed_mesg *p, server *s)
 			}
 		}
 		c = c->next;
-	} while (c != cfirst);
+	} while (c != s->channel);
 
 	draw(D_STATUS);
 

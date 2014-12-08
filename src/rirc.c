@@ -1,3 +1,6 @@
+/* For sigaction */
+#define _POSIX_C_SOURCE 200112L
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -17,7 +20,9 @@ void configure(void);
 void main_loop(void);
 void usage(void);
 void getopts(int, char**);
-void signal_sigwinch(int);
+
+static void signal_sigwinch(int);
+static volatile sig_atomic_t flag_sigwinch;
 
 /* Values parsed from getopts */
 struct
@@ -82,8 +87,8 @@ splash(void)
 void
 getopts(int argc, char **argv)
 {
-	opts.port    = NULL;
 	opts.connect = NULL;
+	opts.port    = NULL;
 	opts.join    = NULL;
 	opts.nicks   = NULL;
 
@@ -112,9 +117,8 @@ getopts(int argc, char **argv)
 				if (*optarg == '-') {
 					puts("-c/--connect requires an argument");
 					exit(EXIT_FAILURE);
-				} else {
-					opts.connect = optarg;
 				}
+				opts.connect = optarg;
 				break;
 
 			/* Connect using port */
@@ -122,9 +126,8 @@ getopts(int argc, char **argv)
 				if (*optarg == '-') {
 					puts("-p/--port requires an argument");
 					exit(EXIT_FAILURE);
-				} else {
-					opts.port = optarg;
 				}
+				opts.port = optarg;
 				break;
 
 			/* Comma/space separated list of nicks to use */
@@ -132,24 +135,22 @@ getopts(int argc, char **argv)
 				if (*optarg == '-') {
 					puts("-n/--nick requires an argument");
 					exit(EXIT_FAILURE);
-				} else {
-					opts.nicks = optarg;
 				}
+				opts.nicks = optarg;
 				break;
 
-			/*Comma separated list of channels to join */
+			/* Comma separated list of channels to join */
 			case 'j':
 				if (*optarg == '-') {
 					puts("-j/--join requires an argument");
 					exit(EXIT_FAILURE);
-				} else {
-					opts.join = optarg;
 				}
+				opts.join = optarg;
 				break;
 
 			/* Print rirc version and exit */
 			case 'v':
-				puts("rirc version " VERSION );
+				puts("rirc version " VERSION);
 				exit(EXIT_SUCCESS);
 
 			/* Print rirc usage and exit */
@@ -186,12 +187,10 @@ configure(void)
 	config.join_part_quit_threshold = 100;
 }
 
-void
+static void
 signal_sigwinch(int unused __attribute__((unused)))
 {
-	resize();
-	if (signal(SIGWINCH, signal_sigwinch) == SIG_ERR)
-		fatal("signal handler: SIGWINCH");
+	flag_sigwinch = 1;
 }
 
 void
@@ -213,16 +212,22 @@ startup(void)
 
 	srand(time(NULL));
 
-	confirm = 0;
-
-	rirc = cfirst = ccur = new_channel("rirc", NULL);
+	rirc = ccur = new_channel("rirc", NULL, NULL);
 
 	splash();
 
-	/* Set sigwinch, init draw */
-	signal_sigwinch(0);
+	/* Init draw */
+	draw(D_RESIZE);
 
-	/* Register cleanup for exit */
+	/* Set up signal handlers */
+	struct sigaction sa_sigwinch;
+
+	memset(&sa_sigwinch, 0, sizeof(struct sigaction));
+	sa_sigwinch.sa_handler = signal_sigwinch;
+	if (sigaction(SIGWINCH, &sa_sigwinch, NULL) == -1)
+		fatal("sigaction - SIGWINCH");
+
+	/* Register cleanup() for exit() */
 	atexit(cleanup);
 
 	if (config.auto_connect)
@@ -237,13 +242,6 @@ cleanup(void)
 
 	/* Reset mousewheel event handling */
 	printf("\x1b[?1000l");
-
-	ccur = cfirst;
-	do {
-		channel_close();
-	} while (cfirst != rirc);
-
-	free_channel(rirc);
 }
 
 void
@@ -257,7 +255,6 @@ main_loop(void)
 	while (1) {
 
 		/* TODO: move this to input.c -> check_inputs(), select/pselect */
-		/* TODO: the input 200ms wait is causing server input to be delayed */
 		if (!poll(poll_stdin, 1, time)) {
 			if (count) {
 				buff[count] = '\0'; /* FIXME, temporary fix */
@@ -272,6 +269,9 @@ main_loop(void)
 
 		/* For each server, check connection status, and input */
 		check_servers();
+
+		if (flag_sigwinch)
+			flag_sigwinch = 0, draw(D_RESIZE);
 
 		/* Redraw the ui (skipped if nothing has changed) */
 		redraw();

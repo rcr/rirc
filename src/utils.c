@@ -11,7 +11,7 @@
 #define H(n) (n == NULL ? 0 : n->height)
 #define MAX(a, b) (a > b ? a : b)
 
-int comp;
+static int comp;
 node* new_node(char*);
 node* rotate_l(node*);
 node* rotate_r(node*);
@@ -62,12 +62,13 @@ getarg(char **str, int set_null)
 	return ret;
 }
 
+/* TODO: double check this implementation */
 char*
 strdup(const char *str)
 {
 	char *ret;
 
-	if ((ret = malloc(strlen(str))) == NULL)
+	if ((ret = malloc(strlen(str) + 1)) == NULL)
 		fatal("strdup - malloc");
 
 	strcpy(ret, str);
