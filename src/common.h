@@ -59,6 +59,7 @@ typedef enum {
 	LINE_NUMRPL,
 	LINE_PINGED,
 	LINE_ACTION,
+	LINE_DEBUG,
 	LINE_T_SIZE
 } line_t;
 

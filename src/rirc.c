@@ -82,6 +82,7 @@ splash(void)
 	newline(rirc, 0, "--", "|_|  |_|_|  \\___|", 0);
 	newline(rirc, 0, "--", "                 ", 0);
 	newline(rirc, 0, "--", " - version " VERSION, 0);
+	newline(rirc, 0, "--", " - compiled " __DATE__ ", " __TIME__, 0);
 }
 
 void

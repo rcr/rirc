@@ -1,5 +1,5 @@
 CC = cc
-CFLAGS = -pthread -std=c99 -Wall -Wextra -pedantic -O3 -g
+CFLAGS = -pthread -std=c99 -Wall -Wextra -pedantic -O3
 
 SDIR = src
 TDIR = test
@@ -25,6 +25,9 @@ test: $(OBJ_T)
 
 $(TDIR_O)/%.test: $(TDIR)/%.c
 	@$(CC) $(CFLAGS) -o $@ $<
+
+debug: CFLAGS += -g -DDEBUG
+debug: rirc
 
 clean:
 	@echo cleaning

@@ -454,6 +454,12 @@ sendf(int soc, const char *fmt, ...)
 	/* TODO: check for error */
 	send(soc, buff, len, 0);
 	va_end(args);
+
+#ifdef DEBUG
+	newline(s->channel, LINE_DEBUG, "DEBUG: sent", buff, 0);
+#endif
+
+	return NULL;
 }
 
 void
@@ -889,12 +895,16 @@ recv_mesg(char *inp, int count, server *s)
 	char *ptr = s->iptr;
 	char *max = s->input + BUFFSIZE;
 
+	static parsed_mesg *p;
+
 	while (count--) {
 		if (*inp == '\r') {
 
 			*ptr = '\0';
 
-			parsed_mesg *p;
+#ifdef DEBUG
+			newline(s->channel, LINE_DEBUG, "DEBUG: recv", s->input, 0);
+#endif
 
 			char *err = NULL;
 			if (!(p = parse(s->input)))
