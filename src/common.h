@@ -172,8 +172,8 @@ channel* new_channel(char*, server*, channel*);
 channel* channel_close(channel*);
 channel* channel_switch(channel*, int);
 void send_mesg(char*);
-void newline(channel*, line_t, char*, char*, int);
-void newlinef(channel*, line_t, char*, char*, ...);
+void newline(channel*, line_t, const char*, const char*, int);
+void newlinef(channel*, line_t, const char*, const char*, ...);
 
 /* draw.c */
 void redraw(void);

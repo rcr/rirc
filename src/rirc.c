@@ -63,7 +63,7 @@ usage(void)
 	"  -c, --connect=SERVER   Connect to SERVER\n"
 	"  -p, --port=PORT        Connect using PORT\n"
 	"  -j, --join=CHANNELS    Comma separated list of channels to join\n"
-	"  -n, --nicks=NICKS      Comma/space separated list of nicks to use\n"
+	"  -n, --nicks=NICKS      Comma and/or space separated list of nicks to use\n"
 	"  -v, --version          Print rirc version and exit\n"
 	"\n"
 	"Examples:\n"
@@ -83,6 +83,9 @@ splash(void)
 	newline(rirc, 0, "--", "                 ", 0);
 	newline(rirc, 0, "--", " - version " VERSION, 0);
 	newline(rirc, 0, "--", " - compiled " __DATE__ ", " __TIME__, 0);
+#ifdef DEBUG
+	newline(rirc, 0, "--", " - compiled with DEBUG flags", 0);
+#endif
 }
 
 void
@@ -131,7 +134,7 @@ getopts(int argc, char **argv)
 				opts.port = optarg;
 				break;
 
-			/* Comma/space separated list of nicks to use */
+			/* Comma and/or space separated list of nicks to use */
 			case 'n':
 				if (*optarg == '-') {
 					puts("-n/--nick requires an argument");
