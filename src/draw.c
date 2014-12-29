@@ -210,7 +210,7 @@ print_line(int row, line *l)
 	if (l < ccur->chat)
 		l += SCROLLBACK_BUFFER;
 
-	if (!l->len || l == ccur->cur_line)
+	if (!l->text || l == ccur->cur_line)
 		return 3;
 
 	int count = 1;
