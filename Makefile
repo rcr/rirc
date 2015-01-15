@@ -1,5 +1,5 @@
 CC = cc
-CFLAGS = -pthread -std=c99 -Wall -Wextra -pedantic -O3
+CFLAGS = -pthread -std=c99 -Wall -Wextra -pedantic -O2
 
 SDIR = src
 TDIR = test
