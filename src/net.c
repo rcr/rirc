@@ -56,6 +56,9 @@
  * TODO: 451, :Connection not registered
  *            (eg sending a join before registering) */
 
+/* Error message length */
+#define MAX_ERROR 512
+
 #define DEFAULT_QUIT_MESG "rirc v" VERSION
 
 #define IS_ME(X) !strcmp(X, s->nick_me)
@@ -69,10 +72,11 @@
 /* Connection thread info */
 typedef struct connection_thread {
 	int socket;
+	int socket_tmp;
 	char *host;
 	char *port;
-	char *error;  /* Thread's error message */
-	char *ipstr;  /* IPv4/6 address string */
+	char ipstr[INET6_ADDRSTRLEN];
+	char error[MAX_ERROR];
 	pthread_t tid;
 } connection_thread;
 
@@ -117,7 +121,6 @@ static void server_disconnect(server*, char*, char*);
 
 static void* threaded_connect(void*);
 static void* threaded_connect_cleanup(void**);
-static void free_connection_info(connection_thread*);
 
 static server *server_head;
 
@@ -174,10 +177,11 @@ server_connect(char *host, char *port)
 		fatal("server_connect - malloc");
 
 	ct->socket = -1;
+	ct->socket_tmp = -1;
 	ct->host = s->host;
 	ct->port = s->port;
-	ct->error = NULL;
-	ct->ipstr = NULL;
+	*ct->error = '\0';
+	*ct->ipstr = '\0';
 
 	s->connecting = ct;
 
@@ -197,7 +201,10 @@ server_connected(server *s)
 	if ((pthread_join(ct->tid, NULL)))
 		fatal("server_connected - pthread_join");
 
-	newlinef(s->channel, 0, "--", "Connected [%s]", ct->ipstr);
+	if (*ct->ipstr)
+		newlinef(s->channel, 0, "--", "Connected to [%s]", ct->ipstr);
+	else
+		newlinef(s->channel, 0, "--", "Error determining server IP: %s", ct->error);
 
 	s->soc = ct->socket;
 
@@ -205,14 +212,10 @@ server_connected(server *s)
 	sendf(s, "USER %s 8 * :%s", config.username, config.realname);
 }
 
-/* FIXME: there's a potential memory leak here somewhere. I think it's when a thread
- * fails to connect. */
 static void*
 threaded_connect(void *arg)
 {
-	void *addr;
-	int ret, soc;
-	char ipstr[INET6_ADDRSTRLEN];
+	int ret;
 	struct addrinfo hints, *p, *servinfo = NULL;
 
 	/* Thread cleanup on error or external thread cancel */
@@ -228,38 +231,37 @@ threaded_connect(void *arg)
 	connection_thread *ct = (connection_thread *)arg;
 
 	/* Resolve host */
-	if ((ret = getaddrinfo(ct->host, ct->port, &hints, &servinfo)) != 0) {
-		ct->error = strdupf("Error resolving host: %s", gai_strerror(ret));
+	if ((ret = getaddrinfo(ct->host, ct->port, &hints, &servinfo))) {
+		strncpy(ct->error, gai_strerror(ret), MAX_ERROR);
 		pthread_exit(NULL);
 	}
 
 	/* Attempt to connect to all address results */
 	for (p = servinfo; p != NULL; p = p->ai_next) {
 
-		if ((soc = socket(p->ai_family, p->ai_socktype, p->ai_protocol)) < 0)
+		if ((ct->socket_tmp = socket(p->ai_family, p->ai_socktype, p->ai_protocol)) < 0)
 			continue;
 
 		/* Break on success */
-		if (connect(soc, p->ai_addr, p->ai_addrlen) == 0)
+		if (connect(ct->socket_tmp, p->ai_addr, p->ai_addrlen) == 0)
 			break;
 
-		close(soc);
+		close(ct->socket_tmp);
 	}
 
-	/* Check for failure to connect */
 	if (p == NULL) {
-		ct->error = strdupf("Error connecting: %s", strerror(errno));
+		strerror_r(errno, ct->error, MAX_ERROR);
 		pthread_exit(NULL);
 	}
 
-	/* Get IPv4 or IPv6 address string */
-	if (p->ai_family == AF_INET)
-		addr = &(((struct sockaddr_in *)p->ai_addr)->sin_addr);
-	else
-		addr = &(((struct sockaddr_in6 *)p->ai_addr)->sin6_addr);
+	/* Failing to get the numeric IP isn't a fatal connection error */
+	if ((ret = getnameinfo(p->ai_addr, p->ai_addrlen, ct->ipstr,
+					INET6_ADDRSTRLEN, NULL, 0, NI_NUMERICHOST))) {
+		strncpy(ct->error, gai_strerror(ret), MAX_ERROR);
+		*ct->ipstr = '\0';
+	}
 
-	ct->ipstr = strdup(inet_ntop(p->ai_family, addr, ipstr, sizeof(ipstr)));
-	ct->socket = soc;
+	ct->socket = ct->socket_tmp;
 
 	pthread_cleanup_pop(1);
 
@@ -277,14 +279,6 @@ threaded_connect_cleanup(void **arg)
 	return NULL;
 }
 
-static void
-free_connection_info(connection_thread *ct)
-{
-	free(ct->error);
-	free(ct->ipstr);
-	free(ct);
-}
-
 void
 check_servers(void)
 {
@@ -294,27 +288,33 @@ check_servers(void)
 
 	static struct pollfd pfd[] = {{ .events = POLLIN }};
 
-	server *s = server_head;
-	do {
-		if (s == NULL)
-			return;
+	server *s;
 
+	if ((s = server_head) == NULL)
+		return;
+
+	do {
 		pfd[0].fd = s->soc;
 
 		if (s->connecting) {
 
 			connection_thread *ct = (connection_thread*)s->connecting;
 
-			if (ct->error || ct->socket >= 0) {
+			/* Connection Success */
+			if (ct->socket >= 0)
+				server_connected(s);
 
-				if (ct->error)
-					newline(s->channel, 0, "-!!-", ct->error, 0);
-				else
-					server_connected(s);
+			/* Connection failure */
+			else if (*ct->error)
+				newline(s->channel, 0, "-!!-", ct->error, 0);
 
-				free_connection_info(ct);
-				s->connecting = NULL;
-			}
+			/* Connection in progress */
+			else
+				continue;
+
+			free(ct);
+			s->connecting = NULL;
+
 		} else while (s->soc > 0 && (ret = poll(pfd, 1, 0)) > 0) {
 			if ((count = read(s->soc, recv_buff, BUFFSIZE)) < 0)
 				; /* TODO: error in read() */
@@ -342,20 +342,21 @@ server_disconnect(server *s, char *err, char *mesg)
 	 *   Disconnect initiated by user */
 
 	if (s->connecting) {
-		/* TODO: make sure thread cancellation closes
-		 * any sockets. See: pthread cancellation points.
-		 * man 7 pthreads */
+		/* Server connection in progress, cancel the connection attempt */
+
 		connection_thread *ct = s->connecting;
 
 		if ((pthread_cancel(ct->tid)))
 			fatal("threaded_connect_cancel - pthread_cancel");
 
-		free_connection_info(ct);
+		/* There's a chance the thread is canceled with an open socket */
+		if (ct->socket_tmp)
+			close(ct->socket_tmp);
 
+		free(ct);
 		s->connecting = NULL;
 
-		newlinef(s->channel, 0, "--", "Connection to '%s' port %s canceled",
-				s->host, s->port);
+		newlinef(s->channel, 0, "--", "Connection to '%s' port %s canceled", s->host, s->port);
 
 		return;
 	}
@@ -623,7 +624,7 @@ channel_switch(channel *c, int next)
 	 * currently it goes to server... Or even the next server's channel??? */
 	if (next)
 		/* If wrapping around forwards, get next server's first channel */
-        ret = !(c->next == c->server->channel) ?
+		ret = !(c->next == c->server->channel) ?
 			c->next : c->server->next->channel;
 	else
 		/* If wrapping around backwards, get previous server's last channel */
