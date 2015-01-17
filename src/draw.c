@@ -276,9 +276,9 @@ print_more(char *start, char *end, int row)
 static void
 draw_input(void)
 {
-	if (confirm) {
+	if (confirm_message) {
 		printf(FG(239)"\x1b[%d;6H\x1b[K"FG(250), w.ws_row);
-		printf("Confirm sending %d lines? (y/n)", confirm);
+		printf("%s", confirm_message);
 		return;
 	}
 
@@ -303,7 +303,7 @@ draw_input(void)
 
 	char *end = in->tail + w.ws_col - 5 - (in->head - in->window);
 
-	while (p < end && p < in->line->text + MAXINPUT)
+	while (p < end && p < in->line->text + MAX_INPUT)
 		putchar(*p++);
 
 	int col = (in->head - in->window);

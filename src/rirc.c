@@ -251,29 +251,15 @@ cleanup(void)
 void
 main_loop(void)
 {
-	char buff[BUFFSIZE];
-	int count = 0, time = 200;
+	for (;;) {
 
-	struct pollfd poll_stdin[] = {{ .fd = STDIN_FILENO, .events = POLLIN }};
-
-	while (1) {
-
-		/* TODO: move this to input.c -> check_inputs(), select/pselect */
-		if (!poll(poll_stdin, 1, time)) {
-			if (count) {
-				buff[count] = '\0'; /* FIXME, temporary fix */
-				inputc(buff, count);
-				count = 0;
-			}
-			time = 200;
-		} else if (poll_stdin[0].revents & POLLIN) {
-			count = read(0, buff, BUFFSIZE);
-			time = 0;
-		}
+		/* Check for input on stdin, sleep 200ms */
+		poll_input();
 
 		/* For each server, check connection status, and input */
 		check_servers();
 
+		/* Window has changed size */
 		if (flag_sigwinch)
 			flag_sigwinch = 0, draw(D_RESIZE);
 

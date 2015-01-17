@@ -3,8 +3,8 @@
 #define SCROLLBACK_BUFFER 200
 #define SCROLLBACK_INPUT 15
 #define BUFFSIZE 512
-#define MAXINPUT 200
 #define NICKSIZE 50 /* TODO */
+#define MAX_INPUT 256
 
 /* Chan modes */
 #define CMODE_STR "OovaimnqpsrtklbeI"
@@ -96,13 +96,13 @@ typedef struct line
 } line;
 
 /* Channel input line */
-typedef struct input_l
+typedef struct input_line
 {
 	char *end;
-	char text[MAXINPUT+1];
-	struct input_l *prev;
-	struct input_l *next;
-} input_l;
+	char text[MAX_INPUT+1];
+	struct input_line *prev;
+	struct input_line *next;
+} input_line;
 
 /* Channel input */
 typedef struct input
@@ -111,8 +111,8 @@ typedef struct input
 	char *head;
 	char *tail;
 	char *window;
-	struct input_l *list_head;
-	struct input_l *line;
+	struct input_line *list_head;
+	struct input_line *line;
 } input;
 
 /* Channel buffer */
@@ -187,10 +187,11 @@ unsigned int draw;
 #define D_FULL ~((draw & 0) | D_RESIZE);
 
 /* input.c */
-int confirm;
+char *confirm_message;
 input* new_input(void);
+void confirm(int(*)(char), const char*, ...);
 void free_input(input*);
-void inputc(char*, int);
+void poll_input(void);
 
 /* utils.c */
 char* strdup(const char*);
