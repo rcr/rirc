@@ -1383,8 +1383,7 @@ recv_numeric(parsed_mesg *p, server *s)
 			/* If reconnecting to server, join any non-parted channels */
 			c = s->channel;
 			do {
-				/* FIXME: dont rejoin private chat channels... */
-				if (c->type && !c->parted)
+				if (c->type && c->type != 'p' && !c->parted)
 					sendf(s, "JOIN %s", c->name);
 				c = c->next;
 			} while (c != s->channel);
