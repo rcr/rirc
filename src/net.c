@@ -1162,7 +1162,7 @@ recv_mode(parsed_mesg *p, server *s)
 			else if (plusminus == '\0') {
 				return "MODE: +/- flag is null";
 			} else {
-				switch(*flags) {
+				switch (*flags) {
 					case 'O':
 						modebit = CMODE_O;
 						break;
@@ -1241,7 +1241,7 @@ recv_mode(parsed_mesg *p, server *s)
 			else if (plusminus == '\0') {
 				return "MODE: +/- flag is null";
 			} else {
-				switch(*flags) {
+				switch (*flags) {
 					case 'a':
 						modebit = UMODE_a;
 						break;
@@ -1558,12 +1558,12 @@ num_400:
 			newlinef(c, LINE_NUMRPL, "--", "Cannot send to '%s'", chan);
 
 
-	case ERR_ERRONEUSNICKNAME:  /* 432 <nick> :Erroneous nickname */
+	case ERR_ERRONEUSNICKNAME:  /* 432 <nick> :<reason> */
 
 		if (!(nick = getarg(&p->params, 1)))
 			return "ERR_ERRONEUSNICKNAME: nick is null";
 
-		newlinef(s->channel, LINE_NUMRPL, "-!!-", "Erroneous nickname: '%s'", nick);
+		newlinef(s->channel, LINE_NUMRPL, "-!!-", "'%s' - %s", nick, p->trailing);
 		return NULL;
 
 	case ERR_NICKNAMEINUSE:  /* 433 <nick> :Nickname is already in use */
