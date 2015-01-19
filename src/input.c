@@ -202,6 +202,16 @@ input_cchar(char c)
 		case 0x18:
 			ccur = channel_close(ccur);
 			break;
+
+		/* ctrl+p */
+		case 0x0E:
+			ccur = channel_switch(ccur, 1);
+			break;
+
+		/* ctrl+n */
+		case 0x10:
+			ccur = channel_switch(ccur, 0);
+			break;
 	}
 }
 
@@ -236,12 +246,12 @@ input_cseq(char *input, ssize_t len)
 		delete_right(ccur->input);
 
 	/* page up */
-	else if (!strncmp(input, "[5~", len))
-		ccur = channel_switch(ccur, 0);
+//	else if (!strncmp(input, "[5~", len))
+//		TODO: scroll buffer up
 
 	/* page down */
-	else if (!strncmp(input, "[6~", len))
-		ccur = channel_switch(ccur, 1);
+//	else if (!strncmp(input, "[6~", len))
+//		TODO: scroll buffer down
 
 	/* mousewheel up */
 	else if (!strncmp(input, "[M`", len))

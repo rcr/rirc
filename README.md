@@ -28,7 +28,14 @@ Examples:
   rirc -c server.tld -p 1234 -j '#chan1,#chan2' -n 'nick, nick_, nick__'
 ```
 
-##More info
+Hotkeys:
+```
+  ctrl+n : next channel
+  ctrl+p : previous channel
+  ctrl+x : close channel
+```
+
+##More info:
 [rcr.io/rirc.html](http://rcr.io/rirc.html)
 
 ##Screenshots:
