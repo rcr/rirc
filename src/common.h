@@ -6,6 +6,9 @@
 #define NICKSIZE 50 /* TODO */
 #define MAX_INPUT 256
 
+#define TO_STR(X) #X
+#define STR(X) TO_STR(X)
+
 /* Chan modes */
 #define CMODE_STR "OovaimnqpsrtklbeI"
 #define CMODE_O (1 << 0) /* give "channel creator" status */
@@ -39,7 +42,7 @@
 #define UMODE_MAX 7
 
 #define fatal(mesg) \
-	do {perror(mesg); exit(EXIT_FAILURE);} while (0);
+	do {perror(mesg); exit(EXIT_FAILURE);} while (0)
 
 /* Channel bar activity types */
 typedef enum {

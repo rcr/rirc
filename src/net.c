@@ -59,12 +59,9 @@
 /* Error message length */
 #define MAX_ERROR 512
 
-#define DEFAULT_QUIT_MESG "rirc v" VERSION
+#define DEFAULT_QUIT_MESG "rirc v" VERSION " -- http://rcr.io/rirc.html"
 
 #define IS_ME(X) !strcmp(X, s->nick_me)
-
-#define TO_STR(X) #X
-#define STR(X) TO_STR(X)
 
 /* Advance a message pointer until non-blank character */
 #define skip_space(X) while (*X && isblank(*X)) X++;
@@ -75,8 +72,8 @@ typedef struct connection_thread {
 	int socket_tmp;
 	char *host;
 	char *port;
-	char ipstr[INET6_ADDRSTRLEN];
 	char error[MAX_ERROR];
+	char ipstr[INET6_ADDRSTRLEN];
 	pthread_t tid;
 } connection_thread;
 
@@ -114,6 +111,8 @@ void free_server(server*);
 void get_auto_nick(char**, char*);
 void recv_mesg(char*, int, server*);
 
+static int confirm_server_close(char);
+
 static char* sendf(server *restrict, const char*, ...);
 
 static void server_connected(server*);
@@ -144,6 +143,8 @@ static server *server_head;
 		if (((N)->next) == (N)) \
 			(L) = NULL; \
 		else { \
+			if ((L) == N) \
+				(L) = ((N)->next); \
 			((N)->next)->prev = ((N)->prev); \
 			((N)->prev)->next = ((N)->next); \
 		} \
@@ -576,36 +577,75 @@ channel_get(char *chan, server *s)
 	return NULL;
 }
 
+/* Confirm closing a server */
+static int
+confirm_server_close(char c)
+{
+	if (c == 'n' || c == 'N')
+		return 1;
+
+	if (c == 'y' || c == 'Y') {
+
+		channel *c = ccur;
+
+		/* If closing the last server */
+		if ((ccur = c->server->next->channel) == c->server->channel)
+			ccur = rirc;
+
+		server_disconnect(c->server, NULL, DEFAULT_QUIT_MESG);
+
+		DLL_DEL(server_head, c->server);
+		free_server(c->server);
+
+		draw(D_FULL);
+
+		return 1;
+	}
+
+	return 0;
+}
+
 /* Close a channel buffer/server and return the next channel */
 channel*
 channel_close(channel *c)
 {
-	channel *ret;
+	/* Close a buffer,
+	 *
+	 * if closing a server buffer, confirm with the user */
+
+	channel *ret = c;
 
 	/* c in this case is the main buffer */
 	if (c->server == NULL)
 		return c;
 
 	if (!c->type) {
+		/* Closing a server, confirm the number of channels being closed */
 
-		/* If closing the last server */
-		if ((ret = c->server->next->channel) == c->server->channel)
-			ret = rirc;
+		int num_chans = 0;
 
-		server_disconnect(c->server, NULL, DEFAULT_QUIT_MESG);
-		DLL_DEL(server_head, c->server);
-		free_server(c->server);
+		while ((c = c->next)->type)
+			num_chans++;
+
+		if (num_chans)
+			confirm(confirm_server_close, "Close server '%s'? Channels: %d   [y/n]",
+					c->server->host, num_chans);
+		else
+			confirm(confirm_server_close, "Close server '%s'?   [y/n]", c->server->host);
 	} else {
+		/* Closing a channel */
 
-		if (c->server->soc)
-			sendf(c->server, "PART %s", c->name);
+		sendf(c->server, "PART %s", c->name);
 
-		ret = channel_switch(c, 1);
+		/* If channel c is last in the list, return the previous channel */
+		ret = !(c->next == c->server->channel) ?
+			c->next : c->prev;
+
 		DLL_DEL(c->server->channel, c);
 		free_channel(c);
-	}
 
-	draw(D_FULL);
+		draw(D_FULL);
+	}
 
 	return ret;
 }
@@ -620,8 +660,6 @@ channel_switch(channel *c, int next)
 	if (c->server == NULL)
 		return c;
 
-	/* TODO: ex:    server chan1 chan2 chan3    close on chan3 should go back to chan2
-	 * currently it goes to server... Or even the next server's channel??? */
 	if (next)
 		/* If wrapping around forwards, get next server's first channel */
 		ret = !(c->next == c->server->channel) ?
@@ -733,7 +771,7 @@ send_mesg(char *mesg)
 static char*
 send_connect(char *mesg)
 {
-	/* /connect [<host> || <host:port> || <hostport>] */
+	/* /connect [(host) | (host:port) | (host port)] */
 
 	char *host, *port;
 
@@ -863,9 +901,8 @@ send_part(char *mesg)
 }
 
 static char*
-send_priv(char *mesg)
-{
-	/* /(priv || msg) <targ> <message> */
+send_priv(char *mesg) {
+	/* /(priv | msg) <target> <message> */
 
 	char *targ;
 
@@ -883,7 +920,7 @@ send_priv(char *mesg)
 static char*
 send_raw(char *mesg)
 {
-	/* /raw <mesg> */
+	/* /raw <raw message> */
 
 	char *err;
 	if ((err = sendf(ccur->server, "%s", mesg)))

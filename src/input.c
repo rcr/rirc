@@ -198,17 +198,17 @@ input_cchar(char c)
 			send_input();
 			break;
 
-		/* CAN -- (cancel) */
+		/* ^X */
 		case 0x18:
 			ccur = channel_close(ccur);
 			break;
 
-		/* ctrl+p */
+		/* ^P */
 		case 0x0E:
 			ccur = channel_switch(ccur, 1);
 			break;
 
-		/* ctrl+n */
+		/* ^N */
 		case 0x10:
 			ccur = channel_switch(ccur, 0);
 			break;

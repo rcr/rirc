@@ -30,9 +30,9 @@ Examples:
 
 Hotkeys:
 ```
-  ctrl+n : next channel
-  ctrl+p : previous channel
-  ctrl+x : close channel
+  ^N : next channel
+  ^P : previous channel
+  ^X : close channel/server
 ```
 
 ##More info:
