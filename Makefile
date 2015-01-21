@@ -4,6 +4,9 @@ CFLAGS = -pthread -std=c99 -Wall -Wextra -pedantic -O2
 SDIR = src
 TDIR = test
 
+# Common header files
+HDS = $(SDIR)/common.h
+
 # Source and object files
 SRC = $(wildcard $(SDIR)/*.c)
 OBJ = $(patsubst $(SDIR)%.c,$(SDIR_O)%.o,$(SRC))
@@ -17,7 +20,7 @@ TDIR_O = $(TDIR)/bld
 rirc: $(OBJ)
 	$(CC) $(CFLAGS) -o $@ $^
 
-$(SDIR_O)/%.o: $(SDIR)/%.c
+$(SDIR_O)/%.o: $(SDIR)/%.c $(HDS)
 	$(CC) $(CFLAGS) -c -o $@ $<
 
 test: $(OBJ_T)
