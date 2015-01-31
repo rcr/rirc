@@ -29,7 +29,7 @@ test: $(OBJ_T)
 $(TDIR_O)/%.test: $(TDIR)/%.c
 	@$(CC) $(CFLAGS) -o $@ $<
 
-debug: CFLAGS += -g -DDEBUG
+debug: CFLAGS += -g -DDEBUG -fsanitize=undefined,null,return,unreachable,shift,address
 debug: rirc
 
 clean:
