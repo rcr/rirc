@@ -7,7 +7,16 @@ many features which you would expect from a basic
 irc client.
 
 ##Building:
-make
+
+Default build:
+```
+make clean rirc
+```
+
+Debug build
+```
+make clean debug
+```
 
 ##Usage:
 ```
@@ -20,7 +29,7 @@ Options:
   -c, --connect=SERVER   Connect to SERVER
   -p, --port=PORT        Connect using PORT
   -j, --join=CHANNELS    Comma separated list of channels to join
-  -n, --nicks=NICKS      Comma/space separated list of nicks to use
+  -n, --nicks=NICKS      Comma and/or space separated list of nicks to use
   -v, --version          Print rirc version and exit
 
 Examples:
@@ -30,9 +39,10 @@ Examples:
 
 Hotkeys:
 ```
-  ^N : next channel
-  ^P : previous channel
-  ^X : close channel/server
+  ^N : go to next channel
+  ^P : go to previous channel
+  ^L : clear channel
+  ^X : close channel
 ```
 
 ##More info:

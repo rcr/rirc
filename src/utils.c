@@ -8,29 +8,39 @@
 
 #include "common.h"
 
-#define H(n) (n == NULL ? 0 : n->height)
-#define MAX(a, b) (a > b ? a : b)
+#define H(N) (N == NULL ? 0 : N->height)
+#define MAX(A, B) (A > B ? A : B)
 
 static int comp;
-node* new_node(char*);
-node* rotate_l(node*);
-node* rotate_r(node*);
-node* node_delete(node*, char*);
-node* node_insert(node*, char*);
+static node* new_node(char*);
+static node* rotate_l(node*);
+static node* rotate_r(node*);
+static node* node_delete(node*, char*);
+static node* node_insert(node*, char*);
 
 static char errbuff[BUFFSIZE];
 
 static jmp_buf jmpbuf;
 
-static parsed_mesg parsed;
+void
+clear_channel(channel *c)
+{
+	free(c->buffer_head->text);
+
+	c->buffer_head->text = NULL;
+
+	draw(D_BUFFER);
+}
 
 char*
 errf(const char *fmt, ...)
 {
-	va_list args;
-	va_start(args, fmt);
-	vsnprintf(errbuff, BUFFSIZE-1, fmt, args);
-	va_end(args);
+	va_list ap;
+
+	va_start(ap, fmt);
+	vsnprintf(errbuff, BUFFSIZE, fmt, ap);
+	va_end(ap);
+
 	return errbuff;
 }
 
@@ -84,16 +94,16 @@ strdupf(const char *fmt, ...)
 	if ((ret = malloc(BUFFSIZE)) == NULL)
 		fatal("strdupf - malloc");
 
-	va_list args;
-	va_start(args, fmt);
-	vsnprintf(ret, BUFFSIZE-1, fmt, args);
-	va_end(args);
+	va_list ap;
+	va_start(ap, fmt);
+	vsnprintf(ret, BUFFSIZE, fmt, ap);
+	va_end(ap);
 
 	return ret;
 }
 
-struct parsed_mesg*
-parse(char *mesg)
+int
+parse(parsed_mesg *p, char *mesg)
 {
 	/* RFC 2812, section 2.3.1 */
 	/* message = [ ":" prefix SPACE ] command [ params ] crlf */
@@ -101,16 +111,16 @@ parse(char *mesg)
 	/* middle =  nospcrlfcl *( ":" / nospcrlfcl ) */
 
 	/* prefix = servername / ( nickname [ [ "!" user ] "@" host ] ) */
-	parsed.from = parsed.hostinfo = NULL;
+	p->from = p->hostinfo = NULL;
 
 	if (*mesg == ':') {
 
-		parsed.from = ++mesg;
+		p->from = ++mesg;
 
 		while (*mesg) {
-			if (*mesg == '!' || (*mesg == '@' && !parsed.hostinfo)) {
+			if (*mesg == '!' || (*mesg == '@' && !p->hostinfo)) {
 				*mesg++ = '\0';
-				parsed.hostinfo = mesg;
+				p->hostinfo = mesg;
 			} else if (*mesg == ' ') {
 				*mesg++ = '\0';
 				break;
@@ -120,29 +130,29 @@ parse(char *mesg)
 	}
 
 	/* command = 1*letter / 3digit */
-	if (!(parsed.command = getarg(&mesg, 1)))
-		return NULL;
+	if (!(p->command = getarg(&mesg, 1)))
+		return 0;
 
 	/* params = *14( SPACE middle ) [ SPACE ":" trailing ] */
 	/* params =/ 14( SPACE middle ) [ SPACE [ ":" ] trailing ] */
 	/* trailing   =  *( ":" / " " / nospcrlfcl ) */
 
-	parsed.trailing = NULL;
+	p->trailing = NULL;
 
 	char *param;
 	if ((param = getarg(&mesg, 0))) {
 		if (*param == ':') {
-			parsed.params = NULL;
+			p->params = NULL;
 			*param++ = '\0';
-			parsed.trailing = param;
+			p->trailing = param;
 		} else {
-			parsed.params = param;
+			p->params = param;
 
 			int paramcount = 1;
 			while ((param = getarg(&mesg, 0))) {
 				if (paramcount == 14 || *param == ':') {
 					*param++ = '\0';
-					parsed.trailing = param;
+					p->trailing = param;
 					break;
 				}
 				paramcount++;
@@ -150,7 +160,7 @@ parse(char *mesg)
 		}
 	}
 
-	return &parsed;
+	return 1;
 }
 
 /* TODO:
@@ -182,7 +192,7 @@ check_pinged(char *mesg, char *nick)
 	return 0;
 }
 
-node*
+static node*
 rotate_r(node *x)
 {
 	node *y = x->l;
@@ -196,7 +206,7 @@ rotate_r(node *x)
 	return y;
 }
 
-node*
+static node*
 rotate_l(node *x)
 {
 	node *y = x->r;
@@ -210,7 +220,7 @@ rotate_l(node *x)
 	return y;
 }
 
-node*
+static node*
 new_node(char *nick)
 {
 	node *n;
@@ -220,6 +230,7 @@ new_node(char *nick)
 	n->r = NULL;
 	n->height = 1;
 	strcpy(n->nick, nick);
+
 	return n;
 }
 
@@ -228,6 +239,7 @@ free_nicklist(node *n)
 {
 	if (n == NULL)
 		return;
+
 	free_nicklist(n->l);
 	free_nicklist(n->r);
 	free(n);
@@ -255,7 +267,7 @@ nicklist_delete(node **n, char *nick)
 	return 1;
 }
 
-node*
+static node*
 node_insert(node *n, char *nick)
 {
 	if (n == NULL)
@@ -289,7 +301,7 @@ node_insert(node *n, char *nick)
 	return n;
 }
 
-node*
+static node*
 node_delete(node *n, char *nick)
 {
 	if (n == NULL)
@@ -320,7 +332,7 @@ node_delete(node *n, char *nick)
 			free(temp);
 		}
 	}
-	else if(comp > 1)
+	else if (comp > 1)
 		n->r = node_delete(n->r, nick);
 	else
 		n->l = node_delete(n->l, nick);

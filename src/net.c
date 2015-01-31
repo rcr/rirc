@@ -999,7 +999,7 @@ recv_mesg(char *inp, int count, server *s)
 	char *ptr = s->iptr;
 	char *max = s->input + BUFFSIZE;
 
-	static parsed_mesg *p;
+	parsed_mesg p;
 
 	while (count--) {
 		if (*inp == '\r') {
@@ -1009,32 +1009,35 @@ recv_mesg(char *inp, int count, server *s)
 #ifdef DEBUG
 			newline(s->channel, LINE_DEBUG, "DEBUG <<", s->input, 0);
 #endif
+			/* FIXME:
+			 * if err != NULL the lifetime of the value it points to has expired...
+			 * */
 			char *err = NULL;
 
-			if (!(p = parse(s->input)))
+			if (!(parse(&p, s->input)))
 				err = "Failed to parse message";
-			else if (isdigit(*p->command))
-				err = recv_numeric(p, s);
-			else if (!strcmp(p->command, "PRIVMSG"))
-				err = recv_priv(p, s);
-			else if (!strcmp(p->command, "JOIN"))
-				err = recv_join(p, s);
-			else if (!strcmp(p->command, "PART"))
-				err = recv_part(p, s);
-			else if (!strcmp(p->command, "QUIT"))
-				err = recv_quit(p, s);
-			else if (!strcmp(p->command, "NOTICE"))
-				err = recv_notice(p, s);
-			else if (!strcmp(p->command, "NICK"))
-				err = recv_nick(p, s);
-			else if (!strcmp(p->command, "PING"))
-				err = recv_ping(p, s);
-			else if (!strcmp(p->command, "MODE"))
-				err = recv_mode(p, s);
-			else if (!strcmp(p->command, "ERROR"))
-				err = recv_error(p, s);
+			else if (isdigit(*p.command))
+				err = recv_numeric(&p, s);
+			else if (!strcmp(p.command, "PRIVMSG"))
+				err = recv_priv(&p, s);
+			else if (!strcmp(p.command, "JOIN"))
+				err = recv_join(&p, s);
+			else if (!strcmp(p.command, "PART"))
+				err = recv_part(&p, s);
+			else if (!strcmp(p.command, "QUIT"))
+				err = recv_quit(&p, s);
+			else if (!strcmp(p.command, "NOTICE"))
+				err = recv_notice(&p, s);
+			else if (!strcmp(p.command, "NICK"))
+				err = recv_nick(&p, s);
+			else if (!strcmp(p.command, "PING"))
+				err = recv_ping(&p, s);
+			else if (!strcmp(p.command, "MODE"))
+				err = recv_mode(&p, s);
+			else if (!strcmp(p.command, "ERROR"))
+				err = recv_error(&p, s);
 			else
-				err = errf("Message type '%s' unknown", p->command);
+				err = errf("Message type '%s' unknown", p.command);
 
 			if (err)
 				newline(s->channel, 0, "-!!-", err, 0);
@@ -1082,16 +1085,24 @@ recv_ctcp_req(parsed_mesg *p, server *s)
 		return "CTCP: command is null";
 
 	if (!strcmp(cmd, "ACTION")) {
+		/* ACTION <message> */
 
-		/* FIXME: wrong??? shouldnt this be p->from?
-		 * it should be from the message target... */
-		/* FIXME: right now this opens a new private chat channel */
-		if ((c = channel_get(p->from, s)) == NULL) {
-			c = new_channel(p->from, s, s->channel);
-			c->type = 'p';
-		}
+		if (IS_ME(targ)) {
+			/* Sending emote to private channel */
+
+			if ((c = channel_get(p->from, s)) == NULL) {
+				c = new_channel(p->from, s, s->channel);
+				c->type = 'p';
+			}
+
+			if (c != ccur)
+				c->active = ACTIVITY_PINGED;
+
+		} else if ((c = channel_get(targ, s)) == NULL)
+			return errf("CTCP ACTION: channel '%s' not found", targ);
 
 		newlinef(c, LINE_ACTION, "*", "%s %s", p->from, p->trailing);
+
 		return NULL;
 	}
 
@@ -1107,7 +1118,7 @@ recv_ctcp_req(parsed_mesg *p, server *s)
 	}
 
 	sendf(s, "NOTICE %s :\x01""ERRMSG %s\x01", p->from, cmd);
-	return errf("CTCP: unknown command '%s'", cmd);
+	return errf("CTCP: Unknown command '%s' from %s", cmd, p->from);
 }
 
 char*
@@ -1705,8 +1716,6 @@ recv_priv(parsed_mesg *p, server *s)
 		if (c != ccur)
 			c->active = ACTIVITY_PINGED;
 
-		draw(D_CHANS);
-
 	} else if ((c = channel_get(targ, s)) == NULL)
 		return errf("PRIVMSG: channel '%s' not found", targ);
 
@@ -1719,8 +1728,6 @@ recv_priv(parsed_mesg *p, server *s)
 	} else {
 		newline(c, 0, p->from, p->trailing, 0);
 	}
-
-	draw(D_CHANS);
 
 	return NULL;
 }

@@ -187,29 +187,38 @@ input_cchar(char c)
 
 	switch (c) {
 
-		/* BS -- '\b' (backspace) */
+		/* Backspace */
 		case 0x7F:
 			delete_left(ccur->input);
 			break;
 
-		/* LF -- '\n' (new line) */
+		/* Line feed */
 		case 0x0A:
 			send_input();
 			break;
 
-		/* ^X */
-		case 0x18:
-			ccur = channel_close(ccur);
-			break;
-
-		/* ^P */
-		case 0x0E:
-			ccur = channel_switch(ccur, 1);
+		/* ^L */
+		case 0x0C:
+			/* Clear current channel */
+			clear_channel(ccur);
 			break;
 
 		/* ^N */
 		case 0x10:
+			/* Go to next channel */
 			ccur = channel_switch(ccur, 0);
+			break;
+
+		/* ^P */
+		case 0x0E:
+			/* Go to previous channel */
+			ccur = channel_switch(ccur, 1);
+			break;
+
+		/* ^X */
+		case 0x18:
+			/* Close current channel */
+			ccur = channel_close(ccur);
 			break;
 	}
 }

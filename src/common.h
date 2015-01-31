@@ -206,5 +206,6 @@ char* getarg(char**, int);
 int check_pinged(char*, char*);
 int nicklist_delete(node**, char*);
 int nicklist_insert(node**, char*);
-parsed_mesg* parse(char *mesg);
+int parse(parsed_mesg*, char*);
+void clear_channel(channel*);
 void free_nicklist(node*);
