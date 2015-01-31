@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/ioctl.h>
@@ -5,50 +6,52 @@
 #include "common.h"
 
 /* Set foreground/background color */
-#define FG(x) "\x1b[38;5;"#x"m"
-#define BG(x) "\x1b[48;5;"#x"m"
+#define FG(X) "\x1b[38;5;"#X"m"
+#define BG(X) "\x1b[48;5;"#X"m"
 
 /* Set bold foreground bold color */
-#define FG_B(x) "\x1b[38;5;"#x";1m"
+#define FG_B(X) "\x1b[38;5;"#X";1m"
 
 /* Reset foreground/background color */
 #define FG_R "\x1b[39m"
 #define BG_R "\x1b[49m"
 
-#define CLEAR_FULL "\x1b[2J"
-#define CLEAR_LINE "\x1b[2K"
 #define MOVE(X, Y) "\x1b["#X";"#Y"H"
 
-static void resize(void);
-static void draw_chat(void);
-static void draw_chans(void);
-static void draw_input(void);
-static void draw_status(void);
+#define CLEAR_FULL  "\x1b[2J"
+#define CLEAR_LINE  "\x1b[2K"
+#define CLEAR_RIGHT "\x1b[K"
 
+/* Save and restore the cursor's location */
+#define CURSOR_SAVE    "\x1b[s"
+#define CURSOR_RESTORE "\x1b[u"
+
+static void resize(void);
+static void draw_buffer(channel*);
+static void draw_chans(channel*);
+static void draw_input(channel*);
+static void draw_status(channel*);
+
+static char* word_wrap(int, char**, char*);
+static int count_line_rows(int, line*);
 static int nick_col(char*);
-static int print_line(int, line*);
-static int print_more(char*, char*, int);
-static char* word_wrap(char*, char*);
 
 struct winsize w;
 
-/* text width */
-static int i, tw = 0;
-
-static int nick_cols[] = {1, 2, 3, 4, 5, 6, 7, 8, 9};
+static int nick_colours[] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14};
 static int actv_cols[ACTIVITY_T_SIZE] = {239, 247, 3};
 
 void
-redraw(void)
+redraw(channel *c)
 {
 	if (!draw) return;
 
 	if (draw & D_RESIZE) resize();
 
-	if (draw & D_CHAT)   draw_chat();
-	if (draw & D_CHANS)  draw_chans();
-	if (draw & D_INPUT)  draw_input();
-	if (draw & D_STATUS) draw_status();
+	if (draw & D_BUFFER) draw_buffer(c);
+	if (draw & D_CHANS)  draw_chans(c);
+	if (draw & D_INPUT)  draw_input(c);
+	if (draw & D_STATUS) draw_status(c);
 
 	draw = 0;
 }
@@ -59,82 +62,235 @@ resize(void)
 	/* Get terminal dimensions */
 	ioctl(0, TIOCGWINSZ, &w);
 
-	/* Clear, set separator color, move to top separator */
-	printf(CLEAR_FULL  FG(239)  MOVE(2, 1));
+	/* Clear, move to top separator and set color */
+	printf(CLEAR_FULL MOVE(2, 1) FG(239));
 
 	/* Draw upper separator */
-	for (i = 0; i < w.ws_col; i++)
+	for (int i = 0; i < w.ws_col; i++)
 		printf("―");
 
 	/* Draw bottom bar, set color back to default */
-	printf(MOVE(%d, 1)" >>> " FG(250), w.ws_row);
+	printf(MOVE(%d, 1) " >>> " FG(250), w.ws_row);
+
+	/* Mark all buffers as resized for next draw */
+	rirc->resized = 1;
+
+	channel *c = ccur;
+	do {
+		c->resized = 1;
+	} while ((c = channel_switch(c, 1)) != ccur);
 
 	/* Draw everything else */
 	draw(D_FULL);
 }
 
-/* TODO (Disconnected) and (Parted) on the status bar */
-/* Statusbar:
+/* TODO:
  *
- * server / private chat:
- * --[usermodes]---
+ * Colorize line types
  *
- * channel:
- * --[usermodes]--[chantype chanmodes chancount]---
- * */
+ * Functional first draft, could use some cleaning up */
 static void
-draw_status(void)
+draw_buffer(channel *c)
 {
-	printf("\x1b[s"); /* save cursor location */
-	printf("\x1b[%d;1H\x1b[2K"FG(239), w.ws_row-1);
+	/* Dynamically draw the current channel's buffer such that:
+	 *
+	 * - The buffer_head line should always be drawn in full when possible
+	 * - Lines wrap on whitespace when possible
+	 * - The top-most lines draws partially when required
+	 * - Buffers requiring fewer rows than available draw from the top down
+	 *
+	 * Rows are numbered from the top down, 1 to w.ws_row, so for w.ws_row = N,
+	 * the drawable area for the buffer is bounded [r3, rN-2]:
+	 *      __________________________
+	 * r1   |     (channel bar)      |
+	 * r2   |------------------------|
+	 * r3   |    ::buffer start::    |
+	 *      |                        |
+	 * ...  |                        |
+	 *      |                        |
+	 * rN-2 |     ::buffer end::     |
+	 * rN-1 |------------------------|
+	 * rN   |______(input bar) ______|
+	 *
+	 *
+	 * So the general steps for drawing are:
+	 *
+	 * 1. Starting from line L = buffer_head, traverse backwards through the
+	 *    buffer summing the rows required to draw lines, until the sum
+	 *    exceeds the number of rows available
+	 *
+	 * 2. L now points to the top-most line to be drawn. L might not be able
+	 *    to draw in full, so discard the excessive word-wrapped segments and
+	 *    draw the remainder
+	 *
+	 * 3. Traverse forward through the buffer, drawing lines until buffer_head
+	 *    is encountered
+	 *
+	 * 4. Clear any remaining rows that might exist in the case where the lines
+	 *    in the channel's buffer are insufficient to fill all rows
+	 */
 
-	int i = 0, j, mode;
-	char umode_str[] = UMODE_STR;
-	char cmode_str[] = CMODE_STR;
+	printf(CURSOR_SAVE);
 
-	/* usermodes */
-	if (ccur->server && (mode = ccur->server->usermode)) {
-		i += printf("―[+") - 2;
-		for (j = 0; j < UMODE_MAX; j++) {
-			if (mode & (1 << j)) {
-				putchar(umode_str[j]);
-				i++;
-			}
-		}
-		i += printf("]");
+	/* Establish current, min and max row for drawing */
+	int buffer_start = 3, buffer_end = w.ws_row - 2;
+	int print_row = buffer_start;
+	int max_row = buffer_end - buffer_start + 1;
+	int count_row = 0;
+
+	/* Insufficient rows for drawing */
+	if (buffer_end < buffer_start)
+		return;
+
+	/* (#terminal columns) - strlen((widest nick in c)) - strlen(" HH:MM   ~ ") */
+	int text_cols = w.ws_col - c->nick_pad - 11;
+
+	/* Insufficient columns for drawing */
+	if (text_cols < 1)
+		goto clear_remainder;
+
+	line *tmp, *l = c->buffer_head;
+
+	/* Empty buffer */
+	if (l->text == NULL)
+		goto clear_remainder;
+
+	/* If the window has been resized, force all cached line rows to be recalculated */
+	if (c->resized) {
+		for (tmp = c->buffer; tmp < &c->buffer[SCROLLBACK_BUFFER]; tmp++)
+			tmp->rows = 0;
+
+		c->resized = 0;
 	}
 
-	/* private chat */
-	if (ccur->type == 'p') {
-		i += printf("―[priv]") - 2;
-	/* chantype, chanmodes, chancount */
-	} else if (ccur->type) {
-		i += printf("―[%c", ccur->type) - 2;
+	/* 1. Find top-most drawable line */
+	for (;;) {
 
-		if ((mode = ccur->chanmode)) {
-			i += printf(" +");
-			for (j = 0; j < CMODE_MAX; j++) {
-				if (mode & (1 << j)) {
-					putchar(cmode_str[j]);
-					i++;
-				}
-			}
-		}
-		i += printf(" %d]", ccur->nick_count);
+		/* Store the number of rows until a resize */
+		if (l->rows == 0)
+			l->rows = count_line_rows(text_cols, l);
+
+		count_row += l->rows;
+
+		if (count_row >= max_row)
+			break;
+
+		tmp = (l == c->buffer) ? &c->buffer[SCROLLBACK_BUFFER - 1] : l - 1;
+
+		if (tmp->text == NULL || tmp == c->buffer_head)
+			break;
+
+		l = tmp;
 	}
 
-	for (; i < w.ws_col; i++)
-		printf("―");
+	/* 2. Handle top-most line if it can't draw in full */
+	if (count_row > max_row) {
+		char *ptr1 = l->text;
+		char *ptr2 = l->text + l->len;
 
-	printf("\x1b[u"); /* restore cursor location */
+		while (count_row-- > max_row)
+			word_wrap(text_cols, &ptr1, ptr2);
+
+		do {
+			printf(MOVE(%d, %d) CLEAR_LINE, print_row++, c->nick_pad + 10);
+			printf(FG(239) "~" FG(250) " ");
+
+			char *print = ptr1;
+			char *wrap = word_wrap(text_cols, &ptr1, ptr2);
+
+			while (print < wrap)
+				putchar(*print++);
+		} while (*ptr1);
+
+
+		if (l == c->buffer_head)
+			goto clear_remainder;
+
+		l = (l == &c->buffer[SCROLLBACK_BUFFER - 1]) ? c->buffer : l + 1;
+
+		if (l->text == NULL)
+			goto clear_remainder;
+	}
+
+	/* 3. Draw all lines */
+	while (print_row <= buffer_end) {
+		/* Draw the main line segment */
+		int from_fg;
+		char *from_bg = "";
+
+		if (l->type == LINE_JOIN || l->type == LINE_PART || l->type == LINE_QUIT)
+			from_fg = 239;
+		else if (l->type == LINE_PINGED)
+			from_fg = 255, from_bg = BG(1);
+		else
+			from_fg = nick_col(l->from);
+
+		printf(MOVE(%d, 1) CLEAR_LINE, print_row++);
+		printf(FG(239) " %02d:%02d  %*s" FG(%d) "%s%s" BG_R FG(239) " ~ " FG(250),
+				l->time_h, l->time_m,
+				(int)(c->nick_pad - strlen(l->from)), "",
+				from_fg, from_bg, l->from);
+
+		char *ptr1 = l->text;
+		char *ptr2 = l->text + l->len;
+
+		char *print = ptr1;
+		char *wrap = word_wrap(text_cols, &ptr1, ptr2);
+
+		while (print < wrap)
+			putchar(*print++);
+
+		if (print_row > buffer_end)
+			break;
+
+		/* Draw any line continuations */
+		while (*ptr1) {
+			printf(MOVE(%d, %d) CLEAR_LINE, print_row++, c->nick_pad + 10);
+			printf(FG(239) "~" FG(250) " ");
+
+			char *print = ptr1;
+			char *wrap = word_wrap(text_cols, &ptr1, ptr2);
+
+			while (print < wrap)
+				putchar(*print++);
+
+			if (print_row > buffer_end)
+				break;
+		}
+
+		if (l == c->buffer_head)
+			break;
+
+		l = (l == &c->buffer[SCROLLBACK_BUFFER - 1]) ? c->buffer : l + 1;
+
+		if (l->text == NULL)
+			break;
+	}
+
+clear_remainder:
+
+	/* 4. Clear any remaining rows */
+	while (print_row <= buffer_end)
+		printf(MOVE(%d, 1) CLEAR_LINE, print_row++);
+
+	printf(CURSOR_RESTORE);
 }
 
+/* TODO:
+ *
+ * For non-default port, include it with the server name,
+ * eg: localhost:9999
+ *
+ * Keep the current channel 'framed' similar to the input bar
+ *
+ * either (#channel) for disconnected/parted channels
+ * or a different color/background color
+ * */
 static void
-draw_chans(void)
+draw_chans(channel *ccur)
 {
-	printf("\x1b[s"); /* save cursor location */
-
-	printf("\x1b[H\x1b[K");
+	printf(CURSOR_SAVE);
+	printf(MOVE(1, 1) CLEAR_LINE);
 
 	int len, width = 0;
 
@@ -145,8 +301,7 @@ draw_chans(void)
 		len = strlen(c->name);
 		if (width + len + 4 < w.ws_col) {
 
-			printf("\x1b[38;5;%dm  %s  ",
-					(c == ccur) ? 255 : actv_cols[c->active], c->name);
+			printf(FG(%d) "  %s  ", (c == ccur) ? 255 : actv_cols[c->active], c->name);
 
 			width += len + 4;
 			c = c->next;
@@ -155,136 +310,23 @@ draw_chans(void)
 	/* FIXME: temporary fix */
 	} while (c != rirc && c != ccur->server->channel);
 
-	/* Restore cursor location */
-	printf("\x1b[u");
+	printf(CURSOR_RESTORE);
 }
 
-static int
-nick_col(char *nick)
-{
-	int col = 0;
-	while (*nick != '\0')
-		col += *nick++;
-	return nick_cols[col % sizeof(nick_cols)/sizeof(nick_cols[0])];
-}
-
-static char*
-word_wrap(char *start, char *end)
-{
-	char *wrap;
-	if ((wrap = start + tw) < end) {
-
-		while (*wrap != ' ' && wrap > start)
-			wrap--;
-
-		if (wrap == start)
-			wrap += tw;
-
-		if (wrap == end)
-			return NULL;
-		else if (*wrap == ' ')
-			return wrap + 1;
-		else
-			return wrap;
-	}
-
-	return NULL;
-}
-
+/* TODO:
+ *
+ * Could use some cleaning up*/
 static void
-draw_chat(void)
-{
-	printf("\x1b[s"); /* save cursor location */
-
-	tw = w.ws_col - ccur->nick_pad - 12;
-
-	int r = print_line(w.ws_row - 2, ccur->cur_line - 1);
-	while (r < w.ws_row - 1)
-		printf("\x1b[%d;1H\x1b[2K", r++);
-	printf("\x1b[u"); /* restore cursor location */
-}
-
-static int
-print_line(int row, line *l)
-{
-	if (l < ccur->chat)
-		l += SCROLLBACK_BUFFER;
-
-	if (!l->text || l == ccur->cur_line)
-		return 3;
-
-	int count = 1;
-	char *ptr1, *ptr2, *wrap;
-
-	ptr1 = l->text;
-	ptr2 = l->text + l->len;
-
-	while ((ptr1 = word_wrap(ptr1, ptr2)) != NULL && ptr1 != ptr2)
-		count++;
-
-	if (row - count > 2)
-		row = print_line(row - count, l - 1) + count - 1;
-
-	ptr1 = l->text;
-	if ((wrap = word_wrap(ptr1, ptr2)) != NULL)
-		row = print_more(wrap, ptr2, row);
-	else
-		wrap = ptr2;
-
-	int from_fg;
-	char *from_bg = "";
-
-	if (l->type == LINE_JOIN || l->type == LINE_PART || l->type == LINE_QUIT)
-		from_fg = 239;
-	else if (l->type == LINE_PINGED)
-		from_fg = 255, from_bg = BG(1);
-	else
-		from_fg = nick_col(l->from);
-
-	if (row > 2) {
-		printf("\x1b[%d;1H\x1b[2K", row);
-		printf(FG(239)" %02d:%02d  %*s"FG(%d)"%s%s"BG_R FG(239)" ~ "FG(250),
-				l->time_h, l->time_m,
-				(int)(ccur->nick_pad - strlen(l->from)), "",
-				from_fg, from_bg, l->from);
-		while (ptr1 < wrap)
-			putchar(*ptr1++);
-	}
-
-	return row + count;
-}
-
-static int
-print_more(char *start, char *end, int row)
-{
-	char *wrap;
-	if ((wrap = word_wrap(start, end)) != NULL && wrap != end)
-		row = print_more(wrap, end, row);
-	else
-		wrap = end;
-
-	if (row > 2) {
-		printf("\x1b[%d;%dH\x1b[2K", row, ccur->nick_pad + 10);
-		printf(FG(239)"~"FG(250)" ");
-		while (start < wrap)
-			putchar(*start++);
-	}
-
-	return row - 1;
-}
-
-static void
-draw_input(void)
+draw_input(channel *c)
 {
 	if (confirm_message) {
-		printf(FG(239)"\x1b[%d;6H\x1b[K"FG(250), w.ws_row);
-		printf("%s", confirm_message);
+		printf(MOVE(%d, 6) CLEAR_RIGHT FG(250) "%s", w.ws_row, confirm_message);
 		return;
 	}
 
 	int winsz = w.ws_col / 3;
 
-	input *in = ccur->input;
+	input *in = c->input;
 
 	/* Reframe the input bar window */
 	if (in->head > (in->window + w.ws_col - 6))
@@ -293,7 +335,7 @@ draw_input(void)
 		in->window = (in->window - winsz > in->line->text)
 			? in->window - winsz : in->line->text;
 
-	printf(FG(239)"\x1b[%d;6H\x1b[K"FG(250), w.ws_row);
+	printf(MOVE(%d, 6) CLEAR_RIGHT FG(250), w.ws_row);
 
 	char *p = in->window;
 	while (p < in->head)
@@ -308,5 +350,145 @@ draw_input(void)
 
 	int col = (in->head - in->window);
 
-	printf("\x1b[%d;%dH", w.ws_row, col + 6);
+	printf(MOVE(%d, %d), w.ws_row, col + 6);
+}
+
+/* TODO:
+ *
+ * Could use some cleaning up*/
+/* Statusbar:
+ *
+ * server / private chat:
+ * --[usermodes]---
+ *
+ * channel:
+ * --[usermodes]--[chantype chanmodes chancount]---
+ * */
+static void
+draw_status(channel *c)
+{
+	printf(CURSOR_SAVE);
+	printf(MOVE(%d, 1) CLEAR_LINE FG(239), w.ws_row - 1);
+
+	int i = 0, j, mode;
+	char umode_str[] = UMODE_STR;
+	char cmode_str[] = CMODE_STR;
+
+	/* usermodes */
+	if (c->server && (mode = c->server->usermode)) {
+		i += printf("―[+") - 2;
+		for (j = 0; j < UMODE_MAX; j++) {
+			if (mode & (1 << j)) {
+				putchar(umode_str[j]);
+				i++;
+			}
+		}
+		i += printf("]");
+	}
+
+	/* private chat */
+	if (c->type == 'p') {
+		i += printf("―[priv]") - 2;
+	/* chantype, chanmodes, chancount */
+	} else if (c->type) {
+		i += printf("―[%c", c->type) - 2;
+
+		if ((mode = c->chanmode)) {
+			i += printf(" +");
+			for (j = 0; j < CMODE_MAX; j++) {
+				if (mode & (1 << j)) {
+					putchar(cmode_str[j]);
+					i++;
+				}
+			}
+		}
+		i += printf(" %d]", c->nick_count);
+	}
+
+	for (; i < w.ws_col; i++)
+		printf("―");
+
+	printf(CURSOR_RESTORE);
+}
+
+static char*
+word_wrap(int text_cols, char **ptr1, char *ptr2)
+{
+	/* Greedy word wrap algorithm.
+	 *
+	 * Given a string bounded by [start, end), return a pointer to the
+	 * character one past the maximum printable character for this string segment
+	 * within text_cols wrapped on whitespace, and set ptr1 to the first character
+	 * that is printable on the next line.
+	 *
+	 * This algorithm never discards whitespace at the beginning of lines, but
+	 * does discard whitespace between line continuations and at end of lines.
+	 *
+	 * text_cols: the number of printable columns
+	 * ptr1:      the first character in string
+	 * ptr2:      the string's null terminator
+	 */
+
+	char *tmp, *ret = (*ptr1) + text_cols;
+
+	assert(text_cols > 0);
+
+	/* Entire line fits within text_cols */
+	if (ret >= ptr2)
+		return (*ptr1 = ptr2);
+
+	/* At least one char exists that can print on current line */
+
+	if (*ret == ' ') {
+
+		/* Wrap on this space, find printable character for next line */
+		for (tmp = ret; *tmp == ' '; tmp++)
+			;
+
+		*ptr1 = tmp;
+
+	} else {
+
+		/* Find a space to wrap on, or wrap on */
+		for (tmp = (*ptr1) + 1; *ret != ' ' && ret > tmp; ret--)
+			;
+
+		/* No space found, wrap on entire segment */
+		if (ret == tmp)
+			return (*ptr1 = (*ptr1) + text_cols);
+
+		*ptr1 = ret + 1;
+	}
+
+	return ret;
+}
+
+static int
+count_line_rows(int text_cols, line *l)
+{
+	/* Count the number of times a line will wrap within text_cols columns */
+
+	int count = 0;
+
+	char *ptr1 = l->text;
+	char *ptr2 = l->text + l->len;
+
+	do {
+		word_wrap(text_cols, &ptr1, ptr2);
+
+		count++;
+	} while (*ptr1);
+
+	return count;
+}
+
+static int
+nick_col(char *nick)
+{
+	int colour = 0;
+
+	while (*nick)
+		colour += *nick++;
+
+	return nick_colours[colour % sizeof(nick_colours) / sizeof(nick_colours[0])];
 }

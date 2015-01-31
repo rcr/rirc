@@ -264,6 +264,6 @@ main_loop(void)
 			flag_sigwinch = 0, draw(D_RESIZE);
 
 		/* Redraw the ui (skipped if nothing has changed) */
-		redraw();
+		redraw(ccur);
 	}
 }

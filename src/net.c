@@ -406,19 +406,25 @@ newline(channel *c, line_t type, const char *from, const char *mesg, int len)
 	if (len == 0)
 		len = strlen(mesg);
 
-	line *l = c->cur_line++;
+	if (++c->buffer_head == &c->buffer[SCROLLBACK_BUFFER])
+		c->buffer_head = c->buffer;
+
+	line *l = c->buffer_head;
 
 	free(l->text);
 
 	l->len = len;
-	if ((l->text = malloc(len)) == NULL)
+	if ((l->text = malloc(len + 1)) == NULL)
 		fatal("newline");
-	memcpy(l->text, mesg, len);
+	strcpy(l->text, mesg);
 
 	time(&raw_t);
 	t = localtime(&raw_t);
 	l->time_h = t->tm_hour;
 	l->time_m = t->tm_min;
+
+	/* Since most lines are added to buffers not beind drawn, set zero */
+	l->rows = 0;
 
 	l->type = type;
 
@@ -431,15 +437,12 @@ newline(channel *c, line_t type, const char *from, const char *mesg, int len)
 	if ((len_from = strlen(l->from)) > c->nick_pad)
 		c->nick_pad = len_from;
 
-	if (c->cur_line == &c->chat[SCROLLBACK_BUFFER])
-		c->cur_line = c->chat;
-
 	if (c == ccur)
-		draw(D_CHAT);
-	else if (!type && c->active < ACTIVITY_ACTIVE) {
+		draw(D_BUFFER);
+	else if (!type && c->active < ACTIVITY_ACTIVE)
 		c->active = ACTIVITY_ACTIVE;
-		draw(D_CHANS);
-	}
+
+	draw(D_CHANS);
 }
 
 void
@@ -515,16 +518,17 @@ new_channel(char *name, server *server, channel *chanlist)
 
 	c->type = '\0';
 	c->parted = 0;
+	c->resized = 0;
 	c->nick_pad = 0;
 	c->chanmode = 0;
 	c->nick_count = 0;
 	c->nicklist = NULL;
 	c->server = server;
-	c->cur_line = c->chat;
+	c->buffer_head = c->buffer;
 	c->active = ACTIVITY_DEFAULT;
 	c->input = new_input();
 	strncpy(c->name, name, 50);
-	memset(c->chat, 0, sizeof(c->chat));
+	memset(c->buffer, 0, sizeof(c->buffer));
 
 	DLL_ADD(chanlist, c);
 
@@ -555,7 +559,7 @@ void
 free_channel(channel *c)
 {
 	line *l;
-	for (l = c->chat; l < c->chat + SCROLLBACK_BUFFER; l++)
+	for (l = c->buffer; l < c->buffer + SCROLLBACK_BUFFER; l++)
 		free(l->text);
 
 	free_nicklist(c->nicklist);

@@ -91,6 +91,7 @@ typedef struct node
 typedef struct line
 {
 	int len;
+	int rows;
 	int time_h;
 	int time_m;
 	char *text;
@@ -128,10 +129,11 @@ typedef struct channel
 	int nick_pad;
 	int nick_count;
 	int parted;
+	int resized;
 	struct channel *next;
 	struct channel *prev;
-	struct line *cur_line;
-	struct line chat[SCROLLBACK_BUFFER];
+	struct line *buffer_head;
+	struct line buffer[SCROLLBACK_BUFFER];
 	struct node *nicklist;
 	struct server *server;
 	struct input *input;
@@ -179,11 +181,11 @@ void newline(channel*, line_t, const char*, const char*, int);
 void newlinef(channel*, line_t, const char*, const char*, ...);
 
 /* draw.c */
-void redraw(void);
 unsigned int draw;
+void redraw(channel*);
 #define draw(X) draw |= X
 #define D_RESIZE (1 << 0)
-#define D_CHAT   (1 << 1)
+#define D_BUFFER (1 << 1)
 #define D_CHANS  (1 << 2)
 #define D_INPUT  (1 << 3)
 #define D_STATUS (1 << 4)

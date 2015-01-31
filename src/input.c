@@ -9,12 +9,13 @@
  * */
 
 #include <ctype.h>
+#include <errno.h>
+#include <poll.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/ioctl.h>
-#include <sys/select.h>
 #include <unistd.h>
 
 #include "common.h"
@@ -125,21 +126,19 @@ poll_input(void)
 	 * pastes exceeding a single line before sending. */
 
 	int ret;
-	fd_set stdin_fd;
+	int timeout_ms = 200;
 
-	FD_ZERO(&stdin_fd);
-	FD_SET(STDIN_FILENO, &stdin_fd);
+	struct pollfd stdin_fd[] = {{ .fd = STDIN_FILENO, .events = POLLIN }};
 
-	/* FIXME: handle EINTR */
-	if ((ret = select(2, &stdin_fd, NULL, NULL, &(struct timeval){ .tv_usec = 200000 })) < 0)
-		fatal("poll_input - select");
+	if ((ret = poll(stdin_fd, 1, timeout_ms)) < 0 && errno != EINTR)
+			fatal("poll");
 
-	if (ret) {
+	if (ret > 0) {
 
 		ssize_t count;
 
-		if ((count = read(STDIN_FILENO, input_buff, MAX_PASTE)) < 0)
-			fatal("poll_input - read");
+		if ((count = read(STDIN_FILENO, input_buff, MAX_PASTE)) < 0 && errno != EINTR)
+			fatal("read");
 
 		if (count == 0)
 			fatal("poll_input - stdin closed");
