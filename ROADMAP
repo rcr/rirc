@@ -1,5 +1,14 @@
 TODO (in no particular order):
 ---------------------------
+
+^F as find channel
+
+^C as cancel current line/action
+
+/IGNORE [nick]
+/UNIGNORE
+	can be implemented as a single nicklist per server
+
 /TOPIC [message]
 	set/get channel topic
 
@@ -7,8 +16,8 @@ TODO (in no particular order):
 	show available commands.
 	if [type] is given, show more specific help
 
-/CLEAR, ctrl+l
-	clear the current channel buffer
+/CLEAR
+	equivalent to ^L for clearing channel
 
 /NICKS
 	print the current nicks to the channel
@@ -44,6 +53,15 @@ buffer logging
 
 Nickserv stuff
 
+Implement flag handling in send_* commands for finer control
+eg:
+/topic                                    = TOPIC #this_channel
+/topic setting a topic                    = TOPIC #this_channel :setting a topic
+/topic -unset                             = TOPIC #this_channel :
+/topic -channel #other                    = TOPIC #other_channel
+/topic -channel #other setting a topic    = TOPIC #other_channel :setting a topic
+/topic -unset #other                      = TOPIC #other_channel :
+
 
 FIXME:
 ---------------------------
@@ -61,6 +79,9 @@ channel name case issues. eg: /join #aBc. Replies refer to #abc
 
 MAYBE (Probably never):
 ---------------------------
+For input pastes that exceed some defined limit, offer a third option:
+	post to, for example, pastebin, and send the url to channel
+
 Client/daemon mode:
 	with -d, --daemon mode, rirc stays open in the background
 	when the user closes the client. draw()s are ignored, etc.
