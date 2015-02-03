@@ -92,17 +92,17 @@ char* recv_priv(parsed_mesg*, server*);
 char* recv_quit(parsed_mesg*, server*);
 
 /* Message sending handlers */
-static char* send_connect(char*);
-static char* send_default(char*);
-static char* send_disconnect(char*);
-static char* send_emote(char*);
-static char* send_join(char*);
-static char* send_nick(char*);
-static char* send_part(char*);
-static char* send_priv(char*);
-static char* send_quit(char*);
-static char* send_raw(char*);
-static char* send_version(char*);
+static int send_connect(char*, char*);
+static int send_default(char*, char*);
+static int send_disconnect(char*, char*);
+static int send_emote(char*, char*);
+static int send_join(char*, char*);
+static int send_nick(char*, char*);
+static int send_part(char*, char*);
+static int send_priv(char*, char*);
+static int send_quit(char*, char*);
+static int send_raw(char*, char*);
+static int send_version(char*, char*);
 
 channel* channel_get(char*, server*);
 server* new_server(char*, char*);
@@ -113,7 +113,7 @@ void recv_mesg(char*, int, server*);
 
 static int confirm_server_close(char);
 
-static char* sendf(server *restrict, const char*, ...);
+static int sendf(char*, server*, const char*, ...);
 
 static void server_connected(server*);
 static void server_disconnect(server*, char*, char*);
@@ -209,8 +209,8 @@ server_connected(server *s)
 
 	s->soc = ct->socket;
 
-	sendf(s, "NICK %s", s->nick_me);
-	sendf(s, "USER %s 8 * :%s", config.username, config.realname);
+	sendf(NULL, s, "NICK %s", s->nick_me);
+	sendf(NULL, s, "USER %s 8 * :%s", config.username, config.realname);
 }
 
 static void*
@@ -368,7 +368,7 @@ server_disconnect(server *s, char *err, char *mesg)
 			newlinef(s->channel, 0, "ERROR", "%s", err);
 
 		if (mesg)
-			sendf(s, "QUIT :%s", mesg);
+			sendf(NULL, s, "QUIT :%s", mesg);
 
 		close(s->soc);
 
@@ -391,12 +391,6 @@ server_disconnect(server *s, char *err, char *mesg)
 	}
 }
 
-/* FIXME: some clients can actually send a null message.
- * this messes up the printing process by thinking there
- * are no more lines to print and effectively 'clears' the screen */
-/* XXX: the routine that prints should check if the POINTER is null,
- * not the contents of the pointer, thats how we know for sure that
- * its an empty message */
 void
 newline(channel *c, line_t type, const char *from, const char *mesg, int len)
 {
@@ -429,9 +423,9 @@ newline(channel *c, line_t type, const char *from, const char *mesg, int len)
 	l->type = type;
 
 	if (!from) /* Server message */
-		strncpy(l->from, c->name, 50);
+		strncpy(l->from, c->name, NICKSIZE);
 	else
-		strncpy(l->from, from, 50);
+		strncpy(l->from, from, NICKSIZE);
 
 	int len_from;
 	if ((len_from = strlen(l->from)) > c->nick_pad)
@@ -479,7 +473,7 @@ get_auto_nick(char **autonick, char *nick)
 			*nick++ = cset[rand() % len];
 	} else {
 		int c = 0;
-		while (*p != ' ' && *p != ',' && *p != '\0' && c++ < 50)
+		while (*p != ' ' && *p != ',' && *p != '\0' && c++ < NICKSIZE)
 			*nick++ = *p++;
 		*autonick = p;
 	}
@@ -527,7 +521,7 @@ new_channel(char *name, server *server, channel *chanlist)
 	c->buffer_head = c->buffer;
 	c->active = ACTIVITY_DEFAULT;
 	c->input = new_input();
-	strncpy(c->name, name, 50);
+	strncpy(c->name, name, CHANSIZE);
 	memset(c->buffer, 0, sizeof(c->buffer));
 
 	DLL_ADD(chanlist, c);
@@ -639,7 +633,7 @@ channel_close(channel *c)
 	} else {
 		/* Closing a channel */
 
-		sendf(c->server, "PART %s", c->name);
+		sendf(NULL, c->server, "PART %s", c->name);
 
 		/* If channel c is last in the list, return the previous channel */
 		ret = !(c->next == c->server->channel) ?
@@ -680,8 +674,19 @@ channel_switch(channel *c, int next)
 	return ret;
 }
 
-static char*
-sendf(server *restrict s, const char *fmt, ...)
+#define MAX_ERROR 512
+
+#define fail(M) \
+	do { if (err) { strncpy(err, M, MAX_ERROR); } return 1; } while(0)
+
+#define failf(M, ...) \
+	do { if (err) { snprintf(err, MAX_ERROR, M, ##__VA_ARGS__); } return 1; } while (0)
+
+#define fail_if(C) \
+	do { if (C) return 1; } while (0)
+
+static int
+sendf(char *err, server *s, const char *fmt, ...)
 {
 	/* Send a formatted message to a server.
 	 *
@@ -698,17 +703,17 @@ sendf(server *restrict s, const char *fmt, ...)
 	va_list ap;
 
 	if (s == NULL || (soc = s->soc) < 0)
-		return "Error: Not connected to server";
+		fail("Error: Not connected to server");
 
 	va_start(ap, fmt);
 	len = vsnprintf(sendbuff, BUFFSIZE-2, fmt, ap);
 	va_end(ap);
 
 	if (len < 0)
-		return "Error: Invalid message format";
+		fail("Error: Invalid message format");
 
 	if (len >= BUFFSIZE-2)
-		return "Error: Message exceeds maximum length of " STR(BUFFSIZE) " bytes";
+		fail("Error: Message exceeds maximum length of " STR(BUFFSIZE) " bytes");
 
 #ifdef DEBUG
 	newline(s->channel, LINE_DEBUG, "DEBUG >>", sendbuff, len);
@@ -718,9 +723,9 @@ sendf(server *restrict s, const char *fmt, ...)
 	sendbuff[len++] = '\n';
 
 	if (send(soc, sendbuff, len, 0) < 0)
-		return errf("Error: %s", strerror(errno));
+		failf("Error: %s", strerror(errno));
 
-	return NULL;
+	return 0;
 }
 
 /*
@@ -730,50 +735,50 @@ sendf(server *restrict s, const char *fmt, ...)
 void
 send_mesg(char *mesg)
 {
-	char *cmd, *err = NULL;
+	char *cmd, errbuff[MAX_ERROR];
+	int err = 0;
 
 	if (*mesg != '/')
-		err = send_default(mesg);
+		err = send_default(errbuff, mesg);
 	else {
 		mesg++;
 
-		if (!(cmd = getarg(&mesg, 1)))
-			err = "Messages beginning with '/' require a command";
+		if (!(cmd = strtok_r(mesg, " ", &mesg)))
+			newline(ccur, 0, "-!!-", "Messages beginning with '/' require a command", 0);
 		else if (!strcasecmp(cmd, "JOIN"))
-			err = send_join(mesg);
+			err = send_join(errbuff, mesg);
 		else if (!strcasecmp(cmd, "CONNECT"))
-			err = send_connect(mesg);
+			err = send_connect(errbuff, mesg);
 		else if (!strcasecmp(cmd, "DISCONNECT"))
-			err = send_disconnect(mesg);
+			err = send_disconnect(errbuff, mesg);
 		else if (!strcasecmp(cmd, "CLOSE"))
 			ccur = channel_close(ccur);
 		else if (!strcasecmp(cmd, "PART"))
-			err = send_part(mesg);
+			err = send_part(errbuff, mesg);
 		else if (!strcasecmp(cmd, "NICK"))
-			err = send_nick(mesg);
+			err = send_nick(errbuff, mesg);
 		else if (!strcasecmp(cmd, "QUIT"))
-			err = send_quit(mesg);
+			err = send_quit(errbuff, mesg);
 		else if (!strcasecmp(cmd, "MSG"))
-			err = send_priv(mesg);
+			err = send_priv(errbuff, mesg);
 		else if (!strcasecmp(cmd, "PRIV"))
-			err = send_priv(mesg);
+			err = send_priv(errbuff, mesg);
 		else if (!strcasecmp(cmd, "ME"))
-			err = send_emote(mesg);
+			err = send_emote(errbuff, mesg);
 		else if (!strcasecmp(cmd, "VERSION"))
-			err = send_version(mesg);
+			err = send_version(errbuff, mesg);
 		else if (!strcasecmp(cmd, "RAW"))
-			err = send_raw(mesg);
+			err = send_raw(errbuff, mesg);
 		else
-			err = errf("Unknown command: %.*s%s",
-				15, cmd, strlen(cmd) > 15 ? "..." : "");
+			newlinef(ccur, 0, "-!!-", "Unknown command: %s", cmd);
 	}
 
 	if (err)
-		newline(ccur, 0, "-!!-", err, 0);
+		newline(ccur, 0, "-!!-", errbuff, 0);
 }
 
-static char*
-send_connect(char *mesg)
+static int
+send_connect(char *err, char *mesg)
 {
 	/* /connect [(host) | (host:port) | (host port)] */
 
@@ -782,7 +787,7 @@ send_connect(char *mesg)
 	if (!(host = strtok(mesg, " :"))) {
 
 		if (!ccur->server || ccur->server->soc >= 0 || ccur->server->connecting)
-			return "Error: Connect requires a hostname argument";
+			fail("Error: Connect requires a hostname argument");
 
 		/* If no hostname arg and server is disconnected, attempt to reconnect */
 		host = ccur->server->host;
@@ -793,150 +798,151 @@ send_connect(char *mesg)
 
 	server_connect(host, port);
 
-	return NULL;
+	return 0;
 }
 
-static char*
-send_default(char *mesg)
+static int
+send_default(char *err, char *mesg)
 {
 	/* All messages not beginning with '/'  */
 
 	if (!ccur->type)
-		return "Error: This is not a channel";
+		fail("Error: This is not a channel");
 
 	if (ccur->parted)
-		return "Error: Parted from channel";
+		fail("Error: Parted from channel");
 
-	char *err;
-	if ((err = sendf(ccur->server, "PRIVMSG %s :%s", ccur->name, mesg)))
-		return err;
+	fail_if(sendf(err, ccur->server, "PRIVMSG %s :%s", ccur->name, mesg));
 
 	newline(ccur, 0, ccur->server->nick_me, mesg, 0);
 
-	return NULL;
+	return 0;
 }
 
-static char*
-send_disconnect(char *mesg)
+static int
+send_disconnect(char *err, char *mesg)
 {
 	/* /disconnect [quit message] */
 
 	if (!ccur->server || (!ccur->server->connecting && ccur->server->soc < 0))
-		return "Error: Not connected to server";
+		fail("Error: Not connected to server");
 
 	skip_space(mesg);
 
 	server_disconnect(ccur->server, NULL, (*mesg) ? mesg : DEFAULT_QUIT_MESG);
 
-	return NULL;
+	return 0;
 }
 
-static char*
-send_emote(char *mesg)
+static int
+send_emote(char *err, char *mesg)
 {
 	/* /me <message> */
 
 	if (!ccur->type)
-		return "Error: This is not a channel";
+		fail("Error: This is not a channel");
 
 	if (ccur->parted)
-		return "Error: Parted from channel";
+		fail("Error: Parted from channel");
 
-	char *err;
-	if ((err = sendf(ccur->server, "PRIVMSG %s :\x01""ACTION %s\x01", ccur->name, mesg)))
-		return err;
+	fail_if(sendf(err, ccur->server, "PRIVMSG %s :\x01""ACTION %s\x01", ccur->name, mesg));
 
 	newlinef(ccur, LINE_ACTION, "*", "%s %s", ccur->server->nick_me, mesg);
 
-	return NULL;
+	return 0;
 }
 
-static char*
-send_join(char *mesg)
+static int
+send_join(char *err, char *mesg)
 {
 	/* /join [target[,targets]*] */
 
 	char *targ;
 
 	if ((targ = strtok(mesg, " ")))
-		return sendf(ccur->server, "JOIN %s", targ);
+		fail_if(sendf(err, ccur->server, "JOIN %s", targ));
+
+	if (!ccur->type)
+		fail("Error: JOIN requires a target");
+
+	if (ccur->type == 'p')
+		fail("Error: Can't rejoin private buffers");
 
 	if (!ccur->parted)
-		return "Error: Not parted from channel";
+		fail("Error: Not parted from channel");
 
-	if (!ccur->type || ccur->type == 'p')
-		return "Error: Can't rejoin server/private buffers";
-
-	return sendf(ccur->server, "JOIN %s", ccur->name);
+	return sendf(err, ccur->server, "JOIN %s", ccur->name);
 }
 
-static char*
-send_nick(char *mesg)
+static int
+send_nick(char *err, char *mesg)
 {
 	/* /nick [nick] */
 
 	char *nick;
 
 	if ((nick = strtok(mesg, " ")))
-		return sendf(ccur->server, "NICK %s", mesg);
+		fail_if(sendf(err, ccur->server, "NICK %s", mesg));
 
 	newlinef(ccur, 0, "--", "Your nick is %s", ccur->server->nick_me);
 
-	return NULL;
+	return 0;
 }
 
-static char*
-send_part(char *mesg)
+static int
+send_part(char *err, char *mesg)
 {
 	/* /part [target[,targets]*] [part message]*/
 
 	char *targ;
 
 	if ((targ = strtok_r(mesg, " ", &mesg)))
-		return sendf(ccur->server, "PART %s :%s", targ, (*mesg) ? mesg : DEFAULT_QUIT_MESG);
+		fail_if(sendf(err, ccur->server, "PART %s :%s", targ, (*mesg) ? mesg : DEFAULT_QUIT_MESG));
+
+	if (!ccur->type)
+		fail("Error: PART requires a target");
+
+	if (ccur->type == 'p')
+		fail("Error: Can't part private buffers");
 
 	if (ccur->parted)
-		return "Error: Already parted from channel";
+		fail("Error: Already parted from channel");
 
-	if (!ccur->type || ccur->type == 'p')
-		return "Error: Can't part server/private buffers";
-
-	return sendf(ccur->server, "PART %s :%s", ccur->name, DEFAULT_QUIT_MESG);
+	return sendf(err, ccur->server, "PART %s :%s", ccur->name, DEFAULT_QUIT_MESG);
 }
 
-static char*
-send_priv(char *mesg) {
+static int
+send_priv(char *err, char *mesg) {
 	/* /(priv | msg) <target> <message> */
 
 	char *targ;
 
 	if (!(targ = strtok_r(mesg, " ", &mesg)))
-		return "Error: Private messages require a target";
+		fail("Error: Private messages require a target");
 
 	if (*mesg == '\0')
-		return "Error: Private messages was null";
+		fail("Error: Private messages was null");
 
-	return sendf(ccur->server, "PRIVMSG %s :%s", targ, mesg);
+	return sendf(err, ccur->server, "PRIVMSG %s :%s", targ, mesg);
+
 	/* TODO: if success, print to current channel?
 	 * or find/open new channel? */
 }
 
-static char*
-send_raw(char *mesg)
+static int
+send_raw(char *err, char *mesg)
 {
 	/* /raw <raw message> */
 
-	char *err;
-	if ((err = sendf(ccur->server, "%s", mesg)))
-		return err;
+	fail_if(sendf(err, ccur->server, "%s", mesg));
 
 	newline(ccur, 0, "RAW >>", mesg, 0);
 
-	return NULL;
+	return 0;
 }
 
-static char*
-send_quit(char *mesg)
+static int
+send_quit(char *err, char *mesg)
 {
 	/* /quit [quit message] */
 
@@ -946,7 +952,7 @@ send_quit(char *mesg)
 	if ((s = server_head)) do {
 
 		if (s->soc >= 0) {
-			sendf(ccur->server, "QUIT :%s", (*mesg) ? mesg : DEFAULT_QUIT_MESG);
+			sendf(err, ccur->server, "QUIT :%s", (*mesg) ? mesg : DEFAULT_QUIT_MESG);
 			close(s->soc);
 		}
 
@@ -964,11 +970,11 @@ send_quit(char *mesg)
 
 	exit(EXIT_SUCCESS);
 
-	return NULL;
+	return 0;
 }
 
-static char*
-send_version(char *mesg)
+static int
+send_version(char *err, char *mesg)
 {
 	/* /version [target] */
 
@@ -977,16 +983,18 @@ send_version(char *mesg)
 	if (ccur == rirc) {
 		newline(ccur, 0, "--", "rirc version " VERSION, 0);
 		newline(ccur, 0, "--", "http://rcr.io/rirc.html", 0);
-		return NULL;
+		return 0;
 	}
 
 	if ((targ = strtok(mesg, " "))) {
 		newlinef(ccur, 0, "--", "Sending CTCP VERSION request to %s", targ);
-		return sendf(ccur->server, "PRIVMSG %s :\x01""VERSION\x01", targ);
+		fail_if(sendf(err, ccur->server, "PRIVMSG %s :\x01""VERSION\x01", targ));
 	} else {
 		newlinef(ccur, 0, "--", "Sending CTCP VERSION request to %s", ccur->server);
-		return sendf(ccur->server, "VERSION");
+		fail_if(sendf(err, ccur->server, "VERSION"));
 	}
+
+	return 0;
 }
 
 /*
@@ -1112,12 +1120,13 @@ recv_ctcp_req(parsed_mesg *p, server *s)
 			c = s->channel;
 
 		newlinef(c, 0, "--", "Received CTCP VERSION from %s", p->from);
-		sendf(s, "NOTICE %s :\x01""VERSION rirc version "VERSION"\x01", p->from);
-		sendf(s, "NOTICE %s :\x01""VERSION http://rcr.io/rirc.html\x01", p->from);
+		sendf(NULL, s, "NOTICE %s :\x01""VERSION rirc version "VERSION"\x01", p->from);
+		sendf(NULL, s, "NOTICE %s :\x01""VERSION http://rcr.io/rirc.html\x01", p->from);
 		return NULL;
 	}
 
-	sendf(s, "NOTICE %s :\x01""ERRMSG %s\x01", p->from, cmd);
+	sendf(NULL, s, "NOTICE %s :\x01""ERRMSG %s\x01", p->from, cmd);
+
 	return errf("CTCP: Unknown command '%s' from %s", cmd, p->from);
 }
 
@@ -1429,14 +1438,14 @@ recv_numeric(parsed_mesg *p, server *s)
 
 		if (config.auto_join) {
 			/* Only send the autojoin on command-line connect */
-			sendf(s, "JOIN %s", config.auto_join);
+			sendf(NULL, s, "JOIN %s", config.auto_join);
 			config.auto_join = NULL;
 		} else {
 			/* If reconnecting to server, join any non-parted channels */
 			c = s->channel;
 			do {
 				if (c->type && c->type != 'p' && !c->parted)
-					sendf(s, "JOIN %s", c->name);
+					sendf(NULL, s, "JOIN %s", c->name);
 				c = c->next;
 			} while (c != s->channel);
 		}
@@ -1626,7 +1635,7 @@ num_400:
 
 		newlinef(s->channel, LINE_NUMRPL, "-!!-", "Trying again with '%s'", s->nick_me);
 
-		sendf(s, "NICK %s", s->nick_me);
+		sendf(NULL, s, "NICK %s", s->nick_me);
 		return NULL;
 
 
@@ -1679,7 +1688,7 @@ recv_ping(parsed_mesg *p, server *s)
 	if (!p->trailing)
 		return "PING: servername is null";
 
-	sendf(s, "PONG %s", p->trailing);
+	sendf(NULL, s, "PONG %s", p->trailing);
 
 	return NULL;
 }

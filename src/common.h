@@ -3,7 +3,8 @@
 #define SCROLLBACK_BUFFER 200
 #define SCROLLBACK_INPUT 15
 #define BUFFSIZE 512
-#define NICKSIZE 50 /* TODO */
+#define NICKSIZE 256
+#define CHANSIZE 256
 #define MAX_INPUT 256
 
 #define TO_STR(X) #X
