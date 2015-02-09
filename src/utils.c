@@ -102,6 +102,11 @@ strdupf(const char *fmt, ...)
 	return ret;
 }
 
+/* FIXME:
+ *
+ * Parsing of the 15 arg max doesn't work correctly
+ *
+ * */
 int
 parse(parsed_mesg *p, char *mesg)
 {
@@ -110,8 +115,9 @@ parse(parsed_mesg *p, char *mesg)
 	/* nospcrlfcl =  %x01-09 / %x0B-0C / %x0E-1F / %x21-39 / %x3B-FF */
 	/* middle =  nospcrlfcl *( ":" / nospcrlfcl ) */
 
+	*p = (parsed_mesg){0};
+
 	/* prefix = servername / ( nickname [ [ "!" user ] "@" host ] ) */
-	p->from = p->hostinfo = NULL;
 
 	if (*mesg == ':') {
 
@@ -136,8 +142,6 @@ parse(parsed_mesg *p, char *mesg)
 	/* params = *14( SPACE middle ) [ SPACE ":" trailing ] */
 	/* params =/ 14( SPACE middle ) [ SPACE [ ":" ] trailing ] */
 	/* trailing   =  *( ":" / " " / nospcrlfcl ) */
-
-	p->trailing = NULL;
 
 	char *param;
 	if ((param = getarg(&mesg, 0))) {
