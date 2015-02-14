@@ -1,31 +1,30 @@
 /* For sigaction */
 #define _POSIX_C_SOURCE 200112L
 
+#include <getopt.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
-#include <signal.h>
-#include <unistd.h>
-#include <poll.h>
-#include <time.h>
 #include <termios.h>
-#include <getopt.h>
+#include <time.h>
 
 #include "common.h"
 
-void splash(void);
-void startup(void);
-void cleanup(void);
-void configure(void);
-void main_loop(void);
-void usage(void);
-void getopts(int, char**);
+static void cleanup(void);
+static void configure(void);
+static void getopts(int, char**);
+static void main_loop(void);
+static void splash(channel*);
+static void startup(void);
+static void usage(void);
 
 static void signal_sigwinch(int);
+
+static struct sigaction sa_sigwinch;
 static volatile sig_atomic_t flag_sigwinch;
 
 /* Values parsed from getopts */
-struct
+static struct
 {
 	char *connect;
 	char *port;
@@ -33,7 +32,7 @@ struct
 	char *nicks;
 } opts;
 
-struct termios oterm, nterm;
+static struct termios oterm, nterm;
 
 int
 main(int argc, char **argv)
@@ -46,7 +45,7 @@ main(int argc, char **argv)
 	return EXIT_SUCCESS;
 }
 
-void
+static void
 usage(void)
 {
 	puts(
@@ -72,23 +71,23 @@ usage(void)
 	);
 }
 
-void
-splash(void)
+static void
+splash(channel *c)
 {
-	newline(rirc, 0, "--", "      _          ", 0);
-	newline(rirc, 0, "--", " _ __(_)_ __ ___ ", 0);
-	newline(rirc, 0, "--", "| '__| | '__/ __|", 0);
-	newline(rirc, 0, "--", "| |  | | | | (__ ", 0);
-	newline(rirc, 0, "--", "|_|  |_|_|  \\___|", 0);
-	newline(rirc, 0, "--", "                 ", 0);
-	newline(rirc, 0, "--", " - version " VERSION, 0);
-	newline(rirc, 0, "--", " - compiled " __DATE__ ", " __TIME__, 0);
+	newline(c, 0, "--", "      _", 0);
+	newline(c, 0, "--", " _ __(_)_ __ ___", 0);
+	newline(c, 0, "--", "| '__| | '__/ __|", 0);
+	newline(c, 0, "--", "| |  | | | | (__", 0);
+	newline(c, 0, "--", "|_|  |_|_|  \\___|", 0);
+	newline(c, 0, "--", "", 0);
+	newline(c, 0, "--", " - version " VERSION, 0);
+	newline(c, 0, "--", " - compiled " __DATE__ ", " __TIME__, 0);
 #ifdef DEBUG
-	newline(rirc, 0, "--", " - compiled with DEBUG flags", 0);
+	newline(c, 0, "--", " - compiled with DEBUG flags", 0);
 #endif
 }
 
-void
+static void
 getopts(int argc, char **argv)
 {
 	opts.connect = NULL;
@@ -169,7 +168,7 @@ getopts(int argc, char **argv)
 	}
 }
 
-void
+static void
 configure(void)
 {
 	if (opts.connect) {
@@ -178,14 +177,11 @@ configure(void)
 		config.auto_join = opts.join;
 		config.nicks = opts.nicks ? opts.nicks : getenv("USER");
 	} else {
-		/* TODO: parse a configuration file. for now set defaults here */
 		config.auto_connect = NULL;
 		config.auto_port = NULL;
 		config.auto_join = NULL;
 		config.nicks = "";
 	}
-
-	/* TODO: parse a configuration file. for now set defaults here */
 	config.username = "rirc_v" VERSION;
 	config.realname = "rirc v" VERSION;
 	config.join_part_quit_threshold = 100;
@@ -197,14 +193,14 @@ signal_sigwinch(int unused __attribute__((unused)))
 	flag_sigwinch = 1;
 }
 
-void
+static void
 startup(void)
 {
 	setbuf(stdout, NULL);
 
 	/* Set terminal to raw mode */
 	tcgetattr(0, &oterm);
-	memcpy(&nterm, &oterm, sizeof(struct termios));
+	nterm = oterm;
 	nterm.c_lflag &= ~(ECHO | ICANON | ISIG);
 	nterm.c_cc[VMIN] = 1;
 	nterm.c_cc[VTIME] = 0;
@@ -216,17 +212,14 @@ startup(void)
 
 	srand(time(NULL));
 
-	rirc = ccur = new_channel("rirc", NULL, NULL);
-
-	splash();
-
 	/* Init draw */
 	draw(D_RESIZE);
 
-	/* Set up signal handlers */
-	struct sigaction sa_sigwinch;
+	rirc = ccur = new_channel("rirc", NULL, NULL);
 
-	memset(&sa_sigwinch, 0, sizeof(struct sigaction));
+	splash(rirc);
+
+	/* Set up signal handlers */
 	sa_sigwinch.sa_handler = signal_sigwinch;
 	if (sigaction(SIGWINCH, &sa_sigwinch, NULL) == -1)
 		fatal("sigaction - SIGWINCH");
@@ -238,7 +231,7 @@ startup(void)
 		server_connect(config.auto_connect, config.auto_port);
 }
 
-void
+static void
 cleanup(void)
 {
 	/* Reset terminal modes */
@@ -248,7 +241,7 @@ cleanup(void)
 	printf("\x1b[?1000l");
 }
 
-void
+static void
 main_loop(void)
 {
 	for (;;) {
