@@ -1,5 +1,11 @@
 TODO (in no particular order):
 ---------------------------
+Cleaner separation between the ui (draw.c) and everything else:
+	- ccur and navigation between channels are all function of the ui
+	- stateful ui related things are functions of the ui, eg:
+		- buffer scrollback
+		- input bar framing
+		- channel bar framing
 
 ^F as find channel
 
@@ -21,11 +27,41 @@ TODO (in no particular order):
 
 /NICKS
 	print the current nicks to the channel
+	^(Also print this implicitly when end of nicks numeric is received)
 
 /NOTICE
 
 CTCP (at a minimum):
 	CLIENTINFO, TIME, PING
+
+receive KICK message type
+
+
+Numerics:
+221 +<flags> :(null)
+     returned when MODE <current nick> is sent
+
+351 reply from server for /version
+     on freenode it sends me 005...
+
+401 no such nick or channel (eg /version <unknown nick>)
+
+402 no such server
+
+403 :no such channel (Getting this from privmsg sometimes)
+
+409 :No origin specified, (eg "/raw PING")
+
+435 cannot change nickname while banned
+    (eg unregistered in channel and trying to /nick)
+
+451 :Connection not registered
+    (eg sending a join before registering)
+
+461 <CMD>   :Syntax error  ... from "/nick" or "/join"
+
+501:Unknown mode "<flag>"
+
 
 Channel buffer scrollback. Probably requires rewrite of buffer
 drawing logic.
@@ -53,6 +89,8 @@ buffer logging
 
 Nickserv stuff
 
+Buffer scrollback
+
 Implement flag handling in send_* commands for finer control
 eg:
 /topic                                    = TOPIC #this_channel
@@ -62,17 +100,43 @@ eg:
 /topic -channel #other setting a topic    = TOPIC #other_channel :setting a topic
 /topic -unset #other                      = TOPIC #other_channel :
 
+colorize output by linetype
+
+Update all places where fatal is called, give the failed system call as the argument
+to fatal and use __func__ in the macro itself
+
+Tests for all the send_*, recv_* handlers
+
+Cleanup the server polling
+
+Allow for multiple connections passed as cli args
+
+Cleanup newline, newlinef
+
+Detect ping timeouts
+
 
 FIXME:
 ---------------------------
+If in ##channel that requires authentication (ie bumps you to ##channel-unauthorized
+or similar), /disconnect, /connect, rirc attempts to join ##channel, can't, and is
+bumped to ##channel-unauthorized, but ##channel buffer remains open and not flagged
+as parted, ie could potentially send messages to the channel, but won't receive any
+
+when registered, and have a nick, and try to /nick to something taken, the message is:
+	thats taken, trying again with <new nick>
+when i successfully change my nick it should print to all channels im in on that server
+Also, the error prints erroneously, printing the current nick and not the nick I tried
+changing to??
+
+use the alternate screen buffer to restore screen when rirc exits
+
+##linux ~ cannot send to channel
+-- cannot send to '##linux - cannot send to channel'
+:::and on each message
+	ERR_ERRONEUSNICKNAME: nick is null
+
 when erroneous nickname on connect (eg too long) goes into infinite loop
-for some reason
-
-numeric 004, the trailing is null on some servers... is it null on freenode?
-	<server info> ~ (null)    as oppose to   "is supported by this server"
-	maybe a blanket thing that checks if trailing is null and doesnt print it
-
-emotes are being received as privmesgs and opening their own channel lol
 
 channel name case issues. eg: /join #aBc. Replies refer to #abc
 
