@@ -110,7 +110,7 @@ void free_server(server*);
 void get_auto_nick(char**, char*);
 void recv_mesg(char*, int, server*);
 
-static int confirm_server_close(char);
+static int action_close_server(char);
 
 static int sendf(char*, server*, const char*, ...);
 
@@ -533,7 +533,7 @@ new_channel(char *name, server *server, channel *chanlist)
 void
 free_server(server *s)
 {
-	/* TODO: s->connecting??? */
+	/* TODO: s->connecting???  should free ct, pthread cancel, close the socket, etc */
 	/* TODO: close the socket? send_quit is expected me to? */
 
 	channel *t, *c = s->channel;
@@ -576,7 +576,7 @@ channel_get(char *chan, server *s)
 
 /* Confirm closing a server */
 static int
-confirm_server_close(char c)
+action_close_server(char c)
 {
 	if (c == 'n' || c == 'N')
 		return 1;
@@ -625,10 +625,10 @@ channel_close(channel *c)
 			num_chans++;
 
 		if (num_chans)
-			confirm(confirm_server_close, "Close server '%s'? Channels: %d   [y/n]",
+			action(action_close_server, "Close server '%s'? Channels: %d   [y/n]",
 					c->server->host, num_chans);
 		else
-			confirm(confirm_server_close, "Close server '%s'?   [y/n]", c->server->host);
+			action(action_close_server, "Close server '%s'?   [y/n]", c->server->host);
 	} else {
 		/* Closing a channel */
 
@@ -839,6 +839,11 @@ send_emote(char *err, char *mesg)
 	return 0;
 }
 
+/* FIXME:    /join #a,#b,#asdf
+ *
+ * joins #a
+ * joins #b
+ * opens a channel named 'sdf' and RPL_NAMEREPLY channel #asdf not found*/
 static int
 send_join(char *err, char *mesg)
 {
@@ -1280,6 +1285,7 @@ recv_mode(char *err, parsed_mesg *p, server *s)
 
 		} while (*(++flags) != '\0');
 
+		/* FIXME: printing flags pointer after it's been iterated over, always \0 */
 		newlinef(c, 0, "--", "%s set %s mode: [%s]", p->from, targ, flags);
 	}
 
@@ -1330,9 +1336,11 @@ recv_mode(char *err, parsed_mesg *p, server *s)
 
 		} while (*(++flags) != '\0');
 
+		/* FIXME: printing flags pointer after it's been iterated over, always \0 */
 		newlinef(s->channel, 0, "--", "%s mode: [%s]", targ, flags);
 	} else {
 		/* TODO: Usermode for other users */
+		/* FIXME: printing flags pointer after it's been iterated over, always \0 */
 		newlinef(s->channel, 0, "--", "%s mode: [%s]", targ, flags);
 	}
 

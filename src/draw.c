@@ -319,8 +319,9 @@ draw_chans(channel *ccur)
 static void
 draw_input(channel *c)
 {
-	if (confirm_message) {
-		printf(MOVE(%d, 6) CLEAR_RIGHT FG(250) "%s", w.ws_row, confirm_message);
+	/* Action messages override the input bar */
+	if (action_message) {
+		printf(MOVE(%d, 6) CLEAR_RIGHT FG(250) "%s", w.ws_row, action_message);
 		return;
 	}
 

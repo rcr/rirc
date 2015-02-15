@@ -194,9 +194,9 @@ void redraw(channel*);
 #define D_FULL ~((draw & 0) | D_RESIZE);
 
 /* input.c */
-char *confirm_message;
+char *action_message;
 input* new_input(void);
-void confirm(int(*)(char), const char*, ...);
+void action(int(*)(char), const char*, ...);
 void free_input(input*);
 void poll_input(void);
 

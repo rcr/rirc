@@ -23,8 +23,8 @@
 /* Max number of characters accepted in user pasted input */
 #define MAX_PASTE 2048
 
-/* Max length of user action confirmation messages */
-#define MAX_CONFIRM 256
+/* Max length of user action message */
+#define MAX_ACTION_MESG 256
 
 /* Defined in draw.c */
 extern struct winsize w;
@@ -37,14 +37,17 @@ static void input_char(char);
 static void input_cchar(char);
 static void input_cseq(char*, ssize_t);
 static void input_paste(char*, ssize_t);
-static void input_confirm(char*, ssize_t);
+static void input_action(char*, ssize_t);
 
-/* Actions confirmation handling */
-static int (*confirm_handler)(char);
-static char confirm_buff[MAX_CONFIRM];
+/* Action handling */
+static int (*action_handler)(char);
+static char action_buff[MAX_ACTION_MESG];
 
 /* Confirmation handler when multi-line pastes are encountered */
-static int send_paste(char);
+static int action_paste_input(char);
+
+/* Incremental channel search */
+static int action_find_channel(char);
 
 /* Send the current input to be parsed and handled */
 static void send_input(void);
@@ -141,11 +144,11 @@ poll_input(void)
 			fatal("read");
 
 		if (count == 0)
-			fatal("poll_input - stdin closed");
+			fatal("stdin closed");
 
-		/* Waiting for user confirmation, ignore everything else */
-		 if (confirm_message)
-			input_confirm(input_buff, count);
+		/* Waiting for user action, ignore everything else */
+		 if (action_message)
+			input_action(input_buff, count);
 
 		/* Case 1 */
 		else if (count == 1 && isprint(*input_buff))
@@ -195,6 +198,13 @@ input_cchar(char c)
 		/* Line feed */
 		case 0x0A:
 			send_input();
+			break;
+
+		/* ^F */
+		case 0x06:
+			/* Find channel */
+			if (ccur->server)
+				action(action_find_channel, "Find: ");
 			break;
 
 		/* ^L */
@@ -282,39 +292,39 @@ input_paste(char *input, ssize_t len)
 	 * - if multiline paste, confirm the number of lines with the user
 	 * - consider that input might be pasted into the middle of a line */
 
-	confirm(send_paste, "Testing paste confirm. y/n? ");
+	action(action_paste_input, "Testing paste confirm. y/n? ");
 }
 
 static void
-input_confirm(char *input, ssize_t len)
+input_action(char *input, ssize_t len)
 {
 	/* Waiting for user confirmation */
 
-	if (len == 1 && confirm_handler(*input)) {
+	if (len == 1 && action_handler(*input)) {
 
-		confirm_message = NULL;
-		confirm_handler = NULL;
+		action_message = NULL;
+		action_handler = NULL;
 
 		draw(D_INPUT);
 	}
 }
 
 void
-confirm(int(*c_handler)(char), const char *fmt, ...)
+action(int(*a_handler)(char), const char *fmt, ...)
 {
-	/* Set a confirmation for the user.
+	/* Begin a user action
 	 *
-	 * The confirmation handler is then passed any future input, and is
-	 * expected to return a non-zero value when the confirmation is resolved*/
+	 * The action handler is then passed any future input, and is
+	 * expected to return a non-zero value when the action is resolved */
 
 	va_list ap;
 
 	va_start(ap, fmt);
-	vsnprintf(confirm_buff, MAX_CONFIRM, fmt, ap);
+	vsnprintf(action_buff, MAX_ACTION_MESG, fmt, ap);
 	va_end(ap);
 
-	confirm_handler = c_handler;
-	confirm_message = confirm_buff;
+	action_handler = a_handler;
+	action_message = action_buff;
 
 	draw(D_INPUT);
 }
@@ -417,23 +427,125 @@ reframe_line(input *in)
 		in->window = in->line->text;
 }
 
+/* TODO: This is a first draft for simple channel searching functionality.
+ *
+ * It can be cleaned up, and input.c is probably not the most ideal place for this */
+#define MAX_SEARCH 128
+channel *search_cptr; /* Used for iterative searching, before setting ccur */
+static char search_buff[MAX_SEARCH];
+static char *search_ptr = search_buff;
+
+static channel* search_channels(channel*, char*);
+static channel*
+search_channels(channel *start, char *search)
+{
+	if (start == NULL || *search == '\0')
+		return NULL;
+
+	/* Start the search one past the input */
+	channel *c = channel_switch(start, 1);
+
+	while (c != start) {
+
+		if (strstr(c->name, search))
+			return c;
+
+		c = channel_switch(c, 1);
+	}
+
+	return NULL;
+}
+
+/* Action line should be:
+ *
+ *
+ * Find: [current result]/[(server if not current server[socket if not 6667])] : <search input> */
+static int
+action_find_channel(char c)
+{
+	/* Incremental channel search */
+
+	/* \n confirms selecting the current match */
+	if (c == '\n' && search_cptr) {
+		*(search_ptr = search_buff) = '\0';
+		ccur = search_cptr;
+		search_cptr = NULL;
+		draw(D_FULL);
+		return 1;
+	}
+
+	/* \n, Esc, ^C cancels a search if no results are found */
+	if (c == '\n' || c == 0x1b || c == 0x03) {
+		*(search_ptr = search_buff) = '\0';
+		return 1;
+	}
+
+	/* ^F repeats the search forward from the current result,
+	 * or resets search criteria if no match */
+	if (c == 0x06) {
+		if (search_cptr == NULL) {
+			*(search_ptr = search_buff) = '\0';
+			action(action_find_channel, "Find: ");
+			return 0;
+		}
+
+		search_cptr = search_channels(search_cptr, search_buff);
+	} else if (c == 0x7f && search_ptr > search_buff) {
+		/* Backspace */
+
+		*(--search_ptr) = '\0';
+
+		search_cptr = search_channels(ccur, search_buff);
+	} else if (isprint(c) && search_ptr < search_buff + MAX_SEARCH && (search_cptr != NULL || *search_buff == '\0')) {
+		/* All other input */
+
+		*(search_ptr++) = c;
+		*search_ptr = '\0';
+
+		search_cptr = search_channels(ccur, search_buff);
+	}
+
+	/* Reprint the action message */
+	if (search_cptr == NULL) {
+		if (*search_buff)
+			action(action_find_channel, "Find: NO MATCH -- %s", search_buff);
+		else
+			action(action_find_channel, "Find: ");
+	} else {
+		/* Found a channel */
+		if (search_cptr->server == ccur->server) {
+			action(action_find_channel, "Find: %s -- %s",
+					search_cptr->name, search_buff);
+		} else {
+			if (!strcmp(search_cptr->server->port, "6667"))
+				action(action_find_channel, "Find: %s->%s -- %s",
+						search_cptr->server->host, search_cptr->name, search_buff);
+			else
+				action(action_find_channel, "Find: %s:%s->%s -- %s",
+						search_cptr->server->host, search_cptr->server->port,
+						search_cptr->name, search_buff);
+		}
+	}
+
+	return 0;
+}
+
 /*
  * Input sending functions
  * */
 
 static int
-send_paste(char c)
+action_paste_input(char c)
 {
-	/* TODO: Testing confirmation functions.
-	 * This should send the paste if confirmed */
+	/* TODO */
 
 	if (c == 'y' || c == 'Y') {
-		newlinef(ccur, 0, "Testing:", "got paste: y/Y");
+		newlinef(ccur, 0, "TODO:", "paste input");
 		return 1;
 	}
 
 	if (c == 'n' || c == 'N') {
-		newlinef(ccur, 0, "Testing:", "got paste: n/N");
+		newlinef(ccur, 0, "TODO:", "paste input");
 		return 1;
 	}
 

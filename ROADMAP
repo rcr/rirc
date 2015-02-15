@@ -7,8 +7,6 @@ Cleaner separation between the ui (draw.c) and everything else:
 		- input bar framing
 		- channel bar framing
 
-^F as find channel
-
 ^C as cancel current line/action
 
 /IGNORE [nick]
@@ -114,6 +112,8 @@ Allow for multiple connections passed as cli args
 Cleanup newline, newlinef
 
 Detect ping timeouts
+
+Reimplement the pasting stuff that was broken
 
 
 FIXME:

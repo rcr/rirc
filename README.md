@@ -43,6 +43,7 @@ Hotkeys:
   ^P : go to previous channel
   ^L : clear channel
   ^X : close channel
+  ^F : find channel
 ```
 
 ##More info:
