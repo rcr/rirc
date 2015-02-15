@@ -104,6 +104,7 @@ typedef struct line
 typedef struct input_line
 {
 	char *end;
+	/* TODO: why is this +1? */
 	char text[MAX_INPUT+1];
 	struct input_line *prev;
 	struct input_line *next;
@@ -124,7 +125,7 @@ typedef struct input
 typedef struct channel
 {
 	activity_t active;
-	char name[50];
+	char name[CHANSIZE];
 	char type;
 	int chanmode;
 	int nick_pad;
@@ -201,9 +202,6 @@ void poll_input(void);
 
 /* utils.c */
 char* strdup(const char*);
-char* strdupf(const char*, ...);
-char* errf(const char*, ...);
-char* getarg(char**, int);
 int check_pinged(char*, char*);
 int nicklist_delete(node**, char*);
 int nicklist_insert(node**, char*);
