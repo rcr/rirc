@@ -61,7 +61,7 @@
 #define fail_if(C) \
 	do { if (C) return 1; } while (0)
 
-#define DEFAULT_QUIT_MESG "rirc v" VERSION " -- http://rcr.io/rirc.html"
+#define DEFAULT_QUIT_MESG "rirc v" VERSION
 
 #define IS_ME(X) !strcmp(X, s->nick_me)
 
@@ -1352,8 +1352,6 @@ recv_nick(char *err, parsed_mesg *p, server *s)
 {
 	/* :nick!user@hostname.domain NICK [:]<new nick> */
 
-	/* TODO: Rename private channels when use changes nick */
-
 	char *nick;
 
 	if (!p->from)
@@ -1390,12 +1388,12 @@ recv_notice(char *err, parsed_mesg *p, server *s)
 	if (!p->trailing)
 		fail("NOTICE: message is null");
 
-	if (!p->from)
-		fail("MODE: sender's nick is null");
-
 	/* CTCP reply */
 	if (*p->trailing == 0x01)
 		return recv_ctcp_rpl(err, p);
+
+	if (!p->from)
+		fail("NOTICE: sender's nick is null");
 
 	if (!(targ = strtok(p->params, " ")))
 		fail("NOTICE: target is null");
@@ -1671,21 +1669,45 @@ recv_part(char *err, parsed_mesg *p, server *s)
 	if (!p->from)
 		fail("PART: sender's nick is null");
 
-	/* TODO: set parted flag */
-	if (IS_ME(p->from))
-		return 0;
-
 	if (!(targ = strtok_r(p->params, " ", &p->params)))
 		fail("PART: target is null");
 
-	if ((c = channel_get(targ, s)) && nicklist_delete(&c->nicklist, p->from)) {
-		c->nick_count--;
-		if (c->nick_count < config.join_part_quit_threshold) {
+	if (IS_ME(p->from)) {
+
+		/* If receving a PART message from myself channel isn't found, assume it was closed */
+		if ((c = channel_get(targ, s)) != NULL) {
+
+			c->parted = 1;
+			c->chanmode = 0;
+			c->nick_count = 0;
+
+			free_nicklist(c->nicklist);
+			c->nicklist = NULL;
+
 			if (p->trailing)
-				newlinef(c, LINE_PART, "<", "%s left %s (%s)", p->from, targ, p->trailing);
+				newlinef(c, 0, "<", "you have left %s (%s)", targ, p->trailing);
 			else
-				newlinef(c, LINE_PART, "<", "%s left %s", p->from, targ);
+				newlinef(c, 0, "<", "you have left %s", targ);
 		}
+
+		draw(D_STATUS);
+
+		return 0;
+	}
+
+	if ((c = channel_get(targ, s)) == NULL)
+		failf("PART: channel '%s' not found", targ);
+
+	if (!nicklist_delete(&c->nicklist, p->from))
+		failf("PART: nick '%s' not found in '%s'", p->from, targ);
+
+	c->nick_count--;
+
+	if (c->nick_count < config.join_part_quit_threshold) {
+		if (p->trailing)
+			newlinef(c, LINE_PART, "<", "%s has left %s (%s)", p->from, targ, p->trailing);
+		else
+			newlinef(c, LINE_PART, "<", "%s has left %s", p->from, targ);
 	}
 
 	draw(D_STATUS);

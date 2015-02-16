@@ -118,6 +118,12 @@ Reimplement the pasting stuff that was broken
 
 FIXME:
 ---------------------------
+Some servers place single args in the trailing section, eg: JOIN :channel vs JOIN channel
+which forces the handlers to check p->params and p->trailing, however since p->params
+is set to NULL in this case, the result is strtok(NULL, " "), so strtok attemps to continue
+parsing whatever it last parsed. Instead, a function like strsep should be implemented
+which correctly handles NULL input in this case
+
 If in ##channel that requires authentication (ie bumps you to ##channel-unauthorized
 or similar), /disconnect, /connect, rirc attempts to join ##channel, can't, and is
 bumped to ##channel-unauthorized, but ##channel buffer remains open and not flagged
