@@ -309,8 +309,10 @@ check_servers(void)
 				newline(s->channel, 0, "-!!-", ct->error, 0);
 
 			/* Connection in progress */
-			else
+			else {
+				s = s->next;
 				continue;
+			}
 
 			free(ct);
 			s->connecting = NULL;
