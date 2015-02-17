@@ -72,7 +72,6 @@ getarg(char **str, int set_null)
 	return ret;
 }
 
-/* TODO: double check this implementation */
 char*
 strdup(const char *str)
 {

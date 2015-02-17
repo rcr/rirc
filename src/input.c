@@ -518,10 +518,10 @@ action_find_channel(char c)
 					search_cptr->name, search_buff);
 		} else {
 			if (!strcmp(search_cptr->server->port, "6667"))
-				action(action_find_channel, "Find: %s->%s -- %s",
+				action(action_find_channel, "Find: %s/%s -- %s",
 						search_cptr->server->host, search_cptr->name, search_buff);
 			else
-				action(action_find_channel, "Find: %s:%s->%s -- %s",
+				action(action_find_channel, "Find: %s:%s/%s -- %s",
 						search_cptr->server->host, search_cptr->server->port,
 						search_cptr->name, search_buff);
 		}

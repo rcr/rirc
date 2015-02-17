@@ -180,7 +180,7 @@ configure(void)
 		config.auto_connect = NULL;
 		config.auto_port = NULL;
 		config.auto_join = NULL;
-		config.nicks = "";
+		config.nicks = getenv("USER");
 	}
 	config.username = "rirc_v" VERSION;
 	config.realname = "rirc v" VERSION;

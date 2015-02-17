@@ -908,6 +908,7 @@ send_priv(char *err, char *mesg) {
 	/* /(priv | msg) <target> <message> */
 
 	char *targ;
+	channel *c;
 
 	if (!(targ = strtok_r(mesg, " ", &mesg)))
 		fail("Error: Private messages require a target");
@@ -915,10 +916,16 @@ send_priv(char *err, char *mesg) {
 	if (*mesg == '\0')
 		fail("Error: Private messages was null");
 
-	return sendf(err, ccur->server, "PRIVMSG %s :%s", targ, mesg);
+	fail_if(sendf(err, ccur->server, "PRIVMSG %s :%s", targ, mesg));
 
-	/* TODO: If sendf succeeds, either print to current channel or
-	 * open new private channel */
+	if ((c = channel_get(targ, ccur->server)) == NULL) {
+		c = new_channel(targ, ccur->server, ccur);
+		c->type = 'p';
+	}
+
+	newline(c, 0, ccur->server->nick_me, mesg, 0);
+
+	return 0;
 }
 
 static int
