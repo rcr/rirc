@@ -1194,7 +1194,7 @@ recv_join(char *err, parsed_mesg *p, server *s)
 		c->nick_count++;
 
 		if (c->nick_count < config.join_part_quit_threshold)
-			newlinef(c, LINE_JOIN, ">", "%s has joined %s", p->from, chan);
+			newlinef(c, LINE_JOIN, ">", "%s/%s has joined %s", p->from, p->hostinfo, chan);
 
 		draw(D_STATUS);
 	}
@@ -1225,6 +1225,8 @@ recv_mode(char *err, parsed_mesg *p, server *s)
 	if ((c = channel_get(targ, s))) {
 
 		int *chanmode = &c->chanmode;
+
+		newlinef(c, 0, "--", "%s set %s mode: [%s]", p->from, targ, flags);
 
 		/* Chanmodes */
 		do {
@@ -1298,14 +1300,13 @@ recv_mode(char *err, parsed_mesg *p, server *s)
 				*chanmode &= ~modebit;
 
 		} while (*(++flags) != '\0');
-
-		/* FIXME: printing flags pointer after it's been iterated over, always \0 */
-		newlinef(c, 0, "--", "%s set %s mode: [%s]", p->from, targ, flags);
 	}
 
 	if (IS_ME(targ)) {
 
 		int *usermode = &s->usermode;
+
+		newlinef(s->channel, 0, "--", "%s mode: [%s]", targ, flags);
 
 		/* Usermodes */
 		do {
@@ -1349,12 +1350,8 @@ recv_mode(char *err, parsed_mesg *p, server *s)
 				*usermode &= ~modebit;
 
 		} while (*(++flags) != '\0');
-
-		/* FIXME: printing flags pointer after it's been iterated over, always \0 */
-		newlinef(s->channel, 0, "--", "%s mode: [%s]", targ, flags);
 	} else {
 		/* TODO: Usermode for other users */
-		/* FIXME: printing flags pointer after it's been iterated over, always \0 */
 		newlinef(s->channel, 0, "--", "%s mode: [%s]", targ, flags);
 	}
 
@@ -1722,9 +1719,9 @@ recv_part(char *err, parsed_mesg *p, server *s)
 
 	if (c->nick_count < config.join_part_quit_threshold) {
 		if (p->trailing)
-			newlinef(c, LINE_PART, "<", "%s has left %s (%s)", p->from, targ, p->trailing);
+			newlinef(c, LINE_PART, "<", "%s/%s has left %s (%s)", p->from, p->hostinfo, targ, p->trailing);
 		else
-			newlinef(c, LINE_PART, "<", "%s has left %s", p->from, targ);
+			newlinef(c, LINE_PART, "<", "%s/%s has left %s", p->from, p->hostinfo, targ);
 	}
 
 	draw(D_STATUS);
@@ -1804,9 +1801,9 @@ recv_quit(char *err, parsed_mesg *p, server *s)
 			c->nick_count--;
 			if (c->nick_count < config.join_part_quit_threshold) {
 				if (p->trailing)
-					newlinef(c, LINE_QUIT, "<", "%s has quit (%s)", p->from, p->trailing);
+					newlinef(c, LINE_QUIT, "<", "%s/%s has quit (%s)", p->from, p->hostinfo, p->trailing);
 				else
-					newlinef(c, LINE_QUIT, "<", "%s has quit", p->from);
+					newlinef(c, LINE_QUIT, "<", "%s/%s has quit", p->from, p->hostinfo);
 			}
 		}
 		c = c->next;
