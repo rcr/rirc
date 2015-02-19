@@ -118,6 +118,10 @@ Reimplement the pasting stuff that was broken
 
 FIXME:
 ---------------------------
+Rewrite check_servers
+
+Closing private channels sometimes results in numeric 403
+
 Some servers place single args in the trailing section, eg: JOIN :channel vs JOIN channel
 which forces the handlers to check p->params and p->trailing, however since p->params
 is set to NULL in this case, the result is strtok(NULL, " "), so strtok attemps to continue

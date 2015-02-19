@@ -374,8 +374,13 @@ server_disconnect(server *s, char *err, char *mesg)
 		close(s->soc);
 
 		/* Set all server attributes back to default */
-		s->usermode = 0;
 		s->soc = -1;
+		s->usermode = 0;
+		s->iptr = s->input;
+		s->nptr = config.nicks;
+
+		/* Reset the nick that reconnects will attempt to register with */
+		get_auto_nick(&(s->nptr), s->nick_me);
 
 		channel *c = s->channel;
 		do {
@@ -1644,18 +1649,21 @@ num_400:
 		newlinef(s->channel, LINE_NUMRPL, "-!!-", "'%s' - %s", nick, p->trailing);
 		return 0;
 
-	/* FIXME: under normal circumstances if /nick <newnick> returns 433 we are
-	 * generating a new nick. Might necessitate a server->registered flag */
 	case ERR_NICKNAMEINUSE:  /* 433 <nick> :Nickname is already in use */
 
-		/* FIXME: wrong, should grab <nick> from the message */
-		newlinef(s->channel, LINE_NUMRPL, "-!!-", "Nick '%s' in use", s->nick_me);
+		if (!(nick = strtok(p->params, " ")))
+			fail("ERR_NICKNAMEINUSE: nick is null");
 
-		get_auto_nick(&(s->nptr), s->nick_me);
+		newlinef(s->channel, LINE_NUMRPL, "-!!-", "Nick '%s' in use", nick);
 
-		newlinef(s->channel, LINE_NUMRPL, "-!!-", "Trying again with '%s'", s->nick_me);
+		if (IS_ME(nick)) {
+			get_auto_nick(&(s->nptr), s->nick_me);
 
-		return sendf(err, s, "NICK %s", s->nick_me);
+			newlinef(s->channel, LINE_NUMRPL, "-!!-", "Trying again with '%s'", s->nick_me);
+
+			return sendf(err, s, "NICK %s", s->nick_me);
+		}
+		return 0;
 
 
 	default:
