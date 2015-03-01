@@ -57,8 +57,8 @@ static inline void cursor_left(input*);
 static inline void cursor_right(input*);
 static inline void delete_left(input*);
 static inline void delete_right(input*);
-static inline void scroll_up(input*);
-static inline void scroll_down(input*);
+static inline void input_scroll_up(input*);
+static inline void input_scroll_down(input*);
 
 /* Input line util functions */
 static inline void reset_line(input*);
@@ -245,11 +245,11 @@ input_cseq(char *input, ssize_t len)
 
 	/* arrow up */
 	else if (!strncmp(input, "[A", len))
-		scroll_up(ccur->input);
+		input_scroll_up(ccur->input);
 
 	/* arrow down */
 	else if (!strncmp(input, "[B", len))
-		scroll_down(ccur->input);
+		input_scroll_down(ccur->input);
 
 	/* arrow right */
 	else if (!strncmp(input, "[C", len))
@@ -283,6 +283,8 @@ input_cseq(char *input, ssize_t len)
 static void
 input_paste(char *input, ssize_t len)
 {
+	UNUSED(input);
+	UNUSED(len);
 	/* Input pasted text */
 
 	/* TODO: count the number of lines that would be sent,
@@ -370,7 +372,7 @@ delete_right(input *in)
 }
 
 static inline void
-scroll_up(input *in)
+input_scroll_up(input *in)
 {
 	reset_line(in);
 
@@ -383,7 +385,7 @@ scroll_up(input *in)
 }
 
 static inline void
-scroll_down(input *in)
+input_scroll_down(input *in)
 {
 	reset_line(in);
 

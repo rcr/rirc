@@ -188,8 +188,10 @@ configure(void)
 }
 
 static void
-signal_sigwinch(int unused __attribute__((unused)))
+signal_sigwinch(int signum)
 {
+	UNUSED(signum);
+
 	flag_sigwinch = 1;
 }
 

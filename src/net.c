@@ -51,7 +51,7 @@
 
 /* Fail macros used in message sending/receiving handlers */
 #define fail(M) \
-	do { if (err) { strncpy(err, M, MAX_ERROR); } return 1; } while(0)
+	do { if (err) { strncpy(err, M, MAX_ERROR); } return 1; } while (0)
 
 /* Fail with formatted message */
 #define failf(M, ...) \
@@ -1151,9 +1151,11 @@ recv_ctcp_rpl(char *err, parsed_mesg *p)
 }
 
 static int
-recv_error(char *err __attribute__((unused)), parsed_mesg *p, server *s)
+recv_error(char *err, parsed_mesg *p, server *s)
 {
 	/* ERROR :<message> */
+
+	UNUSED(err);
 
 	server_disconnect(s, p->trailing ? p->trailing : "Remote hangup", NULL);
 

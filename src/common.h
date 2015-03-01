@@ -45,6 +45,9 @@
 #define fatal(mesg) \
 	do {perror(mesg); exit(EXIT_FAILURE);} while (0)
 
+/* Suppress 'unused parameter' warnings */
+#define UNUSED(X) ((void)(X))
+
 /* Channel bar activity types */
 typedef enum {
 	ACTIVITY_DEFAULT,
