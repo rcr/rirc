@@ -85,22 +85,6 @@ strdup(const char *str)
 	return ret;
 }
 
-char*
-strdupf(const char *fmt, ...)
-{
-	char *ret;
-
-	if ((ret = malloc(BUFFSIZE)) == NULL)
-		fatal("strdupf - malloc");
-
-	va_list ap;
-	va_start(ap, fmt);
-	vsnprintf(ret, BUFFSIZE, fmt, ap);
-	va_end(ap);
-
-	return ret;
-}
-
 /* FIXME:
  *
  * Parsing of the 15 arg max doesn't work correctly

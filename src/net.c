@@ -109,6 +109,7 @@ void free_channel(channel*);
 void free_server(server*);
 void get_auto_nick(char**, char*);
 void recv_mesg(char*, int, server*);
+static void _newline(channel*, line_t, const char*, const char*, size_t);
 
 static int action_close_server(char);
 
@@ -306,7 +307,7 @@ check_servers(void)
 
 			/* Connection failure */
 			else if (*ct->error)
-				newline(s->channel, 0, "-!!-", ct->error, 0);
+				newline(s->channel, 0, "-!!-", ct->error);
 
 			/* Connection in progress */
 			else {
@@ -384,7 +385,7 @@ server_disconnect(server *s, char *err, char *mesg)
 
 		channel *c = s->channel;
 		do {
-			newline(c, 0, "-!!-", "(disconnected)", 0);
+			newline(c, 0, "-!!-", "(disconnected)");
 
 			c->chanmode = 0;
 			c->nick_count = 0;
@@ -398,56 +399,18 @@ server_disconnect(server *s, char *err, char *mesg)
 }
 
 void
-newline(channel *c, line_t type, const char *from, const char *mesg, int len)
+newline(channel *c, line_t type, const char *from, const char *mesg)
 {
-	time_t raw_t;
-	struct tm *t;
+	/* Default wrapper for _newline because length of message won't be known */
 
-	if (len == 0)
-		len = strlen(mesg);
-
-	if (++c->buffer_head == &c->buffer[SCROLLBACK_BUFFER])
-		c->buffer_head = c->buffer;
-
-	line *l = c->buffer_head;
-
-	free(l->text);
-
-	l->len = len;
-	if ((l->text = malloc(len + 1)) == NULL)
-		fatal("newline");
-	strcpy(l->text, mesg);
-
-	time(&raw_t);
-	t = localtime(&raw_t);
-	l->time_h = t->tm_hour;
-	l->time_m = t->tm_min;
-
-	/* Since most lines are added to buffers not beind drawn, set zero */
-	l->rows = 0;
-
-	l->type = type;
-
-	if (!from) /* Server message */
-		strncpy(l->from, c->name, NICKSIZE);
-	else
-		strncpy(l->from, from, NICKSIZE);
-
-	int len_from;
-	if ((len_from = strlen(l->from)) > c->nick_pad)
-		c->nick_pad = len_from;
-
-	if (c == ccur)
-		draw(D_BUFFER);
-	else if (!type && c->active < ACTIVITY_ACTIVE)
-		c->active = ACTIVITY_ACTIVE;
-
-	draw(D_CHANS);
+	_newline(c, type, from, mesg, strlen(mesg));
 }
 
 void
 newlinef(channel *c, line_t type, const char *from, const char *fmt, ...)
 {
+	/* Formating wrapper for _newline */
+
 	char buff[BUFFSIZE];
 	int len;
 	va_list ap;
@@ -456,7 +419,75 @@ newlinef(channel *c, line_t type, const char *from, const char *fmt, ...)
 	len = vsnprintf(buff, BUFFSIZE, fmt, ap);
 	va_end(ap);
 
-	newline(c, type, from, buff, len);
+	_newline(c, type, from, buff, len);
+}
+
+static void
+_newline(channel *c, line_t type, const char *from, const char *mesg, size_t len)
+{
+	/* Static function for handling inserting new lines into buffers */
+
+	line *new_line;
+
+	/* c->buffer_head points to the first printable line, so get the next line in the
+	 * circular buffer */
+	if ((new_line = c->buffer_head + 1) == &c->buffer[SCROLLBACK_BUFFER])
+		new_line = c->buffer;
+
+	/* Increment the channel's scrollback pointer if it pointed to the first or last line, ie:
+	 *  - if it points to c->buffer_head, it pointed to the previous first line in the buffer
+	 *  - if it points to l here, it pointed to the previous last line in the buffer
+	 *  */
+	if (c->draw.scrollback == c->buffer_head || c->draw.scrollback == new_line)
+		if (++c->draw.scrollback == &c->buffer[SCROLLBACK_BUFFER])
+			c->draw.scrollback = c->buffer;
+
+	c->buffer_head = new_line;
+
+	/* new_channel() memsets c->buffer to 0, so this will either free(NULL) or an old line */
+	free(new_line->text);
+
+	if (c == NULL)
+		fatal("channel is null");
+
+	/* Set the line meta data */
+	time_t raw_t;
+	struct tm *t;
+
+	new_line->len = len;
+
+	new_line->type = type;
+
+	/* Rows are recalculated by the draw routine when == 0 */
+	new_line->rows = 0;
+
+	time(&raw_t);
+	t = localtime(&raw_t);
+
+	new_line->time_h = t->tm_hour;
+	new_line->time_m = t->tm_min;
+
+	/* If from is NULL, assume server message */
+	strncpy(new_line->from, (from) ? from : c->name, NICKSIZE);
+
+	size_t len_from;
+	if ((len_from = strlen(new_line->from)) > c->draw.nick_pad)
+		c->draw.nick_pad = len_from;
+
+	if (mesg == NULL)
+		fatal("mesg is null");
+
+	if ((new_line->text = malloc(new_line->len + 1)) == NULL)
+		fatal("newline");
+
+	strcpy(new_line->text, mesg);
+
+	if (c == ccur)
+		draw(D_BUFFER);
+	else if (!type && c->active < ACTIVITY_ACTIVE) {
+		c->active = ACTIVITY_ACTIVE;
+		draw(D_CHANS);
+	}
 }
 
 void
@@ -519,7 +550,6 @@ new_channel(char *name, server *server, channel *chanlist)
 	c->type = '\0';
 	c->parted = 0;
 	c->resized = 0;
-	c->nick_pad = 0;
 	c->chanmode = 0;
 	c->nick_count = 0;
 	c->nicklist = NULL;
@@ -529,6 +559,9 @@ new_channel(char *name, server *server, channel *chanlist)
 	c->input = new_input();
 	strncpy(c->name, name, CHANSIZE);
 	memset(c->buffer, 0, sizeof(c->buffer));
+
+	c->draw.nick_pad = 0;
+	c->draw.scrollback = c->buffer_head;
 
 	DLL_ADD(chanlist, c);
 
@@ -711,7 +744,7 @@ sendf(char *err, server *s, const char *fmt, ...)
 		fail("Error: Message exceeds maximum length of " STR(BUFFSIZE) " bytes");
 
 #ifdef DEBUG
-	newline(s->channel, LINE_DEBUG, "DEBUG >>", sendbuff, len);
+	_newline(s->channel, LINE_DEBUG, "DEBUG >>", sendbuff, len);
 #endif
 
 	sendbuff[len++] = '\r';
@@ -740,7 +773,7 @@ send_mesg(char *mesg)
 		mesg++;
 
 		if (!(cmd = strtok_r(mesg, " ", &mesg)))
-			newline(ccur, 0, "-!!-", "Messages beginning with '/' require a command", 0);
+			newline(ccur, 0, "-!!-", "Messages beginning with '/' require a command");
 		else if (!strcasecmp(cmd, "JOIN"))
 			err = send_join(errbuff, mesg);
 		else if (!strcasecmp(cmd, "CONNECT"))
@@ -770,7 +803,7 @@ send_mesg(char *mesg)
 	}
 
 	if (err)
-		newline(ccur, 0, "-!!-", errbuff, 0);
+		newline(ccur, 0, "-!!-", errbuff);
 }
 
 static int
@@ -810,7 +843,7 @@ send_default(char *err, char *mesg)
 
 	fail_if(sendf(err, ccur->server, "PRIVMSG %s :%s", ccur->name, mesg));
 
-	newline(ccur, 0, ccur->server->nick_me, mesg, 0);
+	newline(ccur, 0, ccur->server->nick_me, mesg);
 
 	return 0;
 }
@@ -930,7 +963,7 @@ send_priv(char *err, char *mesg) {
 		c->type = 'p';
 	}
 
-	newline(c, 0, ccur->server->nick_me, mesg, 0);
+	newline(c, 0, ccur->server->nick_me, mesg);
 
 	return 0;
 }
@@ -942,7 +975,7 @@ send_raw(char *err, char *mesg)
 
 	fail_if(sendf(err, ccur->server, "%s", mesg));
 
-	newline(ccur, 0, "RAW >>", mesg, 0);
+	newline(ccur, 0, "RAW >>", mesg);
 
 	return 0;
 }
@@ -985,8 +1018,8 @@ send_version(char *err, char *mesg)
 	char *targ;
 
 	if (ccur->server == NULL) {
-		newline(ccur, 0, "--", "rirc version " VERSION, 0);
-		newline(ccur, 0, "--", "http://rcr.io/rirc.html", 0);
+		newline(ccur, 0, "--", "rirc version " VERSION);
+		newline(ccur, 0, "--", "http://rcr.io/rirc.html");
 		return 0;
 	}
 
@@ -1020,11 +1053,11 @@ recv_mesg(char *inp, int count, server *s)
 			*ptr = '\0';
 
 #ifdef DEBUG
-			newline(s->channel, LINE_DEBUG, "", "", 0);
-			newline(s->channel, LINE_DEBUG, "DEBUG <<", s->input, 0);
+			newline(s->channel, LINE_DEBUG, "", "");
+			newline(s->channel, LINE_DEBUG, "DEBUG <<", s->input);
 #endif
 			if (!(parse(&p, s->input)))
-				newline(s->channel, 0, "-!!-", "Failed to parse message", 0);
+				newline(s->channel, 0, "-!!-", "Failed to parse message");
 			else if (isdigit(*p.command))
 				err = recv_numeric(errbuff, &p, s);
 			else if (!strcmp(p.command, "PRIVMSG"))
@@ -1427,9 +1460,9 @@ recv_notice(char *err, parsed_mesg *p, server *s)
 		fail("NOTICE: target is null");
 
 	if ((c = channel_get(targ, s)))
-		newline(c, 0, p->from, p->trailing, 0);
+		newline(c, 0, p->from, p->trailing);
 	else
-		newline(s->channel, 0, p->from, p->trailing, 0);
+		newline(s->channel, 0, p->from, p->trailing);
 
 	return 0;
 }
@@ -1486,14 +1519,14 @@ recv_numeric(char *err, parsed_mesg *p, server *s)
 			} while (c != s->channel);
 		}
 
-		newline(s->channel, LINE_NUMRPL, "--", p->trailing, 0);
+		newline(s->channel, LINE_NUMRPL, "--", p->trailing);
 		return 0;
 
 
 	case RPL_YOURHOST:  /* 002 <nick> :<Host info, server version, etc> */
 	case RPL_CREATED:   /* 003 <nick> :<Server creation date message> */
 
-		newline(s->channel, LINE_NUMRPL, "--", p->trailing, 0);
+		newline(s->channel, LINE_NUMRPL, "--", p->trailing);
 		return 0;
 
 
@@ -1592,7 +1625,7 @@ num_200:
 	case RPL_STATSCONN:    /* 250 :<Message> */
 	case RPL_LUSERCLIENT:  /* 251 :<Message> */
 
-		newline(s->channel, LINE_NUMRPL, "--", p->trailing, 0);
+		newline(s->channel, LINE_NUMRPL, "--", p->trailing);
 		return 0;
 
 
@@ -1613,7 +1646,7 @@ num_200:
 	case RPL_MOTD:         /* 372 : - <Message> */
 	case RPL_MOTDSTART:    /* 375 :<server> Message of the day */
 
-		newline(s->channel, LINE_NUMRPL, "--", p->trailing, 0);
+		newline(s->channel, LINE_NUMRPL, "--", p->trailing);
 		return 0;
 
 
@@ -1644,9 +1677,9 @@ num_400:
 		channel *c;
 
 		if ((c = channel_get(chan, s)))
-			newline(c, LINE_NUMRPL, 0, p->trailing, 0);
+			newline(c, LINE_NUMRPL, 0, p->trailing);
 		else
-			newline(s->channel, LINE_NUMRPL, 0, p->trailing, 0);
+			newline(s->channel, LINE_NUMRPL, 0, p->trailing);
 
 		if (p->trailing)
 			newlinef(c, LINE_NUMRPL, "--", "Cannot send to '%s' - %s", chan, p->trailing);
@@ -1797,9 +1830,9 @@ recv_priv(char *err, parsed_mesg *p, server *s)
 		if (c != ccur)
 			c->active = ACTIVITY_PINGED;
 
-		newline(c, LINE_PINGED, p->from, p->trailing, 0);
+		newline(c, LINE_PINGED, p->from, p->trailing);
 	} else
-		newline(c, 0, p->from, p->trailing, 0);
+		newline(c, 0, p->from, p->trailing);
 
 	return 0;
 }

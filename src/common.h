@@ -94,7 +94,7 @@ typedef struct node
 /* Chat buffer line */
 typedef struct line
 {
-	int len;
+	size_t len;
 	int rows;
 	int time_h;
 	int time_m;
@@ -131,7 +131,6 @@ typedef struct channel
 	char name[CHANSIZE];
 	char type;
 	int chanmode;
-	int nick_pad;
 	int nick_count;
 	int parted;
 	int resized;
@@ -142,6 +141,10 @@ typedef struct channel
 	struct node *nicklist;
 	struct server *server;
 	struct input *input;
+	struct {
+		size_t nick_pad;
+		struct line *scrollback;
+	} draw;
 } channel;
 
 /* Server */
@@ -182,7 +185,7 @@ channel* new_channel(char*, server*, channel*);
 channel* channel_close(channel*);
 channel* channel_switch(channel*, int);
 void send_mesg(char*);
-void newline(channel*, line_t, const char*, const char*, int);
+void newline(channel*, line_t, const char*, const char*);
 void newlinef(channel*, line_t, const char*, const char*, ...);
 
 /* draw.c */

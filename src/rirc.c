@@ -74,16 +74,16 @@ usage(void)
 static void
 splash(channel *c)
 {
-	newline(c, 0, "--", "      _", 0);
-	newline(c, 0, "--", " _ __(_)_ __ ___", 0);
-	newline(c, 0, "--", "| '__| | '__/ __|", 0);
-	newline(c, 0, "--", "| |  | | | | (__", 0);
-	newline(c, 0, "--", "|_|  |_|_|  \\___|", 0);
-	newline(c, 0, "--", "", 0);
-	newline(c, 0, "--", " - version " VERSION, 0);
-	newline(c, 0, "--", " - compiled " __DATE__ ", " __TIME__, 0);
+	newline(c, 0, "--", "      _");
+	newline(c, 0, "--", " _ __(_)_ __ ___");
+	newline(c, 0, "--", "| '__| | '__/ __|");
+	newline(c, 0, "--", "| |  | | | | (__");
+	newline(c, 0, "--", "|_|  |_|_|  \\___|");
+	newline(c, 0, "--", "");
+	newline(c, 0, "--", " - version " VERSION);
+	newline(c, 0, "--", " - compiled " __DATE__ ", " __TIME__);
 #ifdef DEBUG
-	newline(c, 0, "--", " - compiled with DEBUG flags", 0);
+	newline(c, 0, "--", " - compiled with DEBUG flags");
 #endif
 }
 

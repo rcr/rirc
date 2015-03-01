@@ -143,7 +143,7 @@ draw_buffer(channel *c)
 		return;
 
 	/* (#terminal columns) - strlen((widest nick in c)) - strlen(" HH:MM   ~ ") */
-	int text_cols = w.ws_col - c->nick_pad - 11;
+	int text_cols = w.ws_col - c->draw.nick_pad - 11;
 
 	/* Insufficient columns for drawing */
 	if (text_cols < 1)
@@ -192,7 +192,7 @@ draw_buffer(channel *c)
 			word_wrap(text_cols, &ptr1, ptr2);
 
 		do {
-			printf(MOVE(%d, %d) CLEAR_LINE, print_row++, c->nick_pad + 10);
+			printf(MOVE(%d, %d) CLEAR_LINE, print_row++, (int)c->draw.nick_pad + 10);
 			printf(FG(239) "~" FG(250) " ");
 
 			char *print = ptr1;
@@ -228,7 +228,7 @@ draw_buffer(channel *c)
 		printf(MOVE(%d, 1) CLEAR_LINE, print_row++);
 		printf(FG(239) " %02d:%02d  %*s" FG(%d) "%s%s" BG_R FG(239) " ~ " FG(250),
 				l->time_h, l->time_m,
-				(int)(c->nick_pad - strlen(l->from)), "",
+				(int)(c->draw.nick_pad - strlen(l->from)), "",
 				from_fg, from_bg, l->from);
 
 		char *ptr1 = l->text;
@@ -245,7 +245,7 @@ draw_buffer(channel *c)
 
 		/* Draw any line continuations */
 		while (*ptr1) {
-			printf(MOVE(%d, %d) CLEAR_LINE, print_row++, c->nick_pad + 10);
+			printf(MOVE(%d, %d) CLEAR_LINE, print_row++, (int)c->draw.nick_pad + 10);
 			printf(FG(239) "~" FG(250) " ");
 
 			char *print = ptr1;
