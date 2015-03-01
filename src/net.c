@@ -1173,8 +1173,20 @@ recv_join(char *err, parsed_mesg *p, server *s)
 	if (!p->from)
 		fail("JOIN: sender's nick is null");
 
-	/* Check params first, then trailing */
-	if (!(chan = strtok(p->params, " ")) && !(chan = strtok(p->trailing, " ")))
+	/* FIXME:
+	 *
+	 * the channel name can come as the param or trailing... when its in the trailing
+	 * we might try strtok(p->params, " ") first BUT this is NULL so strtok is repeating
+	 * it's previous search!
+	 *
+	 * so clearly we do need some sort of strsep like function that simply returns NULL
+	 * if input is NULL and doesn't try to continue parsing whatever it happens to point to
+	 *
+	 * */
+	/* FIXME: temporary fix for the above issue */
+	if (!p->params)
+		p->params = p->trailing;
+	if (!(chan = strtok(p->params, " ")))
 		fail("JOIN: channel is null");
 
 	if (IS_ME(p->from)) {
@@ -1371,7 +1383,10 @@ recv_nick(char *err, parsed_mesg *p, server *s)
 		fail("NICK: old nick is null");
 
 	/* Some servers seem to send the new nick in the trailing */
-	if (!(nick = strtok(p->params, " ")) && !(nick = strtok(p->trailing, " ")))
+	/* FIXME: temporary fix for the issue strtok issue */
+	if (!p->params)
+		p->params = p->trailing;
+	if (!(nick = strtok(p->params, " ")))
 		fail("NICK: new nick is null");
 
 	if (IS_ME(p->from)) {
