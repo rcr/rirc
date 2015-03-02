@@ -198,7 +198,8 @@ signal_sigwinch(int signum)
 static void
 startup(void)
 {
-	setbuf(stdout, NULL);
+	/* stdout is fflush()'ed on every redraw */
+	setvbuf(stdout, NULL, _IOFBF, 0);
 
 	/* Set terminal to raw mode */
 	tcgetattr(0, &oterm);

@@ -54,6 +54,8 @@ redraw(channel *c)
 	if (draw & D_STATUS) draw_status(c);
 
 	draw = 0;
+
+	fflush(stdout);
 }
 
 static void
