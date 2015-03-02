@@ -94,7 +94,7 @@ draw_buffer(channel *c)
 {
 	/* Dynamically draw the current channel's buffer such that:
 	 *
-	 * - The buffer_head line should always be drawn in full when possible
+	 * - The scrollback line should always be drawn in full when possible
 	 * - Lines wrap on whitespace when possible
 	 * - The top-most lines draws partially when required
 	 * - Buffers requiring fewer rows than available draw from the top down
@@ -115,7 +115,7 @@ draw_buffer(channel *c)
 	 *
 	 * So the general steps for drawing are:
 	 *
-	 * 1. Starting from line L = buffer_head, traverse backwards through the
+	 * 1. Starting from line L = scrollback, traverse backwards through the
 	 *    buffer summing the rows required to draw lines, until the sum
 	 *    exceeds the number of rows available
 	 *
@@ -149,7 +149,8 @@ draw_buffer(channel *c)
 	if (text_cols < 1)
 		goto clear_remainder;
 
-	line *tmp, *l = c->buffer_head;
+	line *tmp, *l = c->draw.scrollback;
+
 
 	/* Empty buffer */
 	if (l->text == NULL)
@@ -355,8 +356,9 @@ draw_input(channel *c)
 }
 
 /* TODO:
- *
- * Could use some cleaning up*/
+ * - Could use some cleaning up
+ * - Add scrollback status
+ * */
 /* Statusbar:
  *
  * server / private chat:
@@ -492,4 +494,34 @@ nick_col(char *nick)
 		colour += *nick++;
 
 	return nick_colours[colour % sizeof(nick_colours) / sizeof(nick_colours[0])];
+}
+
+/* TODO: draw scrollback status if != buffer_head */
+void
+buffer_scrollback_page(channel *c, int up)
+{
+	/* TODO Scroll the buffer up or down a full page */
+	buffer_scrollback_line(c, up);
+}
+
+void
+buffer_scrollback_line(channel *c, int up)
+{
+	/* Scroll the buffer up or down a single line */
+
+	line *tmp, *l = c->draw.scrollback;
+
+	if (up) {
+		/* Don't scroll up over the buffer head */
+		tmp = (l == c->buffer) ? &c->buffer[SCROLLBACK_BUFFER - 1] : l - 1;
+
+		if (tmp->text != NULL && tmp != c->buffer_head)
+			c->draw.scrollback = tmp;
+	} else {
+		/* Don't scroll down past the buffer head */
+		if (l != c->buffer_head)
+			c->draw.scrollback = (l == &c->buffer[SCROLLBACK_BUFFER - 1]) ? c->buffer : l + 1;
+	}
+
+	draw(D_BUFFER);
 }

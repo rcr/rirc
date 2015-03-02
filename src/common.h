@@ -7,9 +7,6 @@
 #define CHANSIZE 256
 #define MAX_INPUT 256
 
-#define TO_STR(X) #X
-#define STR(X) TO_STR(X)
-
 /* Chan modes */
 #define CMODE_STR "OovaimnqpsrtklbeI"
 #define CMODE_O (1 << 0) /* give "channel creator" status */
@@ -42,8 +39,13 @@
 #define UMODE_s (1 << 6) /* receiving server notices */
 #define UMODE_MAX 7
 
+/* Irrecoverable error */
 #define fatal(mesg) \
 	do {perror(mesg); exit(EXIT_FAILURE);} while (0)
+
+/* Translate defined values to strings at compile time */
+#define TO_STR(X) #X
+#define STR(X) TO_STR(X)
 
 /* Suppress 'unused parameter' warnings */
 #define UNUSED(X) ((void)(X))
@@ -198,6 +200,8 @@ void redraw(channel*);
 #define D_INPUT  (1 << 3)
 #define D_STATUS (1 << 4)
 #define D_FULL ~((draw & 0) | D_RESIZE);
+void buffer_scrollback_line(channel*, int);
+void buffer_scrollback_page(channel*, int);
 
 /* input.c */
 char *action_message;

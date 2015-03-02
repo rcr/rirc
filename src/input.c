@@ -264,20 +264,20 @@ input_cseq(char *input, ssize_t len)
 		delete_right(ccur->input);
 
 	/* page up */
-//	else if (!strncmp(input, "[5~", len))
-//		TODO: scroll buffer up
+	else if (!strncmp(input, "[5~", len))
+		buffer_scrollback_page(ccur, 1);
 
 	/* page down */
-//	else if (!strncmp(input, "[6~", len))
-//		TODO: scroll buffer down
+	else if (!strncmp(input, "[6~", len))
+		buffer_scrollback_page(ccur, 0);
 
 	/* mousewheel up */
 	else if (!strncmp(input, "[M`", len))
-		ccur = channel_switch(ccur, 0);
+		buffer_scrollback_line(ccur, 1);
 
 	/* mousewheel down */
 	else if (!strncmp(input, "[Ma", len))
-		ccur = channel_switch(ccur, 1);
+		buffer_scrollback_line(ccur, 0);
 }
 
 static void
@@ -406,9 +406,9 @@ reset_line(input *in)
 {
 	/* Reset the line's pointers such that new characters are inserted at the end */
 
-	char *head = in->head,
-		 *tail = in->tail,
-		 *end  = in->line->text + MAX_INPUT;
+	char *head = in->head;
+	char *tail = in->tail;
+	char *end = in->line->text + MAX_INPUT;
 
 	while (tail < end)
 		*head++ = *tail++;

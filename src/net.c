@@ -436,7 +436,7 @@ _newline(channel *c, line_t type, const char *from, const char *mesg, size_t len
 
 	/* Increment the channel's scrollback pointer if it pointed to the first or last line, ie:
 	 *  - if it points to c->buffer_head, it pointed to the previous first line in the buffer
-	 *  - if it points to l here, it pointed to the previous last line in the buffer
+	 *  - if it points to new_line, it pointed to the previous last line in the buffer
 	 *  */
 	if (c->draw.scrollback == c->buffer_head || c->draw.scrollback == new_line)
 		if (++c->draw.scrollback == &c->buffer[SCROLLBACK_BUFFER])

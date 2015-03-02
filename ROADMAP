@@ -7,7 +7,7 @@ Cleaner separation between the ui (draw.c) and everything else:
 		- input bar framing
 		- channel bar framing
 
-^C as cancel current line/action
+^C (0x03) as cancel current line/action
 
 /IGNORE [nick]
 /UNIGNORE
@@ -34,7 +34,6 @@ CTCP (at a minimum):
 
 receive KICK message type
 
-
 Numerics:
 221 +<flags> :(null)
      returned when MODE <current nick> is sent
@@ -59,6 +58,9 @@ Numerics:
 461 <CMD>   :Syntax error  ... from "/nick" or "/join"
 
 501:Unknown mode "<flag>"
+
+502 :Can't set/get mode for other users
+     (e.g.: /raw MODE <not my nick> <flag>
 
 
 Channel buffer scrollback. Probably requires rewrite of buffer
@@ -86,8 +88,6 @@ Parsing 004/005 numeric for server specific configuration
 buffer logging
 
 Nickserv stuff
-
-Buffer scrollback
 
 Implement flag handling in send_* commands for finer control
 eg:
