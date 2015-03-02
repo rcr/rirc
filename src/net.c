@@ -744,7 +744,7 @@ sendf(char *err, server *s, const char *fmt, ...)
 		fail("Error: Message exceeds maximum length of " STR(BUFFSIZE) " bytes");
 
 #ifdef DEBUG
-	_newline(s->channel, LINE_DEBUG, "DEBUG >>", sendbuff, len);
+	_newline(s->channel, 0, "DEBUG >>", sendbuff, len);
 #endif
 
 	sendbuff[len++] = '\r';
@@ -843,7 +843,7 @@ send_default(char *err, char *mesg)
 
 	fail_if(sendf(err, ccur->server, "PRIVMSG %s :%s", ccur->name, mesg));
 
-	newline(ccur, 0, ccur->server->nick_me, mesg);
+	newline(ccur, LINE_CHAT, ccur->server->nick_me, mesg);
 
 	return 0;
 }
@@ -874,7 +874,7 @@ send_emote(char *err, char *mesg)
 
 	fail_if(sendf(err, ccur->server, "PRIVMSG %s :\x01""ACTION %s\x01", ccur->name, mesg));
 
-	newlinef(ccur, LINE_ACTION, "*", "%s %s", ccur->server->nick_me, mesg);
+	newlinef(ccur, 0, "*", "%s %s", ccur->server->nick_me, mesg);
 
 	return 0;
 }
@@ -963,7 +963,7 @@ send_priv(char *err, char *mesg) {
 		c->type = 'p';
 	}
 
-	newline(c, 0, ccur->server->nick_me, mesg);
+	newline(c, LINE_CHAT, ccur->server->nick_me, mesg);
 
 	return 0;
 }
@@ -1053,8 +1053,8 @@ recv_mesg(char *inp, int count, server *s)
 			*ptr = '\0';
 
 #ifdef DEBUG
-			newline(s->channel, LINE_DEBUG, "", "");
-			newline(s->channel, LINE_DEBUG, "DEBUG <<", s->input);
+			newline(s->channel, 0, "", "");
+			newline(s->channel, 0, "DEBUG <<", s->input);
 #endif
 			if (!(parse(&p, s->input)))
 				newline(s->channel, 0, "-!!-", "Failed to parse message");
@@ -1135,7 +1135,7 @@ recv_ctcp_req(char *err, parsed_mesg *p, server *s)
 		} else if ((c = channel_get(targ, s)) == NULL)
 			failf("CTCP ACTION: channel '%s' not found", targ);
 
-		newlinef(c, LINE_ACTION, "*", "%s %s", p->from, mesg);
+		newlinef(c, 0, "*", "%s %s", p->from, mesg);
 
 		return 0;
 	}
@@ -1227,7 +1227,7 @@ recv_join(char *err, parsed_mesg *p, server *s)
 			ccur = new_channel(chan, s, ccur);
 		else {
 			c->parted = 0;
-			newlinef(c, LINE_JOIN, ">", "You have rejoined %s", chan);
+			newlinef(c, 0, ">", "You have rejoined %s", chan);
 		}
 		draw(D_FULL);
 	} else {
@@ -1241,7 +1241,7 @@ recv_join(char *err, parsed_mesg *p, server *s)
 		c->nick_count++;
 
 		if (c->nick_count < config.join_part_quit_threshold)
-			newlinef(c, LINE_JOIN, ">", "%s/%s has joined %s", p->from, p->hostinfo, chan);
+			newlinef(c, 0, ">", "%s/%s has joined %s", p->from, p->hostinfo, chan);
 
 		draw(D_STATUS);
 	}
@@ -1431,7 +1431,7 @@ recv_nick(char *err, parsed_mesg *p, server *s)
 	do {
 		if (nicklist_delete(&c->nicklist, p->from)) {
 			nicklist_insert(&c->nicklist, nick);
-			newlinef(c, LINE_NICK, "--", "%s  >>  %s", p->from, nick);
+			newlinef(c, 0, "--", "%s  >>  %s", p->from, nick);
 		}
 	} while ((c = c->next) != s->channel);
 
@@ -1519,27 +1519,27 @@ recv_numeric(char *err, parsed_mesg *p, server *s)
 			} while (c != s->channel);
 		}
 
-		newline(s->channel, LINE_NUMRPL, "--", p->trailing);
+		newline(s->channel, 0, "--", p->trailing);
 		return 0;
 
 
 	case RPL_YOURHOST:  /* 002 <nick> :<Host info, server version, etc> */
 	case RPL_CREATED:   /* 003 <nick> :<Server creation date message> */
 
-		newline(s->channel, LINE_NUMRPL, "--", p->trailing);
+		newline(s->channel, 0, "--", p->trailing);
 		return 0;
 
 
 	case RPL_MYINFO:    /* 004 <nick> <params> :Are supported by this server */
 	case RPL_ISUPPORT:  /* 005 <nick> <params> :Are supported by this server */
 
-		newlinef(s->channel, LINE_NUMRPL, "--", "%s ~ supported by this server", p->params);
+		newlinef(s->channel, 0, "--", "%s ~ supported by this server", p->params);
 		return 0;
 
 
 	default:
 
-		newlinef(s->channel, LINE_NUMRPL, "UNHANDLED", "%d %s :%s", code, p->params, p->trailing);
+		newlinef(s->channel, 0, "UNHANDLED", "%d %s :%s", code, p->params, p->trailing);
 		return 0;
 	}
 
@@ -1557,7 +1557,7 @@ num_200:
 		if ((c = channel_get(chan, s)) == NULL)
 			failf("RPL_CHANNEL_URL: channel '%s' not found", chan);
 
-		newlinef(c, LINE_NUMRPL, "--", "URL for %s is: \"%s\"", chan, p->trailing);
+		newlinef(c, 0, "--", "URL for %s is: \"%s\"", chan, p->trailing);
 		return 0;
 
 
@@ -1570,7 +1570,7 @@ num_200:
 		if ((c = channel_get(chan, s)) == NULL)
 			failf("RPL_TOPIC: channel '%s' not found", chan);
 
-		newlinef(c, LINE_NUMRPL, "--", "Topic for %s is \"%s\"", chan, p->trailing);
+		newlinef(c, 0, "--", "Topic for %s is \"%s\"", chan, p->trailing);
 		return 0;
 
 
@@ -1592,7 +1592,7 @@ num_200:
 		time_t raw_time = atoi(time);
 		time = ctime(&raw_time);
 
-		newlinef(c, LINE_NUMRPL, "--", "Topic set by %s, %s", nick, time);
+		newlinef(c, 0, "--", "Topic set by %s, %s", nick, time);
 		return 0;
 
 
@@ -1625,7 +1625,7 @@ num_200:
 	case RPL_STATSCONN:    /* 250 :<Message> */
 	case RPL_LUSERCLIENT:  /* 251 :<Message> */
 
-		newline(s->channel, LINE_NUMRPL, "--", p->trailing);
+		newline(s->channel, 0, "--", p->trailing);
 		return 0;
 
 
@@ -1636,7 +1636,7 @@ num_200:
 		if (!(num = strtok_r(p->params, " ", &p->params)))
 			num = "NULL";
 
-		newlinef(s->channel, LINE_NUMRPL, "--", "%s %s", num, p->trailing);
+		newlinef(s->channel, 0, "--", "%s %s", num, p->trailing);
 		return 0;
 
 
@@ -1646,7 +1646,7 @@ num_200:
 	case RPL_MOTD:         /* 372 : - <Message> */
 	case RPL_MOTDSTART:    /* 375 :<server> Message of the day */
 
-		newline(s->channel, LINE_NUMRPL, "--", p->trailing);
+		newline(s->channel, 0, "--", p->trailing);
 		return 0;
 
 
@@ -1660,7 +1660,7 @@ num_200:
 
 	default:
 
-		newlinef(s->channel, LINE_NUMRPL, "UNHANDLED", "%d %s :%s", code, p->params, p->trailing);
+		newlinef(s->channel, 0, "UNHANDLED", "%d %s :%s", code, p->params, p->trailing);
 		return 0;
 	}
 
@@ -1677,14 +1677,14 @@ num_400:
 		channel *c;
 
 		if ((c = channel_get(chan, s)))
-			newline(c, LINE_NUMRPL, 0, p->trailing);
+			newline(c, 0, 0, p->trailing);
 		else
-			newline(s->channel, LINE_NUMRPL, 0, p->trailing);
+			newline(s->channel, 0, 0, p->trailing);
 
 		if (p->trailing)
-			newlinef(c, LINE_NUMRPL, "--", "Cannot send to '%s' - %s", chan, p->trailing);
+			newlinef(c, 0, "--", "Cannot send to '%s' - %s", chan, p->trailing);
 		else
-			newlinef(c, LINE_NUMRPL, "--", "Cannot send to '%s'", chan);
+			newlinef(c, 0, "--", "Cannot send to '%s'", chan);
 		return 0;
 
 
@@ -1693,7 +1693,7 @@ num_400:
 		if (!(nick = strtok_r(p->params, " ", &p->params)))
 			fail("ERR_ERRONEUSNICKNAME: nick is null");
 
-		newlinef(s->channel, LINE_NUMRPL, "-!!-", "'%s' - %s", nick, p->trailing);
+		newlinef(s->channel, 0, "-!!-", "'%s' - %s", nick, p->trailing);
 		return 0;
 
 	case ERR_NICKNAMEINUSE:  /* 433 <nick> :Nickname is already in use */
@@ -1701,12 +1701,12 @@ num_400:
 		if (!(nick = strtok(p->params, " ")))
 			fail("ERR_NICKNAMEINUSE: nick is null");
 
-		newlinef(s->channel, LINE_NUMRPL, "-!!-", "Nick '%s' in use", nick);
+		newlinef(s->channel, 0, "-!!-", "Nick '%s' in use", nick);
 
 		if (IS_ME(nick)) {
 			get_auto_nick(&(s->nptr), s->nick_me);
 
-			newlinef(s->channel, LINE_NUMRPL, "-!!-", "Trying again with '%s'", s->nick_me);
+			newlinef(s->channel, 0, "-!!-", "Trying again with '%s'", s->nick_me);
 
 			return sendf(err, s, "NICK %s", s->nick_me);
 		}
@@ -1715,7 +1715,7 @@ num_400:
 
 	default:
 
-		newlinef(s->channel, LINE_NUMRPL, "UNHANDLED", "%d %s :%s", code, p->params, p->trailing);
+		newlinef(s->channel, 0, "UNHANDLED", "%d %s :%s", code, p->params, p->trailing);
 		return 0;
 	}
 
@@ -1769,9 +1769,9 @@ recv_part(char *err, parsed_mesg *p, server *s)
 
 	if (c->nick_count < config.join_part_quit_threshold) {
 		if (p->trailing)
-			newlinef(c, LINE_PART, "<", "%s/%s has left %s (%s)", p->from, p->hostinfo, targ, p->trailing);
+			newlinef(c, 0, "<", "%s/%s has left %s (%s)", p->from, p->hostinfo, targ, p->trailing);
 		else
-			newlinef(c, LINE_PART, "<", "%s/%s has left %s", p->from, p->hostinfo, targ);
+			newlinef(c, 0, "<", "%s/%s has left %s", p->from, p->hostinfo, targ);
 	}
 
 	draw(D_STATUS);
@@ -1832,7 +1832,7 @@ recv_priv(char *err, parsed_mesg *p, server *s)
 
 		newline(c, LINE_PINGED, p->from, p->trailing);
 	} else
-		newline(c, 0, p->from, p->trailing);
+		newline(c, LINE_CHAT, p->from, p->trailing);
 
 	return 0;
 }
@@ -1851,9 +1851,9 @@ recv_quit(char *err, parsed_mesg *p, server *s)
 			c->nick_count--;
 			if (c->nick_count < config.join_part_quit_threshold) {
 				if (p->trailing)
-					newlinef(c, LINE_QUIT, "<", "%s/%s has quit (%s)", p->from, p->hostinfo, p->trailing);
+					newlinef(c, 0, "<", "%s/%s has quit (%s)", p->from, p->hostinfo, p->trailing);
 				else
-					newlinef(c, LINE_QUIT, "<", "%s/%s has quit", p->from, p->hostinfo);
+					newlinef(c, 0, "<", "%s/%s has quit", p->from, p->hostinfo);
 			}
 		}
 		c = c->next;

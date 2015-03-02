@@ -61,14 +61,8 @@ typedef enum {
 /* Buffer line types */
 typedef enum {
 	LINE_DEFAULT,
-	LINE_NICK,
-	LINE_JOIN,
-	LINE_PART,
-	LINE_QUIT,
-	LINE_NUMRPL,
 	LINE_PINGED,
-	LINE_ACTION,
-	LINE_DEBUG,
+	LINE_CHAT,
 	LINE_T_SIZE
 } line_t;
 

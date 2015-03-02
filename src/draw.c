@@ -217,22 +217,42 @@ draw_buffer(channel *c)
 
 	/* 3. Draw all lines */
 	while (print_row <= buffer_end) {
-		/* Draw the main line segment */
-		int from_fg;
-		char *from_bg = "";
 
-		if (l->type == LINE_JOIN || l->type == LINE_PART || l->type == LINE_QUIT)
-			from_fg = 239;
-		else if (l->type == LINE_PINGED)
-			from_fg = 255, from_bg = BG(1);
-		else
+		/* Draw the main line segment */
+		printf(MOVE(%d, 1) CLEAR_LINE, print_row++);
+
+		/* Main line segment format example:
+		 *
+		 * | 01:23  long_nick ~ hello world |
+		 * | 12:34        rcr ~ testing     |
+		 *
+		 * */
+		int from_fg = -1;
+		int from_bg = -1;
+
+		if (l->type == LINE_DEFAULT)
+			;
+
+		else if (l->type == LINE_CHAT)
 			from_fg = nick_col(l->from);
 
-		printf(MOVE(%d, 1) CLEAR_LINE, print_row++);
-		printf(FG(239) " %02d:%02d  %*s" FG(%d) "%s%s" BG_R FG(239) " ~ " FG(250),
+		else if (l->type == LINE_PINGED)
+			from_fg = 255, from_bg = 1;
+
+		/* Timestamp and padding */
+		printf(FG(239) " %02d:%02d  %*s",
 				l->time_h, l->time_m,
-				(int)(c->draw.nick_pad - strlen(l->from)), "",
-				from_fg, from_bg, l->from);
+				(int)(c->draw.nick_pad - strlen(l->from)), "");
+
+		/* Set foreground and background for the line sender */
+		if (from_fg >= 0)
+			printf(FG(%d), from_fg);
+
+		if (from_bg >= 0)
+			printf(BG(%d), from_bg);
+
+		/* Line sender and separator */
+		printf("%s" FG(239) BG_R " ~ " FG(250), l->from);
 
 		char *ptr1 = l->text;
 		char *ptr2 = l->text + l->len;
