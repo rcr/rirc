@@ -180,9 +180,10 @@ void server_connect(char*, char*);
 channel* new_channel(char*, server*, channel*);
 channel* channel_close(channel*);
 channel* channel_switch(channel*, int);
-void send_mesg(char*);
+void clear_channel(channel*);
 void newline(channel*, line_t, const char*, const char*);
 void newlinef(channel*, line_t, const char*, const char*, ...);
+void send_mesg(char*);
 
 /* draw.c */
 unsigned int draw;
@@ -210,5 +211,4 @@ int check_pinged(char*, char*);
 int nicklist_delete(node**, char*);
 int nicklist_insert(node**, char*);
 int parse(parsed_mesg*, char*);
-void clear_channel(channel*);
 void free_nicklist(node*);

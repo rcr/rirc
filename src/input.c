@@ -312,7 +312,7 @@ input_action(char *input, ssize_t len)
 }
 
 void
-action(int(*a_handler)(char), const char *fmt, ...)
+action(int (*a_handler)(char), const char *fmt, ...)
 {
 	/* Begin a user action
 	 *
@@ -536,6 +536,16 @@ action_find_channel(char c)
  * Input sending functions
  * */
 
+/* TODO: make sure that anything we send is truly sent, eg:
+ * if the split boundary happens to be a '/' character, it still has to be sent
+ * as a privmesg and not interpretted as a command by send_mesg
+ *
+ * we know the length of the channel name, so we can just calculate
+ * the length of each messge segment, ie:
+ *   510 - len('PRIVMESG ' - len(channel-name ), etc.
+ *
+ * reuse word_wrap to split on word boundaries?
+ * */
 static int
 action_paste_input(char c)
 {

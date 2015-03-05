@@ -160,13 +160,11 @@ server_connect(char *host, char *port)
 	if ((s = server_head)) do {
 		if (!strcmp(s->host, host) && !strcmp(s->port, port))
 			break;
-
 		s = s->next;
 	} while (s != server_head || (s = NULL));
 
 	if (s && s->soc >= 0) {
-		newlinef((ccur = s->channel), 0, "-!!-","Already connected to %s:%s", host, port);
-		draw(D_STATUS);
+		newlinef((ccur = s->channel), 0, "-!!-", "Already connected to %s:%s", host, port);
 		return;
 	}
 
@@ -563,6 +561,7 @@ new_channel(char *name, server *server, channel *chanlist)
 	c->draw.nick_pad = 0;
 	c->draw.scrollback = c->buffer_head;
 
+	/* Append the new channel to the list */
 	DLL_ADD(chanlist, c);
 
 	draw(D_FULL);
@@ -612,6 +611,18 @@ channel_get(char *chan, server *s)
 	} while (c != s->channel);
 
 	return NULL;
+}
+
+void
+clear_channel(channel *c)
+{
+	free(c->buffer_head->text);
+
+	c->buffer_head->text = NULL;
+
+	c->draw.nick_pad = 0;
+
+	draw(D_BUFFER);
 }
 
 /* Confirm closing a server */
@@ -879,11 +890,6 @@ send_emote(char *err, char *mesg)
 	return 0;
 }
 
-/* FIXME:    /join #a,#b,#asdf
- *
- * joins #a
- * joins #b
- * opens a channel named 'sdf' and RPL_NAMEREPLY channel #asdf not found*/
 static int
 send_join(char *err, char *mesg)
 {

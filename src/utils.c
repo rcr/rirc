@@ -22,16 +22,6 @@ static char errbuff[BUFFSIZE];
 
 static jmp_buf jmpbuf;
 
-void
-clear_channel(channel *c)
-{
-	free(c->buffer_head->text);
-
-	c->buffer_head->text = NULL;
-
-	draw(D_BUFFER);
-}
-
 char*
 errf(const char *fmt, ...)
 {
@@ -44,7 +34,11 @@ errf(const char *fmt, ...)
 	return errbuff;
 }
 
-/* TODO: Tests for this function */
+/* TODO:
+ *
+ * this should just be rewritten as an implementation of strsep, and would replace
+ * the faulty calls to strtok/strtok_r
+ * */
 char*
 getarg(char **str, int set_null)
 {
