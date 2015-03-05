@@ -62,8 +62,14 @@ Numerics:
 502 :Can't set/get mode for other users
      (e.g.: /raw MODE <not my nick> <flag>
 
-Channel buffer scrollback. Probably requires rewrite of buffer
-drawing logic.
+Buffer scrollback improvements:
+	- full page scrollback
+		- set to topmost line if it doesn't print in full, else the line before it
+	- currently scrollback is still allowed if it doesnt affect the content of the page,
+	  eg: a half full buffer, which prevents the scrollback pointer from being updated as
+	  more input is receieved. If the content of the current page won't change, don't
+	  allow the scrollback.
+	- show scrollback % or x/y lines in the status bar
 
 Input tab complete.
 	For commands if input[0] == '/'
@@ -132,12 +138,6 @@ If in ##channel that requires authentication (ie bumps you to ##channel-unauthor
 or similar), /disconnect, /connect, rirc attempts to join ##channel, can't, and is
 bumped to ##channel-unauthorized, but ##channel buffer remains open and not flagged
 as parted, ie could potentially send messages to the channel, but won't receive any
-
-when registered, and have a nick, and try to /nick to something taken, the message is:
-	thats taken, trying again with <new nick>
-when i successfully change my nick it should print to all channels im in on that server
-Also, the error prints erroneously, printing the current nick and not the nick I tried
-changing to??
 
 use the alternate screen buffer to restore screen when rirc exits
 
