@@ -212,6 +212,10 @@ server_connected(server *s)
 
 	s->soc = ct->socket;
 
+	/* Set reconnect parameters to 0 in case this was an auto-reconnect */
+	s->reconnect_time = 0;
+	s->reconnect_delta = 0;
+
 	sendf(NULL, s, "NICK %s", s->nick_me);
 	sendf(NULL, s, "USER %s 8 * :%s", config.username, config.realname);
 }
@@ -304,8 +308,13 @@ check_connect(server *s)
 		server_connected(s);
 
 	/* Connection failure */
-	else if (*ct->error)
+	else if (*ct->error) {
 		newline(s->channel, 0, "-!!-", ct->error);
+
+		/* If server was auto-reconnecting, increase the backoff */
+		s->reconnect_delta *= 2;
+		s->reconnect_time += s->reconnect_delta;
+	}
 
 	/* Connection in progress */
 	else
@@ -335,8 +344,10 @@ check_reconnect(server *s, time_t t)
 {
 	/* Check if the server is in auto-reconnect mode, and issue a reconnect if needed */
 
-	UNUSED(s);
-	UNUSED(t);
+	if (s->reconnect_time && t > s->reconnect_time) {
+		server_connect(s->host, s->port);
+		return 1;
+	}
 
 	return 0;
 }
@@ -427,8 +438,13 @@ server_disconnect(server *s, char *err, char *mesg)
 
 	if (s->soc >= 0) {
 
-		if (err)
+		if (err) {
 			newlinef(s->channel, 0, "ERROR", "%s", err);
+
+			/* If disconnecting due to error, attempt a reconnect */
+			s->reconnect_time = time(NULL) + RECONNECT_DELTA;
+			s->reconnect_delta = RECONNECT_DELTA;
+		}
 
 		if (mesg)
 			sendf(NULL, s, "QUIT :%s", mesg);
@@ -585,6 +601,8 @@ new_server(char *host, char *port)
 	s->port = strdup(port);
 	s->ping = time(NULL);
 	s->connecting = NULL;
+	s->reconnect_time = 0;
+	s->reconnect_delta = 0;
 
 	get_auto_nick(&(s->nptr), s->nick_me);
 

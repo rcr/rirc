@@ -6,6 +6,7 @@
 #define NICKSIZE 256
 #define CHANSIZE 256
 #define MAX_INPUT 256
+#define RECONNECT_DELTA 15
 
 #include <time.h>
 
@@ -148,6 +149,8 @@ typedef struct channel
 typedef struct server
 {
 	time_t ping;
+	time_t reconnect_time;
+	time_t reconnect_delta;
 	char *iptr;
 	char *nptr;
 	char input[BUFFSIZE];
