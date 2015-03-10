@@ -1,10 +1,10 @@
 /* For addrinfo, getaddrinfo, getnameinfo, strtok_r */
 #define _POSIX_C_SOURCE 200112L
 
-#include <time.h>
 #include <poll.h>
-#include <stdio.h>
 #include <ctype.h>
+#include <fcntl.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
@@ -110,6 +110,11 @@ void free_server(server*);
 void get_auto_nick(char**, char*);
 void recv_mesg(char*, int, server*);
 static void _newline(channel*, line_t, const char*, const char*, size_t);
+
+static int check_connect(server*);
+static int check_timeout(server*, time_t);
+static int check_reconnect(server*, time_t);
+static int check_socket(server*, time_t);
 
 static int action_close_server(char);
 
@@ -260,6 +265,12 @@ threaded_connect(void *arg)
 		*ct->ipstr = '\0';
 	}
 
+	/* Set non-blocking */
+	if ((ret = fcntl(ct->socket_tmp, F_SETFL, O_NONBLOCK)) < 0) {
+		strerror_r(errno, ct->error, MAX_ERROR);
+		pthread_exit(NULL);
+	}
+
 	ct->socket = ct->socket_tmp;
 
 	pthread_cleanup_pop(1);
@@ -278,59 +289,111 @@ threaded_connect_cleanup(void **arg)
 	return NULL;
 }
 
+static int
+check_connect(server *s)
+{
+	/* Check the server's connection thread status for success or failure */
+
+	if (!s->connecting)
+		return 0;
+
+	connection_thread *ct = (connection_thread*)s->connecting;
+
+	/* Connection Success */
+	if (ct->socket >= 0)
+		server_connected(s);
+
+	/* Connection failure */
+	else if (*ct->error)
+		newline(s->channel, 0, "-!!-", ct->error);
+
+	/* Connection in progress */
+	else
+		return 1;
+
+	free(ct);
+	s->connecting = NULL;
+
+	return 1;
+}
+
+static int
+check_timeout(server *s, time_t t)
+{
+	/* Check time since last message */
+
+	if ((t - s->ping) > 255) {
+		server_disconnect(s, "Ping timeout (255s)", NULL);
+		return 1;
+	}
+
+	return 0;
+}
+
+static int
+check_reconnect(server *s, time_t t)
+{
+	/* Check if the server is in auto-reconnect mode, and issue a reconnect if needed */
+
+	UNUSED(s);
+	UNUSED(t);
+
+	return 0;
+}
+
+static int
+check_socket(server *s, time_t t)
+{
+	/* Check the status of the server's socket */
+
+	ssize_t count;
+
+	char recv_buff[BUFFSIZE];
+
+	/* Consume all input on the socket */
+	while ((count = read(s->soc, recv_buff, BUFFSIZE)) >= 0) {
+
+		if (count == 0) {
+			server_disconnect(s, "Remote hangup", NULL);
+			return 0;
+		}
+
+		/* Set time since last message */
+		s->ping = t;
+
+		recv_mesg(recv_buff, count, s);
+	}
+
+	/* Socket is set non-blocking */
+	if (errno != EWOULDBLOCK && errno != EAGAIN)
+		fatal("read");
+
+	return 0;
+}
+
 void
 check_servers(void)
 {
-	int ret, count;
-
-	static char recv_buff[BUFFSIZE];
-
-	static struct pollfd pfd[] = {{ .events = POLLIN }};
-
 	server *s;
 
 	if ((s = server_head) == NULL)
 		return;
 
+	time_t t = time(NULL);
+
 	do {
-		pfd[0].fd = s->soc;
+		if (check_connect(s))
+			continue;
 
-		if (s->connecting) {
+		if (check_timeout(s, t))
+			continue;
 
-			connection_thread *ct = (connection_thread*)s->connecting;
+		if (check_reconnect(s, t))
+			continue;
 
-			/* Connection Success */
-			if (ct->socket >= 0)
-				server_connected(s);
+		check_socket(s, t);
 
-			/* Connection failure */
-			else if (*ct->error)
-				newline(s->channel, 0, "-!!-", ct->error);
-
-			/* Connection in progress */
-			else {
-				s = s->next;
-				continue;
-			}
-
-			free(ct);
-			s->connecting = NULL;
-
-		} else while (s->soc > 0 && (ret = poll(pfd, 1, 0)) > 0) {
-			if ((count = read(s->soc, recv_buff, BUFFSIZE)) < 0)
-				; /* TODO: error in read() */
-			else if (count == 0)
-				server_disconnect(s, "Remote hangup", NULL);
-			else
-				recv_mesg(recv_buff, count, s);
-		}
-
-		if (ret < 0) {
-			; /* TODO: error in poll() */
-		}
-
-		s = s->next;
-	} while (s != server_head);
+	} while ((s = s->next) != server_head);
 }
 
 static void
@@ -449,21 +512,12 @@ _newline(channel *c, line_t type, const char *from, const char *mesg, size_t len
 		fatal("channel is null");
 
 	/* Set the line meta data */
-	time_t raw_t;
-	struct tm *t;
-
 	new_line->len = len;
-
 	new_line->type = type;
+	new_line->time = time(NULL);
 
 	/* Rows are recalculated by the draw routine when == 0 */
 	new_line->rows = 0;
-
-	time(&raw_t);
-	t = localtime(&raw_t);
-
-	new_line->time_h = t->tm_hour;
-	new_line->time_m = t->tm_min;
 
 	/* If from is NULL, assume server message */
 	strncpy(new_line->from, (from) ? from : c->name, NICKSIZE);
@@ -529,6 +583,7 @@ new_server(char *host, char *port)
 	s->nptr = config.nicks;
 	s->host = strdup(host);
 	s->port = strdup(port);
+	s->ping = time(NULL);
 	s->connecting = NULL;
 
 	get_auto_nick(&(s->nptr), s->nick_me);

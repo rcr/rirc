@@ -7,6 +7,8 @@
 #define CHANSIZE 256
 #define MAX_INPUT 256
 
+#include <time.h>
+
 /* Chan modes */
 #define CMODE_STR "OovaimnqpsrtklbeI"
 #define CMODE_O (1 << 0) /* give "channel creator" status */
@@ -90,10 +92,9 @@ typedef struct node
 /* Chat buffer line */
 typedef struct line
 {
-	size_t len;
 	int rows;
-	int time_h;
-	int time_m;
+	size_t len;
+	time_t time;
 	char *text;
 	char from[NICKSIZE];
 	line_t type;
@@ -146,6 +147,7 @@ typedef struct channel
 /* Server */
 typedef struct server
 {
+	time_t ping;
 	char *iptr;
 	char *nptr;
 	char input[BUFFSIZE];

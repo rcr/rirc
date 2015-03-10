@@ -241,7 +241,8 @@ draw_buffer(channel *c)
 
 		/* Timestamp and padding */
 		printf(FG(239) " %02d:%02d  %*s",
-				l->time_h, l->time_m,
+				/* TODO: print formatted time */
+				0, 0,
 				(int)(c->draw.nick_pad - strlen(l->from)), "");
 
 		/* Set foreground and background for the line sender */

@@ -52,10 +52,14 @@ Numerics:
 435 cannot change nickname while banned
     (eg unregistered in channel and trying to /nick)
 
+442 <channel> :You're not on that channel
+
 451 :Connection not registered
     (eg sending a join before registering)
 
 461 <CMD>   :Syntax error  ... from "/nick" or "/join"
+
+470 <chan1> <chan2> :forwarding to another channel
 
 501:Unknown mode "<flag>"
 
@@ -121,9 +125,13 @@ Detect ping timeouts
 
 Reimplement the pasting stuff that was broken
 
+link detection/launching
+
 
 FIXME:
 ---------------------------
+in debug mode errors (eg sender = -!!-) should raise a ping
+
 Rewrite check_servers
 
 Closing private channels sometimes results in numeric 403
@@ -138,6 +146,7 @@ If in ##channel that requires authentication (ie bumps you to ##channel-unauthor
 or similar), /disconnect, /connect, rirc attempts to join ##channel, can't, and is
 bumped to ##channel-unauthorized, but ##channel buffer remains open and not flagged
 as parted, ie could potentially send messages to the channel, but won't receive any
+	- or it returns 403, and cant /join the channel because it's not parted
 
 use the alternate screen buffer to restore screen when rirc exits
 
