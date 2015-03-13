@@ -148,7 +148,8 @@ typedef struct channel
 /* Server */
 typedef struct server
 {
-	time_t ping;
+	time_t latency_time;
+	time_t latency_delta;
 	time_t reconnect_time;
 	time_t reconnect_delta;
 	char *iptr;

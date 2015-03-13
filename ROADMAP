@@ -83,12 +83,7 @@ Make sure all the thread related code is using thread-safe functions,
 and that proper cancellation points are used. Make sure no resources
 can be left hanging (eg: sockets left open when a thread is canceled?)
 
-Reconnection routine for non-explicit disconnect. Exponential backoff
-for repeated attempts, with some maximum number of tries.
-
 A configuration file and parser
-
-Investigate SIGIO as alternative to server socket polling loop
 
 Parsing 004/005 numeric for server specific configuration
 
@@ -117,11 +112,7 @@ Tests for all the send_*, recv_* handlers
 	- ui.c and draw.c would be separate; draw.c is strictly responsible for drawing to stdout,
 	  while ui.c is responsible for all stateful user interactions
 
-Cleanup the server polling
-
 Allow for multiple connections passed as cli args
-
-Detect ping timeouts
 
 Reimplement the pasting stuff that was broken
 
@@ -130,9 +121,11 @@ link detection/launching
 
 FIXME:
 ---------------------------
-in debug mode errors (eg sender = -!!-) should raise a ping
+I broke the activity colouring stuff:
+	join/part/quit sets activity (it shouldnt)
+	message and ping dont set activity (they should)
 
-Rewrite check_servers
+in debug mode errors (eg sender = -!!-) should raise a ping
 
 Closing private channels sometimes results in numeric 403
 

@@ -112,7 +112,7 @@ void recv_mesg(char*, int, server*);
 static void _newline(channel*, line_t, const char*, const char*, size_t);
 
 static int check_connect(server*);
-static int check_timeout(server*, time_t);
+static int check_latency(server*, time_t);
 static int check_reconnect(server*, time_t);
 static int check_socket(server*, time_t);
 
@@ -175,17 +175,17 @@ server_connect(char *host, char *port)
 
 	ccur = s ? s->channel : (s = new_server(host, port))->channel;
 
+	/* TODO: the calling function should take care of adding the server
+	 * let server_connect return server* or NULL */
 	DLL_ADD(server_head, s);
 
-	if ((ct = malloc(sizeof(connection_thread))) == NULL)
-		fatal("server_connect - malloc");
+	if ((ct = calloc(1, sizeof(*ct))) == NULL)
+		fatal("calloc");
 
 	ct->socket = -1;
 	ct->socket_tmp = -1;
 	ct->host = s->host;
 	ct->port = s->port;
-	*ct->error = '\0';
-	*ct->ipstr = '\0';
 
 	s->connecting = ct;
 
@@ -215,6 +215,9 @@ server_connected(server *s)
 	/* Set reconnect parameters to 0 in case this was an auto-reconnect */
 	s->reconnect_time = 0;
 	s->reconnect_delta = 0;
+
+	s->latency_time = time(NULL);
+	s->latency_delta = 0;
 
 	sendf(NULL, s, "NICK %s", s->nick_me);
 	sendf(NULL, s, "USER %s 8 * :%s", config.username, config.realname);
@@ -266,7 +269,6 @@ threaded_connect(void *arg)
 	if ((ret = getnameinfo(p->ai_addr, p->ai_addrlen, ct->ipstr,
 					INET6_ADDRSTRLEN, NULL, 0, NI_NUMERICHOST))) {
 		strncpy(ct->error, gai_strerror(ret), MAX_ERROR);
-		*ct->ipstr = '\0';
 	}
 
 	/* Set non-blocking */
@@ -291,120 +293,6 @@ threaded_connect_cleanup(void **arg)
 		freeaddrinfo(servinfo);
 
 	return NULL;
-}
-
-static int
-check_connect(server *s)
-{
-	/* Check the server's connection thread status for success or failure */
-
-	if (!s->connecting)
-		return 0;
-
-	connection_thread *ct = (connection_thread*)s->connecting;
-
-	/* Connection Success */
-	if (ct->socket >= 0)
-		server_connected(s);
-
-	/* Connection failure */
-	else if (*ct->error) {
-		newline(s->channel, 0, "-!!-", ct->error);
-
-		/* If server was auto-reconnecting, increase the backoff */
-		s->reconnect_delta *= 2;
-		s->reconnect_time += s->reconnect_delta;
-	}
-
-	/* Connection in progress */
-	else
-		return 1;
-
-	free(ct);
-	s->connecting = NULL;
-
-	return 1;
-}
-
-static int
-check_timeout(server *s, time_t t)
-{
-	/* Check time since last message */
-
-	if ((t - s->ping) > 255) {
-		server_disconnect(s, "Ping timeout (255s)", NULL);
-		return 1;
-	}
-
-	return 0;
-}
-
-static int
-check_reconnect(server *s, time_t t)
-{
-	/* Check if the server is in auto-reconnect mode, and issue a reconnect if needed */
-
-	if (s->reconnect_time && t > s->reconnect_time) {
-		server_connect(s->host, s->port);
-		return 1;
-	}
-
-	return 0;
-}
-
-static int
-check_socket(server *s, time_t t)
-{
-	/* Check the status of the server's socket */
-
-	ssize_t count;
-
-	char recv_buff[BUFFSIZE];
-
-	/* Consume all input on the socket */
-	while ((count = read(s->soc, recv_buff, BUFFSIZE)) >= 0) {
-
-		if (count == 0) {
-			server_disconnect(s, "Remote hangup", NULL);
-			return 0;
-		}
-
-		/* Set time since last message */
-		s->ping = t;
-
-		recv_mesg(recv_buff, count, s);
-	}
-
-	/* Socket is set non-blocking */
-	if (errno != EWOULDBLOCK && errno != EAGAIN)
-		fatal("read");
-
-	return 0;
-}
-
-void
-check_servers(void)
-{
-	server *s;
-
-	if ((s = server_head) == NULL)
-		return;
-
-	time_t t = time(NULL);
-
-	do {
-		if (check_connect(s))
-			continue;
-
-		if (check_timeout(s, t))
-			continue;
-
-		if (check_reconnect(s, t))
-			continue;
-
-		check_socket(s, t);
-
-	} while ((s = s->next) != server_head);
 }
 
 static void
@@ -440,6 +328,7 @@ server_disconnect(server *s, char *err, char *mesg)
 
 		if (err) {
 			newlinef(s->channel, 0, "ERROR", "%s", err);
+			newlinef(s->channel, 0, "--", "Attempting reconnect in %ds", RECONNECT_DELTA);
 
 			/* If disconnecting due to error, attempt a reconnect */
 			s->reconnect_time = time(NULL) + RECONNECT_DELTA;
@@ -456,10 +345,12 @@ server_disconnect(server *s, char *err, char *mesg)
 		s->usermode = 0;
 		s->iptr = s->input;
 		s->nptr = config.nicks;
+		s->latency_delta = 0;
 
 		/* Reset the nick that reconnects will attempt to register with */
 		get_auto_nick(&(s->nptr), s->nick_me);
 
+		/* Print message to all open channels and reset their attributes */
 		channel *c = s->channel;
 		do {
 			newline(c, 0, "-!!-", "(disconnected)");
@@ -470,10 +361,178 @@ server_disconnect(server *s, char *err, char *mesg)
 			free_nicklist(c->nicklist);
 			c->nicklist = NULL;
 
-			c = c->next;
-		} while (c != s->channel);
+		} while ((c = c->next) != s->channel);
+
+		return;
+	}
+
+	/* Cancel server reconnect attempts */
+	if (s->reconnect_time) {
+		newlinef(s->channel, 0, "--", "Auto reconnect attempt canceled");
+
+		s->reconnect_time = 0;
+		s->reconnect_delta = 0;
+
+		return;
 	}
 }
+
+/*
+ * Server polling functions
+ * */
+
+void
+check_servers(void)
+{
+	/* For each server, check the following, in order:
+	 *
+	 *  - Connection status. Skip the rest if unresolved
+	 *  - Ping timeout.      Skip the rest detected
+	 *  - Reconnect attempt. Skip the rest if successful
+	 *  - Socket input.      Consume all input
+	 *  */
+
+	/* TODO: there's probably a better order to check these */
+
+	server *s;
+
+	if ((s = server_head) == NULL)
+		return;
+
+	time_t t = time(NULL);
+
+	do {
+		if (check_connect(s))
+			continue;
+
+		if (check_latency(s, t))
+			continue;
+
+		if (check_reconnect(s, t))
+			continue;
+
+		check_socket(s, t);
+
+	} while ((s = s->next) != server_head);
+}
+
+static int
+check_connect(server *s)
+{
+	/* Check the server's connection thread status for success or failure */
+
+	if (!s->connecting)
+		return 0;
+
+	connection_thread *ct = (connection_thread*)s->connecting;
+
+	/* Connection Success */
+	if (ct->socket >= 0) {
+		server_connected(s);
+
+	/* Connection failure */
+	} else if (*ct->error) {
+		newline(s->channel, 0, "-!!-", ct->error);
+
+		/* If server was auto-reconnecting, increase the backoff */
+		if (s->reconnect_time) {
+			s->reconnect_delta *= 2;
+			s->reconnect_time += s->reconnect_delta;
+
+			newlinef(s->channel, 0, "--", "Attempting reconnect in %ds", s->reconnect_delta);
+		}
+
+	/* Connection in progress */
+	} else {
+		return 1;
+	}
+
+	free(ct);
+	s->connecting = NULL;
+
+	return 1;
+}
+
+static int
+check_latency(server *s, time_t t)
+{
+	/* Check time since last message */
+
+	time_t delta;
+
+	if (s->soc < 0)
+		return 0;
+
+	delta = t - s->latency_time;
+
+	/* Timeout */
+	if (delta > 255) {
+		server_disconnect(s, "Ping timeout (255s)", NULL);
+		return 1;
+	}
+
+	/* Display latency status for current server */
+	if (delta > 120 && ccur->server == s) {
+		s->latency_delta = delta;
+		draw(D_STATUS);
+	}
+
+	return 0;
+}
+
+static int
+check_reconnect(server *s, time_t t)
+{
+	/* Check if the server is in auto-reconnect mode, and issue a reconnect if needed */
+
+	if (s->reconnect_time && t > s->reconnect_time) {
+		server_connect(s->host, s->port);
+		return 1;
+	}
+
+	return 0;
+}
+
+static int
+check_socket(server *s, time_t t)
+{
+	/* Check the status of the server's socket */
+
+	ssize_t count;
+	char recv_buff[BUFFSIZE];
+
+	/* Consume all input on the socket */
+	while (s->soc >= 0 && (count = read(s->soc, recv_buff, BUFFSIZE)) >= 0) {
+
+		if (count == 0) {
+			server_disconnect(s, "Remote hangup", NULL);
+			break;
+		}
+
+		/* Set time since last message */
+		s->latency_time = t;
+		s->latency_delta = 0;
+
+		recv_mesg(recv_buff, count, s);
+	}
+
+	/* Server received ERROR message or remote hangup */
+	if (s->soc < 0)
+		return 0;
+
+	/* Socket is non-blocking */
+	if (errno != EWOULDBLOCK && errno != EAGAIN)
+		fatal("read");
+
+	return 0;
+}
+
+/* TODO:
+ *
+ * Everything below this comment has nothing to do with net and should be moved
+ * to mesg.c or similar
+ *
+ * */
 
 void
 newline(channel *c, line_t type, const char *from, const char *mesg)
@@ -590,19 +649,16 @@ server*
 new_server(char *host, char *port)
 {
 	server *s;
-	if ((s = malloc(sizeof(server))) == NULL)
-		fatal("new_server");
 
+	if ((s = calloc(1, sizeof(*s))) == NULL)
+		fatal("calloc");
+
+	/* Set non-zero default fields */
 	s->soc = -1;
-	s->usermode = 0;
 	s->iptr = s->input;
 	s->nptr = config.nicks;
 	s->host = strdup(host);
 	s->port = strdup(port);
-	s->ping = time(NULL);
-	s->connecting = NULL;
-	s->reconnect_time = 0;
-	s->reconnect_delta = 0;
 
 	get_auto_nick(&(s->nptr), s->nick_me);
 
@@ -615,24 +671,19 @@ channel*
 new_channel(char *name, server *server, channel *chanlist)
 {
 	channel *c;
-	if ((c = malloc(sizeof(channel))) == NULL)
-		fatal("new_channel");
 
-	c->type = '\0';
-	c->parted = 0;
-	c->resized = 0;
-	c->chanmode = 0;
-	c->nick_count = 0;
-	c->nicklist = NULL;
+	if ((c = calloc(1, sizeof(*c))) == NULL)
+		fatal("calloc");
+
 	c->server = server;
 	c->buffer_head = c->buffer;
 	c->active = ACTIVITY_DEFAULT;
 	c->input = new_input();
-	strncpy(c->name, name, CHANSIZE);
-	memset(c->buffer, 0, sizeof(c->buffer));
-
-	c->draw.nick_pad = 0;
 	c->draw.scrollback = c->buffer_head;
+
+	/* TODO: if channel name length exceeds CHANSIZE we'll never appropriately
+	 * associate incomming messages with this channel anyways so it shouldn't be allowed */
+	strncpy(c->name, name, CHANSIZE);
 
 	/* Append the new channel to the list */
 	DLL_ADD(chanlist, c);
@@ -937,7 +988,10 @@ send_disconnect(char *err, char *mesg)
 {
 	/* /disconnect [quit message] */
 
-	if (!ccur->server || (!ccur->server->connecting && ccur->server->soc < 0))
+	server *s = ccur->server;
+
+	/* Server isn't connecting, connected or waiting to connect */
+	if (!s || (!s->connecting && s->soc < 0 && !s->reconnect_time))
 		fail("Error: Not connected to server");
 
 	server_disconnect(ccur->server, NULL, (*mesg) ? mesg : DEFAULT_QUIT_MESG);

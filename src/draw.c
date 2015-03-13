@@ -431,6 +431,10 @@ draw_status(channel *c)
 		i += printf(" %d]", c->nick_count);
 	}
 
+	/* If ccur's server is timing out, display latency */
+	if (c->server && c->server->latency_delta)
+		i += printf("―(%llds)", (long long) c->server->latency_delta);
+
 	for (; i < w.ws_col; i++)
 		printf("―");
 
