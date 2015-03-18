@@ -46,6 +46,12 @@
 #define fatal(mesg) \
 	do {perror(mesg); exit(EXIT_FAILURE);} while (0)
 
+/* Error message length */
+#define MAX_ERROR 512
+
+/* Message sent for PART and QUIT by default */
+#define DEFAULT_QUIT_MESG "rirc v" VERSION
+
 /* Translate defined values to strings at compile time */
 #define TO_STR(X) #X
 #define STR(X) TO_STR(X)
@@ -179,17 +185,21 @@ typedef struct parsed_mesg
 /* rirc.c */
 channel *rirc;
 channel *ccur;
+server *server_head;
 
 /* net.c */
 void check_servers(void);
 void server_connect(char*, char*);
+void server_disconnect(server*, char*, char*);
 channel* new_channel(char*, server*, channel*);
 channel* channel_close(channel*);
 channel* channel_switch(channel*, int);
 void clear_channel(channel*);
 void newline(channel*, line_t, const char*, const char*);
 void newlinef(channel*, line_t, const char*, const char*, ...);
-void send_mesg(char*);
+int sendf(char*, server*, const char*, ...);
+void free_channel(channel*);
+void free_server(server*);
 
 /* draw.c */
 unsigned int draw;
@@ -218,3 +228,11 @@ int nicklist_delete(node**, char*);
 int nicklist_insert(node**, char*);
 int parse(parsed_mesg*, char*);
 void free_nicklist(node*);
+void auto_nick(char**, char*);
+
+/* mesg.c */
+void recv_mesg(char*, int, server*);
+void send_mesg(char*);
+
+/* state.c */
+channel* channel_get(char*, server*);

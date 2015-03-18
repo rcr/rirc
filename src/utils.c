@@ -66,6 +66,36 @@ getarg(char **str, int set_null)
 	return ret;
 }
 
+void
+auto_nick(char **autonick, char *nick)
+{
+	char *p = *autonick;
+	while (*p == ' ' || *p == ',')
+		p++;
+
+	if (*p == '\0') {
+
+		/* Autonicks exhausted, generate a random nick */
+		char *base = "rirc_";
+		char *cset = "0123456789ABCDEF";
+
+		strcpy(nick, base);
+		nick += strlen(base);
+
+		int i, len = strlen(cset);
+		for (i = 0; i < 4; i++)
+			*nick++ = cset[rand() % len];
+	} else {
+		int c = 0;
+		while (*p != ' ' && *p != ',' && *p != '\0' && c++ < NICKSIZE)
+			*nick++ = *p++;
+		*autonick = p;
+	}
+
+	*nick = '\0';
+}
+
+
 char*
 strdup(const char *str)
 {
