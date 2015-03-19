@@ -1,4 +1,4 @@
-#define VERSION "0.0.1"
+#define VERSION "-1"
 
 #define SCROLLBACK_BUFFER 200
 #define SCROLLBACK_INPUT 15
