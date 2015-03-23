@@ -243,10 +243,11 @@ draw_buffer(channel *c)
 		else if (l->type == LINE_PINGED)
 			from_fg = 255, from_bg = 1;
 
+		struct tm *tmp = localtime(&l->time);
+
 		/* Timestamp and padding */
 		printf(FG(239) " %02d:%02d  %*s",
-				/* TODO: print formatted time */
-				0, 0,
+				tmp->tm_hour, tmp->tm_min,
 				(int)(c->draw.nick_pad - strlen(l->from)), "");
 
 		/* Set foreground and background for the line sender */
