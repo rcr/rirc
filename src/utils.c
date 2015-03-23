@@ -18,21 +18,7 @@ static node* rotate_r(node*);
 static node* node_delete(node*, char*);
 static node* node_insert(node*, char*);
 
-static char errbuff[BUFFSIZE];
-
 static jmp_buf jmpbuf;
-
-char*
-errf(const char *fmt, ...)
-{
-	va_list ap;
-
-	va_start(ap, fmt);
-	vsnprintf(errbuff, BUFFSIZE, fmt, ap);
-	va_end(ap);
-
-	return errbuff;
-}
 
 /* TODO:
  *
@@ -102,7 +88,7 @@ strdup(const char *str)
 	char *ret;
 
 	if ((ret = malloc(strlen(str) + 1)) == NULL)
-		fatal("strdup - malloc");
+		fatal("malloc");
 
 	strcpy(ret, str);
 

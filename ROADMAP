@@ -34,6 +34,8 @@ CTCP (at a minimum):
 
 receive KICK message type
 
+receive TOPIC message type
+
 Numerics:
 221 +<flags> :(null)
      returned when MODE <current nick> is sent

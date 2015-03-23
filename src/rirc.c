@@ -229,6 +229,8 @@ startup(void)
 	/* Register cleanup() for exit() */
 	atexit(cleanup);
 
+	/* FIXME: if the initial connect fails the autojoin channels
+	 * will be used by whatever server next connects */
 	if (config.auto_connect)
 		server_connect(config.auto_connect, config.auto_port);
 }

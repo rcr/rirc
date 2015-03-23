@@ -59,6 +59,33 @@
 /* Suppress 'unused parameter' warnings */
 #define UNUSED(X) ((void)(X))
 
+/* Doubly linked list macros */
+#define DLL_NEW(L, N) ((L) = (N)->next = (N)->prev = (N))
+
+#define DLL_ADD(L, N) \
+	do { \
+		if ((L) == NULL) \
+			DLL_NEW(L, N); \
+		else { \
+			((L)->next)->prev = (N); \
+			(N)->next = ((L)->next); \
+			(N)->prev = (L); \
+			(L)->next = (N); \
+		} \
+	} while (0)
+
+#define DLL_DEL(L, N) \
+	do { \
+		if (((N)->next) == (N)) \
+			(L) = NULL; \
+		else { \
+			if ((L) == N) \
+				(L) = ((N)->next); \
+			((N)->next)->prev = ((N)->prev); \
+			((N)->prev)->next = ((N)->next); \
+		} \
+	} while (0)
+
 /* Channel bar activity types */
 typedef enum {
 	ACTIVITY_DEFAULT,
@@ -188,18 +215,11 @@ channel *ccur;
 server *server_head;
 
 /* net.c */
+int sendp(char*, server*, const char*);
+int sendf(char*, server*, const char*, ...);
 void check_servers(void);
 void server_connect(char*, char*);
-void server_disconnect(server*, char*, char*);
-channel* new_channel(char*, server*, channel*);
-channel* channel_close(channel*);
-channel* channel_switch(channel*, int);
-void clear_channel(channel*);
-void newline(channel*, line_t, const char*, const char*);
-void newlinef(channel*, line_t, const char*, const char*, ...);
-int sendf(char*, server*, const char*, ...);
-void free_channel(channel*);
-void free_server(server*);
+void server_disconnect(server*, int, char*);
 
 /* draw.c */
 unsigned int draw;
@@ -211,8 +231,6 @@ void redraw(channel*);
 #define D_INPUT  (1 << 3)
 #define D_STATUS (1 << 4)
 #define D_FULL ~((draw & 0) | D_RESIZE);
-void buffer_scrollback_line(channel*, int);
-void buffer_scrollback_page(channel*, int);
 
 /* input.c */
 char *action_message;
@@ -227,12 +245,24 @@ int check_pinged(char*, char*);
 int nicklist_delete(node**, char*);
 int nicklist_insert(node**, char*);
 int parse(parsed_mesg*, char*);
-void free_nicklist(node*);
 void auto_nick(char**, char*);
+void free_nicklist(node*);
 
 /* mesg.c */
 void recv_mesg(char*, int, server*);
 void send_mesg(char*);
+void send_paste(char*);
 
 /* state.c */
+channel* channel_close(channel*);
 channel* channel_get(char*, server*);
+channel* channel_switch(channel*, int);
+channel* new_channel(char*, server*, channel*);
+void buffer_scrollback_line(channel*, int);
+void buffer_scrollback_page(channel*, int);
+void clear_channel(channel*);
+void free_channel(channel*);
+void free_server(server*);
+void newline(channel*, line_t, const char*, const char*);
+void newlinef(channel*, line_t, const char*, const char*, ...);
+void _newline(channel*, line_t, const char*, const char*, size_t);

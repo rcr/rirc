@@ -1,21 +1,15 @@
 /* For addrinfo, getaddrinfo, getnameinfo */
 #define _POSIX_C_SOURCE 200112L
 
-#include <poll.h>
-#include <ctype.h>
+#include <errno.h>
 #include <fcntl.h>
+#include <netdb.h>
+#include <pthread.h>
+#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <unistd.h>
 #include <string.h>
-#include <strings.h>
-#include <stdarg.h>
-#include <pthread.h>
-#include <netdb.h>
-#include <errno.h>
-#include <arpa/inet.h>
-#include <sys/types.h>
-#include <sys/socket.h>
+#include <unistd.h>
 
 #include "common.h"
 
@@ -31,46 +25,16 @@ typedef struct connection_thread {
 } connection_thread;
 
 static server* new_server(char*, char*);
-static void _newline(channel*, line_t, const char*, const char*, size_t);
 
 static int check_connect(server*);
 static int check_latency(server*, time_t);
 static int check_reconnect(server*, time_t);
 static int check_socket(server*, time_t);
 
-static int action_close_server(char);
-
-static void server_connected(server*);
+static void connected(server*);
 
 static void* threaded_connect(void*);
 static void* threaded_connect_cleanup(void**);
-
-/* Doubly linked list macros */
-#define DLL_NEW(L, N) ((L) = (N)->next = (N)->prev = (N))
-
-#define DLL_ADD(L, N) \
-	do { \
-		if ((L) == NULL) \
-			DLL_NEW(L, N); \
-		else { \
-			((L)->next)->prev = (N); \
-			(N)->next = ((L)->next); \
-			(N)->prev = (L); \
-			(L)->next = (N); \
-		} \
-	} while (0)
-
-#define DLL_DEL(L, N) \
-	do { \
-		if (((N)->next) == (N)) \
-			(L) = NULL; \
-		else { \
-			if ((L) == N) \
-				(L) = ((N)->next); \
-			((N)->next)->prev = ((N)->prev); \
-			((N)->prev)->next = ((N)->next); \
-		} \
-	} while (0)
 
 int
 sendf(char *err, server *s, const char *fmt, ...)
@@ -123,25 +87,28 @@ void
 server_connect(char *host, char *port)
 {
 	connection_thread *ct;
-	server *s;
+	server *tmp, *s = NULL;
 
-	/* Check if a server matching host:port already exists */
-	if ((s = server_head)) do {
-		if (!strcmp(s->host, host) && !strcmp(s->port, port))
-			break;
-		s = s->next;
-	} while (s != server_head || (s = NULL));
+	/* Check if server matching host:port already exists */
+	if ((tmp = server_head) != NULL) {
+		do {
+			if (!strcmp(tmp->host, host) && !strcmp(tmp->port, port)) {
+				s = tmp;
+				break;
+			}
+		} while ((tmp = tmp->next) != server_head);
+	}
 
+	/* Check if server is already connected */
 	if (s && s->soc >= 0) {
 		newlinef((ccur = s->channel), 0, "-!!-", "Already connected to %s:%s", host, port);
 		return;
 	}
 
-	ccur = s ? s->channel : (s = new_server(host, port))->channel;
+	if (s == NULL)
+		s = new_server(host, port);
 
-	/* TODO: the calling function should take care of adding the server
-	 * let server_connect return server* or NULL */
-	DLL_ADD(server_head, s);
+	ccur = s->channel;
 
 	if ((ct = calloc(1, sizeof(*ct))) == NULL)
 		fatal("calloc");
@@ -156,18 +123,42 @@ server_connect(char *host, char *port)
 	newlinef(s->channel, 0, "--", "Connecting to '%s' port %s", host, port);
 
 	if ((pthread_create(&ct->tid, NULL, threaded_connect, ct)))
-		fatal("server_connect - pthread_create");
+		fatal("pthread_create");
+}
+
+static server*
+new_server(char *host, char *port)
+{
+	server *s;
+
+	if ((s = calloc(1, sizeof(*s))) == NULL)
+		fatal("calloc");
+
+	/* Set non-zero default fields */
+	s->soc = -1;
+	s->iptr = s->input;
+	s->nptr = config.nicks;
+	s->host = strdup(host);
+	s->port = strdup(port);
+
+	auto_nick(&(s->nptr), s->nick_me);
+
+	s->channel = ccur = new_channel(host, s, NULL);
+
+	DLL_ADD(server_head, s);
+
+	return s;
 }
 
 static void
-server_connected(server *s)
+connected(server *s)
 {
 	/* Server successfully connected, send IRC init messages */
 
 	connection_thread *ct = s->connecting;
 
 	if ((pthread_join(ct->tid, NULL)))
-		fatal("server_connected - pthread_join");
+		fatal("pthread_join");
 
 	if (*ct->ipstr)
 		newlinef(s->channel, 0, "--", "Connected to [%s]", ct->ipstr);
@@ -260,12 +251,12 @@ threaded_connect_cleanup(void **arg)
 }
 
 void
-server_disconnect(server *s, char *err, char *mesg)
+server_disconnect(server *s, int err, char *mesg)
 {
-	/* When err is not null:
+	/* When err is non-zero:
 	 *   Disconnect initiated by remote host
 	 *
-	 * When mesg is not null:
+	 * When err is zero:
 	 *   Disconnect initiated by user */
 
 	if (s->connecting) {
@@ -291,7 +282,7 @@ server_disconnect(server *s, char *err, char *mesg)
 	if (s->soc >= 0) {
 
 		if (err) {
-			newlinef(s->channel, 0, "ERROR", "%s", err);
+			newlinef(s->channel, 0, "ERROR", "%s", mesg);
 			newlinef(s->channel, 0, "--", "Attempting reconnect in %ds", RECONNECT_DELTA);
 
 			/* If disconnecting due to error, attempt a reconnect */
@@ -392,7 +383,7 @@ check_connect(server *s)
 
 	/* Connection Success */
 	if (ct->socket >= 0) {
-		server_connected(s);
+		connected(s);
 
 	/* Connection failure */
 	} else if (*ct->error) {
@@ -431,7 +422,7 @@ check_latency(server *s, time_t t)
 
 	/* Timeout */
 	if (delta > 255) {
-		server_disconnect(s, "Ping timeout (255s)", NULL);
+		server_disconnect(s, 1, "Ping timeout (255s)");
 		return 1;
 	}
 
@@ -469,7 +460,7 @@ check_socket(server *s, time_t t)
 	while (s->soc >= 0 && (count = read(s->soc, recv_buff, BUFFSIZE)) >= 0) {
 
 		if (count == 0) {
-			server_disconnect(s, "Remote hangup", NULL);
+			server_disconnect(s, 1, "Remote hangup");
 			break;
 		}
 
@@ -489,297 +480,4 @@ check_socket(server *s, time_t t)
 		fatal("read");
 
 	return 0;
-}
-
-/* TODO:
- *
- * Everything below this comment has nothing to do with net and should be moved
- * to mesg.c or similar
- *
- * */
-
-void
-newline(channel *c, line_t type, const char *from, const char *mesg)
-{
-	/* Default wrapper for _newline because length of message won't be known */
-
-	_newline(c, type, from, mesg, strlen(mesg));
-}
-
-void
-newlinef(channel *c, line_t type, const char *from, const char *fmt, ...)
-{
-	/* Formating wrapper for _newline */
-
-	char buff[BUFFSIZE];
-	int len;
-	va_list ap;
-
-	va_start(ap, fmt);
-	len = vsnprintf(buff, BUFFSIZE, fmt, ap);
-	va_end(ap);
-
-	_newline(c, type, from, buff, len);
-}
-
-static void
-_newline(channel *c, line_t type, const char *from, const char *mesg, size_t len)
-{
-	/* Static function for handling inserting new lines into buffers */
-
-	line *new_line;
-
-	/* c->buffer_head points to the first printable line, so get the next line in the
-	 * circular buffer */
-	if ((new_line = c->buffer_head + 1) == &c->buffer[SCROLLBACK_BUFFER])
-		new_line = c->buffer;
-
-	/* Increment the channel's scrollback pointer if it pointed to the first or last line, ie:
-	 *  - if it points to c->buffer_head, it pointed to the previous first line in the buffer
-	 *  - if it points to new_line, it pointed to the previous last line in the buffer
-	 *  */
-	if (c->draw.scrollback == c->buffer_head || c->draw.scrollback == new_line)
-		if (++c->draw.scrollback == &c->buffer[SCROLLBACK_BUFFER])
-			c->draw.scrollback = c->buffer;
-
-	c->buffer_head = new_line;
-
-	/* new_channel() memsets c->buffer to 0, so this will either free(NULL) or an old line */
-	free(new_line->text);
-
-	if (c == NULL)
-		fatal("channel is null");
-
-	/* Set the line meta data */
-	new_line->len = len;
-	new_line->type = type;
-	new_line->time = time(NULL);
-
-	/* Rows are recalculated by the draw routine when == 0 */
-	new_line->rows = 0;
-
-	/* If from is NULL, assume server message */
-	strncpy(new_line->from, (from) ? from : c->name, NICKSIZE);
-
-	size_t len_from;
-	if ((len_from = strlen(new_line->from)) > c->draw.nick_pad)
-		c->draw.nick_pad = len_from;
-
-	if (mesg == NULL)
-		fatal("mesg is null");
-
-	if ((new_line->text = malloc(new_line->len + 1)) == NULL)
-		fatal("newline");
-
-	strcpy(new_line->text, mesg);
-
-	if (c == ccur)
-		draw(D_BUFFER);
-	else if (!type && c->active < ACTIVITY_ACTIVE) {
-		c->active = ACTIVITY_ACTIVE;
-		draw(D_CHANS);
-	}
-}
-
-static server*
-new_server(char *host, char *port)
-{
-	server *s;
-
-	if ((s = calloc(1, sizeof(*s))) == NULL)
-		fatal("calloc");
-
-	/* Set non-zero default fields */
-	s->soc = -1;
-	s->iptr = s->input;
-	s->nptr = config.nicks;
-	s->host = strdup(host);
-	s->port = strdup(port);
-
-	auto_nick(&(s->nptr), s->nick_me);
-
-	s->channel = ccur = new_channel(host, s, NULL);
-
-	return s;
-}
-
-channel*
-new_channel(char *name, server *server, channel *chanlist)
-{
-	channel *c;
-
-	if ((c = calloc(1, sizeof(*c))) == NULL)
-		fatal("calloc");
-
-	c->server = server;
-	c->buffer_head = c->buffer;
-	c->active = ACTIVITY_DEFAULT;
-	c->input = new_input();
-	c->draw.scrollback = c->buffer_head;
-
-	/* TODO: if channel name length exceeds CHANSIZE we'll never appropriately
-	 * associate incomming messages with this channel anyways so it shouldn't be allowed */
-	strncpy(c->name, name, CHANSIZE);
-
-	/* Append the new channel to the list */
-	DLL_ADD(chanlist, c);
-
-	draw(D_FULL);
-
-	return c;
-}
-
-void
-free_server(server *s)
-{
-	/* TODO: s->connecting???  should free ct, pthread cancel, close the socket, etc */
-	/* TODO: close the socket? send_quit is expected me to? */
-
-	channel *t, *c = s->channel;
-	do {
-		t = c;
-		c = c->next;
-		free_channel(t);
-	} while (c != s->channel);
-
-	free(s->host);
-	free(s->port);
-	free(s);
-}
-
-void
-free_channel(channel *c)
-{
-	line *l;
-	for (l = c->buffer; l < c->buffer + SCROLLBACK_BUFFER; l++)
-		free(l->text);
-
-	free_nicklist(c->nicklist);
-	free_input(c->input);
-	free(c);
-}
-
-channel*
-channel_get(char *chan, server *s)
-{
-	channel *c = s->channel;
-
-	do {
-		if (!strcmp(c->name, chan))
-			return c;
-		c = c->next;
-	} while (c != s->channel);
-
-	return NULL;
-}
-
-void
-clear_channel(channel *c)
-{
-	free(c->buffer_head->text);
-
-	c->buffer_head->text = NULL;
-
-	c->draw.nick_pad = 0;
-
-	draw(D_BUFFER);
-}
-
-/* Confirm closing a server */
-static int
-action_close_server(char c)
-{
-	if (c == 'n' || c == 'N')
-		return 1;
-
-	if (c == 'y' || c == 'Y') {
-
-		channel *c = ccur;
-
-		/* If closing the last server */
-		if ((ccur = c->server->next->channel) == c->server->channel)
-			ccur = rirc;
-
-		server_disconnect(c->server, NULL, DEFAULT_QUIT_MESG);
-
-		DLL_DEL(server_head, c->server);
-		free_server(c->server);
-
-		draw(D_FULL);
-
-		return 1;
-	}
-
-	return 0;
-}
-
-/* Close a channel buffer/server and return the next channel */
-channel*
-channel_close(channel *c)
-{
-	/* Close a buffer,
-	 *
-	 * if closing a server buffer, confirm with the user */
-
-	channel *ret = c;
-
-	/* c in this case is the main buffer */
-	if (c->server == NULL)
-		return c;
-
-	if (!c->type) {
-		/* Closing a server, confirm the number of channels being closed */
-
-		int num_chans = 0;
-
-		while ((c = c->next)->type)
-			num_chans++;
-
-		if (num_chans)
-			action(action_close_server, "Close server '%s'? Channels: %d   [y/n]",
-					c->server->host, num_chans);
-		else
-			action(action_close_server, "Close server '%s'?   [y/n]", c->server->host);
-	} else {
-		/* Closing a channel */
-
-		sendf(NULL, c->server, "PART %s", c->name);
-
-		/* If channel c is last in the list, return the previous channel */
-		ret = !(c->next == c->server->channel) ?
-			c->next : c->prev;
-
-		DLL_DEL(c->server->channel, c);
-		free_channel(c);
-
-		draw(D_FULL);
-	}
-
-	return ret;
-}
-
-/* Get a channel's next/previous, taking into account server wraparound */
-channel*
-channel_switch(channel *c, int next)
-{
-	channel *ret;
-
-	/* c in this case is the main buffer */
-	if (c->server == NULL)
-		return c;
-
-	if (next)
-		/* If wrapping around forwards, get next server's first channel */
-		ret = !(c->next == c->server->channel) ?
-			c->next : c->server->next->channel;
-	else
-		/* If wrapping around backwards, get previous server's last channel */
-		ret = !(c == c->server->channel) ?
-			c->prev : c->server->prev->channel->prev;
-
-	ret->active = ACTIVITY_DEFAULT;
-
-	draw(D_FULL);
-
-	return ret;
 }

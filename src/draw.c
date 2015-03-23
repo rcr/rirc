@@ -1,5 +1,9 @@
-#include <assert.h>
+/* Draw the elements in state.c to the terminal
+ * using terminal using vt-100 compatible escape codes
+ * */
+
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <sys/ioctl.h>
 
@@ -461,7 +465,8 @@ word_wrap(int text_cols, char **ptr1, char *ptr2)
 
 	char *tmp, *ret = (*ptr1) + text_cols;
 
-	assert(text_cols > 0);
+	if (text_cols <= 0)
+		fatal("Insufficient columns");
 
 	/* Entire line fits within text_cols */
 	if (ret >= ptr2)
@@ -521,34 +526,4 @@ nick_col(char *nick)
 		colour += *nick++;
 
 	return nick_colours[colour % sizeof(nick_colours) / sizeof(nick_colours[0])];
-}
-
-/* TODO: draw scrollback status if != buffer_head */
-void
-buffer_scrollback_page(channel *c, int up)
-{
-	/* TODO Scroll the buffer up or down a full page */
-	buffer_scrollback_line(c, up);
-}
-
-void
-buffer_scrollback_line(channel *c, int up)
-{
-	/* Scroll the buffer up or down a single line */
-
-	line *tmp, *l = c->draw.scrollback;
-
-	if (up) {
-		/* Don't scroll up over the buffer head */
-		tmp = (l == c->buffer) ? &c->buffer[SCROLLBACK_BUFFER - 1] : l - 1;
-
-		if (tmp->text != NULL && tmp != c->buffer_head)
-			c->draw.scrollback = tmp;
-	} else {
-		/* Don't scroll down past the buffer head */
-		if (l != c->buffer_head)
-			c->draw.scrollback = (l == &c->buffer[SCROLLBACK_BUFFER - 1]) ? c->buffer : l + 1;
-	}
-
-	draw(D_BUFFER);
 }
