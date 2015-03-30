@@ -408,6 +408,8 @@ check_connect(server *s)
 	return 1;
 }
 
+/* TODO: should attempt to ping at, say, TIMEOUT - 30s to see if the server pongs
+ * before assuming disconnect */
 static int
 check_latency(server *s, time_t t)
 {

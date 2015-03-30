@@ -6,6 +6,7 @@
 #define NICKSIZE 256
 #define CHANSIZE 256
 #define MAX_INPUT 256
+
 #define RECONNECT_DELTA 15
 
 #include <time.h>
@@ -138,8 +139,7 @@ typedef struct line
 typedef struct input_line
 {
 	char *end;
-	/* TODO: why is this +1? */
-	char text[MAX_INPUT+1];
+	char text[MAX_INPUT];
 	struct input_line *prev;
 	struct input_line *next;
 } input_line;

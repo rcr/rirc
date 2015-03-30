@@ -65,7 +65,7 @@ usage(void)
 	"  -v, --version          Print rirc version and exit\n"
 	"\n"
 	"Examples:\n"
-	"  rirc -c server.tld -j '#chan' -n nick\n"
+	"  rirc -c server.tld -j '#chan'\n"
 	"  rirc -c server.tld -p 1234 -j '#chan1,#chan2' -n 'nick, nick_, nick__'\n"
 	);
 }

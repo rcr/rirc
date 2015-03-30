@@ -146,6 +146,15 @@ send_mesg(char *mesg)
 		newline(ccur, 0, "-!!-", errbuff);
 }
 
+void
+send_paste(char *paste)
+{
+	/* TODO: send the paste buffer, which is preformatted with \r\n, and then
+	 * split the messages and newline them into the buffer * */
+
+	UNUSED(paste);
+}
+
 static int
 send_connect(char *err, char *mesg)
 {
@@ -373,6 +382,7 @@ send_version(char *err, char *mesg)
 /*
  * Message receiving handlers
  * */
+
 void
 recv_mesg(char *inp, int count, server *s)
 {

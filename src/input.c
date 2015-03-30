@@ -5,6 +5,8 @@
  * All input is handled synchronously and refers to the current
  * channel being drawn (ccur)
  *
+ * A buffer input line consists of a doubly linked list of gap buffers
+ *
  * Escape sequences are assumed to be ANSI. As such, you mileage may vary
  * */
 
@@ -23,6 +25,9 @@
 /* Max number of characters accepted in user pasted input */
 #define MAX_PASTE 2048
 
+/* Max number of lines that can result from a paste */
+#define MAX_PASTE_LINES 128
+
 /* Max length of user action message */
 #define MAX_ACTION_MESG 256
 
@@ -32,8 +37,12 @@ extern struct winsize w;
 /* Static buffer that accepts input from stdin */
 static char input_buff[MAX_PASTE];
 
+/* Buffer to hold paste message while waiting for confirmation, includes room for \r\n */
+static char paste_buff[MAX_INPUT + MAX_PASTE + (2 * MAX_PASTE_LINES)];
+static size_t paste_len;
+
 /* User input handlers */
-static void input_char(char);
+static int input_char(char);
 static void input_cchar(char);
 static void input_cseq(char*, ssize_t);
 static void input_paste(char*, ssize_t);
@@ -44,7 +53,7 @@ static int (*action_handler)(char);
 static char action_buff[MAX_ACTION_MESG];
 
 /* Confirmation handler when multi-line pastes are encountered */
-static int action_paste_input(char);
+static int action_send_paste(char);
 
 /* Incremental channel search */
 static int action_find_channel(char);
@@ -70,14 +79,17 @@ input*
 new_input(void)
 {
 	input *i;
-	if ((i = malloc(sizeof(input))) == NULL)
-		fatal("new_input");
 
-	i->count = 0;
-	i->line = new_input_line(NULL);
-	i->list_head = i->line;
+	if ((i = calloc(1, sizeof(*i))) == NULL)
+		fatal("calloc");
+
+	/* DLL of input lines */
+	i->list_head = i->line = new_input_line(NULL);
+
+	/* Gap buffer pointers */
 	i->head = i->line->text;
 	i->tail = i->line->text + MAX_INPUT;
+
 	i->window = i->line->text;
 
 	return i;
@@ -86,6 +98,8 @@ new_input(void)
 void
 free_input(input *i)
 {
+	/* Free an input and all of it's lines */
+
 	input_line *t, *l = i->list_head;
 
 	do {
@@ -100,16 +114,14 @@ free_input(input *i)
 static input_line*
 new_input_line(input_line *prev)
 {
+	/* Add a new line to an input's DLL */
+
 	input_line *l;
-	if ((l = malloc(sizeof(input_line))) == NULL)
-		fatal("new_input_line");
 
-	l->end = l->text;
-	l->prev = prev ? prev : l;
-	l->next = prev ? prev->next : l;
+	if ((l = calloc(1, sizeof(*l))) == NULL)
+		fatal("calloc");
 
-	if (prev)
-		prev->next = prev->next->prev = l;
+	DLL_ADD(prev, l);
 
 	return l;
 }
@@ -134,7 +146,7 @@ poll_input(void)
 	struct pollfd stdin_fd[] = {{ .fd = STDIN_FILENO, .events = POLLIN }};
 
 	if ((ret = poll(stdin_fd, 1, timeout_ms)) < 0 && errno != EINTR)
-			fatal("poll");
+		fatal("poll");
 
 	if (ret > 0) {
 
@@ -172,15 +184,20 @@ poll_input(void)
  * User input handlers
  * */
 
-static void
+static int
 input_char(char c)
 {
 	/* Input a single character */
 
-	if (ccur->input->head < ccur->input->tail)
-		*ccur->input->head++ = c;
+	if (ccur->input->head >= ccur->input->tail)
+		/* Gap buffer is full */
+		return 0;
+
+	*ccur->input->head++ = c;
 
 	draw(D_INPUT);
+
+	return 1;
 }
 
 static void
@@ -263,6 +280,8 @@ input_cseq(char *input, ssize_t len)
 	else if (!strncmp(input, "[3~", len))
 		delete_right(ccur->input);
 
+	/* FIXME: scrollback disabled while it's reworked */
+#if 0
 	/* page up */
 	else if (!strncmp(input, "[5~", len))
 		buffer_scrollback_page(ccur, 1);
@@ -278,23 +297,123 @@ input_cseq(char *input, ssize_t len)
 	/* mousewheel down */
 	else if (!strncmp(input, "[Ma", len))
 		buffer_scrollback_line(ccur, 0);
+#endif
 }
 
 static void
-input_paste(char *input, ssize_t len)
+input_paste(char *paste, ssize_t len)
 {
-	UNUSED(input);
-	UNUSED(len);
-	/* Input pasted text */
+	/* Input pasted text and render a buffer of messages that will be sent if confirmed */
 
-	/* TODO: count the number of lines that would be sent,
+	/* If first character is /, assume a command is being entered:
+	 *  - don't input more than a single input line will accept
+	 *  - don't automatically send anything
+	 */
+	if (*ccur->input->line->text == '/') {
+
+		while (len && input_char(*paste))
+			len--, paste++;
+
+		return;
+	}
+
+	/* Determine how many lines would be required for the paste, confirm with user
 	 *
-	 * - sanitize the input of unprintable chars, warn the user about num dicarded
-	 * - warn the user about input larger than MAX_PASTE which is discarded
-	 * - if multiline paste, confirm the number of lines with the user
-	 * - consider that input might be pasted into the middle of a line */
+	 * Where each message will be:
+	 *   `PRIVMESG <target> :<mesg>\r\n`
+	 */
 
-	action(action_paste_input, "Testing paste confirm. y/n? ");
+	/* Max number of characters per message that can be sent to this target */
+	size_t max_len = BUFFSIZE - strlen("PRIVMESG  :\r\n") - strlen(ccur->name);
+
+	/* Get the number of characters currently on the input line's gap buffer */
+	size_t input_len = (ccur->input->head - ccur->input->line->text)
+		+ (MAX_INPUT - (ccur->input->tail - ccur->input->line->text));
+
+	/* If there are no \n characters in the paste and (head + paste + tail) fits in one
+	 * input line, insert the paste and skip the rest of the processing */
+	if ((input_len + len) <= max_len && !strchr(paste, '\n')) {
+
+		while (len && input_char(*paste))
+			len--, paste++;
+
+		return;
+	}
+
+	/* Else render the paste buffer, count lines, confirm with user
+	 *
+	 * Since paste might be inserted into the middle of the line, copy the input
+	 * head, then scan and copy the paste, then copy the tail
+	 *
+	 * The paste body should be scanned for \n, the head and tail can be assumed to contain none
+	 */
+	char *input_ptr, *paste_ptr = paste_buff;
+
+	int line_count = 1;
+
+	/* Copy the input head to the paste buffer */
+	for (input_ptr = ccur->input->line->text; input_ptr < ccur->input->head; input_ptr++)
+		*paste_ptr++ = *input_ptr;
+
+	/* Initial length is the input head's count */
+	size_t line_len = ccur->input->head - ccur->input->line->text;
+
+	/* Scan the paste for \n characters and count the length, if \n is encountered
+	 * or the max number of characters is encountered, insert message terminator */
+	for (input_ptr = paste; input_ptr < &paste[len]; input_ptr++) {
+
+		if (*input_ptr == '\n' || line_len == max_len) {
+
+			/* Dedupe \n characters to avoid sending empty lines */
+			if (*paste_ptr == '\n')
+				continue;
+
+			line_count++;
+
+			*paste_ptr++ = '\r';
+			*paste_ptr++ = '\n';
+
+			line_len = 0;
+
+			if (line_count == MAX_PASTE_LINES) {
+				newlinef(ccur, 0, "-!!-",
+						"MAX_PASTE_LINES (%d) encountered, discarding excess", MAX_PASTE_LINES);
+
+				/* Goto send_paste to avoid adding the tail to the paste */
+				goto send_paste;
+			}
+		} else {
+			*paste_ptr++ = *input_ptr;
+		}
+	}
+
+	/* Copy the input tail to the paste buffer
+	 *
+	 * Since line_count is at least < MAX_PASTE_LINES there will always  be enough
+	 * for the tail, though it may be be split at least once more
+	 */
+	for (input_ptr = ccur->input->tail; input_ptr < ccur->input->head; input_ptr++) {
+
+		if (line_len == max_len) {
+			line_count++;
+
+			*paste_ptr++ = '\r';
+			*paste_ptr++ = '\n';
+
+			line_len = 0;
+		}
+
+		*paste_ptr++ = *input_ptr;
+		line_len++;
+	}
+
+send_paste:
+
+	/* Store the paste length */
+	paste_len = paste_ptr - paste_buff;
+
+	/* Confirm sending the paste */
+	action(action_send_paste, "Confirm sending %d lines? [y/n]", line_count);
 }
 
 static void
@@ -317,7 +436,8 @@ action(int (*a_handler)(char), const char *fmt, ...)
 	/* Begin a user action
 	 *
 	 * The action handler is then passed any future input, and is
-	 * expected to return a non-zero value when the action is resolved */
+	 * expected to return a non-zero value when the action is resolved
+	 * */
 
 	va_list ap;
 
@@ -338,6 +458,8 @@ action(int (*a_handler)(char), const char *fmt, ...)
 static inline void
 cursor_left(input *in)
 {
+	/* Move the cursor left */
+
 	if (in->head > in->line->text)
 		*(--in->tail) = *(--in->head);
 
@@ -347,6 +469,8 @@ cursor_left(input *in)
 static inline void
 cursor_right(input *in)
 {
+	/* Move the cursor right */
+
 	if (in->tail < in->line->text + MAX_INPUT)
 		*(in->head++) = *(in->tail++);
 
@@ -356,6 +480,8 @@ cursor_right(input *in)
 static inline void
 delete_left(input *in)
 {
+	/* Delete the character left of the cursor */
+
 	if (in->head > in->line->text)
 		in->head--;
 
@@ -365,6 +491,8 @@ delete_left(input *in)
 static inline void
 delete_right(input *in)
 {
+	/* Delete the character right of the cursor */
+
 	if (in->tail < in->line->text + MAX_INPUT)
 		in->tail++;
 
@@ -374,6 +502,8 @@ delete_right(input *in)
 static inline void
 input_scroll_up(input *in)
 {
+	/* Scroll up through the input history */
+
 	reset_line(in);
 
 	if (in->line->prev != in->list_head)
@@ -387,6 +517,8 @@ input_scroll_up(input *in)
 static inline void
 input_scroll_down(input *in)
 {
+	/* Scroll down through the input history */
+
 	reset_line(in);
 
 	if (in->line != in->list_head)
@@ -404,16 +536,14 @@ input_scroll_down(input *in)
 static inline void
 reset_line(input *in)
 {
-	/* Reset the line's pointers such that new characters are inserted at the end */
+	/* Reset a line's gap buffer pointers such that new chars are inserted at the gap head */
 
-	char *head = in->head;
-	char *tail = in->tail;
-	char *end = in->line->text + MAX_INPUT;
+	char *h_tmp = in->head, *t_tmp = in->tail;
 
-	while (tail < end)
-		*head++ = *tail++;
+	while (t_tmp < (in->line->text + MAX_INPUT))
+		*h_tmp++ = *t_tmp++;
 
-	in->line->end = head;
+	in->line->end = h_tmp;
 }
 
 static inline void
@@ -536,31 +666,20 @@ action_find_channel(char c)
  * Input sending functions
  * */
 
-/* TODO: make sure that anything we send is truly sent, eg:
- * if the split boundary happens to be a '/' character, it still has to be sent
- * as a privmesg and not interpretted as a command by send_mesg
- *
- * we know the length of the channel name, so we can just calculate
- * the length of each messge segment, ie:
- *   510 - len('PRIVMESG ' - len(channel-name ), etc.
- *
- * reuse word_wrap to split on word boundaries?
- * */
 static int
-action_paste_input(char c)
+action_send_paste(char c)
 {
-	/* TODO */
-
-	if (c == 'y' || c == 'Y') {
-		newlinef(ccur, 0, "TODO:", "paste input");
+	/* Confirmed send */
+	if (toupper(c) == 'Y') {
+		send_paste(paste_buff);
 		return 1;
 	}
 
-	if (c == 'n' || c == 'N') {
-		newlinef(ccur, 0, "TODO:", "paste input");
+	/* Confirmed don't send */
+	if (toupper(c) == 'N')
 		return 1;
-	}
 
+	/* Do nothing */
 	return 0;
 }
 

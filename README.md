@@ -33,7 +33,7 @@ Options:
   -v, --version          Print rirc version and exit
 
 Examples:
-  rirc -c server.tld -j '#chan' -n nick
+  rirc -c server.tld -j '#chan'
   rirc -c server.tld -p 1234 -j '#chan1,#chan2' -n 'nick, nick_, nick__'
 ```
 
