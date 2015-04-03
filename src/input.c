@@ -66,14 +66,14 @@ static inline void cursor_left(input*);
 static inline void cursor_right(input*);
 static inline void delete_left(input*);
 static inline void delete_right(input*);
-static inline void input_scroll_up(input*);
-static inline void input_scroll_down(input*);
+static inline void input_scroll_backwards(input*);
+static inline void input_scroll_forwards(input*);
 
 /* Input line util functions */
 static inline void reset_line(input*);
 static inline void reframe_line(input*);
 
-static input_line* new_input_line(input_line*);
+static void new_list_head(input*);
 
 input*
 new_input(void)
@@ -83,14 +83,7 @@ new_input(void)
 	if ((i = calloc(1, sizeof(*i))) == NULL)
 		fatal("calloc");
 
-	/* DLL of input lines */
-	i->list_head = i->line = new_input_line(NULL);
-
-	/* Gap buffer pointers */
-	i->head = i->line->text;
-	i->tail = i->line->text + MAX_INPUT;
-
-	i->window = i->line->text;
+	new_list_head(i);
 
 	return i;
 }
@@ -111,19 +104,25 @@ free_input(input *i)
 	free(i);
 }
 
-static input_line*
-new_input_line(input_line *prev)
+static void
+new_list_head(input *i)
 {
-	/* Add a new line to an input's DLL */
+	/* Append a new line as the list_head */
 
 	input_line *l;
 
 	if ((l = calloc(1, sizeof(*l))) == NULL)
 		fatal("calloc");
 
-	DLL_ADD(prev, l);
+	DLL_ADD(i->list_head, l);
 
-	return l;
+	i->line = i->list_head = l;
+
+	/* Gap buffer pointers */
+	i->head = l->text;
+	i->tail = l->text + MAX_INPUT;
+
+	i->window = l->text;
 }
 
 void
@@ -262,11 +261,11 @@ input_cseq(char *input, ssize_t len)
 
 	/* arrow up */
 	else if (!strncmp(input, "[A", len))
-		input_scroll_up(ccur->input);
+		input_scroll_backwards(ccur->input);
 
 	/* arrow down */
 	else if (!strncmp(input, "[B", len))
-		input_scroll_down(ccur->input);
+		input_scroll_forwards(ccur->input);
 
 	/* arrow right */
 	else if (!strncmp(input, "[C", len))
@@ -300,6 +299,10 @@ input_cseq(char *input, ssize_t len)
 #endif
 }
 
+/* TODO:
+ *
+ * Rather than render with \r\n, separate messages with \0. The handler for this will
+ * will iterate over it and call sendf & _newline */
 static void
 input_paste(char *paste, ssize_t len)
 {
@@ -500,14 +503,17 @@ delete_right(input *in)
 }
 
 static inline void
-input_scroll_up(input *in)
+input_scroll_backwards(input *in)
 {
-	/* Scroll up through the input history */
+	/* Scroll backwards through the input history */
+
+	/* Scrolling backwards on the last line */
+	if (in->line->prev == in->list_head)
+		return;
 
 	reset_line(in);
 
-	if (in->line->prev != in->list_head)
-		in->line = in->line->prev;
+	in->line = in->line->prev;
 
 	reframe_line(in);
 
@@ -515,14 +521,17 @@ input_scroll_up(input *in)
 }
 
 static inline void
-input_scroll_down(input *in)
+input_scroll_forwards(input *in)
 {
-	/* Scroll down through the input history */
+	/* Scroll forwards through the input history */
+
+	/* Scrolling forward on the first line */
+	if (in->line == in->list_head)
+		return;
 
 	reset_line(in);
 
-	if (in->line != in->list_head)
-		in->line = in->line->next;
+	in->line = in->line->next;
 
 	reframe_line(in);
 
@@ -549,7 +558,7 @@ reset_line(input *in)
 static inline void
 reframe_line(input *in)
 {
-	/* Reframe the line content in the input bar window */
+	/* Reframe a line's draw window */
 
 	in->head = in->line->end;
 	in->tail = in->line->text + MAX_INPUT;
@@ -686,40 +695,47 @@ action_send_paste(char c)
 static void
 send_input(void)
 {
-	/* TODO: cleanup */
-
 	char sendbuff[BUFFSIZE];
+
 	input *in = ccur->input;
-	draw(D_INPUT);
 
-	char *head = in->head, *tail = in->tail, *end = in->line->text + MAX_INPUT;
+	/* Before sending, copy the tail of the gap buffer back to the head */
+	reset_line(in);
 
-	/* Empty input */
-	if (head == in->line->text && tail == end)
+	/* After resetting, check for empty line */
+	if (in->head == in->line->text)
 		return;
 
-	while (tail < end)
-		*head++ = *tail++;
-	*head = '\0';
-	in->line->end = head;
-
-	/* strcpy is safe here since MAX_INPUT < BUFFSIZE */
+	/* Pass a copy of the message to the send handler, since it may modify the contents */
 	strcpy(sendbuff, in->line->text);
 
-	if (in->line == in->list_head) {
-		if (in->count < SCROLLBACK_INPUT)
-			in->count++;
-		else {
-			input_line *t = in->list_head->next;
-			in->list_head->next = t->next;
-			t->next->prev = in->list_head;
-			free(t);
-		}
-		in->line = in->list_head = new_input_line(in->list_head);
-	} else {
-		/* Resending an input scrollback */
+	send_mesg(sendbuff);
 
-		/* Move from list to head */
+	/* Now check if the sent line was 'new' or was resent input scrollback
+	 *
+	 * If a new line was sent:
+	 *   append a blank input as the new list head
+	 *
+	 * If scrollback was sent:
+	 *   move it to the front of the input scrollback
+	 */
+	if (in->line == in->list_head) {
+
+		if (in->count == SCROLLBACK_INPUT) {
+			/* Reached maximum input scrollback lines, delete the tail */
+			input_line *t = in->list_head->next;
+
+			DLL_DEL(in->list_head, t);
+			free(t);
+		} else {
+			in->count++;
+		}
+
+		new_list_head(in);
+	} else {
+		/* TODO: the DLL macros don't seem to handle this task well...
+		 * Maybe they should be replaced with generic DLL functions in utils */
+
 		in->line->next->prev = in->line->prev;
 		in->line->prev->next = in->line->next;
 
@@ -729,10 +745,9 @@ send_input(void)
 		in->line->next = in->list_head;
 
 		in->line = in->list_head;
-	}
-	in->head = in->line->text;
-	in->tail = in->line->text + MAX_INPUT;
-	in->window = in->line->text;
 
-	send_mesg(sendbuff);
+		reframe_line(in);
+	}
+
+	draw(D_INPUT);
 }

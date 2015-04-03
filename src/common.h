@@ -6,8 +6,13 @@
 #define NICKSIZE 256
 #define CHANSIZE 256
 #define MAX_INPUT 256
-
 #define RECONNECT_DELTA 15
+
+/* Compile time checks */
+#if BUFFSIZE < MAX_INPUT
+/* Required so input lines can be safely strcpy'ed into a send buffer */
+#error BUFFSIZE must be greater than MAX_INPUT
+#endif
 
 #include <time.h>
 
@@ -140,19 +145,19 @@ typedef struct input_line
 {
 	char *end;
 	char text[MAX_INPUT];
-	struct input_line *prev;
 	struct input_line *next;
+	struct input_line *prev;
 } input_line;
 
 /* Channel input */
 typedef struct input
 {
-	int count;
 	char *head;
 	char *tail;
 	char *window;
-	struct input_line *list_head;
+	int count;
 	struct input_line *line;
+	struct input_line *list_head;
 } input;
 
 /* Channel buffer */
