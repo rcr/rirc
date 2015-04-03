@@ -24,7 +24,11 @@ typedef struct connection_thread {
 	pthread_t tid;
 } connection_thread;
 
+/* DLL of current servers */
+static server *server_head;
+
 static server* new_server(char*, char*);
+static void free_server(server*);
 
 static int check_connect(server*);
 static int check_latency(server*, time_t);
@@ -35,6 +39,46 @@ static void connected(server*);
 
 static void* threaded_connect(void*);
 static void* threaded_connect_cleanup(void**);
+
+static server*
+new_server(char *host, char *port)
+{
+	server *s;
+
+	if ((s = calloc(1, sizeof(*s))) == NULL)
+		fatal("calloc");
+
+	/* Set non-zero default fields */
+	s->soc = -1;
+	s->iptr = s->input;
+	s->nptr = config.nicks;
+	s->host = strdup(host);
+	s->port = strdup(port);
+
+	auto_nick(&(s->nptr), s->nick_me);
+
+	s->channel = ccur = new_channel(host, s, NULL);
+
+	DLL_ADD(server_head, s);
+
+	return s;
+}
+
+static void
+free_server(server *s)
+{
+	channel *t, *c = s->channel;
+
+	do {
+		t = c;
+		c = c->next;
+		free_channel(t);
+	} while (c != s->channel);
+
+	free(s->host);
+	free(s->port);
+	free(s);
+}
 
 int
 sendf(char *err, server *s, const char *fmt, ...)
@@ -124,30 +168,6 @@ server_connect(char *host, char *port)
 
 	if ((pthread_create(&ct->tid, NULL, threaded_connect, ct)))
 		fatal("pthread_create");
-}
-
-static server*
-new_server(char *host, char *port)
-{
-	server *s;
-
-	if ((s = calloc(1, sizeof(*s))) == NULL)
-		fatal("calloc");
-
-	/* Set non-zero default fields */
-	s->soc = -1;
-	s->iptr = s->input;
-	s->nptr = config.nicks;
-	s->host = strdup(host);
-	s->port = strdup(port);
-
-	auto_nick(&(s->nptr), s->nick_me);
-
-	s->channel = ccur = new_channel(host, s, NULL);
-
-	DLL_ADD(server_head, s);
-
-	return s;
 }
 
 static void
@@ -251,16 +271,17 @@ threaded_connect_cleanup(void **arg)
 }
 
 void
-server_disconnect(server *s, int err, char *mesg)
+server_disconnect(server *s, int err, int kill, char *mesg)
 {
-	/* When err is non-zero:
+	/* When err flag is set:
 	 *   Disconnect initiated by remote host
 	 *
-	 * When err is zero:
-	 *   Disconnect initiated by user */
+	 * When kill flag is set:
+	 *   Free the server, update ccur
+	 */
 
+	/* Server connection in progress, cancel the connection attempt */
 	if (s->connecting) {
-		/* Server connection in progress, cancel the connection attempt */
 
 		connection_thread *ct = s->connecting;
 
@@ -275,11 +296,10 @@ server_disconnect(server *s, int err, char *mesg)
 		s->connecting = NULL;
 
 		newlinef(s->channel, 0, "--", "Connection to '%s' port %s canceled", s->host, s->port);
-
-		return;
 	}
 
-	if (s->soc >= 0) {
+	/* Server is/was connected, close socket, send quit message if non-erroneous disconnect */
+	else if (s->soc >= 0) {
 
 		if (err) {
 			newlinef(s->channel, 0, "ERROR", "%s", mesg);
@@ -317,18 +337,19 @@ server_disconnect(server *s, int err, char *mesg)
 			c->nicklist = NULL;
 
 		} while ((c = c->next) != s->channel);
-
-		return;
 	}
 
-	/* Cancel server reconnect attempts */
-	if (s->reconnect_time) {
+	/* Server was waiting to reconnect, cancel future attempt */
+	else if (s->reconnect_time) {
 		newlinef(s->channel, 0, "--", "Auto reconnect attempt canceled");
 
 		s->reconnect_time = 0;
 		s->reconnect_delta = 0;
+	}
 
-		return;
+	if (kill) {
+		DLL_DEL(server_head, s);
+		free_server(s);
 	}
 }
 
@@ -424,7 +445,7 @@ check_latency(server *s, time_t t)
 
 	/* Timeout */
 	if (delta > 255) {
-		server_disconnect(s, 1, "Ping timeout (255s)");
+		server_disconnect(s, 1, 0, "Ping timeout (255s)");
 		return 1;
 	}
 
@@ -462,7 +483,7 @@ check_socket(server *s, time_t t)
 	while (s->soc >= 0 && (count = read(s->soc, recv_buff, BUFFSIZE)) >= 0) {
 
 		if (count == 0) {
-			server_disconnect(s, 1, "Remote hangup");
+			server_disconnect(s, 1, 0, "Remote hangup");
 			break;
 		}
 

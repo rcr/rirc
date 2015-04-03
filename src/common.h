@@ -212,14 +212,12 @@ typedef struct parsed_mesg
 /* rirc.c */
 channel *rirc;
 channel *ccur;
-server *server_head;
 
 /* net.c */
-int sendp(char*, server*, const char*);
 int sendf(char*, server*, const char*, ...);
 void check_servers(void);
 void server_connect(char*, char*);
-void server_disconnect(server*, int, char*);
+void server_disconnect(server*, int, int, char*);
 
 /* draw.c */
 unsigned int draw;
@@ -262,7 +260,6 @@ void buffer_scrollback_line(channel*, int);
 void buffer_scrollback_page(channel*, int);
 void clear_channel(channel*);
 void free_channel(channel*);
-void free_server(server*);
 void newline(channel*, line_t, const char*, const char*);
 void newlinef(channel*, line_t, const char*, const char*, ...);
 void _newline(channel*, line_t, const char*, const char*, size_t);

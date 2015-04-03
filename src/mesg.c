@@ -208,7 +208,7 @@ send_disconnect(char *err, char *mesg)
 	if (!s || (!s->connecting && s->soc < 0 && !s->reconnect_time))
 		fail("Error: Not connected to server");
 
-	server_disconnect(ccur->server, 0, (*mesg) ? mesg : DEFAULT_QUIT_MESG);
+	server_disconnect(ccur->server, 0, 0, (*mesg) ? mesg : DEFAULT_QUIT_MESG);
 
 	return 0;
 }
@@ -334,16 +334,13 @@ send_quit(char *err, char *mesg)
 
 	UNUSED(err);
 
-	server *s, *t;
-	if ((s = server_head)) do {
+	server *t, *s = ccur->server;
 
-		server_disconnect(s, 0, (*mesg) ? mesg : DEFAULT_QUIT_MESG);
-
+	if (s) do {
 		t = s;
 		s = s->next;
-		free_server(t);
-
-	} while (s != server_head);
+		server_disconnect(t, 0, 1, (*mesg) ? mesg : DEFAULT_QUIT_MESG);
+	} while (t != s);
 
 	free_channel(rirc);
 
@@ -538,7 +535,7 @@ recv_error(char *err, parsed_mesg *p, server *s)
 
 	UNUSED(err);
 
-	server_disconnect(s, 1, p->trailing ? p->trailing : "Remote hangup");
+	server_disconnect(s, 1, 0, p->trailing ? p->trailing : "Remote hangup");
 
 	return 0;
 }

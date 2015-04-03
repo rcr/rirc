@@ -120,24 +120,6 @@ new_channel(char *name, server *server, channel *chanlist)
 }
 
 void
-free_server(server *s)
-{
-	/* TODO: s->connecting???  should free ct, pthread cancel, close the socket, etc */
-	/* TODO: close the socket? send_quit is expected me to? */
-
-	channel *t, *c = s->channel;
-	do {
-		t = c;
-		c = c->next;
-		free_channel(t);
-	} while (c != s->channel);
-
-	free(s->host);
-	free(s->port);
-	free(s);
-}
-
-void
 free_channel(channel *c)
 {
 	line *l;
@@ -190,10 +172,7 @@ action_close_server(char c)
 		if ((ccur = c->server->next->channel) == c->server->channel)
 			ccur = rirc;
 
-		server_disconnect(c->server, 0, DEFAULT_QUIT_MESG);
-
-		DLL_DEL(server_head, c->server);
-		free_server(c->server);
+		server_disconnect(c->server, 0, 1, DEFAULT_QUIT_MESG);
 
 		draw(D_FULL);
 
