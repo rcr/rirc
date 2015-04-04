@@ -85,6 +85,7 @@ static int recv_quit(char*, parsed_mesg*, server*);
 
 /* Message sending handlers */
 static int send_connect(char*, char*);
+static int send_cmd_exists(char *cmd);
 static int send_default(char*, char*);
 static int send_disconnect(char*, char*);
 static int send_emote(char*, char*);
@@ -93,8 +94,25 @@ static int send_nick(char*, char*);
 static int send_part(char*, char*);
 static int send_priv(char*, char*);
 static int send_quit(char*, char*);
-static int send_raw(char*, char*);
+static int send_default_cmd(char*, char *, char*);
 static int send_version(char*, char*);
+static int send_raw(char *, char *);
+
+/* IRC commands*/
+static const char irc_commands[][MAX_CMD] = 
+{       "ADMIN", "AWAY", "DIE", "ENCAP",
+        "HELP", "INFO", "INVITE","ISON",  
+        "KICK", "KILL", "KNOCK", "LINKS", 
+        "LIST", "LUSERS", "MODE", "MOTD",
+        "NAMES", "NAMESX", "NOTICE", "OPER", 
+        "PASS","REHASH", "RESTART", "RULES",
+        "SERVER", "SERVICE", "SERVLIST", "SQUERY", 
+        "SQUIT", "SETNAME", "SILENCE", "STATS",
+        "SUMMON", "TIME", "TRACE", "UHNAMES", 
+        "USER", "USERHOST", "USERIP", "USERS", 
+        "VERSION", "WALLOPS", "WATCH", "WHO", 
+        "WHOIS", "WHOWAS"
+};
 
 /*
  * Message sending handlers
@@ -111,7 +129,7 @@ send_mesg(char *mesg)
 		err = send_default(errbuff, mesg);
 	else {
 		mesg++;
-
+		
 		if (!(cmd = strtok_r(mesg, " ", &mesg)))
 			newline(ccur, 0, "-!!-", "Messages beginning with '/' require a command");
 		else if (!strcasecmp(cmd, "JOIN"))
@@ -138,6 +156,8 @@ send_mesg(char *mesg)
 			err = send_version(errbuff, mesg);
 		else if (!strcasecmp(cmd, "RAW"))
 			err = send_raw(errbuff, mesg);
+		else if (send_cmd_exists(cmd))
+			err = send_default_cmd(errbuff, cmd, mesg);
 		else
 			newlinef(ccur, 0, "-!!-", "Unknown command: %s", cmd);
 	}
@@ -153,6 +173,18 @@ send_paste(char *paste)
 	 * split the messages and newline them into the buffer * */
 
 	UNUSED(paste);
+}
+
+static int send_cmd_exists(char *cmd) 
+{
+	unsigned int index = 0;
+
+        for ( index = 0; index < sizeof(irc_commands) / sizeof(*irc_commands); index++ ) {
+		if (!strcasecmp(cmd, irc_commands[index]))
+                	return 1;
+        }
+
+        return 0;
 }
 
 static int
@@ -193,6 +225,17 @@ send_default(char *err, char *mesg)
 	fail_if(sendf(err, ccur->server, "PRIVMSG %s :%s", ccur->name, mesg));
 
 	newline(ccur, LINE_CHAT, ccur->server->nick_me, mesg);
+
+	return 0;
+}
+
+
+static int
+send_default_cmd(char *err, char *cmd, char *mesg)
+{
+	/* /<IRC_CMD> */
+
+	fail_if(sendf(err, ccur->server, "%s %s", cmd, mesg));
 
 	return 0;
 }
@@ -263,7 +306,10 @@ send_nick(char *err, char *mesg)
 	if ((nick = strtok(mesg, " ")))
 		return sendf(err, ccur->server, "NICK %s", mesg);
 
-	newlinef(ccur, 0, "--", "Your nick is %s", ccur->server->nick_me);
+        if ( !ccur->server )
+                fail("Error: NICK requires a nick");
+
+        newlinef(ccur, 0, "--", "Your nick is %s", ccur->server->nick_me);
 
 	return 0;
 }
