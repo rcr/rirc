@@ -765,6 +765,9 @@ recv_mode(char *err, parsed_mesg *p, server *s)
 				case 'r':
 					modebit = UMODE_r;
 					break;
+				case 'R':
+					modebit = UMODE_R;
+					break;
 				case 'o':
 					modebit = UMODE_o;
 					break;

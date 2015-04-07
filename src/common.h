@@ -39,15 +39,16 @@
 #define CMODE_MAX 18
 
 /* User modes */
-#define UMODE_STR "aiwroOs"
+#define UMODE_STR "aiwrRoOs"
 #define UMODE_a (1 << 0) /* away */
 #define UMODE_i (1 << 1) /* invisible */
 #define UMODE_w (1 << 2) /* receiving wallops */
 #define UMODE_r (1 << 3) /* restricted user connection */
-#define UMODE_o (1 << 4) /* operator */
-#define UMODE_O (1 << 5) /* local operator */
-#define UMODE_s (1 << 6) /* receiving server notices */
-#define UMODE_MAX 7
+#define UMODE_R (1 << 4) /* registered nicknames only*/
+#define UMODE_o (1 << 5) /* operator */
+#define UMODE_O (1 << 6) /* local operator */
+#define UMODE_s (1 << 7) /* receiving server notices */
+#define UMODE_MAX 8
 
 /* Irrecoverable error */
 #define fatal(mesg) \
