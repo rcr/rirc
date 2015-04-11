@@ -6,7 +6,6 @@
 #define NICKSIZE 256
 #define CHANSIZE 256
 #define MAX_INPUT 256
-#define MAX_CMD 256
 #define RECONNECT_DELTA 15
 
 /* Compile time checks */
