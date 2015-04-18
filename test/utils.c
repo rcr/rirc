@@ -1,11 +1,18 @@
+#include <math.h>
 #include <stdio.h>
 #include <string.h>
 
 #include "../src/utils.c"
 
-int __assert_strcmp(char*, char*);
+int _assert_strcmp(char*, char*);
 
-#define fail_test(M, ...) \
+#define fail_test(M) \
+	do { \
+		failures++; \
+		printf("\t%s %d: " M "\n", __func__, __LINE__); \
+	} while (0)
+
+#define fail_testf(M, ...) \
 	do { \
 		failures++; \
 		printf("\t%s %d: " M "\n", __func__, __LINE__, ##__VA_ARGS__); \
@@ -13,12 +20,12 @@ int __assert_strcmp(char*, char*);
 
 #define assert_strcmp(X, Y) \
 	do { \
-		if (__assert_strcmp(X, Y)) \
-			fail_test(#X " expected '%s', got '%s'", (Y) ? (Y) : "NULL", (X) ? (X) : "NULL"); \
+		if (_assert_strcmp(X, Y)) \
+			fail_testf(#X " expected '%s', got '%s'", (Y) ? (Y) : "NULL", (X) ? (X) : "NULL"); \
 	} while (0)
 
 int
-__assert_strcmp(char *p1, char *p2)
+_assert_strcmp(char *p1, char *p2)
 {
 	if (p1 == NULL || p2 == NULL)
 		return p1 != p2;
@@ -26,7 +33,131 @@ __assert_strcmp(char *p1, char *p2)
 	return strcmp(p1, p2);
 }
 
+/* Recusrive functions for testing AVL tree properties */
+
+int
+_avl_count(avl_node *n)
+{
+	/* Count the number of nodes in a tree */
+
+	if (n == NULL)
+		return 0;
+
+	return 1 + _avl_count(n->l) + _avl_count(n->r);
+}
+
+int
+_avl_is_binary(avl_node *n)
+{
+	if (n == NULL)
+		return 1;
+
+	if (n->l && (strcmp(n->str, n->l->str) <= 0))
+		return 0;
+
+	if (n->r && (strcmp(n->str, n->r->str) >= 0))
+		return 0;
+
+	return 1 & _avl_is_binary(n->l) & _avl_is_binary(n->r);
+}
+
+int
+_avl_height(avl_node *n)
+{
+	if (n == NULL)
+		return 0;
+
+	return 1 + MAX(_avl_height(n->l), _avl_height(n->r));
+}
+
+/*
+ * Tests
+ * */
+
+int test_avl(void);
 int test_parse(void);
+
+int
+test_avl(void)
+{
+	/* Test AVL tree functions */
+
+	int failures = 0;
+
+	avl_node *root = NULL;
+
+	/* Insert strings a-z, zz-za, aa-az to hopefully excersize all combinations of rotations */
+	const char **ptr, *strings[] = {
+		"a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m",
+		"n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z",
+		"zz", "zy", "zx", "zw", "zv", "zu", "zt", "zs", "zr", "zq", "zp", "zo", "zn",
+		"zm", "zl", "zk", "zj", "zi", "zh", "zg", "zf", "ze", "zd", "zc", "zb", "za",
+		"aa", "ab", "ac", "ad", "ae", "af", "ag", "ah", "ai", "aj", "ak", "al", "am",
+		"an", "ao", "ap", "aq", "ar", "as", "at", "au", "av", "aw", "ax", "ay", "az",
+		NULL
+	};
+
+	int ret, count = 0;
+
+	/* Add all strings to the tree */
+	for (ptr = strings; *ptr; ptr++) {
+		if (!avl_add(&root, *ptr))
+			fail_testf("avl_add() failed to add %s", *ptr);
+		else
+			count++;
+	}
+
+	/* Check that all were added correctly */
+	if ((ret = _avl_count(root)) != count)
+		fail_testf("_avl_count() returned %d, expected %d", ret, count);
+
+	/* Check that the binary properties of the tree hold */
+	if (!_avl_is_binary(root))
+		fail_test("_avl_is_binary() failed");
+
+	/* Check that the height of root stays within the mathematical bounds AVL trees allow */
+	double max_height = 1.44 * log2(count + 2) - 0.328;
+
+	if ((ret = _avl_height(root)) >= max_height)
+		fail_testf("_avl_height() returned %d, expected strictly less than %f", ret, max_height);
+
+	/* Test adding a duplicate and case sensitive duplicate */
+	if (avl_add(&root, "aa") && count++)
+		fail_test("avl_add() failed to detect duplicate 'aaa'");
+
+	if (avl_add(&root, "aA") && count++)
+		fail_test("avl_add() failed to detect case sensitive duplicate 'aAa'");
+
+	/* Delete about half of the strings */
+	int num_delete = count / 2;
+
+	for (ptr = strings; *ptr && num_delete > 0; ptr++, num_delete--) {
+		if (!avl_del(&root, *ptr))
+			fail_testf("avl_del() failed to delete %s", *ptr);
+		else
+			count--;
+	}
+
+	/* Check that all were deleted correctly */
+	if ((ret = _avl_count(root)) != count)
+		fail_testf("_avl_count() returned %d, expected %d", ret, count);
+
+	/* Check that the binary properties of the tree still hold */
+	if (!_avl_is_binary(root))
+		fail_test("_avl_is_binary() failed");
+
+	/* Check that the height of root is still within the mathematical bounds AVL trees allow */
+	max_height = 1.44 * log2(count + 2) - 0.328;
+
+	if ((ret = _avl_height(root)) >= max_height)
+		fail_testf("_avl_height() returned %d, expected strictly less than %f", ret, max_height);
+
+	/* Test deleting string that was previously deleted */
+	if (avl_del(&root, *strings))
+		fail_testf("_avl_del() should have failed to delete %s", *strings);
+
+	return failures;
+}
 
 int
 test_parse(void)
@@ -42,7 +173,7 @@ test_parse(void)
 
 	/* Should fail due to empty command */
 	if ((ret = parse(&p, mesg0)) != 0)
-		fail_test("parse() returned %d, expected 0", ret);
+		fail_testf("parse() returned %d, expected 0", ret);
 	assert_strcmp(p.from,     NULL);
 	assert_strcmp(p.hostinfo, NULL);
 	assert_strcmp(p.command,  NULL);
@@ -124,7 +255,7 @@ test_parse(void)
 
 	/* Should fail due to empty command */
 	if ((ret = parse(&p, mesg8)) != 0)
-		fail_test("parse() returned %d, expected 0", ret);
+		fail_testf("parse() returned %d, expected 0", ret);
 	assert_strcmp(p.from,     "nick");
 	assert_strcmp(p.hostinfo, "user@hostname.domain");
 	assert_strcmp(p.command,  NULL);
@@ -145,6 +276,7 @@ main(void)
 
 	int failures = 0;
 
+	failures += test_avl();
 	failures += test_parse();
 
 	if (failures) {

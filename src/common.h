@@ -122,13 +122,13 @@ struct config
 } config;
 
 /* Nicklist AVL tree node */
-typedef struct node
+typedef struct avl_node
 {
 	int height;
-	struct node *l;
-	struct node *r;
-	char nick[NICKSIZE];
-} node;
+	struct avl_node *l;
+	struct avl_node *r;
+	char *str;
+} avl_node;
 
 /* Chat buffer line */
 typedef struct line
@@ -175,7 +175,7 @@ typedef struct channel
 	struct channel *prev;
 	struct line *buffer_head;
 	struct line buffer[SCROLLBACK_BUFFER];
-	struct node *nicklist;
+	struct avl_node *nicklist;
 	struct server *server;
 	struct input *input;
 	struct {
@@ -245,12 +245,12 @@ void poll_input(void);
 
 /* utils.c */
 char* strdup(const char*);
+int avl_add(avl_node**, const char*);
+int avl_del(avl_node**, const char*);
 int check_pinged(char*, char*);
-int nicklist_delete(node**, char*);
-int nicklist_insert(node**, char*);
 int parse(parsed_mesg*, char*);
 void auto_nick(char**, char*);
-void free_nicklist(node*);
+void free_avl(avl_node*);
 
 /* mesg.c */
 void recv_mesg(char*, int, server*);

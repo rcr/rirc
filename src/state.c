@@ -126,7 +126,7 @@ free_channel(channel *c)
 	for (l = c->buffer; l < c->buffer + SCROLLBACK_BUFFER; l++)
 		free(l->text);
 
-	free_nicklist(c->nicklist);
+	free_avl(c->nicklist);
 	free_input(c->input);
 	free(c);
 }

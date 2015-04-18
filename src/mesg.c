@@ -98,7 +98,7 @@ static int send_version(char*, char*);
 static int send_raw(char *, char *);
 
 /* Unhandled IRC commands which are sent as-is to the server */
-static const char* irc_commands[] = {
+static const char *irc_commands[] = {
 	"ADMIN", "AWAY", "DIE", "ENCAP", "HELP",
 	"INFO", "INVITE", "ISON", "KICK", "KILL",
 	"KNOCK", "LINKS", "LIST", "LUSERS", "MODE",
@@ -628,7 +628,7 @@ recv_join(char *err, parsed_mesg *p, server *s)
 		if ((c = channel_get(chan, s)) == NULL)
 			failf("JOIN: channel '%s' not found", chan);
 
-		if (!nicklist_insert(&(c->nicklist), p->from))
+		if (!avl_add(&(c->nicklist), p->from))
 			failf("JOIN: nick '%s' already in '%s'", p->from, chan);
 
 		c->nick_count++;
@@ -825,8 +825,8 @@ recv_nick(char *err, parsed_mesg *p, server *s)
 
 	channel *c = s->channel;
 	do {
-		if (nicklist_delete(&c->nicklist, p->from)) {
-			nicklist_insert(&c->nicklist, nick);
+		if (avl_del(&c->nicklist, p->from)) {
+			avl_add(&c->nicklist, nick);
 			newlinef(c, 0, "--", "%s  >>  %s", p->from, nick);
 		}
 	} while ((c = c->next) != s->channel);
@@ -1010,7 +1010,7 @@ num_200:
 		while ((nick = strtok_r(p->trailing, " ", &p->trailing))) {
 			if (*nick == '@' || *nick == '+')
 				nick++;
-			if (nicklist_insert(&c->nicklist, nick))
+			if (avl_add(&c->nicklist, nick))
 				c->nick_count++;
 		}
 
@@ -1141,7 +1141,7 @@ recv_part(char *err, parsed_mesg *p, server *s)
 			c->chanmode = 0;
 			c->nick_count = 0;
 
-			free_nicklist(c->nicklist);
+			free_avl(c->nicklist);
 			c->nicklist = NULL;
 
 			if (p->trailing)
@@ -1158,7 +1158,7 @@ recv_part(char *err, parsed_mesg *p, server *s)
 	if ((c = channel_get(targ, s)) == NULL)
 		failf("PART: channel '%s' not found", targ);
 
-	if (!nicklist_delete(&c->nicklist, p->from))
+	if (!avl_del(&c->nicklist, p->from))
 		failf("PART: nick '%s' not found in '%s'", p->from, targ);
 
 	c->nick_count--;
@@ -1243,7 +1243,7 @@ recv_quit(char *err, parsed_mesg *p, server *s)
 
 	channel *c = s->channel;
 	do {
-		if (nicklist_delete(&c->nicklist, p->from)) {
+		if (avl_del(&c->nicklist, p->from)) {
 			c->nick_count--;
 			if (c->nick_count < config.join_part_quit_threshold) {
 				if (p->trailing)

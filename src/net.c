@@ -333,7 +333,7 @@ server_disconnect(server *s, int err, int kill, char *mesg)
 			c->chanmode = 0;
 			c->nick_count = 0;
 
-			free_nicklist(c->nicklist);
+			free_avl(c->nicklist);
 			c->nicklist = NULL;
 
 		} while ((c = c->next) != s->channel);

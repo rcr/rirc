@@ -23,6 +23,8 @@ rirc: $(OBJ)
 $(SDIR_O)/%.o: $(SDIR)/%.c $(HDS)
 	$(CC) $(CFLAGS) -c -o $@ $<
 
+# link to math libs for some avl tree calculations
+test: CFLAGS += -lm
 test: $(OBJ_T)
 	@for test in $(OBJ_T); do ./$$test; done
 
