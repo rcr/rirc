@@ -162,6 +162,11 @@ send_mesg(char *mesg)
 		else if (!strcmp(cmd, "RAW"))
 			err = send_raw(errbuff, mesg);
 		else
+			/* FIXME: bug when comparing the command string:
+			 *   type  /testing
+			 *   then backspace the input
+			 *   type  /quit
+			 *   the 'ing' from the end of 'testing' are still used in the matching */
 			newlinef(ccur, 0, "-!!-", "Unknown command: '%s'", cmd);
 	}
 

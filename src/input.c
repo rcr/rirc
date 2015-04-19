@@ -58,6 +58,9 @@ static int action_send_paste(char);
 /* Incremental channel search */
 static int action_find_channel(char);
 
+/* Case insensitive tab complete for commands and nicks */
+static void tab_complete(input*);
+
 /* Send the current input to be parsed and handled */
 static void send_input(void);
 
@@ -209,6 +212,11 @@ input_cchar(char c)
 		/* Backspace */
 		case 0x7F:
 			delete_left(ccur->input);
+			break;
+
+		/* Horizontal tab */
+		case 0x09:
+			tab_complete(ccur->input);
 			break;
 
 		/* Line feed */
@@ -669,6 +677,54 @@ action_find_channel(char c)
 	}
 
 	return 0;
+}
+
+/* Case insensitive tab complete for commands and nicks */
+#define TAB_COMPLETE_DELIMITER ':'
+void
+tab_complete(input *inp)
+{
+	/* Tab completion */
+
+	const char *match, *str = inp->head;
+
+	size_t len = 0;
+
+	/* Don't tab complete at beginning of line or if previous character is space */
+	if (inp->head == inp->line->text || *(inp->head - 1) == ' ')
+		return;
+
+	/* Don't tab complete if cursor is scrolled left and next character isn't space */
+	if (inp->tail < (inp->line->text + MAX_INPUT) && *inp->tail != ' ')
+		return;
+
+	/* Scan backwards for the point to autocomplete from */
+	while (str > inp->line->text && *(str - 1) != ' ')
+		len++, str--;
+
+	/* Check if tab completing a command at the beginning of the buffer */
+	if (*str == '/' && str == inp->line->text) {
+
+		/* TODO */
+
+	} else if ((match = avl_get(ccur->nicklist, str, len)) != NULL) {
+		/* Nick tab completion */
+
+		/* Since matching is case insensitive, delete the prefix */
+		while (len--)
+			delete_left(inp);
+
+		/* Then insert the matching string */
+		while (*match && input_char(*match++))
+			; /* do nothing */
+
+		/* If tab copleting a nick at the beginning of the input,
+		 * append the delimiter and a final space */
+		if (str == inp->line->text) {
+			input_char(TAB_COMPLETE_DELIMITER);
+			input_char(' ');
+		}
+	}
 }
 
 /*

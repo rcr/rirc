@@ -80,9 +80,10 @@ Buffer scrollback improvements:
 	  allow the scrollback.
 	- show scrollback % or x/y lines in the status bar
 
-Input tab complete.
-	For commands if input[0] == '/'
-	For nicks (in order of last spoken in channel?)
+When connection is lost before ping timeout, disconnect, reconnect
+and /connect errs out read: Connection reset by peer
+
+Input tab complete for commands if input[0] == '/'
 
 Make sure all the thread related code is using thread-safe functions,
 and that proper cancellation points are used. Make sure no resources
@@ -122,11 +123,6 @@ Allow for multiple connections passed as cli args
 Reimplement the pasting stuff that was broken
 
 link detection/launching
-
-implement tab completion as a generic, case insensitive avl tree function,
- - init mesg functions to add recv_ and send_ functions to trees,
-   xmacro adding and retrieving these as some init_mesg function
-
 
 FIXME:
 ---------------------------

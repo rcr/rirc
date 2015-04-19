@@ -245,6 +245,7 @@ void poll_input(void);
 
 /* utils.c */
 char* strdup(const char*);
+const char* avl_get(avl_node*, const char*, size_t);
 int avl_add(avl_node**, const char*);
 int avl_del(avl_node**, const char*);
 int check_pinged(char*, char*);

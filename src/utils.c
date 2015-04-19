@@ -14,6 +14,7 @@
 /* AVL tree function */
 static avl_node* _avl_add(avl_node*, const char*);
 static avl_node* _avl_del(avl_node*, const char*);
+static avl_node* _avl_get(avl_node*, const char*, size_t);
 static avl_node* avl_new_node(const char*);
 static avl_node* avl_rotate_L(avl_node*);
 static avl_node* avl_rotate_R(avl_node*);
@@ -231,6 +232,17 @@ avl_del(avl_node **n, const char *str)
 	return 1;
 }
 
+const char*
+avl_get(avl_node *n, const char *str, size_t len)
+{
+	/* Entry point for fetching an avl node with prefix str */
+
+	if (setjmp(jmpbuf))
+		return NULL;
+
+	return _avl_get(n, str, len)->str;
+}
+
 static avl_node*
 avl_new_node(const char *str)
 {
@@ -427,5 +439,26 @@ _avl_del(avl_node *n, const char *str)
 		return avl_rotate_L(n);
 	}
 
+	return n;
+}
+
+static avl_node*
+_avl_get(avl_node *n, const char *str, size_t len)
+{
+	/* Case insensitive search for a node whose value is prefixed by str */
+
+	/* Failed to find node */
+	if (n == NULL)
+		longjmp(jmpbuf, 1);
+
+	int ret = strncasecmp(str, n->str, len);
+
+	if (ret > 0)
+		return _avl_get(n->r, str, len);
+
+	if (ret < 0)
+		return _avl_get(n->l, str, len);
+
+	/* Match found */
 	return n;
 }
