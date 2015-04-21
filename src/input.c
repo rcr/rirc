@@ -560,6 +560,8 @@ reset_line(input *in)
 	while (t_tmp < (in->line->text + MAX_INPUT))
 		*h_tmp++ = *t_tmp++;
 
+	*h_tmp = '\0';
+
 	in->line->end = h_tmp;
 }
 
@@ -698,7 +700,7 @@ tab_complete(input *inp)
 	if (inp->tail < (inp->line->text + MAX_INPUT) && *inp->tail != ' ')
 		return;
 
-	/* Scan backwards for the point to autocomplete from */
+	/* Scan backwards for the point to tab complete from */
 	while (str > inp->line->text && *(str - 1) != ' ')
 		len++, str--;
 
@@ -718,8 +720,7 @@ tab_complete(input *inp)
 		while (*match && input_char(*match++))
 			; /* do nothing */
 
-		/* If tab copleting a nick at the beginning of the input,
-		 * append the delimiter and a final space */
+		/* Tab completing first word in input, append delimiter and space */
 		if (str == inp->line->text) {
 			input_char(TAB_COMPLETE_DELIMITER);
 			input_char(' ');
