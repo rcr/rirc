@@ -52,10 +52,10 @@ _avl_is_binary(avl_node *n)
 	if (n == NULL)
 		return 1;
 
-	if (n->l && (strcmp(n->str, n->l->str) <= 0))
+	if (n->l && (strcmp(n->key, n->l->key) <= 0))
 		return 0;
 
-	if (n->r && (strcmp(n->str, n->r->str) >= 0))
+	if (n->r && (strcmp(n->key, n->r->key) >= 0))
 		return 0;
 
 	return 1 & _avl_is_binary(n->l) & _avl_is_binary(n->r);
@@ -101,7 +101,7 @@ test_avl(void)
 
 	/* Add all strings to the tree */
 	for (ptr = strings; *ptr; ptr++) {
-		if (!avl_add(&root, *ptr))
+		if (!avl_add(&root, *ptr, NULL))
 			fail_testf("avl_add() failed to add %s", *ptr);
 		else
 			count++;
@@ -122,11 +122,11 @@ test_avl(void)
 		fail_testf("_avl_height() returned %d, expected strictly less than %f", ret, max_height);
 
 	/* Test adding a duplicate and case sensitive duplicate */
-	if (avl_add(&root, "aa") && count++)
-		fail_test("avl_add() failed to detect duplicate 'aaa'");
+	if (avl_add(&root, "aa", NULL) && count++)
+		fail_test("avl_add() failed to detect duplicate 'aa'");
 
-	if (avl_add(&root, "aA") && count++)
-		fail_test("avl_add() failed to detect case sensitive duplicate 'aAa'");
+	if (avl_add(&root, "aA", NULL) && count++)
+		fail_test("avl_add() failed to detect case sensitive duplicate 'aA'");
 
 	/* Delete about half of the strings */
 	int num_delete = count / 2;

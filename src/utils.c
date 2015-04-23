@@ -12,10 +12,10 @@
 #define MAX(A, B) (A > B ? A : B)
 
 /* AVL tree function */
-static avl_node* _avl_add(avl_node*, const char*);
+static avl_node* _avl_add(avl_node*, const char*, void*);
 static avl_node* _avl_del(avl_node*, const char*);
 static avl_node* _avl_get(avl_node*, const char*, size_t);
-static avl_node* avl_new_node(const char*);
+static avl_node* avl_new_node(const char*, void*);
 static avl_node* avl_rotate_L(avl_node*);
 static avl_node* avl_rotate_R(avl_node*);
 
@@ -202,49 +202,50 @@ free_avl(avl_node *n)
 
 	free_avl(n->l);
 	free_avl(n->r);
-	free(n->str);
+	free(n->key);
+	free(n->val);
 	free(n);
 }
 
 int
-avl_add(avl_node **n, const char *str)
+avl_add(avl_node **n, const char *key, void *val)
 {
 	/* Entry point for adding a node to an AVL tree */
 
 	if (setjmp(jmpbuf))
 		return 0;
 
-	*n = _avl_add(*n, str);
+	*n = _avl_add(*n, key, val);
 
 	return 1;
 }
 
 int
-avl_del(avl_node **n, const char *str)
+avl_del(avl_node **n, const char *key)
 {
 	/* Entry point for removing a node from an AVL tree */
 
 	if (setjmp(jmpbuf))
 		return 0;
 
-	*n = _avl_del(*n, str);
+	*n = _avl_del(*n, key);
 
 	return 1;
 }
 
-const char*
-avl_get(avl_node *n, const char *str, size_t len)
+const avl_node*
+avl_get(avl_node *n, const char *key, size_t len)
 {
-	/* Entry point for fetching an avl node with prefix str */
+	/* Entry point for fetching an avl node with prefix key */
 
 	if (setjmp(jmpbuf))
 		return NULL;
 
-	return _avl_get(n, str, len)->str;
+	return _avl_get(n, key, len);
 }
 
 static avl_node*
-avl_new_node(const char *str)
+avl_new_node(const char *key, void *val)
 {
 	avl_node *n;
 
@@ -252,7 +253,8 @@ avl_new_node(const char *str)
 		fatal("calloc");
 
 	n->height = 1;
-	n->str = strdup(str);
+	n->key = strdup(key);
+	n->val = val;
 
 	return n;
 }
@@ -308,26 +310,26 @@ avl_rotate_L(avl_node *r)
 }
 
 static avl_node*
-_avl_add(avl_node *n, const char *str)
+_avl_add(avl_node *n, const char *key, void *val)
 {
-	/* Recursively add str to an AVL tree.
+	/* Recursively add key to an AVL tree.
 	 *
 	 * If a duplicate is found (case insensitive) longjmp is called to indicate failure */
 
 	if (n == NULL)
-		return avl_new_node(str);
+		return avl_new_node(key, val);
 
-	int ret = strcasecmp(str, n->str);
+	int ret = strcasecmp(key, n->key);
 
 	if (ret == 0)
 		/* Duplicate found */
 		longjmp(jmpbuf, 1);
 
 	else if (ret > 0)
-		n->r = _avl_add(n->r, str);
+		n->r = _avl_add(n->r, key, val);
 
 	else if (ret < 0)
-		n->l = _avl_add(n->l, str);
+		n->l = _avl_add(n->l, key, val);
 
 	/* Node was successfully added, recaculate height and rebalance */
 
@@ -339,7 +341,7 @@ _avl_add(avl_node *n, const char *str)
 	if (balance > 1) {
 
 		/* left-right rotation */
-		if (strcasecmp(str, n->l->str) > 0)
+		if (strcasecmp(key, n->l->key) > 0)
 			n->l = avl_rotate_L(n->l);
 
 		return avl_rotate_R(n);
@@ -349,7 +351,7 @@ _avl_add(avl_node *n, const char *str)
 	if (balance < -1) {
 
 		/* right-left rotation */
-		if (strcasecmp(n->r->str, str) > 0)
+		if (strcasecmp(n->r->key, key) > 0)
 			n->r = avl_rotate_R(n->r);
 
 		return avl_rotate_L(n);
@@ -359,7 +361,7 @@ _avl_add(avl_node *n, const char *str)
 }
 
 static avl_node*
-_avl_del(avl_node *n, const char *str)
+_avl_del(avl_node *n, const char *key)
 {
 	/* Recursive function for deleting nodes from an AVL tree
 	 *
@@ -369,7 +371,7 @@ _avl_del(avl_node *n, const char *str)
 		/* Node not found */
 		longjmp(jmpbuf, 1);
 
-	int ret = strcasecmp(str, n->str);
+	int ret = strcasecmp(key, n->key);
 
 	if (ret == 0) {
 		/* Node found */
@@ -384,22 +386,17 @@ _avl_del(avl_node *n, const char *str)
 				next = next->l;
 
 			/* Swap it's value with the node being deleted */
-			char *t = n->str;
+			char *t = n->key;
 
-			n->str = next->str;
-			next->str = t;
+			n->key = next->key;
+			next->key = t;
 
 			/* Recusively delete in the right subtree */
 			n->r = _avl_del(n->r, t);
 
 		} else {
-			/* When zero children, simply free the node, return NULL
-			 *
-			 * When one child, free the node and return the child */
-
-			avl_node *tmp;
-
-			(void)((tmp = n->l) || (tmp = n->r));
+			/* If n has a child, return it */
+			avl_node *tmp = (n->l) ? n->l : n->r;
 
 			free(n);
 
@@ -408,12 +405,12 @@ _avl_del(avl_node *n, const char *str)
 	}
 
 	else if (ret > 0)
-		n->r = _avl_del(n->r, str);
+		n->r = _avl_del(n->r, key);
 
 	else if (ret < 0)
-		n->l = _avl_del(n->l, str);
+		n->l = _avl_del(n->l, key);
 
-	/* Node was successfully deleted, recaculate height and rebalance */
+	/* Node was successfully deleted, recalculate height and rebalance */
 
 	n->height = MAX(H(n->l), H(n->r)) + 1;
 
@@ -443,21 +440,21 @@ _avl_del(avl_node *n, const char *str)
 }
 
 static avl_node*
-_avl_get(avl_node *n, const char *str, size_t len)
+_avl_get(avl_node *n, const char *key, size_t len)
 {
-	/* Case insensitive search for a node whose value is prefixed by str */
+	/* Case insensitive search for a node whose value is prefixed by key */
 
 	/* Failed to find node */
 	if (n == NULL)
 		longjmp(jmpbuf, 1);
 
-	int ret = strncasecmp(str, n->str, len);
+	int ret = strncasecmp(key, n->key, len);
 
 	if (ret > 0)
-		return _avl_get(n->r, str, len);
+		return _avl_get(n->r, key, len);
 
 	if (ret < 0)
-		return _avl_get(n->l, str, len);
+		return _avl_get(n->l, key, len);
 
 	/* Match found */
 	return n;

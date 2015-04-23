@@ -214,6 +214,9 @@ startup(void)
 
 	srand(time(NULL));
 
+	/* Build the avl tree of command handlers */
+	init_commands();
+
 	/* Init draw */
 	draw(D_RESIZE);
 
@@ -240,6 +243,9 @@ cleanup(void)
 {
 	/* Reset terminal modes */
 	tcsetattr(0, TCSADRAIN, &oterm);
+
+	/* Free the tree of command handlers */
+	free_avl(commands);
 
 	/* Reset mousewheel event handling */
 	printf("\x1b[?1000l");

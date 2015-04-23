@@ -85,6 +85,8 @@ and /connect errs out read: Connection reset by peer
 
 Input tab complete for commands if input[0] == '/'
 
+Keep state of tab complete for successively getting the next nick lexicographically
+
 Make sure all the thread related code is using thread-safe functions,
 and that proper cancellation points are used. Make sure no resources
 can be left hanging (eg: sockets left open when a thread is canceled?)
@@ -96,15 +98,6 @@ Parsing 004/005 numeric for server specific configuration
 buffer logging
 
 Nickserv stuff
-
-Implement flag handling in send_* commands for finer control
-eg:
-/topic                                    = TOPIC #this_channel
-/topic setting a topic                    = TOPIC #this_channel :setting a topic
-/topic -unset                             = TOPIC #this_channel :
-/topic -channel #other                    = TOPIC #other_channel
-/topic -channel #other setting a topic    = TOPIC #other_channel :setting a topic
-/topic -unset #other                      = TOPIC #other_channel :
 
 colorize output by linetype
 

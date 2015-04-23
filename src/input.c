@@ -681,15 +681,13 @@ action_find_channel(char c)
 	return 0;
 }
 
-/* Case insensitive tab complete for commands and nicks */
-#define TAB_COMPLETE_DELIMITER ':'
 void
 tab_complete(input *inp)
 {
-	/* Tab completion */
+	/* Case insensitive tab complete for commands and nicks */
 
+	const avl_node *n;
 	const char *match, *str = inp->head;
-
 	size_t len = 0;
 
 	/* Don't tab complete at beginning of line or if previous character is space */
@@ -706,11 +704,27 @@ tab_complete(input *inp)
 
 	/* Check if tab completing a command at the beginning of the buffer */
 	if (*str == '/' && str == inp->line->text) {
+		/* Command tab completion */
 
-		/* TODO */
+		if ((n = avl_get(commands, ++str, --len))) {
 
-	} else if ((match = avl_get(ccur->nicklist, str, len)) != NULL) {
+			match = n->key;
+
+			/* Since matching is case insensitive, delete the prefix */
+			while (len--)
+				delete_left(inp);
+
+			/* Then insert the matching string */
+			while (*match && input_char(*match++))
+				; /* do nothing */
+
+			/* For commands, append a space */
+			input_char(' ');
+		}
+	} else if ((n = avl_get(ccur->nicklist, str, len))) {
 		/* Nick tab completion */
+
+		match = n->key;
 
 		/* Since matching is case insensitive, delete the prefix */
 		while (len--)

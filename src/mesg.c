@@ -1,22 +1,3 @@
-/* All irc related messages
- *
- * interface to this file:
- *	recv_mesg
- *	send_mesg
- *
- *	consider how pasted input might make its way to this file
- *
- * For each send* type defined in the rfc, include a comment
- * with the list of errors this command can return
- * and make sure it's implemented
- *
- * For each send* type not defined by the rfc (eg: /version
- * include brief comment about what it does
- *
- * For each recv* type, include the standard format
- *
- * */
-
 /* For strtok_r */
 #define _POSIX_C_SOURCE 200112L
 
@@ -68,6 +49,55 @@
 
 #define IS_ME(X) !strcmp(X, s->nick_me)
 
+/* List of common IRC commands with no explicit handling */
+#define UNHANDLED_CMDS \
+	X(admin)   X(away)     X(die) \
+	X(encap)   X(help)     X(info) \
+	X(invite)  X(ison)     X(kick) \
+	X(kill)    X(knock)    X(links) \
+	X(list)    X(lusers)   X(mode) \
+	X(motd)    X(names)    X(namesx) \
+	X(notice)  X(oper)     X(pass) \
+	X(rehash)  X(restart)  X(rules) \
+	X(server)  X(service)  X(servlist) \
+	X(setname) X(silence)  X(squery) \
+	X(squit)   X(stats)    X(summon) \
+	X(time)    X(trace)    X(uhnames) \
+	X(user)    X(userhost) X(userip) \
+	X(users)   X(version)  X(wallops) \
+	X(watch)   X(who)      X(whois) \
+	X(whowas)
+
+/* List of commands (some rirc-specific) which are explicitly handled */
+#define HANDLED_CMDS \
+	X(close) \
+	X(connect) \
+	X(disconnect) \
+	X(join) \
+	X(me) \
+	X(msg) \
+	X(nick) \
+	X(part) \
+	X(privmsg) \
+	X(quit) \
+	X(raw) \
+	X(version)
+
+/* Function prototypes for explicitly handled commands */
+#define X(cmd) static int send_##cmd(char*, char*);
+HANDLED_CMDS
+#undef X
+
+/* Special case handler for sending non-command input */
+static int send_default(char*, char*);
+
+/* Default case handler for sending commands */
+static int send_unhandled(char*, char*, char*);
+
+/* Encapsulate a function pointer in a struct so AVL tree cleanup can free it */
+struct command { int (*fptr)(char*, char*); };
+static struct command* new_command(int (*fptr)(char*, char*));
+
 /* Message receiving handlers */
 static int recv_ctcp_req(char*, parsed_mesg*, server*);
 static int recv_ctcp_rpl(char*, parsed_mesg*);
@@ -82,34 +112,36 @@ static int recv_ping(char*, parsed_mesg*, server*);
 static int recv_priv(char*, parsed_mesg*, server*);
 static int recv_quit(char*, parsed_mesg*, server*);
 
-/* Message sending handlers */
-static int send_connect(char*, char*);
-static int send_cmd_exists(char *cmd);
-static int send_default(char*, char*);
-static int send_disconnect(char*, char*);
-static int send_emote(char*, char*);
-static int send_join(char*, char*);
-static int send_nick(char*, char*);
-static int send_part(char*, char*);
-static int send_priv(char*, char*);
-static int send_quit(char*, char*);
-static int send_default_cmd(char*, char*, char*);
-static int send_version(char*, char*);
-static int send_raw(char *, char *);
+void
+init_commands(void)
+{
+	/* Build and AVL tree off commands and function pointers to handlers */
 
-/* Unhandled IRC commands which are sent as-is to the server */
-static const char *irc_commands[] = {
-	"ADMIN", "AWAY", "DIE", "ENCAP", "HELP",
-	"INFO", "INVITE", "ISON", "KICK", "KILL",
-	"KNOCK", "LINKS", "LIST", "LUSERS", "MODE",
-	"MOTD", "NAMES", "NAMESX", "NOTICE", "OPER",
-	"PASS", "REHASH", "RESTART", "RULES", "SERVER",
-	"SERVICE", "SERVLIST", "SETNAME", "SILENCE",
-	"SQUERY", "SQUIT", "STATS", "SUMMON", "TIME",
-	"TRACE", "UHNAMES", "USER", "USERHOST", "USERIP",
-	"USERS", "VERSION", "WALLOPS", "WATCH", "WHO",
-	"WHOIS", "WHOWAS", NULL
-};
+	/* Add the unhandled commands with no explicit handler */
+	#define X(cmd) avl_add(&commands, #cmd, NULL);
+	UNHANDLED_CMDS
+	#undef X
+
+	/* Add the handled commands with explicit handlers */
+	#define X(cmd) avl_add(&commands, #cmd, new_command(send_##cmd));
+	HANDLED_CMDS
+	#undef X
+}
+
+static struct command*
+new_command(int (*fptr)(char*, char*))
+{
+	/* Allocate a command handler */
+
+	struct command *c;
+
+	if ((c = malloc(sizeof(struct command))) == NULL)
+		fatal("malloc");
+
+	c->fptr = fptr;
+
+	return c;
+}
 
 /*
  * Message sending handlers
@@ -118,56 +150,40 @@ static const char *irc_commands[] = {
 void
 send_mesg(char *mesg)
 {
-	char *p, *cmd, errbuff[MAX_ERROR];
+	/* Handle an input line */
 
+	char errbuff[MAX_ERROR];
 	int err = 0;
 
-	if (*mesg != '/')
-		err = send_default(errbuff, mesg);
-	else {
-		/* Skip '/' character and get the command */
-		if (!(cmd = strtok_r((mesg + 1), " ", &mesg))) {
+	if (*mesg == '/') {
+		/* Input is a command */
+
+		const avl_node *cmd;
+		char *cmd_str;
+
+		/* Skip the '/' character and try to get the command */
+		if (!(cmd_str = strtok_r((mesg + 1), " ", &mesg))) {
 			newline(ccur, 0, "-!!-", "Messages beginning with '/' require a command");
 			return;
 		}
 
-		/* Convert command to upper case to avoid case insensitive string comparison */
-		for (p = cmd; (*p = toupper(*p)); p++)
-			/* do nothing */ ;
+		/* Check if command is defined, and retrieve the handler */
+		if (!(cmd = avl_get(commands, cmd_str, strlen(cmd_str)))) {
+			newlinef(ccur, 0, "-!!-", "Unknown command: '%s'", cmd_str);
+			return;
+		}
 
-		if (send_cmd_exists(cmd))
-			err = send_default_cmd(errbuff, cmd, mesg);
-		else if (!strcmp(cmd, "JOIN"))
-			err = send_join(errbuff, mesg);
-		else if (!strcmp(cmd, "CONNECT"))
-			err = send_connect(errbuff, mesg);
-		else if (!strcmp(cmd, "DISCONNECT"))
-			err = send_disconnect(errbuff, mesg);
-		else if (!strcmp(cmd, "CLOSE"))
-			ccur = channel_close(ccur);
-		else if (!strcmp(cmd, "PART"))
-			err = send_part(errbuff, mesg);
-		else if (!strcmp(cmd, "NICK"))
-			err = send_nick(errbuff, mesg);
-		else if (!strcmp(cmd, "QUIT"))
-			err = send_quit(errbuff, mesg);
-		else if (!strcmp(cmd, "MSG"))
-			err = send_priv(errbuff, mesg);
-		else if (!strcmp(cmd, "PRIV"))
-			err = send_priv(errbuff, mesg);
-		else if (!strcmp(cmd, "ME"))
-			err = send_emote(errbuff, mesg);
-		else if (!strcmp(cmd, "VERSION"))
-			err = send_version(errbuff, mesg);
-		else if (!strcmp(cmd, "RAW"))
-			err = send_raw(errbuff, mesg);
+		struct command *c = (struct command*)(cmd->val);
+
+		/* If the command has no explicit handler, send the input line as-is */
+		if (c)
+			err = c->fptr(errbuff, mesg);
 		else
-			/* FIXME: bug when comparing the command string:
-			 *   type  /testing
-			 *   then backspace the input
-			 *   type  /quit
-			 *   the 'ing' from the end of 'testing' are still used in the matching */
-			newlinef(ccur, 0, "-!!-", "Unknown command: '%s'", cmd);
+			err = send_unhandled(errbuff, cmd_str, mesg);
+
+	} else {
+		/* Non command message, send as privmesg to current buffer */
+		err = send_default(errbuff, mesg);
 	}
 
 	if (err)
@@ -184,16 +200,17 @@ send_paste(char *paste)
 }
 
 static int
-send_cmd_exists(char *cmd)
+send_unhandled(char *err, char *cmd, char *args)
 {
-	const char **ptr;
+	/* All commands defined in the UNHANDLED_CMDS */
 
-	for (ptr = irc_commands; *ptr; ptr++) {
-		if (!strcmp(cmd, *ptr))
-			return 1;
-	}
+	char *ptr;
 
-	return 0;
+	/* /command -> COMMAND */
+	for (ptr = cmd; *ptr; ptr++)
+		*ptr = toupper(*ptr);
+
+	return sendf(err, ccur->server, "%s %s", cmd, args);
 }
 
 static int
@@ -221,6 +238,19 @@ send_connect(char *err, char *mesg)
 }
 
 static int
+send_close(char *err, char *mesg)
+{
+	/* TODO: if no args in mesg, close ccur, else try to find the channel */
+
+	UNUSED(err);
+	UNUSED(mesg);
+
+	ccur = channel_close(ccur);
+
+	return 0;
+}
+
+static int
 send_default(char *err, char *mesg)
 {
 	/* All messages not beginning with '/'  */
@@ -236,15 +266,6 @@ send_default(char *err, char *mesg)
 	newline(ccur, LINE_CHAT, ccur->server->nick_me, mesg);
 
 	return 0;
-}
-
-
-static int
-send_default_cmd(char *err, char *cmd, char *mesg)
-{
-	/* /<IRC_CMD> */
-
-	return sendf(err, ccur->server, "%s %s", cmd, mesg);
 }
 
 static int
@@ -264,7 +285,7 @@ send_disconnect(char *err, char *mesg)
 }
 
 static int
-send_emote(char *err, char *mesg)
+send_me(char *err, char *mesg)
 {
 	/* /me <message> */
 
@@ -301,6 +322,14 @@ send_join(char *err, char *mesg)
 		fail("Error: Not parted from channel");
 
 	return sendf(err, ccur->server, "JOIN %s", ccur->name);
+}
+
+static int
+send_msg(char *err, char *mesg)
+{
+	/* Alias for /priv */
+
+	return send_privmsg(err, mesg);
 }
 
 static int
@@ -344,7 +373,7 @@ send_part(char *err, char *mesg)
 }
 
 static int
-send_priv(char *err, char *mesg) {
+send_privmsg(char *err, char *mesg) {
 	/* /(priv | msg) <target> <message> */
 
 	char *targ;
@@ -633,13 +662,13 @@ recv_join(char *err, parsed_mesg *p, server *s)
 		if ((c = channel_get(chan, s)) == NULL)
 			failf("JOIN: channel '%s' not found", chan);
 
-		if (!avl_add(&(c->nicklist), p->from))
+		if (!avl_add(&(c->nicklist), p->from, NULL))
 			failf("JOIN: nick '%s' already in '%s'", p->from, chan);
 
 		c->nick_count++;
 
 		if (c->nick_count < config.join_part_quit_threshold)
-			newlinef(c, 0, ">", "%s/%s has joined %s", p->from, p->hostinfo, chan);
+			newlinef(c, 0, ">", "%s!%s has joined %s", p->from, p->hostinfo, chan);
 
 		draw(D_STATUS);
 	}
@@ -831,7 +860,7 @@ recv_nick(char *err, parsed_mesg *p, server *s)
 	channel *c = s->channel;
 	do {
 		if (avl_del(&c->nicklist, p->from)) {
-			avl_add(&c->nicklist, nick);
+			avl_add(&c->nicklist, nick, NULL);
 			newlinef(c, 0, "--", "%s  >>  %s", p->from, nick);
 		}
 	} while ((c = c->next) != s->channel);
@@ -1015,7 +1044,7 @@ num_200:
 		while ((nick = strtok_r(p->trailing, " ", &p->trailing))) {
 			if (*nick == '@' || *nick == '+')
 				nick++;
-			if (avl_add(&c->nicklist, nick))
+			if (avl_add(&c->nicklist, nick, NULL))
 				c->nick_count++;
 		}
 
@@ -1170,9 +1199,9 @@ recv_part(char *err, parsed_mesg *p, server *s)
 
 	if (c->nick_count < config.join_part_quit_threshold) {
 		if (p->trailing)
-			newlinef(c, 0, "<", "%s/%s has left %s (%s)", p->from, p->hostinfo, targ, p->trailing);
+			newlinef(c, 0, "<", "%s!%s has left %s (%s)", p->from, p->hostinfo, targ, p->trailing);
 		else
-			newlinef(c, 0, "<", "%s/%s has left %s", p->from, p->hostinfo, targ);
+			newlinef(c, 0, "<", "%s!%s has left %s", p->from, p->hostinfo, targ);
 	}
 
 	draw(D_STATUS);
@@ -1252,9 +1281,9 @@ recv_quit(char *err, parsed_mesg *p, server *s)
 			c->nick_count--;
 			if (c->nick_count < config.join_part_quit_threshold) {
 				if (p->trailing)
-					newlinef(c, 0, "<", "%s/%s has quit (%s)", p->from, p->hostinfo, p->trailing);
+					newlinef(c, 0, "<", "%s!%s has quit (%s)", p->from, p->hostinfo, p->trailing);
 				else
-					newlinef(c, 0, "<", "%s/%s has quit", p->from, p->hostinfo);
+					newlinef(c, 0, "<", "%s!%s has quit", p->from, p->hostinfo);
 			}
 		}
 		c = c->next;

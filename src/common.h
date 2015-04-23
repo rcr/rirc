@@ -1,4 +1,4 @@
-#define VERSION "-1"
+#define VERSION "0.1"
 
 #define SCROLLBACK_BUFFER 200
 #define SCROLLBACK_INPUT 15
@@ -7,6 +7,9 @@
 #define CHANSIZE 256
 #define MAX_INPUT 256
 #define RECONNECT_DELTA 15
+
+/* When tab completing a nick at the beginning of the line, append the following char */
+#define TAB_COMPLETE_DELIMITER ':'
 
 /* Compile time checks */
 #if BUFFSIZE < MAX_INPUT
@@ -127,9 +130,11 @@ typedef struct avl_node
 	int height;
 	struct avl_node *l;
 	struct avl_node *r;
-	char *str;
+	char *key;
+	void *val;
 } avl_node;
 
+/* TODO: buffer_line */
 /* Chat buffer line */
 typedef struct line
 {
@@ -245,8 +250,8 @@ void poll_input(void);
 
 /* utils.c */
 char* strdup(const char*);
-const char* avl_get(avl_node*, const char*, size_t);
-int avl_add(avl_node**, const char*);
+const avl_node* avl_get(avl_node*, const char*, size_t);
+int avl_add(avl_node**, const char*, void*);
 int avl_del(avl_node**, const char*);
 int check_pinged(char*, char*);
 int parse(parsed_mesg*, char*);
@@ -254,6 +259,8 @@ void auto_nick(char**, char*);
 void free_avl(avl_node*);
 
 /* mesg.c */
+avl_node* commands;
+void init_commands(void);
 void recv_mesg(char*, int, server*);
 void send_mesg(char*);
 void send_paste(char*);
