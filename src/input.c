@@ -766,8 +766,6 @@ send_input(void)
 	/* Pass a copy of the message to the send handler, since it may modify the contents */
 	strcpy(sendbuff, in->line->text);
 
-	send_mesg(sendbuff);
-
 	/* Now check if the sent line was 'new' or was resent input scrollback
 	 *
 	 * If a new line was sent:
@@ -807,4 +805,7 @@ send_input(void)
 	}
 
 	draw(D_INPUT);
+
+	/* Send the message last; the channel might be closed as a result of the command */
+	send_mesg(sendbuff);
 }
