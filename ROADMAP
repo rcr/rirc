@@ -83,8 +83,6 @@ Buffer scrollback improvements:
 When connection is lost before ping timeout, disconnect, reconnect
 and /connect errs out read: Connection reset by peer
 
-Input tab complete for commands if input[0] == '/'
-
 Keep state of tab complete for successively getting the next nick lexicographically
 
 Make sure all the thread related code is using thread-safe functions,
@@ -101,8 +99,7 @@ Nickserv stuff
 
 colorize output by linetype
 
-Update all places where fatal is called, give the failed system call as the argument
-to fatal and use __func__ in the macro itself
+Fix the channel colouring on various status events
 
 Tests for all the send_*, recv_* handlers
 	- split all the handlers out into mesg.c and move all net unrelated functions into

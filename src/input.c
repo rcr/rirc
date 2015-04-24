@@ -11,7 +11,6 @@
  * */
 
 #include <ctype.h>
-#include <errno.h>
 #include <poll.h>
 #include <stdarg.h>
 #include <stdio.h>

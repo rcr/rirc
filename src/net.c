@@ -1,7 +1,6 @@
 /* For addrinfo, getaddrinfo, getnameinfo */
 #define _POSIX_C_SOURCE 200112L
 
-#include <errno.h>
 #include <fcntl.h>
 #include <netdb.h>
 #include <pthread.h>
@@ -286,7 +285,7 @@ server_disconnect(server *s, int err, int kill, char *mesg)
 		connection_thread *ct = s->connecting;
 
 		if ((pthread_cancel(ct->tid)))
-			fatal("threaded_connect_cancel - pthread_cancel");
+			fatal("pthread_cancel");
 
 		/* There's a chance the thread is canceled with an open socket */
 		if (ct->socket_tmp)

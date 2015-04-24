@@ -100,6 +100,8 @@ strdup(const char *str)
  *
  * Parsing of the 15 arg max doesn't work correctly
  *
+ * if no args, point args to trailing
+ *
  * */
 int
 parse(parsed_mesg *p, char *mesg)

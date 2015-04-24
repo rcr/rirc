@@ -17,8 +17,6 @@
 #error BUFFSIZE must be greater than MAX_INPUT
 #endif
 
-#include <time.h>
-
 /* Chan modes */
 #define CMODE_STR "OovaimnqpsrtklbeI"
 #define CMODE_O (1 << 0) /* give "channel creator" status */
@@ -52,9 +50,13 @@
 #define UMODE_s (1 << 7) /* receiving server notices */
 #define UMODE_MAX 8
 
+#include <time.h>
+#include <errno.h>
+#include <error.h>
+
 /* Irrecoverable error */
-#define fatal(mesg) \
-	do {perror(mesg); exit(EXIT_FAILURE);} while (0)
+#define fatal(mesg) do { \
+	error(EXIT_FAILURE, errno, "ERROR in %s(), %s", __func__, mesg); } while (0)
 
 /* Error message length */
 #define MAX_ERROR 512
