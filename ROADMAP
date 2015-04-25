@@ -118,6 +118,7 @@ FIXME:
 connection reset by peer:
  - was at about 220s latency, attempted to send something, assuming remote peer
    already reset the connection
+ - errno = ECONNRESET
 
 I broke the activity colouring stuff:
 	join/part/quit sets activity (it shouldnt)

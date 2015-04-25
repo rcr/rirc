@@ -586,6 +586,10 @@ recv_ctcp_req(char *err, parsed_mesg *p, server *s)
 	if (!p->from)
 		fail("CTCP: sender's nick is null");
 
+	/* CTCP request from ignored user, do nothing */
+	if (avl_get(ccur->server->ignore, p->from, strlen(p->from)))
+		return 0;
+
 	if (!(targ = strtok(p->params, " ")))
 		fail("CTCP: target is null");
 
@@ -647,6 +651,10 @@ recv_ctcp_rpl(char *err, parsed_mesg *p)
 
 	if (!p->from)
 		fail("CTCP: sender's nick is null");
+
+	/* CTCP reply from ignored user, do nothing */
+	if (avl_get(ccur->server->ignore, p->from, strlen(p->from)))
+		return 0;
 
 	if (!(mesg = strtok(p->trailing, "\x01")))
 		fail("CTCP: invalid markup");
@@ -936,6 +944,10 @@ recv_notice(char *err, parsed_mesg *p, server *s)
 
 	if (!p->from)
 		fail("NOTICE: sender's nick is null");
+
+	/* Notice from ignored user, do nothing */
+	if (avl_get(ccur->server->ignore, p->from, strlen(p->from)))
+		return 0;
 
 	if (!(targ = strtok(p->params, " ")))
 		fail("NOTICE: target is null");
@@ -1288,6 +1300,10 @@ recv_priv(char *err, parsed_mesg *p, server *s)
 
 	if (!p->from)
 		fail("PRIVMSG: sender's nick is null");
+
+	/* Privmesg from ignored user, do nothing */
+	if (avl_get(ccur->server->ignore, p->from, strlen(p->from)))
+		return 0;
 
 	if (!(targ = strtok_r(p->params, " ", &p->params)))
 		fail("PRIVMSG: target is null");
