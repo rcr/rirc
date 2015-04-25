@@ -73,6 +73,7 @@
 	X(close) \
 	X(connect) \
 	X(disconnect) \
+	X(ignore) \
 	X(join) \
 	X(me) \
 	X(msg) \
@@ -81,6 +82,7 @@
 	X(privmsg) \
 	X(quit) \
 	X(raw) \
+	X(unignore) \
 	X(version)
 
 /* Function prototypes for explicitly handled commands */
@@ -302,6 +304,31 @@ send_me(char *err, char *mesg)
 	return 0;
 }
 
+/* TODO discard privmesg and notice from users on the list */
+static int
+send_ignore(char *err, char *mesg)
+{
+	/* /ignore [nick] */
+
+	char *nick;
+
+	if (!ccur->server)
+		fail("Error: Not connected to server");
+
+	if (!(nick = strtok(mesg, " "))) {
+		/* TODO */
+		newline(ccur, 0, "TODO", "Ignoring:");
+		return 0;
+	}
+
+	if (!avl_add(&(ccur->server->ignore), nick, NULL))
+		failf("Error: Already ignoring '%s'", nick);
+
+	newlinef(ccur, 0, "--", "Ignoring '%s'", nick);
+
+	return 0;
+}
+
 static int
 send_join(char *err, char *mesg)
 {
@@ -405,6 +432,30 @@ send_raw(char *err, char *mesg)
 	fail_if(sendf(err, ccur->server, "%s", mesg));
 
 	newline(ccur, 0, "RAW >>", mesg);
+
+	return 0;
+}
+
+static int
+send_unignore(char *err, char *mesg)
+{
+	/* /unignore [nick] */
+
+	char *nick;
+
+	if (!ccur->server)
+		fail("Error: Not connected to server");
+
+	if (!(nick = strtok(mesg, " "))) {
+		/* TODO */
+		newline(ccur, 0, "TODO", "Ignoring:");
+		return 0;
+	}
+
+	if (!avl_del(&(ccur->server->ignore), nick))
+		failf("Error: '%s' not on ignore list", nick);
+
+	newlinef(ccur, 0, "--", "No longer ignoring '%s'", nick);
 
 	return 0;
 }

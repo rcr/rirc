@@ -194,21 +194,22 @@ typedef struct channel
 /* Server */
 typedef struct server
 {
-	time_t latency_time;
-	time_t latency_delta;
-	time_t reconnect_time;
-	time_t reconnect_delta;
-	char *iptr;
-	char *nptr;
-	char input[BUFFSIZE];
 	char *host;
-	char *port;
+	char input[BUFFSIZE];
+	char *iptr;
 	char nick_me[NICKSIZE];
+	char *nptr;
+	char *port;
 	int soc;
 	int usermode;
+	struct avl_node *ignore;
 	struct channel *channel;
 	struct server *next;
 	struct server *prev;
+	time_t latency_delta;
+	time_t latency_time;
+	time_t reconnect_delta;
+	time_t reconnect_time;
 	void *connecting;
 } server;
 

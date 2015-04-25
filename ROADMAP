@@ -11,10 +11,6 @@ Cleaner separation between the ui (draw.c) and everything else:
 
 Implement a mesg.c test framework before adding new message types, then:
 ----------------------
-	/IGNORE [nick]
-	/UNIGNORE
-		can be implemented as a single nicklist per server
-
 	/TOPIC [message]
 		set/get channel topic
 
@@ -71,6 +67,9 @@ Implement a mesg.c test framework before adding new message types, then:
 		 (e.g.: /raw MODE <not my nick> <flag>
 ----------------------
 
+Function for nicely printing a nicklist to use with /nicks command
+or when /ignore or /unignore are called with no argument
+
 Buffer scrollback improvements:
 	- full page scrollback
 		- set to topmost line if it doesn't print in full, else the line before it
@@ -123,8 +122,6 @@ connection reset by peer:
 I broke the activity colouring stuff:
 	join/part/quit sets activity (it shouldnt)
 	message and ping dont set activity (they should)
-
-in debug mode errors (eg sender = -!!-) should raise a ping
 
 Closing private channels sometimes results in numeric 403
 
