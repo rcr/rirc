@@ -18,9 +18,6 @@ Implement a mesg.c test framework before adding new message types, then:
 		show available commands.
 		if [type] is given, show more specific help
 
-	/CLEAR
-		equivalent to ^L for clearing channel
-
 	/NICKS
 		print the current nicks to the channel
 		^(Also print this implicitly when end of nicks numeric is received)

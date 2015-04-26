@@ -70,6 +70,7 @@
 
 /* List of commands (some rirc-specific) which are explicitly handled */
 #define HANDLED_CMDS \
+	X(clear) \
 	X(close) \
 	X(connect) \
 	X(disconnect) \
@@ -216,6 +217,32 @@ send_unhandled(char *err, char *cmd, char *args)
 }
 
 static int
+send_clear(char *err, char *mesg)
+{
+	/* Clear the current buffer */
+
+	UNUSED(err);
+	UNUSED(mesg);
+
+	clear_channel(ccur);
+
+	return 0;
+}
+
+static int
+send_close(char *err, char *mesg)
+{
+	/* TODO: if no args in mesg, close ccur, else try to find the channel */
+
+	UNUSED(err);
+	UNUSED(mesg);
+
+	ccur = channel_close(ccur);
+
+	return 0;
+}
+
+static int
 send_connect(char *err, char *mesg)
 {
 	/* /connect [(host) | (host:port) | (host port)] */
@@ -235,19 +262,6 @@ send_connect(char *err, char *mesg)
 		port = "6667";
 
 	server_connect(host, port);
-
-	return 0;
-}
-
-static int
-send_close(char *err, char *mesg)
-{
-	/* TODO: if no args in mesg, close ccur, else try to find the channel */
-
-	UNUSED(err);
-	UNUSED(mesg);
-
-	ccur = channel_close(ccur);
 
 	return 0;
 }
