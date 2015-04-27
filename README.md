@@ -1,4 +1,5 @@
 #rirc
+[![Coverity Scan Build](https://scan.coverity.com/projects/4940/badge.svg)](https://scan.coverity.com/projects/4940)
 
 A minimalistic irc client written in C.
 
