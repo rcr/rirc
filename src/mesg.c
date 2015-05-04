@@ -1181,15 +1181,12 @@ num_400:
 		if (!(chan = strtok_r(p->params, " ", &p->params)))
 			fail("ERR_CANNOTSENDTOCHAN: channel is null");
 
-		channel *c;
-
+		/* Channel buffer might not exist */
 		if ((c = channel_get(chan, s)))
-			newline(c, 0, 0, p->trailing);
-		else
-			newline(s->channel, 0, 0, p->trailing);
+			c = s->channel;
 
 		if (p->trailing)
-			newlinef(c, 0, "--", "Cannot send to '%s' - %s", chan, p->trailing);
+			newlinef(c, 0, "--", "Cannot send to '%s': %s", chan, p->trailing);
 		else
 			newlinef(c, 0, "--", "Cannot send to '%s'", chan);
 		return 0;
