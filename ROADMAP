@@ -29,8 +29,6 @@ Implement a mesg.c test framework before adding new message types, then:
 
 	receive KICK message type
 
-	receive TOPIC message type
-
 	Numerics:
 	221 +<flags> :(null)
 		 returned when MODE <current nick> is sent

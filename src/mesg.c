@@ -114,6 +114,7 @@ static int recv_part(char*, parsed_mesg*, server*);
 static int recv_ping(char*, parsed_mesg*, server*);
 static int recv_priv(char*, parsed_mesg*, server*);
 static int recv_quit(char*, parsed_mesg*, server*);
+static int recv_topic(char*, parsed_mesg*, server*);
 
 void
 init_commands(void)
@@ -318,7 +319,6 @@ send_me(char *err, char *mesg)
 	return 0;
 }
 
-/* TODO discard privmesg and notice from users on the list */
 static int
 send_ignore(char *err, char *mesg)
 {
@@ -330,8 +330,8 @@ send_ignore(char *err, char *mesg)
 		fail("Error: Not connected to server");
 
 	if (!(nick = strtok(mesg, " "))) {
-		/* TODO */
 		newline(ccur, 0, "TODO", "Ignoring:");
+		/* TODO print ignore list*/
 		return 0;
 	}
 
@@ -461,8 +461,8 @@ send_unignore(char *err, char *mesg)
 		fail("Error: Not connected to server");
 
 	if (!(nick = strtok(mesg, " "))) {
-		/* TODO */
 		newline(ccur, 0, "TODO", "Ignoring:");
+		/* TODO print ignore list*/
 		return 0;
 	}
 
@@ -570,6 +570,8 @@ recv_mesg(char *inp, int count, server *s)
 				err = recv_mode(errbuff, &p, s);
 			else if (!strcmp(p.command, "ERROR"))
 				err = recv_error(errbuff, &p, s);
+			else if (!strcmp(p.command, "TOPIC"))
+				err = recv_topic(errbuff, &p, s);
 			else
 				newlinef(s->channel, 0, "-!!-", "Message type '%s' unknown", p.command);
 
@@ -1368,6 +1370,32 @@ recv_quit(char *err, parsed_mesg *p, server *s)
 	} while (c != s->channel);
 
 	draw(D_STATUS);
+
+	return 0;
+}
+
+static int
+recv_topic(char *err, parsed_mesg *p, server *s)
+{
+	/* :nick!user@hostname.domain TOPIC <channel> :topic */
+
+	channel *c;
+	char *targ;
+
+	if (!p->from)
+		fail("TOPIC: sender's nick is null");
+
+	if (!(targ = strtok_r(p->params, " ", &p->params)))
+		fail("TOPIC: target is null");
+
+	if (!p->trailing)
+		fail("TOPIC: topic is null");
+
+	if ((c = channel_get(targ, s)) == NULL)
+		failf("TOPIC: channel '%s' not found", targ);
+
+	newlinef(c, 0, "--", "%s has changed the topic:", p->from);
+	newlinef(c, 0, "--", "\"%s\"", p->trailing);
 
 	return 0;
 }
