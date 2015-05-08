@@ -280,3 +280,4 @@ void free_channel(channel*);
 void newline(channel*, line_t, const char*, const char*);
 void newlinef(channel*, line_t, const char*, const char*, ...);
 void _newline(channel*, line_t, const char*, const char*, size_t);
+void part_channel(channel*);

@@ -106,6 +106,7 @@ static int recv_ctcp_req(char*, parsed_mesg*, server*);
 static int recv_ctcp_rpl(char*, parsed_mesg*);
 static int recv_error(char*, parsed_mesg*, server*);
 static int recv_join(char*, parsed_mesg*, server*);
+static int recv_kick(char*, parsed_mesg*, server*);
 static int recv_mode(char*, parsed_mesg*, server*);
 static int recv_nick(char*, parsed_mesg*, server*);
 static int recv_notice(char*, parsed_mesg*, server*);
@@ -566,6 +567,8 @@ recv_mesg(char *inp, int count, server *s)
 				err = recv_nick(errbuff, &p, s);
 			else if (!strcmp(p.command, "PING"))
 				err = recv_ping(errbuff, &p, s);
+			else if (!strcmp(p.command, "KICK"))
+				err = recv_kick(errbuff, &p, s);
 			else if (!strcmp(p.command, "MODE"))
 				err = recv_mode(errbuff, &p, s);
 			else if (!strcmp(p.command, "ERROR"))
@@ -747,6 +750,60 @@ recv_join(char *err, parsed_mesg *p, server *s)
 
 		draw(D_STATUS);
 	}
+
+	return 0;
+}
+
+static int
+recv_kick(char *err, parsed_mesg *p, server *s)
+{
+	/* :nick!user@hostname.domain KICK <channel> <user> :comment */
+
+	char *chan, *user;
+	channel *c;
+
+	if (!p->from)
+		fail("KICK: sender's nick is null");
+
+	if (!(chan = strtok_r(p->params, " ", &p->params)))
+		fail("KICK: channel is null");
+
+	if (!(user = strtok_r(p->params, " ", &p->params)))
+		fail("KICK: user is null");
+
+	if ((c = channel_get(chan, s)) == NULL)
+		failf("KICK: channel '%s' not found", chan);
+
+	/* RFC 2812, 3.2.8:
+	 *
+	 * If a "comment" is given, this will be sent instead of the default message,
+	 * the nickname of the user issuing the KICK.
+	 * */
+	if (!strcmp(p->from, p->trailing))
+		p->trailing = NULL;
+
+	if (IS_ME(user)) {
+
+		part_channel(c);
+
+		if (p->trailing)
+			newlinef(c, 0, "--", "You've been kicked by %s (%s)", p->from, p->trailing);
+		else
+			newlinef(c, 0, "--", "You've been kicked by %s", p->from, user);
+	} else {
+
+		if (!avl_del(&c->nicklist, user))
+			failf("KICK: nick '%s' not found in '%s'", user, chan);
+
+		c->nick_count--;
+
+		if (p->trailing)
+			newlinef(c, 0, "--", "%s has kicked %s (%s)", p->from, user, p->trailing);
+		else
+			newlinef(c, 0, "--", "%s has kicked %s", p->from, user);
+	}
+
+	draw(D_STATUS);
 
 	return 0;
 }
@@ -1247,12 +1304,7 @@ recv_part(char *err, parsed_mesg *p, server *s)
 		/* If receving a PART message from myself channel isn't found, assume it was closed */
 		if ((c = channel_get(targ, s)) != NULL) {
 
-			c->parted = 1;
-			c->chanmode = 0;
-			c->nick_count = 0;
-
-			free_avl(c->nicklist);
-			c->nicklist = NULL;
+			part_channel(c);
 
 			if (p->trailing)
 				newlinef(c, 0, "<", "you have left %s (%s)", targ, p->trailing);

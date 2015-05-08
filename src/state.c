@@ -182,13 +182,25 @@ action_close_server(char c)
 	return 0;
 }
 
-/* Close a channel buffer/server and return the next channel */
+void
+part_channel(channel *c)
+{
+	/* Set the state of a parted channel */
+
+	free_avl(c->nicklist);
+
+	c->chanmode = 0;
+	c->nick_count = 0;
+	c->nicklist = NULL;
+	c->parted = 1;
+}
+
 channel*
 channel_close(channel *c)
 {
-	/* Close a buffer,
+	/* Close a buffer and return the next
 	 *
-	 * if closing a server buffer, confirm with the user */
+	 * If closing a server buffer, confirm with the user */
 
 	channel *ret = c;
 

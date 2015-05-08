@@ -22,12 +22,8 @@ Implement a mesg.c test framework before adding new message types, then:
 		print the current nicks to the channel
 		^(Also print this implicitly when end of nicks numeric is received)
 
-	/NOTICE
-
 	CTCP (at a minimum):
 		CLIENTINFO, TIME, PING
-
-	receive KICK message type
 
 	Numerics:
 	221 +<flags> :(null)
@@ -46,6 +42,9 @@ Implement a mesg.c test framework before adding new message types, then:
 
 	435 cannot change nickname while banned
 		(eg unregistered in channel and trying to /nick)
+
+	441 <user> <channel> :They're not on that channel
+		(eg kick a user not in the channel)
 
 	442 <channel> :You're not on that channel
 
