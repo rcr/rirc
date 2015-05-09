@@ -22,9 +22,6 @@ Implement a mesg.c test framework before adding new message types, then:
 		print the current nicks to the channel
 		^(Also print this implicitly when end of nicks numeric is received)
 
-	CTCP (at a minimum):
-		CLIENTINFO, TIME, PING
-
 	Numerics:
 	221 +<flags> :(null)
 		 returned when MODE <current nick> is sent
@@ -54,6 +51,8 @@ Implement a mesg.c test framework before adding new message types, then:
 	461 <CMD>   :Syntax error  ... from "/nick" or "/join"
 
 	470 <chan1> <chan2> :forwarding to another channel
+
+	482 <channel> :You're not the channel operator
 
 	501:Unknown mode "<flag>"
 

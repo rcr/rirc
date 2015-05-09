@@ -73,6 +73,7 @@
 	X(clear) \
 	X(close) \
 	X(connect) \
+	X(ctcp) \
 	X(disconnect) \
 	X(ignore) \
 	X(join) \
@@ -266,6 +267,30 @@ send_connect(char *err, char *mesg)
 	server_connect(host, port);
 
 	return 0;
+}
+
+static int
+send_ctcp(char *err, char *mesg)
+{
+	/* /ctcp <target> <message> */
+
+	char *targ, *p;
+
+	if (!(targ = strtok_r(mesg, " ", &mesg)))
+		fail("Error: /ctcp <target> <command> [arguments]");
+
+	/* Crude to check that at least some ctcp command exists */
+	while (*mesg == ' ')
+		mesg++;
+
+	if (*mesg == '\0')
+		fail("Error: /ctcp <target> <command> [arguments]");
+
+	/* Ensure the command is uppercase */
+	for (p = mesg; *p && *p != ' '; p++)
+		*p = toupper(*p);
+
+	return sendf(err, ccur->server, "PRIVMSG %s :\x01""%s\x01", targ, mesg);
 }
 
 static int
@@ -510,18 +535,16 @@ send_version(char *err, char *mesg)
 	char *targ;
 
 	if (ccur->server == NULL) {
-		newline(ccur, 0, "--", "rirc version " VERSION);
+		newline(ccur, 0, "--", "rirc v"VERSION);
 		newline(ccur, 0, "--", "http://rcr.io/rirc.html");
+
 		return 0;
 	}
 
-	if ((targ = strtok(mesg, " "))) {
-		newlinef(ccur, 0, "--", "Sending CTCP VERSION request to %s", targ);
-		return sendf(err, ccur->server, "PRIVMSG %s :\x01""VERSION\x01", targ);
-	}
-
-	newlinef(ccur, 0, "--", "Sending CTCP VERSION request to %s", ccur->server->host);
-	return sendf(err, ccur->server, "VERSION");
+	if ((targ = strtok(mesg, " ")))
+		return sendf(err, ccur->server, "VERSION %s", targ);
+	else
+		return sendf(err, ccur->server, "VERSION");
 }
 
 /*
@@ -597,10 +620,12 @@ static int
 recv_ctcp_req(char *err, parsed_mesg *p, server *s)
 {
 	/* CTCP Requests:
-	 * PRIVMSG <target> :0x01<command> <arguments>0x01 */
+	 * PRIVMSG <target> :0x01<command> <arguments>0x01
+	 *
+	 * All replies must be:
+	 * NOTICE <target> :0x01<reply>0x01 */
 
 	char *targ, *cmd, *mesg;
-	channel *c;
 
 	if (!p->from)
 		fail("CTCP: sender's nick is null");
@@ -619,8 +644,12 @@ recv_ctcp_req(char *err, parsed_mesg *p, server *s)
 	if (!(cmd = strtok_r(mesg, " ", &mesg)))
 		fail("CTCP: command is null");
 
+	/* Handle the CTCP request if supported */
+
 	if (!strcmp(cmd, "ACTION")) {
 		/* ACTION <message> */
+
+		channel *c;
 
 		if (IS_ME(targ)) {
 			/* Sending emote to private channel */
@@ -641,22 +670,65 @@ recv_ctcp_req(char *err, parsed_mesg *p, server *s)
 		return 0;
 	}
 
-	if (!strcmp(cmd, "VERSION")) {
-		/* VERSION */
+	if (!strcmp(cmd, "CLIENTINFO")) {
+		/* CLIENTINFO
+		 *
+		 * Returns a list of CTCP commands supported by rirc */
 
-		if ((c = channel_get(p->from, s)) == NULL)
-			c = s->channel;
+		newlinef(s->channel, 0, "--", "CTCP CLIENTINFO request from %s", p->from);
 
-		newlinef(c, 0, "--", "CTCP VERSION request from %s", p->from);
-
-		fail_if(sendf(err, s, "NOTICE %s :\x01""VERSION rirc version "VERSION"\x01", p->from));
-		fail_if(sendf(err, s, "NOTICE %s :\x01""VERSION http://rcr.io/rirc.html\x01", p->from));
-
-		return 0;
+		return sendf(err, s, "NOTICE %s :\x01""CLIENTINFO ACTION PING VERSION TIME\x01", p->from);
 	}
 
-	fail_if(sendf(err, s, "NOTICE %s :\x01""ERRMSG %s not supported\x01", p->from, cmd));
+	if (!strcmp(cmd, "PING")) {
+		/* PING
+		 *
+		 * Returns a millisecond precision timestamp */
 
+		struct timespec t;
+
+		clock_gettime(CLOCK_REALTIME, &t);
+
+		long long milliseconds = t.tv_sec * 1000LL + t.tv_nsec / 1000;
+
+		newlinef(s->channel, 0, "--", "CTCP PING request from %s", p->from);
+
+		return sendf(err, s, "NOTICE %s :\x01""PING %lld\x01", p->from, milliseconds);
+	}
+
+	if (!strcmp(cmd, "VERSION")) {
+		/* VERSION
+		 *
+		 * Returns version info about rirc */
+
+		newlinef(s->channel, 0, "--", "CTCP VERSION request from %s", p->from);
+
+		return sendf(err, s,
+			"NOTICE %s :\x01""VERSION rirc v"VERSION", http://rcr.io/rirc.html\x01", p->from);
+	}
+
+	if (!strcmp(cmd, "TIME")) {
+		/* TIME
+		 *
+		 * Returns the localtime in human readable form */
+
+		char time_str[64];
+		struct tm *tm;
+		time_t t;
+
+		t = time(NULL);
+		tm = localtime(&t);
+
+		/* Mon Jan 01 20:30 GMT */
+		strftime(time_str, sizeof(time_str), "%a %b %d %H:%M %Z", tm);
+
+		newlinef(s->channel, 0, "--", "CTCP TIME request from %s", p->from);
+
+		return sendf(err, s, "NOTICE %s :\x01""TIME %s\x01", p->from, time_str);
+	}
+
+	/* Unsupported CTCP request */
+	fail_if(sendf(err, s, "NOTICE %s :\x01""ERRMSG %s not supported\x01", p->from, cmd));
 	failf("CTCP: Unknown command '%s' from %s", cmd, p->from);
 }
 
@@ -682,7 +754,7 @@ recv_ctcp_rpl(char *err, parsed_mesg *p)
 	if (!(cmd = strtok_r(mesg, " ", &mesg)))
 		fail("CTCP: command is null");
 
-	newlinef(ccur, 0, "--", "CTCP %s reply from %s", cmd, p->from);
+	newlinef(ccur, 0, "--", "CTCP %s reply from %s:", cmd, p->from);
 	newlinef(ccur, 0, "--", "%s", mesg);
 
 	return 0;
