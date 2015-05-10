@@ -223,6 +223,14 @@ input_cchar(char c)
 			send_input();
 			break;
 
+		/* ^C */
+		case 0x03:
+			/* Cancel current input */
+			ccur->input->head = ccur->input->line->text;
+			ccur->input->tail = ccur->input->line->text + MAX_INPUT;
+			draw(D_INPUT);
+			break;
+
 		/* ^F */
 		case 0x06:
 			/* Find channel */
@@ -431,7 +439,8 @@ input_action(char *input, ssize_t len)
 {
 	/* Waiting for user confirmation */
 
-	if (len == 1 && action_handler(*input)) {
+	if (len == 1 && (*input == 0x03 || action_handler(*input))) {
+		/* ^C canceled the action, or the action was resolved */
 
 		action_message = NULL;
 		action_handler = NULL;

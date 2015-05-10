@@ -7,8 +7,6 @@ Cleaner separation between the ui (draw.c) and everything else:
 		- input bar framing
 		- channel bar framing
 
-^C (0x03) as cancel current line/action
-
 Implement a mesg.c test framework before adding new message types, then:
 ----------------------
 	/TOPIC [message]

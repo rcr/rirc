@@ -45,6 +45,7 @@ Hotkeys:
   ^L : clear channel
   ^X : close channel
   ^F : find channel
+  ^C : cancel input/action
 ```
 
 ##More info:
