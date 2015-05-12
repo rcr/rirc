@@ -298,7 +298,7 @@ send_default(char *err, char *mesg)
 {
 	/* All messages not beginning with '/'  */
 
-	if (!ccur->type)
+	if (ccur->buffer_type == BUFFER_SERVER)
 		fail("Error: This is not a channel");
 
 	if (ccur->parted)
@@ -332,7 +332,7 @@ send_me(char *err, char *mesg)
 {
 	/* /me <message> */
 
-	if (!ccur->type)
+	if (ccur->buffer_type == BUFFER_SERVER)
 		fail("Error: This is not a channel");
 
 	if (ccur->parted)
@@ -379,10 +379,10 @@ send_join(char *err, char *mesg)
 	if ((targ = strtok(mesg, " ")))
 		return sendf(err, ccur->server, "JOIN %s", targ);
 
-	if (!ccur->type)
+	if (ccur->buffer_type == BUFFER_SERVER)
 		fail("Error: JOIN requires a target");
 
-	if (ccur->type == 'p')
+	if (ccur->buffer_type == BUFFER_PRIVATE)
 		fail("Error: Can't rejoin private buffers");
 
 	if (!ccur->parted)
@@ -427,10 +427,10 @@ send_part(char *err, char *mesg)
 	if ((targ = strtok_r(mesg, " ", &mesg)))
 		return sendf(err, ccur->server, "PART %s :%s", targ, (*mesg) ? mesg : DEFAULT_QUIT_MESG);
 
-	if (!ccur->type)
+	if (ccur->buffer_type == BUFFER_SERVER)
 		fail("Error: PART requires a target");
 
-	if (ccur->type == 'p')
+	if (ccur->buffer_type == BUFFER_PRIVATE)
 		fail("Error: Can't part private buffers");
 
 	if (ccur->parted)
@@ -454,10 +454,8 @@ send_privmsg(char *err, char *mesg) {
 
 	fail_if(sendf(err, ccur->server, "PRIVMSG %s :%s", targ, mesg));
 
-	if ((c = channel_get(targ, ccur->server)) == NULL) {
-		c = new_channel(targ, ccur->server, ccur);
-		c->type = 'p';
-	}
+	if ((c = channel_get(targ, ccur->server)) == NULL)
+		c = new_channel(targ, ccur->server, ccur, BUFFER_PRIVATE);
 
 	newline(c, LINE_CHAT, ccur->server->nick_me, mesg);
 
@@ -654,10 +652,8 @@ recv_ctcp_req(char *err, parsed_mesg *p, server *s)
 		if (IS_ME(targ)) {
 			/* Sending emote to private channel */
 
-			if ((c = channel_get(p->from, s)) == NULL) {
-				c = new_channel(p->from, s, s->channel);
-				c->type = 'p';
-			}
+			if ((c = channel_get(p->from, s)) == NULL)
+				c = new_channel(p->from, s, s->channel, BUFFER_PRIVATE);
 
 			if (c != ccur)
 				c->active = ACTIVITY_PINGED;
@@ -801,7 +797,7 @@ recv_join(char *err, parsed_mesg *p, server *s)
 
 	if (IS_ME(p->from)) {
 		if ((c = channel_get(chan, s)) == NULL)
-			ccur = new_channel(chan, s, ccur);
+			ccur = new_channel(chan, s, ccur, BUFFER_CHANNEL);
 		else {
 			c->parted = 0;
 			newlinef(c, 0, ">", "You have rejoined %s", chan);
@@ -1151,7 +1147,7 @@ recv_numeric(char *err, parsed_mesg *p, server *s)
 			/* If reconnecting to server, join any non-parted channels */
 			c = s->channel;
 			do {
-				if (c->type && c->type != 'p' && !c->parted)
+				if (c->buffer_type == BUFFER_CHANNEL && !c->parted)
 					fail_if(sendf(err, s, "JOIN %s", c->name));
 				c = c->next;
 			} while (c != s->channel);
@@ -1247,7 +1243,7 @@ num_200:
 		if ((c = channel_get(chan, s)) == NULL)
 			failf("RPL_NAMEREPLY: channel '%s' not found", chan);
 
-		c->type = *type;
+		c->type_flag = *type;
 
 		while ((nick = strtok_r(p->trailing, " ", &p->trailing))) {
 			if (*nick == '@' || *nick == '+')
@@ -1448,10 +1444,8 @@ recv_priv(char *err, parsed_mesg *p, server *s)
 	/* Find the target channel */
 	if (IS_ME(targ)) {
 
-		if ((c = channel_get(p->from, s)) == NULL) {
-			c = new_channel(p->from, s, s->channel);
-			c->type = 'p';
-		}
+		if ((c = channel_get(p->from, s)) == NULL)
+			c = new_channel(p->from, s, s->channel, BUFFER_PRIVATE);
 
 		if (c != ccur)
 			c->active = ACTIVITY_PINGED;
@@ -1501,7 +1495,7 @@ recv_quit(char *err, parsed_mesg *p, server *s)
 static int
 recv_topic(char *err, parsed_mesg *p, server *s)
 {
-	/* :nick!user@hostname.domain TOPIC <channel> :topic */
+	/* :nick!user@hostname.domain TOPIC <channel> :[topic] */
 
 	channel *c;
 	char *targ;

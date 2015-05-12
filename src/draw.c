@@ -418,11 +418,11 @@ draw_status(channel *c)
 	}
 
 	/* private chat */
-	if (c->type == 'p') {
+	if (c->buffer_type == BUFFER_PRIVATE) {
 		i += printf("―[priv]") - 2;
 	/* chantype, chanmodes, chancount */
-	} else if (c->type) {
-		i += printf("―[%c", c->type) - 2;
+	} else if (c->buffer_type == BUFFER_CHANNEL) {
+		i += printf("―[%c", c->type_flag) - 2;
 
 		if ((mode = c->chanmode)) {
 			i += printf(" +");

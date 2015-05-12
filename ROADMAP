@@ -113,8 +113,6 @@ I broke the activity colouring stuff:
 	join/part/quit sets activity (it shouldnt)
 	message and ping dont set activity (they should)
 
-Closing private channels sometimes results in numeric 403
-
 Some servers place single args in the trailing section, eg: JOIN :channel vs JOIN channel
 which forces the handlers to check p->params and p->trailing, however since p->params
 is set to NULL in this case, the result is strtok(NULL, " "), so strtok attemps to continue

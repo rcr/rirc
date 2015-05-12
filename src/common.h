@@ -98,7 +98,16 @@
 		} \
 	} while (0)
 
-/* Channel bar activity types */
+/* Buffer types */
+typedef enum {
+	BUFFER_OTHER,   /* Default/all other buffers */
+	BUFFER_CHANNEL, /* IRC channel buffer */
+	BUFFER_SERVER,  /* Server message buffer */
+	BUFFER_PRIVATE, /* Private chat buffer */
+	BUFFER_T_SIZE
+} buffer_t;
+
+/* Buffer bar activity types */
 typedef enum {
 	ACTIVITY_DEFAULT,
 	ACTIVITY_ACTIVE,
@@ -172,8 +181,9 @@ typedef struct input
 typedef struct channel
 {
 	activity_t active;
+	buffer_t buffer_type;
 	char name[CHANSIZE];
-	char type;
+	char type_flag;
 	int chanmode;
 	int nick_count;
 	int parted;
@@ -272,7 +282,7 @@ void send_paste(char*);
 channel* channel_close(channel*);
 channel* channel_get(char*, server*);
 channel* channel_switch(channel*, int);
-channel* new_channel(char*, server*, channel*);
+channel* new_channel(char*, server*, channel*, buffer_t);
 void buffer_scrollback_line(channel*, int);
 void buffer_scrollback_page(channel*, int);
 void clear_channel(channel*);

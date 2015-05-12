@@ -95,7 +95,7 @@ _newline(channel *c, line_t type, const char *from, const char *mesg, size_t len
 }
 
 channel*
-new_channel(char *name, server *server, channel *chanlist)
+new_channel(char *name, server *server, channel *chanlist, buffer_t type)
 {
 	channel *c;
 
@@ -103,6 +103,7 @@ new_channel(char *name, server *server, channel *chanlist)
 		fatal("calloc");
 
 	c->server = server;
+	c->buffer_type = type;
 	c->buffer_head = c->buffer;
 	c->active = ACTIVITY_DEFAULT;
 	c->input = new_input();
@@ -209,12 +210,12 @@ channel_close(channel *c)
 	if (c->server == NULL)
 		return c;
 
-	if (!c->type) {
+	if (c->buffer_type == BUFFER_SERVER) {
 		/* Closing a server, confirm the number of channels being closed */
 
 		int num_chans = 0;
 
-		while ((c = c->next)->type)
+		while ((c = c->next)->buffer_type != BUFFER_SERVER)
 			num_chans++;
 
 		if (num_chans)
@@ -225,7 +226,8 @@ channel_close(channel *c)
 	} else {
 		/* Closing a channel */
 
-		sendf(NULL, c->server, "PART %s", c->name);
+		if (c->buffer_type == BUFFER_CHANNEL)
+			sendf(NULL, c->server, "PART %s", c->name);
 
 		/* If channel c is last in the list, return the previous channel */
 		ret = !(c->next == c->server->channel) ?

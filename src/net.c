@@ -56,7 +56,7 @@ new_server(char *host, char *port)
 
 	auto_nick(&(s->nptr), s->nick_me);
 
-	s->channel = ccur = new_channel(host, s, NULL);
+	s->channel = ccur = new_channel(host, s, NULL, BUFFER_SERVER);
 
 	DLL_ADD(server_head, s);
 

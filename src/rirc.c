@@ -220,7 +220,7 @@ startup(void)
 	/* Init draw */
 	draw(D_RESIZE);
 
-	rirc = ccur = new_channel("rirc", NULL, NULL);
+	rirc = ccur = new_channel("rirc", NULL, NULL, BUFFER_OTHER);
 
 	splash(rirc);
 
