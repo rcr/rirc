@@ -19,6 +19,7 @@ Implement a mesg.c test framework before adding new message types, then:
 	/NICKS
 		print the current nicks to the channel
 		^(Also print this implicitly when end of nicks numeric is received)
+		^(Also print server's ignore list for '/ignore' and '/unignore')
 
 	Numerics:
 	221 +<flags> :(null)
@@ -57,9 +58,6 @@ Implement a mesg.c test framework before adding new message types, then:
 	502 :Can't set/get mode for other users
 		 (e.g.: /raw MODE <not my nick> <flag>
 ----------------------
-
-Function for nicely printing a nicklist to use with /nicks command
-or when /ignore or /unignore are called with no argument
 
 Buffer scrollback improvements:
 	- full page scrollback
@@ -137,8 +135,6 @@ use the alternate screen buffer to restore screen when rirc exits
 	ERR_ERRONEUSNICKNAME: nick is null
 
 when erroneous nickname on connect (eg too long) goes into infinite loop
-
-channel name case issues. eg: /join #aBc. Replies refer to #abc
 
 
 MAYBE (Probably never):

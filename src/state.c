@@ -3,6 +3,7 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include <stdarg.h>
 #include <stdio.h>
 
@@ -137,7 +138,7 @@ channel_get(char *chan, server *s)
 	channel *c = s->channel;
 
 	do {
-		if (!strcmp(c->name, chan))
+		if (!strcasecmp(c->name, chan))
 			return c;
 
 	} while ((c = c->next) != s->channel);
