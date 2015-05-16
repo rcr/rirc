@@ -303,14 +303,6 @@ input_cseq(char *input, ssize_t len)
 	/* page down */
 	else if (!strncmp(input, "[6~", len))
 		buffer_scrollback_page(ccur, 0);
-
-	/* mousewheel up */
-	else if (!strncmp(input, "[M`", len))
-		buffer_scrollback_line(ccur, 1);
-
-	/* mousewheel down */
-	else if (!strncmp(input, "[Ma", len))
-		buffer_scrollback_line(ccur, 0);
 #endif
 }
 

@@ -209,9 +209,6 @@ startup(void)
 	if (tcsetattr(0, TCSADRAIN, &nterm) < 0)
 		fatal("tcsetattr");
 
-	/* Set mousewheel event handling */
-	printf("\x1b[?1000h");
-
 	srand(time(NULL));
 
 	/* Build the avl tree of command handlers */
@@ -246,9 +243,6 @@ cleanup(void)
 
 	/* Free the tree of command handlers */
 	free_avl(commands);
-
-	/* Reset mousewheel event handling */
-	printf("\x1b[?1000l");
 }
 
 static void
