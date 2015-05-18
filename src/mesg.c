@@ -84,6 +84,7 @@
 	X(privmsg) \
 	X(quit) \
 	X(raw) \
+	X(topic) \
 	X(unignore) \
 	X(version)
 
@@ -475,6 +476,21 @@ send_raw(char *err, char *mesg)
 }
 
 static int
+send_topic(char *err, char *mesg)
+{
+	/* /topic [topic] */
+
+	/* If no actual message is given, retrieve the current topic */
+	while (*mesg == ' ')
+		mesg++;
+
+	if (*mesg == '\0')
+		return sendf(err, ccur->server, "TOPIC %s", ccur->name);
+
+	return sendf(err, ccur->server, "TOPIC %s :%s", ccur->name, mesg);
+}
+
+static int
 send_unignore(char *err, char *mesg)
 {
 	/* /unignore [nick] */
@@ -750,8 +766,7 @@ recv_ctcp_rpl(char *err, parsed_mesg *p)
 	if (!(cmd = strtok_r(mesg, " ", &mesg)))
 		fail("CTCP: command is null");
 
-	newlinef(ccur, 0, "--", "CTCP %s reply from %s:", cmd, p->from);
-	newlinef(ccur, 0, "--", "%s", mesg);
+	newlinef(ccur, 0, p->from, "CTCP %s reply: %s", cmd, mesg);
 
 	return 0;
 }
@@ -1512,8 +1527,12 @@ recv_topic(char *err, parsed_mesg *p, server *s)
 	if ((c = channel_get(targ, s)) == NULL)
 		failf("TOPIC: channel '%s' not found", targ);
 
-	newlinef(c, 0, "--", "%s has changed the topic:", p->from);
-	newlinef(c, 0, "--", "\"%s\"", p->trailing);
+	if (*p->trailing) {
+		newlinef(c, 0, "--", "%s has changed the topic:", p->from);
+		newlinef(c, 0, "--", "\"%s\"", p->trailing);
+	} else {
+		newlinef(c, 0, "--", "%s has unset the topic", p->from);
+	}
 
 	return 0;
 }

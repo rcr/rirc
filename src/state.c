@@ -226,7 +226,7 @@ channel_close(channel *c)
 	} else {
 		/* Closing a channel */
 
-		if (c->buffer_type == BUFFER_CHANNEL)
+		if (c->buffer_type == BUFFER_CHANNEL && !c->parted)
 			sendf(NULL, c->server, "PART %s", c->name);
 
 		/* If channel c is last in the list, return the previous channel */
