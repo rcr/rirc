@@ -192,6 +192,77 @@ check_pinged(char *mesg, char *nick)
 	return 0;
 }
 
+char*
+word_wrap(int text_cols, char **ptr1, char *ptr2)
+{
+	/* Greedy word wrap algorithm.
+	 *
+	 * Given a string bounded by [start, end), return a pointer to the
+	 * character one past the maximum printable character for this string segment
+	 * within text_cols wrapped on whitespace, and set ptr1 to the first character
+	 * that is printable on the next line.
+	 *
+	 * This algorithm never discards whitespace at the beginning of lines, but
+	 * does discard whitespace between line continuations and at end of lines.
+	 *
+	 * text_cols: the number of printable columns
+	 * ptr1:      the first character in string
+	 * ptr2:      the string's null terminator
+	 */
+
+	char *tmp, *ret = (*ptr1) + text_cols;
+
+	if (text_cols <= 0)
+		fatal("Insufficient columns");
+
+	/* Entire line fits within text_cols */
+	if (ret >= ptr2)
+		return (*ptr1 = ptr2);
+
+	/* At least one char exists that can print on current line */
+
+	if (*ret == ' ') {
+
+		/* Wrap on this space, find printable character for next line */
+		for (tmp = ret; *tmp == ' '; tmp++)
+			;
+
+		*ptr1 = tmp;
+
+	} else {
+
+		/* Find a space to wrap on, or wrap on */
+		for (tmp = (*ptr1) + 1; *ret != ' ' && ret > tmp; ret--)
+			;
+
+		/* No space found, wrap on entire segment */
+		if (ret == tmp)
+			return (*ptr1 = (*ptr1) + text_cols);
+
+		*ptr1 = ret + 1;
+	}
+
+	return ret;
+}
+
+int
+count_line_rows(int text_cols, buffer_line *l)
+{
+	/* Count the number of times a line will wrap within text_cols columns */
+
+	int count = 0;
+
+	char *ptr1 = l->text;
+	char *ptr2 = l->text + l->len;
+
+	do {
+		word_wrap(text_cols, &ptr1, ptr2);
+		count++;
+	} while (*ptr1);
+
+	return count;
+}
+
 /* AVL tree functions */
 
 void

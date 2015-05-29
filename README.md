@@ -46,6 +46,8 @@ Hotkeys:
   ^X : close channel
   ^F : find channel
   ^C : cancel input/action
+  ^U : scroll buffer up
+  ^D : scroll buffer down
 ```
 
 ##More info:

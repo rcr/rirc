@@ -145,9 +145,8 @@ typedef struct avl_node
 	void *val;
 } avl_node;
 
-/* TODO: buffer_line */
 /* Chat buffer line */
-typedef struct line
+typedef struct buffer_line
 {
 	int rows;
 	size_t len;
@@ -155,7 +154,7 @@ typedef struct line
 	char *text;
 	char from[NICKSIZE];
 	line_t type;
-} line;
+} buffer_line;
 
 /* Channel input line */
 typedef struct input_line
@@ -190,14 +189,14 @@ typedef struct channel
 	int resized;
 	struct channel *next;
 	struct channel *prev;
-	struct line *buffer_head;
-	struct line buffer[SCROLLBACK_BUFFER];
+	struct buffer_line *buffer_head;
+	struct buffer_line buffer[SCROLLBACK_BUFFER];
 	struct avl_node *nicklist;
 	struct server *server;
 	struct input *input;
 	struct {
 		size_t nick_pad;
-		struct line *scrollback;
+		struct buffer_line *scrollback;
 	} draw;
 } channel;
 
@@ -263,10 +262,12 @@ void poll_input(void);
 
 /* utils.c */
 char* strdup(const char*);
+char* word_wrap(int, char**, char*);
 const avl_node* avl_get(avl_node*, const char*, size_t);
 int avl_add(avl_node**, const char*, void*);
 int avl_del(avl_node**, const char*);
 int check_pinged(char*, char*);
+int count_line_rows(int, buffer_line*);
 int parse(parsed_mesg*, char*);
 void auto_nick(char**, char*);
 void free_avl(avl_node*);
@@ -283,8 +284,8 @@ channel* channel_close(channel*);
 channel* channel_get(char*, server*);
 channel* channel_switch(channel*, int);
 channel* new_channel(char*, server*, channel*, buffer_t);
-void buffer_scrollback_line(channel*, int);
-void buffer_scrollback_page(channel*, int);
+void buffer_scrollback_back(channel*);
+void buffer_scrollback_forw(channel*);
 void clear_channel(channel*);
 void free_channel(channel*);
 void newline(channel*, line_t, const char*, const char*);

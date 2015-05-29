@@ -11,6 +11,9 @@
 
 static int action_close_server(char);
 
+/* Defined in draw.c */
+extern int term_rows, term_cols;
+
 void
 newline(channel *c, line_t type, const char *from, const char *mesg)
 {
@@ -40,7 +43,7 @@ _newline(channel *c, line_t type, const char *from, const char *mesg, size_t len
 {
 	/* Static function for handling inserting new lines into buffers */
 
-	line *new_line;
+	buffer_line *new_line;
 
 	/* c->buffer_head points to the first printable line, so get the next line in the
 	 * circular buffer */
@@ -124,7 +127,7 @@ new_channel(char *name, server *server, channel *chanlist, buffer_t type)
 void
 free_channel(channel *c)
 {
-	line *l;
+	buffer_line *l;
 	for (l = c->buffer; l < c->buffer + SCROLLBACK_BUFFER; l++)
 		free(l->text);
 
@@ -268,32 +271,62 @@ channel_switch(channel *c, int next)
 	return ret;
 }
 
-/* TODO: draw scrollback status if != buffer_head */
 void
-buffer_scrollback_page(channel *c, int up)
+buffer_scrollback_back(channel *c)
 {
-	/* TODO Scroll the buffer up or down a full page */
-	buffer_scrollback_line(c, up);
+	/* Scroll a buffer back one page */
+
+	buffer_line *l = c->draw.scrollback;
+
+	/* Terminal rows - nav - separator*2 - input */
+	int rows = term_rows - 4;
+
+	do {
+		/* Circular buffer prev */
+		l = (l == c->buffer) ? &c->buffer[SCROLLBACK_BUFFER - 1] : l - 1;
+
+		/* If last scrollback line is found before a full page is counted, do nothing */
+		if (l->text == NULL || l == c->buffer_head)
+			return;
+
+		rows -= l->rows;
+
+	} while (rows > 0);
+
+	c->draw.scrollback = l;
+
+	draw(D_BUFFER);
 }
 
 void
-buffer_scrollback_line(channel *c, int up)
+buffer_scrollback_forw(channel *c)
 {
-	/* Scroll the buffer up or down a single line */
+	/* Scroll a buffer forward one page */
 
-	line *tmp, *l = c->draw.scrollback;
+	buffer_line *l = c->draw.scrollback;
 
-	if (up) {
-		/* Don't scroll up over the buffer head */
-		tmp = (l == c->buffer) ? &c->buffer[SCROLLBACK_BUFFER - 1] : l - 1;
+	/* Terminal rows - nav - separator*2 - input */
+	int rows = term_rows - 4;
 
-		if (tmp->text != NULL && tmp != c->buffer_head)
-			c->draw.scrollback = tmp;
-	} else {
-		/* Don't scroll down past the buffer head */
-		if (l != c->buffer_head)
-			c->draw.scrollback = (l == &c->buffer[SCROLLBACK_BUFFER - 1]) ? c->buffer : l + 1;
-	}
+	/* Unfortunately Scrolling forward might encountej
+	 * lines that haven't been drawn since resizing */
+	int text_cols = term_cols - c->draw.nick_pad - 11;
+
+	do {
+		if (l == c->buffer_head)
+			break;
+
+		if (l->rows == 0)
+			l->rows = count_line_rows(text_cols, l);
+
+		rows -= l->rows;
+
+		/* Circular buffer next */
+		l = (l == &c->buffer[SCROLLBACK_BUFFER - 1]) ? c->buffer : l + 1;
+
+	} while (rows > 0);
+
+	c->draw.scrollback = l;
 
 	draw(D_BUFFER);
 }

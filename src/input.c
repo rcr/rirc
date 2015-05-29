@@ -16,7 +16,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/ioctl.h>
 #include <unistd.h>
 
 #include "common.h"
@@ -31,7 +30,7 @@
 #define MAX_ACTION_MESG 256
 
 /* Defined in draw.c */
-extern struct winsize w;
+extern int term_cols;
 
 /* Static buffer that accepts input from stdin */
 static char input_buff[MAX_PASTE];
@@ -261,6 +260,18 @@ input_cchar(char c)
 			/* Close current channel */
 			ccur = channel_close(ccur);
 			break;
+
+		/* ^U */
+		case 0x15:
+			/* Scoll buffer up */
+			buffer_scrollback_back(ccur);
+			break;
+
+		/* ^D */
+		case 0x04:
+			/* Scoll buffer down */
+			buffer_scrollback_forw(ccur);
+			break;
 	}
 }
 
@@ -294,16 +305,13 @@ input_cseq(char *input, ssize_t len)
 	else if (!strncmp(input, "[3~", len))
 		delete_right(ccur->input);
 
-	/* FIXME: scrollback disabled while it's reworked */
-#if 0
 	/* page up */
 	else if (!strncmp(input, "[5~", len))
-		buffer_scrollback_page(ccur, 1);
+		buffer_scrollback_back(ccur);
 
 	/* page down */
 	else if (!strncmp(input, "[6~", len))
-		buffer_scrollback_page(ccur, 0);
-#endif
+		buffer_scrollback_forw(ccur);
 }
 
 /* TODO:
@@ -572,7 +580,7 @@ reframe_line(input *in)
 
 	in->head = in->line->end;
 	in->tail = in->line->text + MAX_INPUT;
-	in->window = in->head - (2 * w.ws_col / 3);
+	in->window = in->head - (2 * term_cols / 3);
 
 	if (in->window < in->line->text)
 		in->window = in->line->text;

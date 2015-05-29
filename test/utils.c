@@ -76,6 +76,11 @@ _avl_height(avl_node *n)
 
 int test_avl(void);
 int test_parse(void);
+int test_check_pinged(void);
+int test_word_wrap(void);
+int test_count_line_rows(void);
+int test_auto_nick(void);
+
 
 int
 test_avl(void)
@@ -268,6 +273,33 @@ test_parse(void)
 	return failures;
 }
 
+int
+test_check_pinged(void)
+{
+	/* TODO */
+	return 0;
+}
+
+int
+test_word_wrap(void)
+{
+	/* TODO */
+	return 0;
+}
+
+int
+test_count_line_rows(void)
+{
+	/* TODO */
+	return 0;
+}
+
+int
+test_auto_nick(void)
+{
+	/* TODO */
+	return 0;
+}
 
 int
 main(void)
@@ -278,6 +310,10 @@ main(void)
 
 	failures += test_avl();
 	failures += test_parse();
+	failures += test_check_pinged();
+	failures += test_word_wrap();
+	failures += test_count_line_rows();
+	failures += test_auto_nick();
 
 	if (failures) {
 		printf("%d failure%c total\n\n", failures, (failures > 1) ? 's' : 0);

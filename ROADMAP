@@ -9,9 +9,6 @@ Cleaner separation between the ui (draw.c) and everything else:
 
 Implement a mesg.c test framework before adding new message types, then:
 ----------------------
-	/TOPIC [message]
-		set/get channel topic
-
 	/HELP [type]
 		show available commands.
 		if [type] is given, show more specific help
@@ -59,14 +56,7 @@ Implement a mesg.c test framework before adding new message types, then:
 		 (e.g.: /raw MODE <not my nick> <flag>
 ----------------------
 
-Buffer scrollback improvements:
-	- full page scrollback
-		- set to topmost line if it doesn't print in full, else the line before it
-	- currently scrollback is still allowed if it doesnt affect the content of the page,
-	  eg: a half full buffer, which prevents the scrollback pointer from being updated as
-	  more input is receieved. If the content of the current page won't change, don't
-	  allow the scrollback.
-	- show scrollback % or x/y lines in the status bar
+show scrollback % or x/y lines in the status bar
 
 When connection is lost before ping timeout, disconnect, reconnect
 and /connect errs out read: Connection reset by peer
@@ -100,7 +90,7 @@ Allow for multiple connections passed as cli args
 
 Reimplement the pasting stuff that was broken
 
-link detection/launching
+A way to unset current topic
 
 FIXME:
 ---------------------------
