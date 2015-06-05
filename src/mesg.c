@@ -1324,7 +1324,7 @@ num_400:
 			fail("ERR_CANNOTSENDTOCHAN: channel is null");
 
 		/* Channel buffer might not exist */
-		if ((c = channel_get(chan, s)))
+		if ((c = channel_get(chan, s)) == NULL)
 			c = s->channel;
 
 		if (p->trailing)
