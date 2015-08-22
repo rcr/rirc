@@ -21,6 +21,26 @@ static avl_node* avl_rotate_R(avl_node*);
 
 static jmp_buf jmpbuf;
 
+void
+error(int errnum, const char *fmt, ...)
+{
+	/* Report an error and exit the program */
+
+	va_list ap;
+
+	fflush(stdout);
+
+	fputs("rirc: ", stderr);
+
+	va_start(ap, fmt);
+	vfprintf(stderr, fmt, ap);
+	va_end(ap);
+
+	fprintf(stderr, errnum ? " (errno: %s)\n" : "\n", strerror(errnum));
+
+	exit(EXIT_FAILURE);
+}
+
 /* TODO:
  *
  * this should just be rewritten as an implementation of strsep, and would replace

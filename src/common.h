@@ -52,11 +52,6 @@
 
 #include <time.h>
 #include <errno.h>
-#include <error.h>
-
-/* Irrecoverable error */
-#define fatal(mesg) do { \
-	error(EXIT_FAILURE, errno, "ERROR in %s(), %s", __func__, mesg); } while (0)
 
 /* Error message length */
 #define MAX_ERROR 512
@@ -270,7 +265,12 @@ int check_pinged(char*, char*);
 int count_line_rows(int, buffer_line*);
 int parse(parsed_mesg*, char*);
 void auto_nick(char**, char*);
+void error(int status, const char*, ...);
 void free_avl(avl_node*);
+
+/* Irrecoverable error */
+#define fatal(mesg) do { \
+	error(errno, "ERROR in %s: %s", __func__, mesg); } while (0)
 
 /* mesg.c */
 avl_node* commands;
@@ -289,6 +289,6 @@ void buffer_scrollback_forw(channel*);
 void clear_channel(channel*);
 void free_channel(channel*);
 void newline(channel*, line_t, const char*, const char*);
-void newlinef(channel*, line_t, const char*, const char*, ...);
 void _newline(channel*, line_t, const char*, const char*, size_t);
+void newlinef(channel*, line_t, const char*, const char*, ...);
 void part_channel(channel*);
