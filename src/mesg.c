@@ -183,6 +183,11 @@ send_mesg(char *mesg)
 
 		struct command *c = (struct command*)(cmd->val);
 
+		/* strtok_r may set mesg to NULL if it doesn't have spaces */
+		/* instead, point it to the \0 at the end of cmd_str */
+		if (!mesg)
+			mesg = cmd_str + strlen(cmd_str);
+
 		/* If the command has no explicit handler, send the input line as-is */
 		if (c)
 			err = c->fptr(errbuff, mesg);
