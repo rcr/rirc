@@ -36,7 +36,10 @@ error(int errnum, const char *fmt, ...)
 	vfprintf(stderr, fmt, ap);
 	va_end(ap);
 
-	fprintf(stderr, errnum ? " (errno: %s)\n" : "\n", strerror(errnum));
+	if (errnum)
+		fprintf(stderr, " (errno: %s)\n", strerror(errnum));
+	else
+		fprintf(stderr, "\n");
 
 	exit(EXIT_FAILURE);
 }
@@ -131,7 +134,7 @@ parse(parsed_mesg *p, char *mesg)
 	/* nospcrlfcl =  %x01-09 / %x0B-0C / %x0E-1F / %x21-39 / %x3B-FF */
 	/* middle =  nospcrlfcl *( ":" / nospcrlfcl ) */
 
-	*p = (parsed_mesg){0};
+	memset(p, 0, sizeof(parsed_mesg));
 
 	/* prefix = servername / ( nickname [ [ "!" user ] "@" host ] ) */
 
