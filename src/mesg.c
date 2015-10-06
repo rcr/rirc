@@ -5,6 +5,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <sys/time.h>
 
 #include "common.h"
 
@@ -40,8 +41,8 @@
 	do { if (err) { strncpy(err, M, MAX_ERROR); } return 1; } while (0)
 
 /* Fail with formatted message */
-#define failf(M, ...) \
-	do { if (err) { snprintf(err, MAX_ERROR, M, ##__VA_ARGS__); } return 1; } while (0)
+#define failf(...) \
+	do { if (err) { snprintf(err, MAX_ERROR, __VA_ARGS__); } return 1; } while (0)
 
 /* Conditionally fail */
 #define fail_if(C) \
@@ -181,6 +182,11 @@ send_mesg(char *mesg)
 		}
 
 		struct command *c = (struct command*)(cmd->val);
+
+		/* strtok_r may set mesg to NULL if it doesn't have spaces */
+		/* instead, point it to the \0 at the end of cmd_str */
+		if (!mesg)
+			mesg = cmd_str + strlen(cmd_str);
 
 		/* If the command has no explicit handler, send the input line as-is */
 		if (c)
@@ -697,11 +703,11 @@ recv_ctcp_req(char *err, parsed_mesg *p, server *s)
 		 *
 		 * Returns a millisecond precision timestamp */
 
-		struct timespec t;
+		struct timeval t;
 
-		clock_gettime(CLOCK_REALTIME, &t);
+		gettimeofday(&t, NULL);
 
-		long long milliseconds = t.tv_sec * 1000LL + t.tv_nsec / 1000;
+		long long milliseconds = t.tv_sec * 1000LL + t.tv_usec;
 
 		newlinef(s->channel, 0, "--", "CTCP PING request from %s", p->from);
 

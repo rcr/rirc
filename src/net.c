@@ -37,7 +37,7 @@ static int check_socket(server*, time_t);
 static void connected(server*);
 
 static void* threaded_connect(void*);
-static void* threaded_connect_cleanup(void**);
+static void threaded_connect_cleanup(void*);
 
 static server*
 new_server(char *host, char *port)
@@ -258,15 +258,13 @@ threaded_connect(void *arg)
 	return NULL;
 }
 
-static void*
-threaded_connect_cleanup(void **arg)
+static void
+threaded_connect_cleanup(void *arg)
 {
-	struct addrinfo *servinfo = (struct addrinfo *)(*arg);
+	struct addrinfo *servinfo = *(struct addrinfo **)arg;
 
 	if (servinfo)
 		freeaddrinfo(servinfo);
-
-	return NULL;
 }
 
 void
