@@ -12,6 +12,18 @@
 
 #include "common.h"
 
+#define SERVER_TIMEOUT_S 255 /* Latency time at which a server is considered to be timed out and a disconnect is issued */
+#define SERVER_LATENCY_S 125 /* Latency time at which to begin showing in the status bar */
+#define SERVER_LATENCY_PING_S (SERVER_LATENCY_S - 10) /* Latency time at which to issue a PING before displaying latency */
+
+#if SERVER_TIMEOUT_S <= SERVER_LATENCY_S
+#error Server timeout must be greater than latency counting time
+#endif
+
+#if SERVER_LATENCY_PING_S <= 0
+#error Server latency display time too low
+#endif
+
 /* Connection thread info */
 typedef struct connection_thread {
 	int socket;
@@ -426,8 +438,6 @@ check_connect(server *s)
 	return 1;
 }
 
-/* TODO: should attempt to ping at, say, TIMEOUT - 30s to see if the server pongs
- * before assuming disconnect */
 static int
 check_latency(server *s, time_t t)
 {
@@ -440,14 +450,20 @@ check_latency(server *s, time_t t)
 
 	delta = t - s->latency_time;
 
-	/* Timeout */
-	if (delta > 255) {
-		server_disconnect(s, 1, 0, "Ping timeout (255s)");
+	/* Server has timed out */
+	if (delta > SERVER_TIMEOUT_S) {
+		server_disconnect(s, 1, 0, "Ping timeout (" STR(SERVER_TIMEOUT_S) ")");
 		return 1;
 	}
 
-	/* Display latency status for current server */
-	if (delta > 120 && ccur->server == s) {
+	/* Server might be timing out, attempt to PING */
+	if (delta > SERVER_LATENCY_PING_S && !s->pinging) {
+		sendf(NULL, s, "PING :%s", s->host);
+		s->pinging = 1;
+	}
+
+	/* Server hasn't responded to PING, display latency in status */
+	if (delta > SERVER_LATENCY_S && ccur->server == s) {
 		s->latency_delta = delta;
 		draw(D_STATUS);
 	}

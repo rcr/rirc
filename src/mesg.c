@@ -116,6 +116,7 @@ static int recv_notice(char*, parsed_mesg*, server*);
 static int recv_numeric(char*, parsed_mesg*, server*);
 static int recv_part(char*, parsed_mesg*, server*);
 static int recv_ping(char*, parsed_mesg*, server*);
+static int recv_pong(char*, parsed_mesg*, server*);
 static int recv_priv(char*, parsed_mesg*, server*);
 static int recv_quit(char*, parsed_mesg*, server*);
 static int recv_topic(char*, parsed_mesg*, server*);
@@ -610,6 +611,8 @@ recv_mesg(char *inp, int count, server *s)
 				err = recv_nick(errbuff, &p, s);
 			else if (!strcmp(p.command, "PING"))
 				err = recv_ping(errbuff, &p, s);
+			else if (!strcmp(p.command, "PONG"))
+				err = recv_pong(errbuff, &p, s);
 			else if (!strcmp(p.command, "KICK"))
 				err = recv_kick(errbuff, &p, s);
 			else if (!strcmp(p.command, "MODE"))
@@ -1435,6 +1438,22 @@ recv_ping(char *err, parsed_mesg *p, server *s)
 		fail("PING: server is null");
 
 	return sendf(err, s, "PONG %s", p->trailing);
+}
+
+static int
+recv_pong(char *err, parsed_mesg *p, server *s)
+{
+	/*  PONG <server> [<server2>] */
+
+	UNUSED(err);
+
+	/*  PING sent explicitly by the user */
+	if (!s->pinging)
+		newlinef(ccur, 0, "!!", "PONG %s", p->params);
+
+	s->pinging = 0;
+
+	return 0;
 }
 
 static int

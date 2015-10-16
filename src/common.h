@@ -206,6 +206,7 @@ typedef struct server
 	char *port;
 	int soc;
 	int usermode;
+	int pinging : 1;
 	struct avl_node *ignore;
 	struct channel *channel;
 	struct server *next;
