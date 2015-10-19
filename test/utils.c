@@ -12,10 +12,12 @@ int _assert_strcmp(char*, char*);
 		printf("\t%s %d: " M "\n", __func__, __LINE__); \
 	} while (0)
 
-#define fail_testf(M, ...) \
+#define fail_testf(...) \
 	do { \
 		failures++; \
-		printf("\t%s %d: " M "\n", __func__, __LINE__, ##__VA_ARGS__); \
+		printf("\t%s %d: ", __func__, __LINE__); \
+		printf(__VA_ARGS__); \
+		printf("\n"); \
 	} while (0)
 
 #define assert_strcmp(X, Y) \
@@ -160,6 +162,61 @@ test_avl(void)
 	/* Test deleting string that was previously deleted */
 	if (avl_del(&root, *strings))
 		fail_testf("_avl_del() should have failed to delete %s", *strings);
+
+	return failures;
+}
+
+int
+test_getarg(void)
+{
+	/* Test string token parsing */
+
+	int failures = 0;
+
+	char *ptr;
+
+	/* Test null pointer */
+	assert_strcmp(getarg(NULL), NULL);
+
+	/* Test empty string */
+	char str1[] = "";
+
+	ptr = str1;
+	assert_strcmp(getarg(&ptr), NULL);
+
+	/* Test only whitestapce */
+	char str2[] = "   ";
+
+	ptr = str2;
+	assert_strcmp(getarg(&ptr), NULL);
+
+	/* Test single token */
+	char str3[] = "arg1";
+
+	ptr = str3;
+	assert_strcmp(getarg(&ptr), "arg1");
+	assert_strcmp(getarg(&ptr), NULL);
+
+	/* Test multiple tokens */
+	char str4[] = "arg2 arg3 arg4";
+
+	ptr = str4;
+	assert_strcmp(getarg(&ptr), "arg2");
+	assert_strcmp(getarg(&ptr), "arg3");
+	assert_strcmp(getarg(&ptr), "arg4");
+	assert_strcmp(getarg(&ptr), NULL);
+
+	/* Test multiple tokens with extraneous whitespace */
+	char str5[] = "   arg5   arg6   arg7   ";
+
+	ptr = str5;
+	assert_strcmp(getarg(&ptr), "arg5");
+	assert_strcmp(getarg(&ptr), "arg6");
+	assert_strcmp(getarg(&ptr), "arg7");
+	assert_strcmp(getarg(&ptr), NULL);
+
+	if (failures)
+		printf("\t%d failure%c\n", failures, (failures > 1) ? 's' : 0);
 
 	return failures;
 }
@@ -310,6 +367,7 @@ main(void)
 
 	failures += test_avl();
 	failures += test_parse();
+	failures += test_getarg();
 	failures += test_check_pinged();
 	failures += test_word_wrap();
 	failures += test_count_line_rows();

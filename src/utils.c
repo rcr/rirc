@@ -44,34 +44,39 @@ error(int errnum, const char *fmt, ...)
 	exit(EXIT_FAILURE);
 }
 
-/* TODO:
- *
- * this should just be rewritten as an implementation of strsep, and would replace
- * the faulty calls to strtok/strtok_r
- * */
 char*
-getarg(char **str, int set_null)
+getarg(char **str)
 {
-	char *ptr, *ret;
+	/* Return a token parsed from *str delimited by space characters.
+	 *
+	 * Consumes all space characters preceding the token and null terminates it.
+	 *
+	 * Returns NULL if *str is NULL or contains only space characters */
 
-	/* Check that str isnt pointing to NULL */
-	if (!(ptr = *str))
+	char *ret, *ptr;
+
+	if (str == NULL || (ptr = *str) == NULL)
 		return NULL;
-	else while (*ptr && *ptr == ' ')
+
+	while (*ptr && *ptr == ' ')
 		ptr++;
 
-	if (*ptr)
-		ret = ptr;
-	else
+	if (*ptr == '\0')
 		return NULL;
+
+	ret = ptr;
 
 	while (*ptr && *ptr != ' ')
 		ptr++;
 
-	if (set_null && *ptr == ' ')
-		*ptr++ = '\0';
+	/* If the string continues after the found arg, set the input to point
+	 * one past the arg's null terminator.
+	 *
+	 * This might result in *str pointing to the original string's null
+	 * terminator, in which case the next call to getarg will return NULL */
+	*str = ptr + (*ptr == ' ');
 
-	*str = ptr;
+	*ptr = '\0';
 
 	return ret;
 }
@@ -155,7 +160,7 @@ parse(parsed_mesg *p, char *mesg)
 	}
 
 	/* command = 1*letter / 3digit */
-	if (!(p->command = getarg(&mesg, 1)))
+	if (!(p->command = getarg(&mesg)))
 		return 0;
 
 	/* params = *14( SPACE middle ) [ SPACE ":" trailing ] */

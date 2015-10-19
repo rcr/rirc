@@ -206,7 +206,7 @@ typedef struct server
 	char *port;
 	int soc;
 	int usermode;
-	int pinging : 1;
+	int pinging;
 	struct avl_node *ignore;
 	struct channel *channel;
 	struct server *next;
@@ -257,6 +257,7 @@ void free_input(input*);
 void poll_input(void);
 
 /* utils.c */
+char* getarg(char**);
 char* strdup(const char*);
 char* word_wrap(int, char**, char*);
 const avl_node* avl_get(avl_node*, const char*, size_t);
