@@ -176,44 +176,44 @@ test_getarg(void)
 	char *ptr;
 
 	/* Test null pointer */
-	assert_strcmp(getarg(NULL), NULL);
+	assert_strcmp(getarg(NULL, ' '), NULL);
 
 	/* Test empty string */
 	char str1[] = "";
 
 	ptr = str1;
-	assert_strcmp(getarg(&ptr), NULL);
+	assert_strcmp(getarg(&ptr, ' '), NULL);
 
 	/* Test only whitestapce */
 	char str2[] = "   ";
 
 	ptr = str2;
-	assert_strcmp(getarg(&ptr), NULL);
+	assert_strcmp(getarg(&ptr, ' '), NULL);
 
 	/* Test single token */
 	char str3[] = "arg1";
 
 	ptr = str3;
-	assert_strcmp(getarg(&ptr), "arg1");
-	assert_strcmp(getarg(&ptr), NULL);
+	assert_strcmp(getarg(&ptr, ' '), "arg1");
+	assert_strcmp(getarg(&ptr, ' '), NULL);
 
 	/* Test multiple tokens */
 	char str4[] = "arg2 arg3 arg4";
 
 	ptr = str4;
-	assert_strcmp(getarg(&ptr), "arg2");
-	assert_strcmp(getarg(&ptr), "arg3");
-	assert_strcmp(getarg(&ptr), "arg4");
-	assert_strcmp(getarg(&ptr), NULL);
+	assert_strcmp(getarg(&ptr, ' '), "arg2");
+	assert_strcmp(getarg(&ptr, ' '), "arg3");
+	assert_strcmp(getarg(&ptr, ' '), "arg4");
+	assert_strcmp(getarg(&ptr, ' '), NULL);
 
 	/* Test multiple tokens with extraneous whitespace */
 	char str5[] = "   arg5   arg6   arg7   ";
 
 	ptr = str5;
-	assert_strcmp(getarg(&ptr), "arg5");
-	assert_strcmp(getarg(&ptr), "arg6");
-	assert_strcmp(getarg(&ptr), "arg7");
-	assert_strcmp(getarg(&ptr), NULL);
+	assert_strcmp(getarg(&ptr, ' '), "arg5");
+	assert_strcmp(getarg(&ptr, ' '), "arg6");
+	assert_strcmp(getarg(&ptr, ' '), "arg7");
+	assert_strcmp(getarg(&ptr, ' '), NULL);
 
 	if (failures)
 		printf("\t%d failure%c\n", failures, (failures > 1) ? 's' : 0);
@@ -226,66 +226,59 @@ test_parse(void)
 {
 	/* Test the IRC message parsing function */
 
-	int ret, failures = 0;
+	int failures = 0;
 
 	parsed_mesg p;
-
-	/* Test empty message */
-	char mesg0[] = "";
-
-	/* Should fail due to empty command */
-	if ((ret = parse(&p, mesg0)) != 0)
-		fail_testf("parse() returned %d, expected 0", ret);
-	assert_strcmp(p.from,     NULL);
-	assert_strcmp(p.hostinfo, NULL);
-	assert_strcmp(p.command,  NULL);
-	assert_strcmp(p.params,   NULL);
-	assert_strcmp(p.trailing, NULL);
 
 	/* Test ordinary message */
 	char mesg1[] = ":nick!user@hostname.domain CMD args :trailing";
 
-	parse(&p, mesg1);
+	if ((parse(&p, mesg1)) == NULL)
+		fail_test("Failed to parse message");
 	assert_strcmp(p.from,     "nick");
 	assert_strcmp(p.hostinfo, "user@hostname.domain");
 	assert_strcmp(p.command,  "CMD");
-	assert_strcmp(p.params,   "args ");
+	assert_strcmp(p.params,   "args");
 	assert_strcmp(p.trailing, "trailing");
 
 	/* Test no nick/host */
 	char mesg2[] = "CMD arg1 arg2 :  trailing message  ";
 
-	parse(&p, mesg2);
+	if ((parse(&p, mesg2)) == NULL)
+		fail_test("Failed to parse message");
 	assert_strcmp(p.from,     NULL);
 	assert_strcmp(p.hostinfo, NULL);
 	assert_strcmp(p.command,  "CMD");
-	assert_strcmp(p.params,   "arg1 arg2 ");
+	assert_strcmp(p.params,   "arg1 arg2");
 	assert_strcmp(p.trailing, "  trailing message  ");
 
 	/* Test the 15 arg limit */
 	char mesg3[] = "CMD a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 a11 a12 a13 a14 a15 :trailing message";
 
-	parse(&p, mesg3);
+	if ((parse(&p, mesg3)) == NULL)
+		fail_test("Failed to parse message");
 	assert_strcmp(p.from,     NULL);
 	assert_strcmp(p.hostinfo, NULL);
 	assert_strcmp(p.command,  "CMD");
-	assert_strcmp(p.params,   "a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 a11 a12 a13 a14 ");
+	assert_strcmp(p.params,   "a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 a11 a12 a13 a14");
 	assert_strcmp(p.trailing, "a15 :trailing message");
 
 	/* Test ':' can exist in args */
 	char mesg4[] = ":nick!user@hostname.domain CMD arg:1:2:3 arg:4:5:6 :trailing message";
 
-	parse(&p, mesg4);
+	if ((parse(&p, mesg4)) == NULL)
+		fail_test("Failed to parse message");
 	assert_strcmp(p.from,     "nick");
 	assert_strcmp(p.hostinfo, "user@hostname.domain");
 	assert_strcmp(p.command,  "CMD");
-	assert_strcmp(p.params,   "arg:1:2:3 arg:4:5:6 ");
+	assert_strcmp(p.params,   "arg:1:2:3 arg:4:5:6");
 	assert_strcmp(p.trailing, "trailing message");
 
 	/* Test no args */
 	char mesg5[] = ":nick!user@hostname.domain CMD :trailing message";
 
-	parse(&p, mesg5);
+	if ((parse(&p, mesg5)) == NULL)
+		fail_test("Failed to parse message");
 	assert_strcmp(p.from,     "nick");
 	assert_strcmp(p.hostinfo, "user@hostname.domain");
 	assert_strcmp(p.command,  "CMD");
@@ -295,7 +288,8 @@ test_parse(void)
 	/* Test no trailing */
 	char mesg6[] = ":nick!user@hostname.domain CMD arg1 arg2 arg3";
 
-	parse(&p, mesg6);
+	if ((parse(&p, mesg6)) == NULL)
+		fail_test("Failed to parse message");
 	assert_strcmp(p.from,     "nick");
 	assert_strcmp(p.hostinfo, "user@hostname.domain");
 	assert_strcmp(p.command,  "CMD");
@@ -305,24 +299,25 @@ test_parse(void)
 	/* Test no user */
 	char mesg7[] = ":nick@hostname.domain CMD arg1 arg2 arg3";
 
-	parse(&p, mesg7);
+	if ((parse(&p, mesg7)) == NULL)
+		fail_test("Failed to parse message");
 	assert_strcmp(p.from,     "nick");
 	assert_strcmp(p.hostinfo, "hostname.domain");
 	assert_strcmp(p.command,  "CMD");
 	assert_strcmp(p.params,   "arg1 arg2 arg3");
 	assert_strcmp(p.trailing, NULL);
 
-	/* Test no command */
-	char mesg8[] = ":nick!user@hostname.domain";
+	/* Error: empty message */
+	char mesg8[] = "";
 
-	/* Should fail due to empty command */
-	if ((ret = parse(&p, mesg8)) != 0)
-		fail_testf("parse() returned %d, expected 0", ret);
-	assert_strcmp(p.from,     "nick");
-	assert_strcmp(p.hostinfo, "user@hostname.domain");
-	assert_strcmp(p.command,  NULL);
-	assert_strcmp(p.params,   NULL);
-	assert_strcmp(p.trailing, NULL);
+	if ((parse(&p, mesg8)) != NULL)
+		fail_test("parse() was expected to fail");
+
+	/* Error: no command */
+	char mesg9[] = ":nick!user@hostname.domain";
+
+	if ((parse(&p, mesg9)) != NULL)
+		fail_test("parse() was expected to fail");
 
 	if (failures)
 		printf("\t%d failure%c\n", failures, (failures > 1) ? 's' : 0);

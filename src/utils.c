@@ -45,20 +45,20 @@ error(int errnum, const char *fmt, ...)
 }
 
 char*
-getarg(char **str)
+getarg(char **str, const char sep)
 {
-	/* Return a token parsed from *str delimited by space characters.
+	/* Return a token parsed from *str delimited by sep.
 	 *
-	 * Consumes all space characters preceding the token and null terminates it.
+	 * Consumes all sep characters preceding the token and null terminates it.
 	 *
-	 * Returns NULL if *str is NULL or contains only space characters */
+	 * Returns NULL if *str is NULL or contains only sep characters */
 
 	char *ret, *ptr;
 
 	if (str == NULL || (ptr = *str) == NULL)
 		return NULL;
 
-	while (*ptr && *ptr == ' ')
+	while (*ptr && *ptr == sep)
 		ptr++;
 
 	if (*ptr == '\0')
@@ -66,7 +66,7 @@ getarg(char **str)
 
 	ret = ptr;
 
-	while (*ptr && *ptr != ' ')
+	while (*ptr && *ptr != sep)
 		ptr++;
 
 	/* If the string continues after the found arg, set the input to point
@@ -74,7 +74,7 @@ getarg(char **str)
 	 *
 	 * This might result in *str pointing to the original string's null
 	 * terminator, in which case the next call to getarg will return NULL */
-	*str = ptr + (*ptr == ' ');
+	*str = ptr + (*ptr == sep);
 
 	*ptr = '\0';
 
@@ -124,25 +124,33 @@ strdup(const char *str)
 	return ret;
 }
 
-/* FIXME:
- *
- * Parsing of the 15 arg max doesn't work correctly
- *
- * if no args, point args to trailing
- *
- * */
-int
+parsed_mesg*
 parse(parsed_mesg *p, char *mesg)
 {
-	/* RFC 2812, section 2.3.1 */
-	/* message = [ ":" prefix SPACE ] command [ params ] crlf */
-	/* nospcrlfcl =  %x01-09 / %x0B-0C / %x0E-1F / %x21-39 / %x3B-FF */
-	/* middle =  nospcrlfcl *( ":" / nospcrlfcl ) */
+	/* RFC 2812, section 2.3.1
+	 *
+	 * message    =   [ ":" prefix SPACE ] command [ params ] crlf
+	 * prefix     =   servername / ( nickname [ [ "!" user ] "@" host ] )
+	 * command    =   1*letter / 3digit
+	 * params     =   *14( SPACE middle ) [ SPACE ":" trailing ]
+	 *            =/  14( SPACE middle ) [ SPACE [ ":" ] trailing ]
+	 *
+	 * nospcrlfcl =   %x01-09 / %x0B-0C / %x0E-1F / %x21-39 / %x3B-FF
+	 *                ; any octet except NUL, CR, LF, " " and ":"
+	 * middle     =   nospcrlfcl *( ":" / nospcrlfcl )
+	 * trailing   =   *( ":" / " " / nospcrlfcl )
+	 *
+	 * SPACE      =   %x20        ; space character
+	 * crlf       =   %x0D %x0A   ; "carriage return" "linefeed"
+	 */
 
 	memset(p, 0, sizeof(parsed_mesg));
 
-	/* prefix = servername / ( nickname [ [ "!" user ] "@" host ] ) */
+	/* Skip leading whitespace */
+	while (*mesg && *mesg == ' ')
+		mesg++;
 
+	/* Check for prefix and parse if detected */
 	if (*mesg == ':') {
 
 		p->from = ++mesg;
@@ -159,36 +167,57 @@ parse(parsed_mesg *p, char *mesg)
 		}
 	}
 
-	/* command = 1*letter / 3digit */
-	if (!(p->command = getarg(&mesg)))
-		return 0;
+	/* The command is minimally required for a valid message */
+	if (!(p->command = getarg(&mesg, ' ')))
+		return NULL;
 
-	/* params = *14( SPACE middle ) [ SPACE ":" trailing ] */
-	/* params =/ 14( SPACE middle ) [ SPACE [ ":" ] trailing ] */
-	/* trailing   =  *( ":" / " " / nospcrlfcl ) */
+	/* Keep track of the last arg so it can be terminated */
+	char *param_end = NULL;
 
-	char *param;
-	if ((param = getarg(&mesg, 0))) {
-		if (*param == ':') {
-			p->params = NULL;
-			*param++ = '\0';
-			p->trailing = param;
-		} else {
-			p->params = param;
+	int param_count = 0;
 
-			int paramcount = 1;
-			while ((param = getarg(&mesg, 0))) {
-				if (paramcount == 14 || *param == ':') {
-					*param++ = '\0';
-					p->trailing = param;
-					break;
-				}
-				paramcount++;
+	while (*mesg) {
+
+		/* Skip whitespace before each parameter */
+		while (*mesg && *mesg == ' ')
+			mesg++;
+
+		/* Parameter found */
+		if (*mesg) {
+
+			/* Maximum number of parameters found */
+			if (param_count == 14) {
+				p->trailing = mesg;
+				break;
 			}
+
+			/* Trailing section found */
+			if (*mesg == ':') {
+				p->trailing = (mesg + 1);
+				break;
+			}
+
+			if (!p->params)
+				p->params = mesg;
 		}
+
+		while (*mesg && *mesg != ' ')
+			mesg++;
+
+		param_count++;
+		param_end = mesg;
 	}
 
-	return 1;
+	/* Terminate the last parameter if any */
+	if (param_end) {
+
+		while (*param_end && *param_end != ' ')
+			param_end++;
+
+		*param_end = '\0';
+	}
+
+	return p;
 }
 
 /* TODO:
@@ -196,7 +225,7 @@ parse(parsed_mesg *p, char *mesg)
  * match = nick *[chars] (space / null)
  * chars = Any printable characters not allowed in a nick by this server */
 int
-check_pinged(char *mesg, char *nick)
+check_pinged(const char *mesg, const char *nick)
 {
 	int len = strlen(nick);
 

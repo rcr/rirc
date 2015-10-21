@@ -257,15 +257,15 @@ void free_input(input*);
 void poll_input(void);
 
 /* utils.c */
-char* getarg(char**);
+char* getarg(char**, const char);
 char* strdup(const char*);
 char* word_wrap(int, char**, char*);
 const avl_node* avl_get(avl_node*, const char*, size_t);
 int avl_add(avl_node**, const char*, void*);
 int avl_del(avl_node**, const char*);
-int check_pinged(char*, char*);
+int check_pinged(const char*, const char*);
 int count_line_rows(int, buffer_line*);
-int parse(parsed_mesg*, char*);
+parsed_mesg* parse(parsed_mesg*, char*);
 void auto_nick(char**, char*);
 void error(int status, const char*, ...);
 void free_avl(avl_node*);

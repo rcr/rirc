@@ -161,17 +161,16 @@ send_mesg(char *mesg)
 {
 	/* Handle an input line */
 
-	char errbuff[MAX_ERROR];
+	char *cmd_str, errbuff[MAX_ERROR];
+	const avl_node *cmd;
 	int err = 0;
 
 	if (*mesg == '/') {
-		/* Input is a command */
-
-		const avl_node *cmd;
-		char *cmd_str;
+		/* Input is a command, skip '/' character */
+		mesg++;
 
 		/* Skip the '/' character and try to get the command */
-		if (!(cmd_str = strtok_r((mesg + 1), " ", &mesg))) {
+		if (!(cmd_str = getarg(&mesg, ' '))) {
 			newline(ccur, 0, "-!!-", "Messages beginning with '/' require a command");
 			return;
 		}
@@ -183,11 +182,6 @@ send_mesg(char *mesg)
 		}
 
 		struct command *c = (struct command*)(cmd->val);
-
-		/* strtok_r may set mesg to NULL if it doesn't have spaces */
-		/* instead, point it to the \0 at the end of cmd_str */
-		if (!mesg)
-			mesg = cmd_str + strlen(cmd_str);
 
 		/* If the command has no explicit handler, send the input line as-is */
 		if (c)
