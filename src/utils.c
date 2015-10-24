@@ -333,7 +333,6 @@ free_avl(avl_node *n)
 	free_avl(n->l);
 	free_avl(n->r);
 	free(n->key);
-	free(n->val);
 	free(n);
 }
 
