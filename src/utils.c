@@ -392,6 +392,7 @@ static void
 avl_free_node(avl_node *n)
 {
 	free(n->key);
+	free(n->val);
 	free(n);
 }
 
