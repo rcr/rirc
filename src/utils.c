@@ -507,7 +507,7 @@ _avl_del(avl_node *n, const char *key)
 		/* Node found */
 
 		if (n->l && n->r) {
-			/* Recusrively delete nodes with both children to ensure balance */
+			/* Recursively delete nodes with both children to ensure balance */
 
 			/* Find the next largest value in the tree (the leftmost node in the right subtree) */
 			avl_node *next = n->r;
