@@ -16,6 +16,7 @@ static avl_node* _avl_add(avl_node*, const char*, void*);
 static avl_node* _avl_del(avl_node*, const char*);
 static avl_node* _avl_get(avl_node*, const char*, size_t);
 static avl_node* avl_new_node(const char*, void*);
+static void avl_free_node(avl_node*);
 static avl_node* avl_rotate_L(avl_node*);
 static avl_node* avl_rotate_R(avl_node*);
 
@@ -332,8 +333,7 @@ free_avl(avl_node *n)
 
 	free_avl(n->l);
 	free_avl(n->r);
-	free(n->key);
-	free(n);
+	avl_free_node(n);
 }
 
 int
@@ -386,6 +386,13 @@ avl_new_node(const char *key, void *val)
 	n->val = val;
 
 	return n;
+}
+
+static void
+avl_free_node(avl_node *n)
+{
+	free(n->key);
+	free(n);
 }
 
 static avl_node*
@@ -529,7 +536,7 @@ _avl_del(avl_node *n, const char *key)
 			/* If n has a child, return it */
 			avl_node *tmp = (n->l) ? n->l : n->r;
 
-			free(n);
+			avl_free_node(n);
 
 			return tmp;
 		}
