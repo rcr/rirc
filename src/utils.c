@@ -516,13 +516,15 @@ _avl_del(avl_node *n, const char *key)
 				next = next->l;
 
 			/* Swap it's value with the node being deleted */
-			char *t = n->key;
+			avl_node t = *n;
 
 			n->key = next->key;
-			next->key = t;
+			n->val = next->val;
+			next->key = t.key;
+			next->val = t.val;
 
 			/* Recusively delete in the right subtree */
-			n->r = _avl_del(n->r, t);
+			n->r = _avl_del(n->r, t.key);
 
 		} else {
 			/* If n has a child, return it */
