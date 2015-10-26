@@ -16,6 +16,7 @@ static avl_node* _avl_add(avl_node*, const char*, void*);
 static avl_node* _avl_del(avl_node*, const char*);
 static avl_node* _avl_get(avl_node*, const char*, size_t);
 static avl_node* avl_new_node(const char*, void*);
+static void avl_free_node(avl_node*);
 static avl_node* avl_rotate_L(avl_node*);
 static avl_node* avl_rotate_R(avl_node*);
 
@@ -332,9 +333,7 @@ free_avl(avl_node *n)
 
 	free_avl(n->l);
 	free_avl(n->r);
-	free(n->key);
-	free(n->val);
-	free(n);
+	avl_free_node(n);
 }
 
 int
@@ -387,6 +386,14 @@ avl_new_node(const char *key, void *val)
 	n->val = val;
 
 	return n;
+}
+
+static void
+avl_free_node(avl_node *n)
+{
+	free(n->key);
+	free(n->val);
+	free(n);
 }
 
 static avl_node*
@@ -507,7 +514,7 @@ _avl_del(avl_node *n, const char *key)
 		/* Node found */
 
 		if (n->l && n->r) {
-			/* Recusrively delete nodes with both children to ensure balance */
+			/* Recursively delete nodes with both children to ensure balance */
 
 			/* Find the next largest value in the tree (the leftmost node in the right subtree) */
 			avl_node *next = n->r;
@@ -516,19 +523,21 @@ _avl_del(avl_node *n, const char *key)
 				next = next->l;
 
 			/* Swap it's value with the node being deleted */
-			char *t = n->key;
+			avl_node t = *n;
 
 			n->key = next->key;
-			next->key = t;
+			n->val = next->val;
+			next->key = t.key;
+			next->val = t.val;
 
 			/* Recusively delete in the right subtree */
-			n->r = _avl_del(n->r, t);
+			n->r = _avl_del(n->r, t.key);
 
 		} else {
 			/* If n has a child, return it */
 			avl_node *tmp = (n->l) ? n->l : n->r;
 
-			free(n);
+			avl_free_node(n);
 
 			return tmp;
 		}

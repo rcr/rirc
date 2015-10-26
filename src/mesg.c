@@ -65,9 +65,8 @@
 	X(squit)   X(stats)    X(summon) \
 	X(time)    X(trace)    X(uhnames) \
 	X(user)    X(userhost) X(userip) \
-	X(users)   X(version)  X(wallops) \
-	X(watch)   X(who)      X(whois) \
-	X(whowas)
+	X(users)   X(wallops)  X(watch) \
+	X(who)     X(whois)    X(whowas)
 
 /* List of commands (some rirc-specific) which are explicitly handled */
 #define HANDLED_CMDS \
