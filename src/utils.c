@@ -210,13 +210,8 @@ parse(parsed_mesg *p, char *mesg)
 	}
 
 	/* Terminate the last parameter if any */
-	if (param_end) {
-
-		while (*param_end && *param_end != ' ')
-			param_end++;
-
+	if (param_end)
 		*param_end = '\0';
-	}
 
 	return p;
 }
