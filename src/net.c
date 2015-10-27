@@ -317,10 +317,9 @@ server_disconnect(server *s, int err, int kill, char *mesg)
 			/* If disconnecting due to error, attempt a reconnect */
 			s->reconnect_time = time(NULL) + RECONNECT_DELTA;
 			s->reconnect_delta = RECONNECT_DELTA;
-		}
-
-		if (mesg)
+		} else if (mesg) {
 			sendf(NULL, s, "QUIT :%s", mesg);
+		}
 
 		close(s->soc);
 
@@ -511,9 +510,13 @@ check_socket(server *s, time_t t)
 	if (s->soc < 0)
 		return 0;
 
-	/* Socket is non-blocking */
-	if (errno != EWOULDBLOCK && errno != EAGAIN)
-		fatal("read");
+	/* Socket is non-blocking, all other errors cause a disconnect */
+	if (errno != EWOULDBLOCK && errno != EAGAIN) {
+		if (errno)
+			server_disconnect(s, 1, 0, strerror(errno));
+		else
+			server_disconnect(s, 1, 0, "Remote hangup");
+	}
 
 	return 0;
 }
