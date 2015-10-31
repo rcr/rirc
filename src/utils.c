@@ -11,6 +11,8 @@
 #define H(N) (N == NULL ? 0 : N->height)
 #define MAX(A, B) (A > B ? A : B)
 
+static int irc_isnickchar(const char);
+
 /* AVL tree function */
 static avl_node* _avl_add(avl_node*, const char*, void*);
 static avl_node* _avl_del(avl_node*, const char*);
@@ -123,6 +125,20 @@ strdup(const char *str)
 	strcpy(ret, str);
 
 	return ret;
+}
+
+static int
+irc_isnickchar(const char c)
+{
+	/* RFC 2812, section 2.3.1
+	 *
+	 * nickname   =  ( letter / special ) *8( letter / digit / special / "-" )
+	 * letter     =  %x41-5A / %x61-7A       ; A-Z / a-z
+	 * digit      =  %x30-39                 ; 0-9
+	 * special    =  %x5B-60 / %x7B-7D       ; "[", "]", "\", "`", "_", "^", "{", "|", "}"
+	 */
+
+	return (c == '-' || (c >= 0x30 && c <= 0x39) || (c >= 0x41 && c <= 0x7D));
 }
 
 parsed_mesg*
