@@ -1,5 +1,6 @@
 CC = cc
-CFLAGS = -pthread -std=c99 -Wall -Wextra -pedantic -O2
+CCFLAGS = -std=c99 -Wall -Wextra -pedantic -O2
+LDFLAGS = -pthread
 
 SDIR = src
 TDIR = test
@@ -18,20 +19,20 @@ OBJ_T = $(patsubst $(TDIR)%.c,$(TDIR_O)%.test,$(SRC_T))
 TDIR_O = $(TDIR)/bld
 
 rirc: $(OBJ)
-	$(CC) $(CFLAGS) -o $@ $^
+	$(CC) $(LDFLAGS) -o $@ $^
 
 $(SDIR_O)/%.o: $(SDIR)/%.c $(HDS)
-	$(CC) $(CFLAGS) -c -o $@ $<
+	$(CC) $(CCFLAGS) -c -o $@ $<
 
 # link to math libs for some avl tree calculations
-test: CFLAGS += -lm -g
+test: CCFLAGS += -lm -g
 test: $(OBJ_T)
 	@for test in $(OBJ_T); do ./$$test; done
 
 $(TDIR_O)/%.test: $(TDIR)/%.c
-	@$(CC) $(CFLAGS) -o $@ $<
+	@$(CC) $(CCFLAGS) -o $@ $<
 
-debug: CFLAGS += -g -DDEBUG -fsanitize=undefined,null,return,unreachable,shift,address
+debug: CCFLAGS += -g -DDEBUG -fsanitize=undefined,null,return,unreachable,shift,address
 debug: rirc
 
 clean:
