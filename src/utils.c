@@ -232,23 +232,20 @@ parse(parsed_mesg *p, char *mesg)
 	return p;
 }
 
-/* TODO:
- * Consider cleaning up the policy here. Ideally a match should be:
- * match = nick *[chars] (space / null)
- * chars = Any printable characters not allowed in a nick by this server */
 int
 check_pinged(const char *mesg, const char *nick)
 {
+
 	int len = strlen(nick);
 
 	while (*mesg) {
 
-		/* skip to next word */
-		while (*mesg == ' ')
+		/* skip any prefixing characters that wouldn't match a valid nick */
+		while (!(*mesg >= 0x41 && *mesg <= 0x7D))
 			mesg++;
 
 		/* nick prefixes the word, following character is space or symbol */
-		if (!strncasecmp(mesg, nick, len) && !isalnum(*(mesg + len))) {
+		if (!strncasecmp(mesg, nick, len) && !irc_isnickchar(*(mesg + len))) {
 			putchar('\a');
 			return 1;
 		}

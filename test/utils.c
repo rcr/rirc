@@ -26,6 +26,12 @@ int _assert_strcmp(char*, char*);
 			fail_testf(#X " expected '%s', got '%s'", (Y) ? (Y) : "NULL", (X) ? (X) : "NULL"); \
 	} while (0)
 
+#define assert_equals(X, Y) \
+	do { \
+		if ((X) != (Y)) \
+			fail_testf(#X " expected '%d', got '%d'", (Y), (X)); \
+	} while (0)
+
 int
 _assert_strcmp(char *p1, char *p2)
 {
@@ -328,8 +334,44 @@ test_parse(void)
 int
 test_check_pinged(void)
 {
-	/* TODO */
-	return 0;
+	/* Test detecting user's nick in message */
+
+	int failures = 0;
+
+	char *nick = "testnick";
+
+	/* Test message contains username */
+	char *mesg1 = "testing testnick testing";
+	assert_equals(check_pinged(mesg1, nick), 1);
+
+	/* Test common way of addressing messages to users */
+	char *mesg2 = "testnick: testing";
+	assert_equals(check_pinged(mesg2, nick), 1);
+
+	/* Test non-nick char prefix */
+	char *mesg3 = "testing !@#testnick testing";
+	assert_equals(check_pinged(mesg3, nick), 1);
+
+	/* Test non-nick char suffix */
+	char *mesg4 = "testing testnick!@#$ testing";
+	assert_equals(check_pinged(mesg4, nick), 1);
+
+	/* Test non-nick char prefix and suffix */
+	char *mesg5 = "testing !testnick! testing";
+	assert_equals(check_pinged(mesg5, nick), 1);
+
+	/* Error: message doesn't contain username */
+	char *mesg6 = "testing testing";
+	assert_equals(check_pinged(mesg6, nick), 0);
+
+	/* Error: message contains username prefix */
+	char *mesg7 = "testing testnickshouldfail testing";
+	assert_equals(check_pinged(mesg7, nick), 0);
+
+	if (failures)
+		printf("\t%d failure%c\n", failures, (failures > 1) ? 's' : 0);
+
+	return failures;
 }
 
 int
