@@ -30,6 +30,20 @@
 #define CURSOR_SAVE    "\x1b[s"
 #define CURSOR_RESTORE "\x1b[u"
 
+#ifndef NEUTRAL_FG
+#define NEUTRAL_FG 239
+#endif
+#ifndef MSG_DEFAULT_FG
+#define MSG_DEFAULT_FG 250
+#endif
+#ifndef MSG_GREEN_FG
+#define MSG_GREEN_FG 113
+#endif
+#ifndef QUOTE_CHAR
+#define QUOTE_CHAR '>'
+#endif
+
+
 static void resize(void);
 static void draw_buffer(channel*);
 static void draw_chans(channel*);
@@ -72,14 +86,14 @@ resize(void)
 	term_cols = w.ws_col;
 
 	/* Clear, move to top separator and set color */
-	printf(CLEAR_FULL MOVE(2, 1) FG(239));
+	printf(CLEAR_FULL MOVE(2, 1) FG(%d), NEUTRAL_FG);
 
 	/* Draw upper separator */
 	for (int i = 0; i < term_cols; i++)
 		printf("―");
 
 	/* Draw bottom bar, set color back to default */
-	printf(MOVE(%d, 1) " >>> " FG(250), term_rows);
+	printf(MOVE(%d, 1) " >>> " FG(%d), term_rows, MSG_DEFAULT_FG);
 
 	/* Mark all buffers as resized for next draw */
 	rirc->resized = 1;
@@ -197,13 +211,16 @@ draw_buffer(channel *c)
 	if (count_row > max_row) {
 		char *ptr1 = l->text;
 		char *ptr2 = l->text + l->len;
+		
+		int text_fg = (l->text[0] == QUOTE_CHAR ?
+				MSG_GREEN_FG : MSG_DEFAULT_FG);
 
 		while (count_row-- > max_row)
 			word_wrap(text_cols, &ptr1, ptr2);
 
 		do {
 			printf(MOVE(%d, %d) CLEAR_LINE, print_row++, (int)c->draw.nick_pad + 10);
-			printf(FG(239) "~" FG(250) " ");
+			printf(FG(%d) "~" FG(%d) " ", NEUTRAL_FG, text_fg);
 
 			char *print = ptr1;
 			char *wrap = word_wrap(text_cols, &ptr1, ptr2);
@@ -249,8 +266,8 @@ draw_buffer(channel *c)
 		struct tm *tmp = localtime(&l->time);
 
 		/* Timestamp and padding */
-		printf(FG(239) " %02d:%02d  %*s",
-				tmp->tm_hour, tmp->tm_min,
+		printf(FG(%d) " %02d:%02d  %*s",
+				NEUTRAL_FG, tmp->tm_hour, tmp->tm_min,
 				(int)(c->draw.nick_pad - strlen(l->from)), "");
 
 		/* Set foreground and background for the line sender */
@@ -260,14 +277,18 @@ draw_buffer(channel *c)
 		if (from_bg >= 0)
 			printf(BG(%d), from_bg);
 
-		/* Line sender and separator */
-		printf("%s" FG(239) BG_R " ~ " FG(250), l->from);
-
 		char *ptr1 = l->text;
 		char *ptr2 = l->text + l->len;
 
 		char *print = ptr1;
 		char *wrap = word_wrap(text_cols, &ptr1, ptr2);
+
+		int text_fg = (l->text[0] == QUOTE_CHAR ?
+				MSG_GREEN_FG : MSG_DEFAULT_FG);
+		
+		/* Line sender and separator */
+		printf("%s" FG(%d) BG_R " ~ " FG(%d),
+				l->from, NEUTRAL_FG, text_fg);
 
 		while (print < wrap)
 			putchar(*print++);
@@ -278,7 +299,7 @@ draw_buffer(channel *c)
 		/* Draw any line continuations */
 		while (*ptr1) {
 			printf(MOVE(%d, %d) CLEAR_LINE, print_row++, (int)c->draw.nick_pad + 10);
-			printf(FG(239) "~" FG(250) " ");
+			printf(FG(%d) "~" FG(%d) " ", NEUTRAL_FG, text_fg);
 
 			char *print = ptr1;
 			char *wrap = word_wrap(text_cols, &ptr1, ptr2);
@@ -353,7 +374,8 @@ draw_input(channel *c)
 {
 	/* Action messages override the input bar */
 	if (action_message) {
-		printf(MOVE(%d, 6) CLEAR_RIGHT FG(250) "%s", term_rows, action_message);
+		printf(MOVE(%d, 6) CLEAR_RIGHT FG(%d) "%s",
+				term_rows, NEUTRAL_FG, action_message);
 		return;
 	}
 
@@ -368,7 +390,7 @@ draw_input(channel *c)
 		in->window = (in->window - winsz > in->line->text)
 			? in->window - winsz : in->line->text;
 
-	printf(MOVE(%d, 6) CLEAR_RIGHT FG(250), term_rows);
+	printf(MOVE(%d, 6) CLEAR_RIGHT FG(%d), term_rows, NEUTRAL_FG);
 
 	char *p = in->window;
 	while (p < in->head)
@@ -402,7 +424,7 @@ static void
 draw_status(channel *c)
 {
 	printf(CURSOR_SAVE);
-	printf(MOVE(%d, 1) CLEAR_LINE FG(239), term_rows - 1);
+	printf(MOVE(%d, 1) CLEAR_LINE FG(%d), term_rows - 1, NEUTRAL_FG);
 
 	int i = 0, j, mode;
 	char umode_str[] = UMODE_STR;
