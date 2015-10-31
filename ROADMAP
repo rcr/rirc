@@ -18,6 +18,12 @@ Implement a mesg.c test framework before adding new message types, then:
 		^(Also print this implicitly when end of nicks numeric is received)
 		^(Also print server's ignore list for '/ignore' and '/unignore')
 
+	/CHANS
+		print currently open channels with status information, and numeric index
+
+	/<#>
+		go to channel <#>
+
 	Numerics:
 	221 +<flags> :(null)
 		 returned when MODE <current nick> is sent
@@ -58,9 +64,6 @@ Implement a mesg.c test framework before adding new message types, then:
 
 show scrollback % or x/y lines in the status bar
 
-When connection is lost before ping timeout, disconnect, reconnect
-and /connect errs out read: Connection reset by peer
-
 Keep state of tab complete for successively getting the next nick lexicographically
 
 Make sure all the thread related code is using thread-safe functions,
@@ -77,8 +80,6 @@ Nickserv stuff
 
 colorize output by linetype
 
-Fix the channel colouring on various status events
-
 Tests for all the send_*, recv_* handlers
 	- split all the handlers out into mesg.c and move all net unrelated functions into
 	  ui.c so they can be mocked in test cases. Ideally the only interface to mesg.c
@@ -94,11 +95,6 @@ A way to unset current topic
 
 FIXME:
 ---------------------------
-connection reset by peer:
- - was at about 220s latency, attempted to send something, assuming remote peer
-   already reset the connection
- - errno = ECONNRESET
-
 I broke the activity colouring stuff:
 	join/part/quit sets activity (it shouldnt)
 	message and ping dont set activity (they should)
