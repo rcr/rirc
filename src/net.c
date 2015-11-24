@@ -72,7 +72,7 @@ new_server(char *host, char *port)
 	s->host = strdup(host);
 	s->port = strdup(port);
 
-	auto_nick(&(s->nptr), s->nick_me);
+	auto_nick(&(s->nptr), s->nick);
 
 	s->channel = ccur = new_channel(host, s, NULL, BUFFER_SERVER);
 
@@ -211,7 +211,7 @@ connected(server *s)
 	s->latency_time = time(NULL);
 	s->latency_delta = 0;
 
-	sendf(NULL, s, "NICK %s", s->nick_me);
+	sendf(NULL, s, "NICK %s", s->nick);
 	sendf(NULL, s, "USER %s 8 * :%s", config.username, config.realname);
 }
 
@@ -337,7 +337,7 @@ server_disconnect(server *s, int err, int kill, char *mesg)
 		s->latency_delta = 0;
 
 		/* Reset the nick that reconnects will attempt to register with */
-		auto_nick(&(s->nptr), s->nick_me);
+		auto_nick(&(s->nptr), s->nick);
 
 		/* Print message to all open channels and reset their attributes */
 		channel *c = s->channel;

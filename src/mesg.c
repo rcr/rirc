@@ -49,7 +49,7 @@
 #define fail_if(C) \
 	do { if (C) return 1; } while (0)
 
-#define IS_ME(X) !strcmp(X, s->nick_me)
+#define IS_ME(X) !strcmp(X, s->nick)
 
 /* List of common IRC commands with no explicit handling */
 #define UNHANDLED_CMDS \
@@ -325,7 +325,7 @@ send_default(char *err, char *mesg)
 
 	fail_if(sendf(err, ccur->server, "PRIVMSG %s :%s", ccur->name, mesg));
 
-	newline(ccur, LINE_CHAT, ccur->server->nick_me, mesg);
+	newline(ccur, LINE_CHAT, ccur->server->nick, mesg);
 
 	return 0;
 }
@@ -359,7 +359,7 @@ send_me(char *err, char *mesg)
 
 	fail_if(sendf(err, ccur->server, "PRIVMSG %s :\x01""ACTION %s\x01", ccur->name, mesg));
 
-	newlinef(ccur, 0, "*", "%s %s", ccur->server->nick_me, mesg);
+	newlinef(ccur, 0, "*", "%s %s", ccur->server->nick, mesg);
 
 	return 0;
 }
@@ -431,7 +431,7 @@ send_nick(char *err, char *mesg)
 	if (!ccur->server)
 		fail("Error: Not connected to server");
 
-	newlinef(ccur, 0, "--", "Your nick is %s", ccur->server->nick_me);
+	newlinef(ccur, 0, "--", "Your nick is %s", ccur->server->nick);
 
 	return 0;
 }
@@ -476,7 +476,7 @@ send_privmsg(char *err, char *mesg) {
 	if ((c = channel_get(targ, ccur->server)) == NULL)
 		c = new_channel(targ, ccur->server, ccur, BUFFER_PRIVATE);
 
-	newline(c, LINE_CHAT, ccur->server->nick_me, mesg);
+	newline(c, LINE_CHAT, ccur->server->nick, mesg);
 
 	return 0;
 }
@@ -1088,7 +1088,7 @@ recv_nick(char *err, parsed_mesg *p, server *s)
 		fail("NICK: new nick is null");
 
 	if (IS_ME(p->from)) {
-		strncpy(s->nick_me, nick, NICKSIZE-1);
+		strncpy(s->nick, nick, NICKSIZE);
 		newlinef(s->channel, 0, "--", "You are now known as %s", nick);
 	}
 
@@ -1139,25 +1139,32 @@ recv_notice(char *err, parsed_mesg *p, server *s)
 static int
 recv_numeric(char *err, parsed_mesg *p, server *s)
 {
-	/* :server <numeric> <target> [args] */
+	/* :server <code> <target> [args] */
 
 	channel *c;
-	char *nick, *chan, *time, *type, *num;
-
-	/* Target should be s->nick_me, or '*' if unregistered.
-	 * Currently not used for anything */
-	if (!(nick = strtok_r(p->params, " ", &p->params)))
-		fail("NUMERIC: target is null");
+	char *targ, *nick, *chan, *time, *type, *num;
+	int code;
 
 	/* Extract numeric code */
-	int code = 0;
-	do {
-		code = code * 10 + (*p->command++ - '0');
+	for (code = 0; isdigit(*p->command); p->command++) {
+
+		code = code * 10 + (*p->command - '0');
 
 		if (code > 999)
 			fail("NUMERIC: greater than 999");
+	}
 
-	} while (isdigit(*p->command));
+	/* Message target is only used to establish s->nick when registering with a server */
+	if (!(targ = strtok_r(p->params, " ", &p->params))) {
+		server_fatal(s, "NUMERIC: target is null");
+		return NULL;
+	}
+
+	/* Message target should match s->nick or '*' if unregistered, otherwise out of sync */
+	if (strcmp(targ, s->nick) && strcmp(targ, "*") && code != RPL_WELCOME) {
+		server_fatal(s, "NUMERIC: target mismatched, nick is '%s', received '%s'", s->nick, targ);
+		return NULL;
+	}
 
 	/* Shortcuts */
 	if (!code)
@@ -1168,8 +1175,13 @@ recv_numeric(char *err, parsed_mesg *p, server *s)
 	/* Numeric types (000, 200) */
 	switch (code) {
 
-	/* 001 <nick> :<Welcome message> */
+	/* 001 :<Welcome message> */
 	case RPL_WELCOME:
+
+		/* Establishing new connection with a server, set initial nick,
+		 * handle any channel auto-join or rejoins */
+
+		strncpy(s->nick, targ, NICKSIZE);
 
 		/* Reset list of auto nicks */
 		s->nptr = config.nicks;
@@ -1188,19 +1200,22 @@ recv_numeric(char *err, parsed_mesg *p, server *s)
 			} while (c != s->channel);
 		}
 
+		if (p->trailing)
+			newline(s->channel, 0, "--", p->trailing);
+
+		newlinef(s->channel, 0, "--", "You are known as %s", s->nick);
+		return 0;
+
+
+	case RPL_YOURHOST:  /* 002 :<Host info, server version, etc> */
+	case RPL_CREATED:   /* 003 :<Server creation date message> */
+
 		newline(s->channel, 0, "--", p->trailing);
 		return 0;
 
 
-	case RPL_YOURHOST:  /* 002 <nick> :<Host info, server version, etc> */
-	case RPL_CREATED:   /* 003 <nick> :<Server creation date message> */
-
-		newline(s->channel, 0, "--", p->trailing);
-		return 0;
-
-
-	case RPL_MYINFO:    /* 004 <nick> <params> :Are supported by this server */
-	case RPL_ISUPPORT:  /* 005 <nick> <params> :Are supported by this server */
+	case RPL_MYINFO:    /* 004 <params> :Are supported by this server */
+	case RPL_ISUPPORT:  /* 005 <params> :Are supported by this server */
 
 		newlinef(s->channel, 0, "--", "%s ~ supported by this server", p->params);
 		return 0;
@@ -1312,8 +1327,8 @@ num_200:
 	case RPL_LUSERME:      /* 255 :I have <int> clients and <int> servers */
 	case RPL_LOCALUSERS:   /* 265 <int> <int> :Local users <int>, max <int> */
 	case RPL_GLOBALUSERS:  /* 266 <int> <int> :Global users <int>, max <int> */
-	case RPL_MOTD:         /* 372 : - <Message> */
-	case RPL_MOTDSTART:    /* 375 :<server> Message of the day */
+	case RPL_MOTD:         /* 372 :- <text> */
+	case RPL_MOTDSTART:    /* 375 :- <server> Message of the day - */
 
 		newline(s->channel, 0, "--", p->trailing);
 		return 0;
@@ -1322,8 +1337,7 @@ num_200:
 	/* Not printing these */
 	case RPL_NOTOPIC:     /* 331 <chan> :<Message> */
 	case RPL_ENDOFNAMES:  /* 366 <chan> :<Message> */
-	case RPL_ENDOFMOTD:   /* 376 :<Message> */
-
+	case RPL_ENDOFMOTD:   /* 376 :End of MOTD command */
 		return 0;
 
 
@@ -1370,11 +1384,11 @@ num_400:
 		newlinef(s->channel, 0, "-!!-", "Nick '%s' in use", nick);
 
 		if (IS_ME(nick)) {
-			auto_nick(&(s->nptr), s->nick_me);
+			auto_nick(&(s->nptr), s->nick);
 
-			newlinef(s->channel, 0, "-!!-", "Trying again with '%s'", s->nick_me);
+			newlinef(s->channel, 0, "-!!-", "Trying again with '%s'", s->nick);
 
-			return sendf(err, s, "NICK %s", s->nick_me);
+			return sendf(err, s, "NICK %s", s->nick);
 		}
 		return 0;
 
@@ -1504,7 +1518,7 @@ recv_priv(char *err, parsed_mesg *p, server *s)
 	} else if ((c = channel_get(targ, s)) == NULL)
 		failf("PRIVMSG: channel '%s' not found", targ);
 
-	if (check_pinged(p->trailing, s->nick_me)) {
+	if (check_pinged(p->trailing, s->nick)) {
 
 		if (c != ccur)
 			c->active = ACTIVITY_PINGED;

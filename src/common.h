@@ -1,3 +1,6 @@
+#ifndef COMMON_H
+#define COMMON_H
+
 #define VERSION "0.1"
 
 #define SCROLLBACK_BUFFER 200
@@ -147,7 +150,7 @@ typedef struct buffer_line
 	size_t len;
 	time_t time;
 	char *text;
-	char from[NICKSIZE];
+	char from[NICKSIZE + 1];
 	line_t type;
 } buffer_line;
 
@@ -201,7 +204,7 @@ typedef struct server
 	char *host;
 	char input[BUFFSIZE];
 	char *iptr;
-	char nick_me[NICKSIZE];
+	char nick[NICKSIZE + 1];
 	char *nptr;
 	char *port;
 	int soc;
@@ -294,3 +297,5 @@ void newline(channel*, line_t, const char*, const char*);
 void _newline(channel*, line_t, const char*, const char*, size_t);
 void newlinef(channel*, line_t, const char*, const char*, ...);
 void part_channel(channel*);
+
+#endif
