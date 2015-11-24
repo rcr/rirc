@@ -2,9 +2,10 @@
 #define _POSIX_C_SOURCE 200112L
 
 #include <ctype.h>
-#include <string.h>
-#include <stdlib.h>
+#include <stdarg.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include <sys/time.h>
 
 #include "common.h"
@@ -93,6 +94,9 @@
 HANDLED_CMDS
 #undef X
 
+/* Handler for errors deemed fatal to a server's state */
+static void server_fatal(server*, char*, ...);
+
 /* Special case handler for sending non-command input */
 static int send_default(char*, char*);
 
@@ -119,6 +123,20 @@ static int recv_pong(char*, parsed_mesg*, server*);
 static int recv_priv(char*, parsed_mesg*, server*);
 static int recv_quit(char*, parsed_mesg*, server*);
 static int recv_topic(char*, parsed_mesg*, server*);
+
+static void
+server_fatal(server *s, char *fmt, ...)
+{
+	/* Encountered an error fatal to a server, disconnect and begin a reconnect */
+	char errbuff[BUFFSIZE];
+	va_list ap;
+
+	va_start(ap, fmt);
+	vsnprintf(errbuff, BUFFSIZE, fmt, ap);
+	va_end(ap);
+
+	server_disconnect(s, 1, 0, errbuff);
+}
 
 void
 init_commands(void)
