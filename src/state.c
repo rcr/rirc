@@ -1,5 +1,9 @@
-/* All manipulation of stateful ui elements
- * */
+/**
+ * state.c
+ *
+ * All manipulation of global program state
+ *
+ **/
 
 #include <stdlib.h>
 #include <string.h>
@@ -8,11 +12,53 @@
 #include <stdio.h>
 
 #include "common.h"
+#include "state.h"
 
 static int action_close_server(char);
 
+/* TODO: move to state struct */
 /* Defined in draw.c */
 extern int term_rows, term_cols;
+
+/* Global state of rirc */
+
+/* TODO: move all current global state from elsewhere to here */
+#if 0
+static struct
+{
+	channel *current_channel;
+	channel *default_channel; /* The serverless 'rirc' buffer */
+} state;
+#endif
+
+void
+init_state(void)
+{
+	/* TODO: move these to state struct */
+	rirc = ccur = new_channel("rirc", NULL, NULL, BUFFER_OTHER);
+
+	/* Splashscreen */
+	newline(rirc, 0, "--", "      _");
+	newline(rirc, 0, "--", " _ __(_)_ __ ___");
+	newline(rirc, 0, "--", "| '__| | '__/ __|");
+	newline(rirc, 0, "--", "| |  | | | | (__");
+	newline(rirc, 0, "--", "|_|  |_|_|  \\___|");
+	newline(rirc, 0, "--", "");
+	newline(rirc, 0, "--", " - version " VERSION);
+	newline(rirc, 0, "--", " - compiled " __DATE__ ", " __TIME__);
+#ifdef DEBUG
+	newline(rirc, 0, "--", " - compiled with DEBUG flags");
+#endif
+
+	/* Init a full redraw */
+	draw(D_RESIZE);
+}
+
+void
+free_state(void)
+{
+	free_channel(rirc);
+}
 
 void
 newline(channel *c, line_t type, const char *from, const char *mesg)
@@ -330,3 +376,34 @@ buffer_scrollback_forw(channel *c)
 
 	draw(D_BUFFER);
 }
+
+void
+auto_nick(char **autonick, char *nick)
+{
+	char *p = *autonick;
+	while (*p == ' ' || *p == ',')
+		p++;
+
+	if (*p == '\0') {
+
+		/* Autonicks exhausted, generate a random nick */
+		char *base = "rirc_";
+		char *cset = "0123456789ABCDEF";
+
+		strcpy(nick, base);
+		nick += strlen(base);
+
+		int i, len = strlen(cset);
+		for (i = 0; i < 4; i++)
+			*nick++ = cset[rand() % len];
+	} else {
+		int c = 0;
+		while (*p != ' ' && *p != ',' && *p != '\0' && c++ < NICKSIZE)
+			*nick++ = *p++;
+		*autonick = p;
+	}
+
+	*nick = '\0';
+}
+
+

@@ -8,6 +8,7 @@
 #include <sys/ioctl.h>
 
 #include "common.h"
+#include "state.h"
 
 /* Set foreground/background color */
 #define FG(X) "\x1b[38;5;"#X"m"

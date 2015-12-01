@@ -84,36 +84,6 @@ getarg(char **str, const char sep)
 	return ret;
 }
 
-void
-auto_nick(char **autonick, char *nick)
-{
-	char *p = *autonick;
-	while (*p == ' ' || *p == ',')
-		p++;
-
-	if (*p == '\0') {
-
-		/* Autonicks exhausted, generate a random nick */
-		char *base = "rirc_";
-		char *cset = "0123456789ABCDEF";
-
-		strcpy(nick, base);
-		nick += strlen(base);
-
-		int i, len = strlen(cset);
-		for (i = 0; i < 4; i++)
-			*nick++ = cset[rand() % len];
-	} else {
-		int c = 0;
-		while (*p != ' ' && *p != ',' && *p != '\0' && c++ < NICKSIZE)
-			*nick++ = *p++;
-		*autonick = p;
-	}
-
-	*nick = '\0';
-}
-
-
 char*
 strdup(const char *str)
 {
@@ -295,6 +265,9 @@ word_wrap(int text_cols, char **ptr1, char *ptr2)
 
 		*ptr1 = tmp;
 
+		/* Return only the printable segment */
+		while (*(ret - 1) == ' ')
+			ret--;
 	} else {
 
 		/* Find a space to wrap on, or wrap on */

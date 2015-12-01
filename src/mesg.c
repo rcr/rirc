@@ -9,6 +9,7 @@
 #include <sys/time.h>
 
 #include "common.h"
+#include "state.h"
 
 /* Numeric Reply Codes */
 #define RPL_WELCOME            1
@@ -52,7 +53,7 @@
 #define IS_ME(X) !strcmp(X, s->nick)
 
 /* List of common IRC commands with no explicit handling */
-#define UNHANDLED_CMDS \
+#define UNHANDLED_SEND_CMDS \
 	X(admin)   X(away)     X(die) \
 	X(encap)   X(help)     X(info) \
 	X(invite)  X(ison)     X(kick) \
@@ -70,7 +71,7 @@
 	X(who)     X(whois)    X(whowas)
 
 /* List of commands (some rirc-specific) which are explicitly handled */
-#define HANDLED_CMDS \
+#define HANDLED_SEND_CMDS \
 	X(clear) \
 	X(close) \
 	X(connect) \
@@ -91,7 +92,7 @@
 
 /* Function prototypes for explicitly handled commands */
 #define X(cmd) static int send_##cmd(char*, char*);
-HANDLED_CMDS
+HANDLED_SEND_CMDS
 #undef X
 
 /* Handler for errors deemed fatal to a server's state */
@@ -128,30 +129,36 @@ static void
 server_fatal(server *s, char *fmt, ...)
 {
 	/* Encountered an error fatal to a server, disconnect and begin a reconnect */
-	char errbuff[BUFFSIZE];
+	char errbuff[MAX_ERROR];
 	va_list ap;
 
 	va_start(ap, fmt);
-	vsnprintf(errbuff, BUFFSIZE, fmt, ap);
+	vsnprintf(errbuff, MAX_ERROR, fmt, ap);
 	va_end(ap);
 
 	server_disconnect(s, 1, 0, errbuff);
 }
 
 void
-init_commands(void)
+init_mesg(void)
 {
-	/* Build and AVL tree off commands and function pointers to handlers */
+	/* Build and AVL tree of commands and function pointers to handlers */
 
 	/* Add the unhandled commands with no explicit handler */
 	#define X(cmd) avl_add(&commands, #cmd, NULL);
-	UNHANDLED_CMDS
+	UNHANDLED_SEND_CMDS
 	#undef X
 
 	/* Add the handled commands with explicit handlers */
 	#define X(cmd) avl_add(&commands, #cmd, new_command(send_##cmd));
-	HANDLED_CMDS
+	HANDLED_SEND_CMDS
 	#undef X
+}
+
+void
+free_mesg(void)
+{
+	free_avl(commands);
 }
 
 static struct command*
@@ -1157,13 +1164,13 @@ recv_numeric(char *err, parsed_mesg *p, server *s)
 	/* Message target is only used to establish s->nick when registering with a server */
 	if (!(targ = strtok_r(p->params, " ", &p->params))) {
 		server_fatal(s, "NUMERIC: target is null");
-		return NULL;
+		return 1;
 	}
 
 	/* Message target should match s->nick or '*' if unregistered, otherwise out of sync */
 	if (strcmp(targ, s->nick) && strcmp(targ, "*") && code != RPL_WELCOME) {
 		server_fatal(s, "NUMERIC: target mismatched, nick is '%s', received '%s'", s->nick, targ);
-		return NULL;
+		return 1;
 	}
 
 	/* Shortcuts */

@@ -12,15 +12,14 @@
 #include <termios.h>
 
 #include "common.h"
+#include "state.h"
 
 static void cleanup(void);
 static void configure(void);
 static void getopts(int, char**);
 static void main_loop(void);
-static void splash(channel*);
 static void startup(void);
 static void usage(void);
-
 static void signal_sigwinch(int);
 
 static struct sigaction sa_sigwinch;
@@ -72,22 +71,6 @@ usage(void)
 	"  rirc -c server.tld -j '#chan'\n"
 	"  rirc -c server.tld -p 1234 -j '#chan1,#chan2' -n 'nick, nick_, nick__'\n"
 	);
-}
-
-static void
-splash(channel *c)
-{
-	newline(c, 0, "--", "      _");
-	newline(c, 0, "--", " _ __(_)_ __ ___");
-	newline(c, 0, "--", "| '__| | '__/ __|");
-	newline(c, 0, "--", "| |  | | | | (__");
-	newline(c, 0, "--", "|_|  |_|_|  \\___|");
-	newline(c, 0, "--", "");
-	newline(c, 0, "--", " - version " VERSION);
-	newline(c, 0, "--", " - compiled " __DATE__ ", " __TIME__);
-#ifdef DEBUG
-	newline(c, 0, "--", " - compiled with DEBUG flags");
-#endif
 }
 
 static void
@@ -215,15 +198,9 @@ startup(void)
 
 	srand(time(NULL));
 
-	/* Build the avl tree of command handlers */
-	init_commands();
-
-	/* Init draw */
-	draw(D_RESIZE);
-
-	rirc = ccur = new_channel("rirc", NULL, NULL, BUFFER_OTHER);
-
-	splash(rirc);
+	/* Initialize submodules */
+	init_mesg();
+	init_state();
 
 	/* Set up signal handlers */
 	sa_sigwinch.sa_handler = signal_sigwinch;
@@ -245,8 +222,9 @@ cleanup(void)
 	/* Reset terminal modes */
 	tcsetattr(0, TCSADRAIN, &oterm);
 
-	/* Free the tree of command handlers */
-	free_avl(commands);
+	/* Free submodules */
+	free_mesg();
+	free_state();
 }
 
 static void

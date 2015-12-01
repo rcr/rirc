@@ -20,6 +20,7 @@
 #error BUFFSIZE must be greater than MAX_INPUT
 #endif
 
+//FIXME: just use an ascii sized buffer and let servers use whatever flag they want
 /* Chan modes */
 #define CMODE_STR "OovaimnqpsrtklbeI"
 #define CMODE_O (1 << 0) /* give "channel creator" status */
@@ -232,6 +233,7 @@ typedef struct parsed_mesg
 } parsed_mesg;
 
 /* rirc.c */
+//TODO: move to state
 channel *rirc;
 channel *ccur;
 
@@ -269,7 +271,6 @@ int avl_del(avl_node**, const char*);
 int check_pinged(const char*, const char*);
 int count_line_rows(int, buffer_line*);
 parsed_mesg* parse(parsed_mesg*, char*);
-void auto_nick(char**, char*);
 void error(int status, const char*, ...);
 void free_avl(avl_node*);
 
@@ -279,23 +280,10 @@ void free_avl(avl_node*);
 
 /* mesg.c */
 avl_node* commands;
-void init_commands(void);
+void init_mesg(void);
+void free_mesg(void);
 void recv_mesg(char*, int, server*);
 void send_mesg(char*);
 void send_paste(char*);
-
-/* state.c */
-channel* channel_close(channel*);
-channel* channel_get(char*, server*);
-channel* channel_switch(channel*, int);
-channel* new_channel(char*, server*, channel*, buffer_t);
-void buffer_scrollback_back(channel*);
-void buffer_scrollback_forw(channel*);
-void clear_channel(channel*);
-void free_channel(channel*);
-void newline(channel*, line_t, const char*, const char*);
-void _newline(channel*, line_t, const char*, const char*, size_t);
-void newlinef(channel*, line_t, const char*, const char*, ...);
-void part_channel(channel*);
 
 #endif

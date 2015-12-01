@@ -6,6 +6,12 @@ Cleaner separation between the ui (draw.c) and everything else:
 		- buffer scrollback
 		- input bar framing
 		- channel bar framing
+	- handle all draw routines from state altering functions, eg:
+	     input.c ___
+	                \
+	                 ---> state.c ---> draw.c
+	      mesg.c ___/
+
 
 Implement a mesg.c test framework before adding new message types, then:
 ----------------------
@@ -99,11 +105,14 @@ I broke the activity colouring stuff:
 	join/part/quit sets activity (it shouldnt)
 	message and ping dont set activity (they should)
 
+Scrollback is broken, some sort of fencepost error I think
+
 Some servers place single args in the trailing section, eg: JOIN :channel vs JOIN channel
 which forces the handlers to check p->params and p->trailing, however since p->params
 is set to NULL in this case, the result is strtok(NULL, " "), so strtok attemps to continue
 parsing whatever it last parsed. Instead, a function like strsep should be implemented
 which correctly handles NULL input in this case
+	-> replace stringtok/stringtok_r with getarg
 
 If in ##channel that requires authentication (ie bumps you to ##channel-unauthorized
 or similar), /disconnect, /connect, rirc attempts to join ##channel, can't, and is
@@ -117,8 +126,6 @@ use the alternate screen buffer to restore screen when rirc exits
 -- cannot send to '##linux - cannot send to channel'
 :::and on each message
 	ERR_ERRONEUSNICKNAME: nick is null
-
-when erroneous nickname on connect (eg too long) goes into infinite loop
 
 
 MAYBE (Probably never):

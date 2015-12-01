@@ -17,6 +17,7 @@
 #endif
 
 #include "common.h"
+#include "state.h"
 
 #define SERVER_TIMEOUT_S 255 /* Latency time at which a server is considered to be timed out and a disconnect is issued */
 #define SERVER_LATENCY_S 125 /* Latency time at which to begin showing in the status bar */
@@ -317,10 +318,11 @@ server_disconnect(server *s, int err, int kill, char *mesg)
 	else if (s->soc >= 0) {
 
 		if (err) {
+			/* If disconnecting due to error, attempt a reconnect */
+
 			newlinef(s->channel, 0, "ERROR", "%s", mesg);
 			newlinef(s->channel, 0, "--", "Attempting reconnect in %ds", RECONNECT_DELTA);
 
-			/* If disconnecting due to error, attempt a reconnect */
 			s->reconnect_time = time(NULL) + RECONNECT_DELTA;
 			s->reconnect_delta = RECONNECT_DELTA;
 		} else if (mesg) {

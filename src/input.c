@@ -19,6 +19,7 @@
 #include <unistd.h>
 
 #include "common.h"
+#include "state.h"
 
 /* Max number of characters accepted in user pasted input */
 #define MAX_PASTE 2048
