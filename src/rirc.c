@@ -225,6 +225,15 @@ cleanup(void)
 	/* Free submodules */
 	free_mesg();
 	free_state();
+
+	/* Reset terminal colours */
+	printf("\x1b[38;0;m");
+	printf("\x1b[48;0;m");
+
+#ifndef DEBUG
+	/* Clear screen */
+	printf("\x1b[H\x1b[J");
+#endif
 }
 
 static void

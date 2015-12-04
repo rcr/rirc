@@ -1,4 +1,4 @@
-TODO (in no particular order):
+WIP:
 ---------------------------
 Cleaner separation between the ui (draw.c) and everything else:
 	- ccur and navigation between channels are all function of the ui
@@ -12,6 +12,13 @@ Cleaner separation between the ui (draw.c) and everything else:
 	                 ---> state.c ---> draw.c
 	      mesg.c ___/
 
+	- Once the message handlers have a better interface to state altering functions
+	  the testcases will be much easier to implement
+	- Then replace strtok/strtok_r with getarg
+
+
+TODO (in no particular order):
+---------------------------
 
 Implement a mesg.c test framework before adding new message types, then:
 ----------------------
@@ -68,6 +75,10 @@ Implement a mesg.c test framework before adding new message types, then:
 		 (e.g.: /raw MODE <not my nick> <flag>
 ----------------------
 
+show something other than the ping time when attempting to reconnect
+
+show disconnected/parted in status bar for channels instead of 0 user count
+
 show scrollback % or x/y lines in the status bar
 
 Keep state of tab complete for successively getting the next nick lexicographically
@@ -104,6 +115,8 @@ FIXME:
 I broke the activity colouring stuff:
 	join/part/quit sets activity (it shouldnt)
 	message and ping dont set activity (they should)
+
+cleared channels can still be scrolled back? Need a better mechanism for clearing a channel
 
 Scrollback is broken, some sort of fencepost error I think
 

@@ -554,13 +554,6 @@ send_quit(char *err, char *mesg)
 		server_disconnect(t, 0, 1, (*mesg) ? mesg : DEFAULT_QUIT_MESG);
 	} while (t != s);
 
-	free_channel(rirc);
-
-#ifndef DEBUG
-	/* Clear screen */
-	printf("\x1b[H\x1b[J");
-#endif
-
 	exit(EXIT_SUCCESS);
 
 	return 0;
