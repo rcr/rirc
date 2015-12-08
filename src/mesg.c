@@ -91,7 +91,7 @@
 	X(version)
 
 /* Function prototypes for explicitly handled commands */
-#define X(cmd) static int send_##cmd(char*, char*);
+#define X(cmd) static int send_##cmd(char*, char*, channel*);
 HANDLED_SEND_CMDS
 #undef X
 
@@ -99,14 +99,14 @@ HANDLED_SEND_CMDS
 static void server_fatal(server*, char*, ...);
 
 /* Special case handler for sending non-command input */
-static int send_default(char*, char*);
+static int send_default(char*, char*, channel*);
 
 /* Default case handler for sending commands */
-static int send_unhandled(char*, char*, char*);
+static int send_unhandled(char*, char*, char*, channel*);
 
 /* Encapsulate a function pointer in a struct so AVL tree cleanup can free it */
-struct command { int (*fptr)(char*, char*); };
-static struct command* new_command(int (*fptr)(char*, char*));
+struct command { int (*fptr)(char*, char*, channel*); };
+static struct command* new_command(int (*fptr)(char*, char*, channel*));
 
 /* Message receiving handlers */
 static int recv_ctcp_req(char*, parsed_mesg*, server*);
@@ -162,7 +162,7 @@ free_mesg(void)
 }
 
 static struct command*
-new_command(int (*fptr)(char*, char*))
+new_command(int (*fptr)(char*, char*, channel *c))
 {
 	/* Allocate a command handler */
 
@@ -181,7 +181,7 @@ new_command(int (*fptr)(char*, char*))
  * */
 
 void
-send_mesg(char *mesg)
+send_mesg(char *mesg, channel *chan)
 {
 	/* Handle an input line */
 
@@ -195,13 +195,13 @@ send_mesg(char *mesg)
 
 		/* Skip the '/' character and try to get the command */
 		if (!(cmd_str = getarg(&mesg, ' '))) {
-			newline(ccur, 0, "-!!-", "Messages beginning with '/' require a command");
+			newline(chan, 0, "-!!-", "Messages beginning with '/' require a command");
 			return;
 		}
 
 		/* Check if command is defined, and retrieve the handler */
 		if (!(cmd = avl_get(commands, cmd_str, strlen(cmd_str)))) {
-			newlinef(ccur, 0, "-!!-", "Unknown command: '%s'", cmd_str);
+			newlinef(chan, 0, "-!!-", "Unknown command: '%s'", cmd_str);
 			return;
 		}
 
@@ -209,17 +209,17 @@ send_mesg(char *mesg)
 
 		/* If the command has no explicit handler, send the input line as-is */
 		if (c)
-			err = c->fptr(errbuff, mesg);
+			err = c->fptr(errbuff, mesg, chan);
 		else
-			err = send_unhandled(errbuff, cmd_str, mesg);
+			err = send_unhandled(errbuff, cmd_str, mesg, chan);
 
 	} else {
 		/* Non command message, send as privmesg to current buffer */
-		err = send_default(errbuff, mesg);
+		err = send_default(errbuff, mesg, chan);
 	}
 
 	if (err)
-		newline(ccur, 0, "-!!-", errbuff);
+		newline(chan, 0, "-!!-", errbuff);
 }
 
 void
@@ -227,12 +227,11 @@ send_paste(char *paste)
 {
 	/* TODO: send the paste buffer, which is preformatted with \r\n, and then
 	 * split the messages and newline them into the buffer * */
-
 	UNUSED(paste);
 }
 
 static int
-send_unhandled(char *err, char *cmd, char *args)
+send_unhandled(char *err, char *cmd, char *args, channel *c)
 {
 	/* All commands defined in the UNHANDLED_CMDS */
 
@@ -242,37 +241,38 @@ send_unhandled(char *err, char *cmd, char *args)
 	for (ptr = cmd; *ptr; ptr++)
 		*ptr = toupper(*ptr);
 
-	return sendf(err, ccur->server, "%s %s", cmd, args);
+	return sendf(err, c->server, "%s %s", cmd, args);
 }
 
 static int
-send_clear(char *err, char *mesg)
+send_clear(char *err, char *mesg, channel *c)
 {
 	/* Clear the current buffer */
 
 	UNUSED(err);
 	UNUSED(mesg);
 
-	clear_channel(ccur);
+	clear_channel(c);
 
 	return 0;
 }
 
 static int
-send_close(char *err, char *mesg)
+send_close(char *err, char *mesg, channel *c)
 {
-	/* TODO: if no args in mesg, close ccur, else try to find the channel */
+	/* TODO: if no args in mesg, close c, else try to find the channel */
 
 	UNUSED(err);
 	UNUSED(mesg);
 
-	ccur = channel_close(ccur);
+	/* FIXME: state.c should handle this */
+	ccur = channel_close(c);
 
 	return 0;
 }
 
 static int
-send_connect(char *err, char *mesg)
+send_connect(char *err, char *mesg, channel *c)
 {
 	/* /connect [(host) | (host:port) | (host port)] */
 
@@ -280,12 +280,12 @@ send_connect(char *err, char *mesg)
 
 	if (!(host = strtok_r(mesg, " :", &mesg))) {
 
-		if (!ccur->server || ccur->server->soc >= 0 || ccur->server->connecting)
+		if (!c->server || c->server->soc >= 0 || c->server->connecting)
 			fail("Error: Connect requires a hostname argument");
 
 		/* If no hostname arg and server is disconnected, attempt to reconnect */
-		host = ccur->server->host;
-		port = ccur->server->port;
+		host = c->server->host;
+		port = c->server->port;
 
 	} else if (!(port = strtok_r(NULL, " ", &mesg)))
 		port = "6667";
@@ -296,7 +296,7 @@ send_connect(char *err, char *mesg)
 }
 
 static int
-send_ctcp(char *err, char *mesg)
+send_ctcp(char *err, char *mesg, channel *c)
 {
 	/* /ctcp <target> <message> */
 
@@ -316,161 +316,162 @@ send_ctcp(char *err, char *mesg)
 	for (p = mesg; *p && *p != ' '; p++)
 		*p = toupper(*p);
 
-	return sendf(err, ccur->server, "PRIVMSG %s :\x01""%s\x01", targ, mesg);
+	return sendf(err, c->server, "PRIVMSG %s :\x01""%s\x01", targ, mesg);
 }
 
 static int
-send_default(char *err, char *mesg)
+send_default(char *err, char *mesg, channel *c)
 {
 	/* All messages not beginning with '/'  */
 
-	if (ccur->buffer_type == BUFFER_SERVER)
+	if (c->buffer_type == BUFFER_SERVER)
 		fail("Error: This is not a channel");
 
-	if (ccur->parted)
+	if (c->parted)
 		fail("Error: Parted from channel");
 
-	fail_if(sendf(err, ccur->server, "PRIVMSG %s :%s", ccur->name, mesg));
+	fail_if(sendf(err, c->server, "PRIVMSG %s :%s", c->name, mesg));
 
-	newline(ccur, LINE_CHAT, ccur->server->nick, mesg);
+	newline(c, LINE_CHAT, c->server->nick, mesg);
 
 	return 0;
 }
 
 static int
-send_disconnect(char *err, char *mesg)
+send_disconnect(char *err, char *mesg, channel *c)
 {
 	/* /disconnect [quit message] */
 
-	server *s = ccur->server;
+	server *s = c->server;
 
 	/* Server isn't connecting, connected or waiting to connect */
 	if (!s || (!s->connecting && s->soc < 0 && !s->reconnect_time))
 		fail("Error: Not connected to server");
 
-	server_disconnect(ccur->server, 0, 0, (*mesg) ? mesg : DEFAULT_QUIT_MESG);
+	server_disconnect(c->server, 0, 0, (*mesg) ? mesg : DEFAULT_QUIT_MESG);
 
 	return 0;
 }
 
 static int
-send_me(char *err, char *mesg)
+send_me(char *err, char *mesg, channel *c)
 {
 	/* /me <message> */
 
-	if (ccur->buffer_type == BUFFER_SERVER)
+	if (c->buffer_type == BUFFER_SERVER)
 		fail("Error: This is not a channel");
 
-	if (ccur->parted)
+	if (c->parted)
 		fail("Error: Parted from channel");
 
-	fail_if(sendf(err, ccur->server, "PRIVMSG %s :\x01""ACTION %s\x01", ccur->name, mesg));
+	fail_if(sendf(err, c->server, "PRIVMSG %s :\x01""ACTION %s\x01", c->name, mesg));
 
-	newlinef(ccur, 0, "*", "%s %s", ccur->server->nick, mesg);
+	newlinef(c, 0, "*", "%s %s", c->server->nick, mesg);
 
 	return 0;
 }
 
 static int
-send_ignore(char *err, char *mesg)
+send_ignore(char *err, char *mesg, channel *c)
 {
 	/* /ignore [nick] */
 
 	char *nick;
 
-	if (!ccur->server)
+	if (!c->server)
 		fail("Error: Not connected to server");
 
 	if (!(nick = strtok(mesg, " "))) {
-		newline(ccur, 0, "TODO", "Ignoring:");
+		newline(c, 0, "TODO", "Ignoring:");
 		/* TODO print ignore list*/
 		return 0;
 	}
 
-	if (!avl_add(&(ccur->server->ignore), nick, NULL))
+	if (!avl_add(&(c->server->ignore), nick, NULL))
 		failf("Error: Already ignoring '%s'", nick);
 
-	newlinef(ccur, 0, "--", "Ignoring '%s'", nick);
+	newlinef(c, 0, "--", "Ignoring '%s'", nick);
 
 	return 0;
 }
 
 static int
-send_join(char *err, char *mesg)
+send_join(char *err, char *mesg, channel *c)
 {
 	/* /join [target[,targets]*] */
 
 	char *targ;
 
 	if ((targ = strtok(mesg, " ")))
-		return sendf(err, ccur->server, "JOIN %s", targ);
+		return sendf(err, c->server, "JOIN %s", targ);
 
-	if (ccur->buffer_type == BUFFER_SERVER)
+	if (c->buffer_type == BUFFER_SERVER)
 		fail("Error: JOIN requires a target");
 
-	if (ccur->buffer_type == BUFFER_PRIVATE)
+	if (c->buffer_type == BUFFER_PRIVATE)
 		fail("Error: Can't rejoin private buffers");
 
-	if (!ccur->parted)
+	if (!c->parted)
 		fail("Error: Not parted from channel");
 
-	return sendf(err, ccur->server, "JOIN %s", ccur->name);
+	return sendf(err, c->server, "JOIN %s", c->name);
 }
 
 static int
-send_msg(char *err, char *mesg)
+send_msg(char *err, char *mesg, channel *c)
 {
 	/* Alias for /priv */
 
-	return send_privmsg(err, mesg);
+	return send_privmsg(err, mesg, c);
 }
 
 static int
-send_nick(char *err, char *mesg)
+send_nick(char *err, char *mesg, channel *c)
 {
 	/* /nick [nick] */
 
 	char *nick;
 
 	if ((nick = strtok(mesg, " ")))
-		return sendf(err, ccur->server, "NICK %s", mesg);
+		return sendf(err, c->server, "NICK %s", mesg);
 
-	if (!ccur->server)
+	if (!c->server)
 		fail("Error: Not connected to server");
 
-	newlinef(ccur, 0, "--", "Your nick is %s", ccur->server->nick);
+	newlinef(c, 0, "--", "Your nick is %s", c->server->nick);
 
 	return 0;
 }
 
 static int
-send_part(char *err, char *mesg)
+send_part(char *err, char *mesg, channel *c)
 {
 	/* /part [[target[,targets]*] part message]*/
 
 	char *targ;
 
 	if ((targ = strtok_r(mesg, " ", &mesg)))
-		return sendf(err, ccur->server, "PART %s :%s", targ, (*mesg) ? mesg : DEFAULT_QUIT_MESG);
+		return sendf(err, c->server, "PART %s :%s", targ, (*mesg) ? mesg : DEFAULT_QUIT_MESG);
 
-	if (ccur->buffer_type == BUFFER_SERVER)
+	if (c->buffer_type == BUFFER_SERVER)
 		fail("Error: PART requires a target");
 
-	if (ccur->buffer_type == BUFFER_PRIVATE)
+	if (c->buffer_type == BUFFER_PRIVATE)
 		fail("Error: Can't part private buffers");
 
-	if (ccur->parted)
+	if (c->parted)
 		fail("Error: Already parted from channel");
 
-	return sendf(err, ccur->server, "PART %s :%s", ccur->name, DEFAULT_QUIT_MESG);
+	return sendf(err, c->server, "PART %s :%s", c->name, DEFAULT_QUIT_MESG);
 }
 
 static int
-send_privmsg(char *err, char *mesg) {
+send_privmsg(char *err, char *mesg, channel *c)
+{
 	/* /(priv | msg) <target> <message> */
 
 	char *targ;
-	channel *c;
+	channel *cc;
 
 	if (!(targ = strtok_r(mesg, " ", &mesg)))
 		fail("Error: Private messages require a target");
@@ -478,30 +479,30 @@ send_privmsg(char *err, char *mesg) {
 	if (*mesg == '\0')
 		fail("Error: Private messages was null");
 
-	fail_if(sendf(err, ccur->server, "PRIVMSG %s :%s", targ, mesg));
+	fail_if(sendf(err, c->server, "PRIVMSG %s :%s", targ, mesg));
 
-	if ((c = channel_get(targ, ccur->server)) == NULL)
-		c = new_channel(targ, ccur->server, ccur, BUFFER_PRIVATE);
+	if ((cc = channel_get(targ, c->server)) == NULL)
+		cc = new_channel(targ, c->server, c, BUFFER_PRIVATE);
 
-	newline(c, LINE_CHAT, ccur->server->nick, mesg);
+	newline(c, LINE_CHAT, c->server->nick, mesg);
 
 	return 0;
 }
 
 static int
-send_raw(char *err, char *mesg)
+send_raw(char *err, char *mesg, channel *c)
 {
 	/* /raw <raw message> */
 
-	fail_if(sendf(err, ccur->server, "%s", mesg));
+	fail_if(sendf(err, c->server, "%s", mesg));
 
-	newline(ccur, 0, "RAW >>", mesg);
+	newline(c, 0, "RAW >>", mesg);
 
 	return 0;
 }
 
 static int
-send_topic(char *err, char *mesg)
+send_topic(char *err, char *mesg, channel *c)
 {
 	/* /topic [topic] */
 
@@ -510,43 +511,43 @@ send_topic(char *err, char *mesg)
 		mesg++;
 
 	if (*mesg == '\0')
-		return sendf(err, ccur->server, "TOPIC %s", ccur->name);
+		return sendf(err, c->server, "TOPIC %s", c->name);
 
-	return sendf(err, ccur->server, "TOPIC %s :%s", ccur->name, mesg);
+	return sendf(err, c->server, "TOPIC %s :%s", c->name, mesg);
 }
 
 static int
-send_unignore(char *err, char *mesg)
+send_unignore(char *err, char *mesg, channel *c)
 {
 	/* /unignore [nick] */
 
 	char *nick;
 
-	if (!ccur->server)
+	if (!c->server)
 		fail("Error: Not connected to server");
 
 	if (!(nick = strtok(mesg, " "))) {
-		newline(ccur, 0, "TODO", "Ignoring:");
+		newline(c, 0, "TODO", "Ignoring:");
 		/* TODO print ignore list*/
 		return 0;
 	}
 
-	if (!avl_del(&(ccur->server->ignore), nick))
+	if (!avl_del(&(c->server->ignore), nick))
 		failf("Error: '%s' not on ignore list", nick);
 
-	newlinef(ccur, 0, "--", "No longer ignoring '%s'", nick);
+	newlinef(c, 0, "--", "No longer ignoring '%s'", nick);
 
 	return 0;
 }
 
 static int
-send_quit(char *err, char *mesg)
+send_quit(char *err, char *mesg, channel *c)
 {
 	/* /quit [quit message] */
 
 	UNUSED(err);
 
-	server *t, *s = ccur->server;
+	server *t, *s = c->server;
 
 	if (s) do {
 		t = s;
@@ -560,23 +561,23 @@ send_quit(char *err, char *mesg)
 }
 
 static int
-send_version(char *err, char *mesg)
+send_version(char *err, char *mesg, channel *c)
 {
 	/* /version [target] */
 
 	char *targ;
 
-	if (ccur->server == NULL) {
-		newline(ccur, 0, "--", "rirc v"VERSION);
-		newline(ccur, 0, "--", "http://rcr.io/rirc.html");
+	if (c->server == NULL) {
+		newline(c, 0, "--", "rirc v"VERSION);
+		newline(c, 0, "--", "http://rcr.io/rirc.html");
 
 		return 0;
 	}
 
 	if ((targ = strtok(mesg, " ")))
-		return sendf(err, ccur->server, "VERSION %s", targ);
+		return sendf(err, c->server, "VERSION %s", targ);
 	else
-		return sendf(err, ccur->server, "VERSION");
+		return sendf(err, c->server, "VERSION");
 }
 
 /*

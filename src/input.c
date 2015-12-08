@@ -830,5 +830,5 @@ send_input(void)
 	draw(D_INPUT);
 
 	/* Send the message last; the channel might be closed as a result of the command */
-	send_mesg(sendbuff);
+	send_mesg(sendbuff, ccur);
 }
