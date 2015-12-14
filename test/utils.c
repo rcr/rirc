@@ -2,48 +2,15 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "test.h"
+
 #include "../src/utils.c"
 
-int _assert_strcmp(char*, char*);
+/*
+ * Util functions for testing AVL properties
+ * */
 
-#define fail_test(M) \
-	do { \
-		failures++; \
-		printf("\t%s %d: " M "\n", __func__, __LINE__); \
-	} while (0)
-
-#define fail_testf(...) \
-	do { \
-		failures++; \
-		printf("\t%s %d: ", __func__, __LINE__); \
-		printf(__VA_ARGS__); \
-		printf("\n"); \
-	} while (0)
-
-#define assert_strcmp(X, Y) \
-	do { \
-		if (_assert_strcmp(X, Y)) \
-			fail_testf(#X " expected '%s', got '%s'", (Y) ? (Y) : "NULL", (X) ? (X) : "NULL"); \
-	} while (0)
-
-#define assert_equals(X, Y) \
-	do { \
-		if ((X) != (Y)) \
-			fail_testf(#X " expected '%d', got '%d'", (Y), (X)); \
-	} while (0)
-
-int
-_assert_strcmp(char *p1, char *p2)
-{
-	if (p1 == NULL || p2 == NULL)
-		return p1 != p2;
-
-	return strcmp(p1, p2);
-}
-
-/* Recusrive functions for testing AVL tree properties */
-
-int
+static int
 _avl_count(avl_node *n)
 {
 	/* Count the number of nodes in a tree */
@@ -54,7 +21,7 @@ _avl_count(avl_node *n)
 	return 1 + _avl_count(n->l) + _avl_count(n->r);
 }
 
-int
+static int
 _avl_is_binary(avl_node *n)
 {
 	if (n == NULL)
@@ -69,7 +36,7 @@ _avl_is_binary(avl_node *n)
 	return 1 & _avl_is_binary(n->l) & _avl_is_binary(n->r);
 }
 
-int
+static int
 _avl_height(avl_node *n)
 {
 	if (n == NULL)
@@ -82,20 +49,10 @@ _avl_height(avl_node *n)
  * Tests
  * */
 
-int test_avl(void);
-int test_parse(void);
-int test_check_pinged(void);
-int test_word_wrap(void);
-int test_count_line_rows(void);
-int test_auto_nick(void);
-
-
-int
+void
 test_avl(void)
 {
 	/* Test AVL tree functions */
-
-	int failures = 0;
 
 	avl_node *root = NULL;
 
@@ -168,16 +125,12 @@ test_avl(void)
 	/* Test deleting string that was previously deleted */
 	if (avl_del(&root, *strings))
 		fail_testf("_avl_del() should have failed to delete %s", *strings);
-
-	return failures;
 }
 
-int
+void
 test_getarg(void)
 {
 	/* Test string token parsing */
-
-	int failures = 0;
 
 	char *ptr;
 
@@ -220,19 +173,12 @@ test_getarg(void)
 	assert_strcmp(getarg(&ptr, ' '), "arg6");
 	assert_strcmp(getarg(&ptr, ' '), "arg7");
 	assert_strcmp(getarg(&ptr, ' '), NULL);
-
-	if (failures)
-		printf("\t%d failure%c\n", failures, (failures > 1) ? 's' : 0);
-
-	return failures;
 }
 
-int
+void
 test_parse(void)
 {
 	/* Test the IRC message parsing function */
-
-	int failures = 0;
 
 	parsed_mesg p;
 
@@ -324,19 +270,12 @@ test_parse(void)
 
 	if ((parse(&p, mesg9)) != NULL)
 		fail_test("parse() was expected to fail");
-
-	if (failures)
-		printf("\t%d failure%c\n", failures, (failures > 1) ? 's' : 0);
-
-	return failures;
 }
 
-int
+void
 test_check_pinged(void)
 {
 	/* Test detecting user's nick in message */
-
-	int failures = 0;
 
 	char *nick = "testnick";
 
@@ -367,55 +306,97 @@ test_check_pinged(void)
 	/* Error: message contains username prefix */
 	char *mesg7 = "testing testnickshouldfail testing";
 	assert_equals(check_pinged(mesg7, nick), 0);
-
-	if (failures)
-		printf("\t%d failure%c\n", failures, (failures > 1) ? 's' : 0);
-
-	return failures;
 }
 
-int
+void
 test_word_wrap(void)
 {
-	/* TODO */
-	return 0;
+	/* Test edge cases for word wrap algorithm */
+
+	int len;
+	char *ptr1, *ptr2, *ret, *end;
+
+	/* Test wraping mid-word */
+	char mesg1[] = "testing1 testing2";
+	ptr1 = mesg1, ptr2 = mesg1, end = (mesg1 + strlen(mesg1));
+	len = strlen("testing1 test");
+
+	ret = word_wrap(len, &ptr2, end), *ret = '\0';
+	assert_strcmp(ptr1, "testing1");
+	assert_strcmp(ptr2, "testing2");
+
+	/* Test wrap on whitespace */
+	char mesg2[] = "testing1 testing2";
+	ptr1 = mesg2, ptr2 = mesg2, end = (mesg2 + strlen(mesg2));
+	len = strlen("testing1");
+
+	ret = word_wrap(len, &ptr2, end), *ret = '\0';
+	assert_strcmp(ptr1, "testing1");
+	assert_strcmp(ptr2, "testing2");
+
+	/* Test wrap on extraneous whitespace */
+	char mesg3[] = "testing1     testing2";
+	ptr1 = mesg3, ptr2 = mesg3, end = (mesg3 + strlen(mesg3));
+	len = strlen("testing1   ");
+
+	ret = word_wrap(len, &ptr2, end), *ret = '\0';
+	assert_strcmp(ptr1, "testing1");
+	assert_strcmp(ptr2, "testing2");
+
+	/* Test wrap on exact length */
+	char mesg4[] = "testing1 testing2";
+	ptr1 = mesg4, ptr2 = mesg4, end = (mesg4 + strlen(mesg4));
+	len = strlen("testing1 testing2");
+
+	ret = word_wrap(len, &ptr2, end), *ret = '\0';
+	assert_strcmp(ptr1, "testing1 testing2");
+	assert_strcmp(ptr2, "");
+
+	/* Test whole string fits */
+	char mesg5[] = "testing";
+	ptr1 = mesg5, ptr2 = mesg5, end = (mesg5 + strlen(mesg5));
+	len = strlen("testing") * 2;
+
+	ret = word_wrap(len, &ptr2, end), *ret = '\0';
+	assert_strcmp(ptr1, "testing");
+	assert_strcmp(ptr2, "");
+
+	/* Test all whitespace */
+	char mesg6[] = "                  ";
+	ptr1 = mesg6, ptr2 = mesg6, end = (mesg6 + strlen(mesg6));
+	len = strlen("   ");
+
+	ret = word_wrap(len, &ptr2, end), *ret = '\0';
+	assert_strcmp(ptr1, "");
+	assert_strcmp(ptr2, "");
+
+	/* Test empty string */
+	char mesg7[] = "";
+	ptr1 = mesg7, ptr2 = mesg7, end = (mesg7 + strlen(mesg7));
+	len = strlen("   ");
+
+	ret = word_wrap(len, &ptr2, end), *ret = '\0';
+	assert_strcmp(ptr1, "");
+	assert_strcmp(ptr2, "");
 }
 
-int
+void
 test_count_line_rows(void)
 {
 	/* TODO */
-	return 0;
-}
-
-int
-test_auto_nick(void)
-{
-	/* TODO */
-	return 0;
 }
 
 int
 main(void)
 {
-	printf(__FILE__":\n");
+	testcase tests[] = {
+		&test_avl,
+		&test_parse,
+		&test_getarg,
+		&test_check_pinged,
+		&test_word_wrap,
+		&test_count_line_rows,
+	};
 
-	int failures = 0;
-
-	failures += test_avl();
-	failures += test_parse();
-	failures += test_getarg();
-	failures += test_check_pinged();
-	failures += test_word_wrap();
-	failures += test_count_line_rows();
-	failures += test_auto_nick();
-
-	if (failures) {
-		printf("%d failure%c total\n\n", failures, (failures > 1) ? 's' : 0);
-		exit(EXIT_FAILURE);
-	}
-
-	printf("OK\n\n");
-
-	return EXIT_SUCCESS;
+	return run_tests(tests);
 }
