@@ -194,7 +194,7 @@ send_mesg(char *mesg, channel *chan)
 		mesg++;
 
 		/* Skip the '/' character and try to get the command */
-		if (!(cmd_str = getarg(&mesg, ' '))) {
+		if (!(cmd_str = getarg(&mesg, " "))) {
 			newline(chan, 0, "-!!-", "Messages beginning with '/' require a command");
 			return;
 		}
@@ -278,16 +278,20 @@ send_connect(char *err, char *mesg, channel *c)
 
 	char *host, *port;
 
-	if (!(host = strtok_r(mesg, " :", &mesg))) {
+	if (!(host = getarg(&mesg, " :"))) {
 
-		if (!c->server || c->server->soc >= 0 || c->server->connecting)
+		/* If no hostname arg is given, attempt to reconnect on the current server */
+
+		if (c->server->soc >= 0 || c->server->connecting)
+			fail("Error: Already connected or reconnecting to server");
+
+		if (!c->server)
 			fail("Error: Connect requires a hostname argument");
 
-		/* If no hostname arg and server is disconnected, attempt to reconnect */
 		host = c->server->host;
 		port = c->server->port;
 
-	} else if (!(port = strtok_r(NULL, " ", &mesg)))
+	} else if (!(port = getarg(&mesg, " ")))
 		port = "6667";
 
 	server_connect(host, port);

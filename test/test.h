@@ -35,7 +35,7 @@ static int _assert_strcmp(char*, char*);
 #define assert_strcmp(X, Y) \
 	do { \
 		if (_assert_strcmp(X, Y)) \
-			fail_testf(#X " expected '%s', got '%s'", (Y) ? (Y) : "NULL", (X) ? (X) : "NULL"); \
+			fail_testf(#X " expected '%s', got '%s'", (Y) == NULL ? "NULL" : (Y), (X) == NULL ? "NULL" : (X)); \
 	} while (0)
 
 #define assert_equals(X, Y) \

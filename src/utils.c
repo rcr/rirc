@@ -48,9 +48,9 @@ error(int errnum, const char *fmt, ...)
 }
 
 char*
-getarg(char **str, const char sep)
+getarg(char **str, const char *sep)
 {
-	/* Return a token parsed from *str delimited by sep.
+	/* Return a token parsed from *str delimited by any character in sep.
 	 *
 	 * Consumes all sep characters preceding the token and null terminates it.
 	 *
@@ -61,7 +61,7 @@ getarg(char **str, const char sep)
 	if (str == NULL || (ptr = *str) == NULL)
 		return NULL;
 
-	while (*ptr && *ptr == sep)
+	while (*ptr && strchr(sep, *ptr))
 		ptr++;
 
 	if (*ptr == '\0')
@@ -69,7 +69,7 @@ getarg(char **str, const char sep)
 
 	ret = ptr;
 
-	while (*ptr && *ptr != sep)
+	while (*ptr && !strchr(sep, *ptr))
 		ptr++;
 
 	/* If the string continues after the found arg, set the input to point
@@ -77,7 +77,8 @@ getarg(char **str, const char sep)
 	 *
 	 * This might result in *str pointing to the original string's null
 	 * terminator, in which case the next call to getarg will return NULL */
-	*str = ptr + (*ptr == sep);
+
+	*str = ptr + (*ptr && strchr(sep, *ptr));
 
 	*ptr = '\0';
 
@@ -155,7 +156,7 @@ parse(parsed_mesg *p, char *mesg)
 	}
 
 	/* The command is minimally required for a valid message */
-	if (!(p->command = getarg(&mesg, ' ')))
+	if (!(p->command = getarg(&mesg, " ")))
 		return NULL;
 
 	/* Keep track of the last arg so it can be terminated */

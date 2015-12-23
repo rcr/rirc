@@ -9,7 +9,6 @@ static server mock_s = {
 	.host = "mock-host",
 	.port = "mock-port",
 
-	.soc = -1, /* -1 implies not connected */
 	.connecting = NULL,
 };
 
@@ -42,13 +41,29 @@ server_connect(char *host, char *port)
 void
 test_send_connect(void)
 {
-	/* No args, should attempt to reconnect on the current server */
+	/* No args, connected, should issue an error message */
 	server_connect__called__ = 0;
 	server_connect__host__ = NULL;
 	server_connect__port__ = NULL;
 
+	mock_s.soc = 1; /* Non-negative socket implies connected */
+
 	char str1[] = "";
 	send_connect(err, str1, c);
+
+	assert_equals(server_connect__called__, 0);
+	assert_strcmp(err, "Error: Already connected or reconnecting to server");
+
+
+	/* No args, not connected, should attempt to reconnect on the current server */
+	server_connect__called__ = 0;
+	server_connect__host__ = NULL;
+	server_connect__port__ = NULL;
+
+	mock_s.soc = -1; /* -1 socket implies not connected */
+
+	char str2[] = "";
+	send_connect(err, str2, c);
 
 	assert_equals(server_connect__called__, 1);
 	assert_strcmp(server_connect__host__, "mock-host");
@@ -60,8 +75,8 @@ test_send_connect(void)
 	server_connect__host__ = NULL;
 	server_connect__port__ = NULL;
 
-	char str2[] = "server.tld";
-	send_connect(err, str2, c);
+	char str3[] = "server.tld";
+	send_connect(err, str3, c);
 
 	assert_equals(server_connect__called__, 1);
 	assert_strcmp(server_connect__host__, "server.tld");
@@ -73,8 +88,8 @@ test_send_connect(void)
 	server_connect__host__ = NULL;
 	server_connect__port__ = NULL;
 
-	char str3[] = "server.tld:123";
-	send_connect(err, str3, c);
+	char str4[] = "server.tld:123";
+	send_connect(err, str4, c);
 
 	assert_equals(server_connect__called__, 1);
 	assert_strcmp(server_connect__host__, "server.tld");
@@ -86,8 +101,8 @@ test_send_connect(void)
 	server_connect__host__ = NULL;
 	server_connect__port__ = NULL;
 
-	char str4[] = "server.tld 123";
-	send_connect(err, str4, c);
+	char str5[] = "server.tld 123";
+	send_connect(err, str5, c);
 
 	assert_equals(server_connect__called__, 1);
 	assert_strcmp(server_connect__host__, "server.tld");
