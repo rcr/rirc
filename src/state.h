@@ -15,6 +15,7 @@ void free_channel(channel*);
 void newline(channel*, line_t, const char*, const char*);
 void _newline(channel*, line_t, const char*, const char*, size_t);
 void newlinef(channel*, line_t, const char*, const char*, ...);
+void nicklist_print(channel*);
 void part_channel(channel*);
 
 void init_state(void);

@@ -145,6 +145,7 @@ sendf(char *err, server *s, const char *fmt, ...)
 	return 0;
 }
 
+//FIXME: move the stateful stuff to state.c, only the connection relavent stuff should be here
 void
 server_connect(char *host, char *port)
 {
@@ -214,6 +215,9 @@ connected(server *s)
 
 	sendf(NULL, s, "NICK %s", s->nick);
 	sendf(NULL, s, "USER %s 8 * :%s", config.username, config.realname);
+
+	//FIXME: should the server send nick as is? compare the nick when it's received?
+	//or should auto_nick take a server argument and write to a buffer of NICKSIZE length?
 }
 
 static void*
@@ -286,6 +290,10 @@ threaded_connect_cleanup(void *arg)
 		freeaddrinfo(servinfo);
 }
 
+//TODO:
+#define DISCONNECT_KILL  (1 << 0)
+#define DISCONNECT_ERROR (1 << 1)
+//server_disconnect(server *s, char *mesg, int flags)
 void
 server_disconnect(server *s, int err, int kill, char *mesg)
 {

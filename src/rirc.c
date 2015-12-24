@@ -157,6 +157,13 @@ getopts(int argc, char **argv)
 static void
 configure(void)
 {
+	/* TODO: this should create a series of server objects, and begin a connection on them
+	 * things like autojoin for these servers will be a one-time property of the server
+	 * instead of an awkward global config. in this sense, it will be required for a -c
+	 * configuration to be present before any -j/-p/-n etc */
+	/* Build a linked list of server objects, and delete the linked list as they're sent
+	 * off for connection */
+
 	if (opts.connect) {
 		config.auto_connect = opts.connect;
 		config.auto_port = opts.port ? opts.port : "6667";
@@ -168,6 +175,10 @@ configure(void)
 		config.auto_join = NULL;
 		config.nicks = getenv("USER");
 	}
+
+	//FIXME: these would become global_config as oppose to each s.config
+	//options in this struct can be /set, or :set
+
 	config.username = "rirc_v" VERSION;
 	config.realname = "rirc v" VERSION;
 	config.join_part_quit_threshold = 100;
@@ -212,6 +223,8 @@ startup(void)
 
 	/* FIXME: if the initial connect fails the autojoin channels
 	 * will be used by whatever server next connects */
+	/* TODO: for multiple server on cli, it will be a linked list
+	 * and for each, we will send a server autoconnect and then free it */
 	if (config.auto_connect)
 		server_connect(config.auto_connect, config.auto_port);
 }

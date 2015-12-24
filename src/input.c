@@ -772,6 +772,7 @@ action_send_paste(char c)
 	return 0;
 }
 
+/* TODO: pass channel into this function too */
 static void
 send_input(void)
 {

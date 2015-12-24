@@ -1,5 +1,6 @@
 #include "../src/mesg.c"
 #include "../src/utils.c"
+#include "../src/state.c.mock"
 
 #include "test.h"
 
@@ -13,38 +14,43 @@ static server mock_s = {
 };
 
 static channel mock_c = {
-	.server = &mock_s
+	.server = &mock_s,
+	.name = "mock-channel",
 };
 
 static channel *c = &mock_c;
 
 static char err[MAX_ERROR];
 
-/* TODO:
- * Move this stuff and find a cleaner way to reset these in tests
- * */
-static int server_connect__called__;
-static char *server_connect__host__;
-static char *server_connect__port__;
+/* send handler tests */
 
-void
-server_connect(char *host, char *port)
+/* Ensure all send handlers have a testcase */
+#define X(cmd) static void test_send_##cmd(void);
+HANDLED_SEND_CMDS
+#undef X
+
+static void
+test_send_clear(void)
 {
-	server_connect__called__ = 1;
-
-	server_connect__host__ = host;
-	server_connect__port__ = port;
+	/* TODO */ ;
 }
 
-/* Handler tests */
+static void
+test_send_close(void)
+{
+	/* TODO */ ;
+}
 
-void
+static void
 test_send_connect(void)
 {
+	/* /connect [(host) | (host:port) | (host port)] */
+
 	/* No args, connected, should issue an error message */
 	server_connect__called__ = 0;
 	server_connect__host__ = NULL;
 	server_connect__port__ = NULL;
+	*err = 0;
 
 	mock_s.soc = 1; /* Non-negative socket implies connected */
 
@@ -109,101 +115,171 @@ test_send_connect(void)
 	assert_strcmp(server_connect__port__, "123");
 }
 
+static void
+test_send_ctcp(void)
+{
+	/* /ctcp <target> <message> */
+
+	*err = 0;
+
+	char str1[] = "";
+	send_ctcp(err, str1, c);
+
+	assert_strcmp(err, "Error: /ctcp <target> <command> [arguments]");
+
+
+	*err = 0;
+
+	char str2[] = "target";
+	send_ctcp(err, str2, c);
+
+	assert_strcmp(err, "Error: /ctcp <target> <command> [arguments]");
+
+
+	server_connect__called__ = 0;
+	*sendf__buff__ = 0;
+
+	char str3[] = "target command";
+	send_ctcp(err, str3, c);
+
+	assert_equals(sendf__called__, 1);
+	assert_strcmp(sendf__buff__, "PRIVMSG target :""\x01""COMMAND\x01");
+
+
+	server_connect__called__ = 0;
+	*sendf__buff__ = 0;
+
+	char str4[] = "target coMMand arg1 arg2 arg3";
+	send_ctcp(err, str4, c);
+
+	assert_equals(sendf__called__, 1);
+	assert_strcmp(sendf__buff__, "PRIVMSG target :""\x01""COMMAND arg1 arg2 arg3\x01");
+}
+
+static void
+test_send_disconnect(void)
+{
+	/* TODO */ ;
+}
+
+static void
+test_send_ignore(void)
+{
+	/* /ignore [nick] */
+
+	nicklist_print__called__ = 0;
+
+	char str1[] = "";
+	send_ignore(err, str1, c);
+
+	assert_equals(nicklist_print__called__, 1);
+
+
+	newlinef__called__ = 0;
+	*newlinef__buff__ = 0;
+
+	char str2[] = "ignore_test";
+	send_ignore(err, str2, c);
+
+	assert_equals(newlinef__called__, 1);
+	assert_strcmp(newlinef__buff__, "Ignoring 'ignore_test'");
+
+
+	newlinef__called__ = 0;
+	*err = 0;
+
+	char str3[] = "ignore_test";
+	send_ignore(err, str3, c);
+
+	assert_strcmp(err, "Error: Already ignoring 'ignore_test'");
+}
+
+static void
+test_send_join(void)
+{
+	/* TODO */ ;
+}
+
+static void
+test_send_me(void)
+{
+	/* TODO */ ;
+}
+
+static void
+test_send_msg(void)
+{
+	/* TODO */ ;
+}
+
+static void
+test_send_nick(void)
+{
+	/* TODO */ ;
+}
+
+static void
+test_send_part(void)
+{
+	/* TODO */ ;
+}
+
+static void
+test_send_privmsg(void)
+{
+	/* TODO */ ;
+}
+
+static void
+test_send_quit(void)
+{
+	/* TODO */ ;
+}
+
+static void
+test_send_raw(void)
+{
+	/* TODO */ ;
+}
+
+static void
+test_send_topic(void)
+{
+	/* TODO */ ;
+}
+
+static void
+test_send_unignore(void)
+{
+	/* TODO */ ;
+}
+
+static void
+test_send_version(void)
+{
+	/* TODO */ ;
+}
+
+/* recv handler tests */
+
+static void
+test_recv_join(void)
+{
+
+}
+
 int
 main(void)
 {
 	testcase tests[] = {
-		&test_send_connect,
+		/* Test all send handlers */
+		#define X(cmd) &test_send_##cmd,
+		HANDLED_SEND_CMDS
+		#undef X
+
+		/* TODO: all the other recv commands */
+		&test_recv_join,
 	};
 
 	return run_tests(tests);
-}
-
-/* Stubbed out functions required by hanlders in send/recv methods
- *
- * TODO: The number of functions here is an indication that some refactoring is needed,
- * consider moving this stuff to state.c.mock */
-
-void
-newline(channel *c, line_t type, const char *from, const char *mesg)
-{
-	UNUSED(c);
-	UNUSED(type);
-	UNUSED(from);
-	UNUSED(mesg);
-}
-
-void
-newlinef(channel *c, line_t type, const char *from, const char *mesg, ...)
-{
-	UNUSED(c);
-	UNUSED(type);
-	UNUSED(from);
-	UNUSED(mesg);
-}
-
-channel*
-channel_get(char *chan, server *s)
-{
-	UNUSED(chan);
-	UNUSED(s);
-
-	return NULL;
-}
-
-int
-sendf(char *err, server *s, const char *fmt, ...)
-{
-	UNUSED(err);
-	UNUSED(s);
-	UNUSED(fmt);
-
-	return 0;
-}
-
-channel*
-new_channel(char *name, server *server, channel *chanlist, buffer_t type)
-{
-	UNUSED(name);
-	UNUSED(server);
-	UNUSED(chanlist);
-	UNUSED(type);
-
-	return NULL;
-}
-
-void
-server_disconnect(server *s, int err, int kill, char *mesg)
-{
-	UNUSED(s);
-	UNUSED(err);
-	UNUSED(kill);
-	UNUSED(mesg);
-}
-
-void
-auto_nick(char **autonick, char *nick)
-{
-	UNUSED(autonick);
-	UNUSED(nick);
-}
-
-void
-clear_channel(channel *c)
-{
-	UNUSED(c);
-}
-
-channel*
-channel_close(channel *c)
-{
-	UNUSED(c);
-
-	return NULL;
-}
-
-void
-free_channel(channel *c)
-{
-	UNUSED(c);
 }

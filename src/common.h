@@ -245,6 +245,8 @@ void server_disconnect(server*, int, int, char*);
 
 /* draw.c */
 unsigned int draw;
+//FIXME: draw(state) (should be the only thing rirc needs to know about draw.c
+//       set_draw() as a function
 void redraw(channel*);
 #define draw(X) draw |= X
 #define D_RESIZE (1 << 0)
@@ -275,8 +277,8 @@ void error(int status, const char*, ...);
 void free_avl(avl_node*);
 
 /* Irrecoverable error */
-#define fatal(mesg) do { \
-	error(errno, "ERROR in %s: %s", __func__, mesg); } while (0)
+#define fatal(mesg) \
+	do { error(errno, "ERROR in %s: %s", __func__, mesg); } while (0)
 
 /* mesg.c */
 avl_node* commands;

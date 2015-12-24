@@ -424,6 +424,9 @@ draw_input(channel *c)
 static void
 draw_status(channel *c)
 {
+	/* TODO: this should write the status bar to a buffer, up until the ---- terminator,
+	 * and then use that to print to the terminal */
+
 	printf(CURSOR_SAVE);
 	printf(MOVE(%d, 1) CLEAR_LINE FG(%d), term_rows - 1, NEUTRAL_FG);
 

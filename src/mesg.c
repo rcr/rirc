@@ -1,6 +1,3 @@
-/* For strtok_r */
-#define _POSIX_C_SOURCE 200112L
-
 #include <ctype.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -108,6 +105,7 @@ static int send_unhandled(char*, char*, char*, channel*);
 struct command { int (*fptr)(char*, char*, channel*); };
 static struct command* new_command(int (*fptr)(char*, char*, channel*));
 
+//TODO: mimic the send handler macros and build/free a tree of handlers
 /* Message receiving handlers */
 static int recv_ctcp_req(char*, parsed_mesg*, server*);
 static int recv_ctcp_rpl(char*, parsed_mesg*);
@@ -222,6 +220,7 @@ send_mesg(char *mesg, channel *chan)
 		newline(chan, 0, "-!!-", errbuff);
 }
 
+//TODO: move this function to state?
 void
 send_paste(char *paste)
 {
@@ -230,6 +229,7 @@ send_paste(char *paste)
 	UNUSED(paste);
 }
 
+//TODO: this can be just moved up to send_mesg?
 static int
 send_unhandled(char *err, char *cmd, char *args, channel *c)
 {
@@ -291,8 +291,9 @@ send_connect(char *err, char *mesg, channel *c)
 		host = c->server->host;
 		port = c->server->port;
 
-	} else if (!(port = getarg(&mesg, " ")))
+	} else if (!(port = getarg(&mesg, " "))) {
 		port = "6667";
+	}
 
 	server_connect(host, port);
 
@@ -306,7 +307,7 @@ send_ctcp(char *err, char *mesg, channel *c)
 
 	char *targ, *p;
 
-	if (!(targ = strtok_r(mesg, " ", &mesg)))
+	if (!(targ = getarg(&mesg, " ")))
 		fail("Error: /ctcp <target> <command> [arguments]");
 
 	/* Crude to check that at least some ctcp command exists */
@@ -385,16 +386,14 @@ send_ignore(char *err, char *mesg, channel *c)
 	if (!c->server)
 		fail("Error: Not connected to server");
 
-	if (!(nick = strtok(mesg, " "))) {
-		newline(c, 0, "TODO", "Ignoring:");
-		/* TODO print ignore list*/
-		return 0;
-	}
+	if (!(nick = getarg(&mesg, " ")))
+		nicklist_print(c);
 
-	if (!avl_add(&(c->server->ignore), nick, NULL))
+	else if (!avl_add(&(c->server->ignore), nick, NULL))
 		failf("Error: Already ignoring '%s'", nick);
 
-	newlinef(c, 0, "--", "Ignoring '%s'", nick);
+	else
+		newlinef(c, 0, "--", "Ignoring '%s'", nick);
 
 	return 0;
 }
@@ -406,7 +405,7 @@ send_join(char *err, char *mesg, channel *c)
 
 	char *targ;
 
-	if ((targ = strtok(mesg, " ")))
+	if ((targ = getarg(&mesg, " ")))
 		return sendf(err, c->server, "JOIN %s", targ);
 
 	if (c->buffer_type == BUFFER_SERVER)
@@ -436,7 +435,7 @@ send_nick(char *err, char *mesg, channel *c)
 
 	char *nick;
 
-	if ((nick = strtok(mesg, " ")))
+	if ((nick = getarg(&mesg, " ")))
 		return sendf(err, c->server, "NICK %s", mesg);
 
 	if (!c->server)
@@ -454,7 +453,7 @@ send_part(char *err, char *mesg, channel *c)
 
 	char *targ;
 
-	if ((targ = strtok_r(mesg, " ", &mesg)))
+	if ((targ = getarg(&mesg, " ")))
 		return sendf(err, c->server, "PART %s :%s", targ, (*mesg) ? mesg : DEFAULT_QUIT_MESG);
 
 	if (c->buffer_type == BUFFER_SERVER)
@@ -477,7 +476,7 @@ send_privmsg(char *err, char *mesg, channel *c)
 	char *targ;
 	channel *cc;
 
-	if (!(targ = strtok_r(mesg, " ", &mesg)))
+	if (!(targ = getarg(&mesg, " ")))
 		fail("Error: Private messages require a target");
 
 	if (*mesg == '\0')
@@ -485,6 +484,7 @@ send_privmsg(char *err, char *mesg, channel *c)
 
 	fail_if(sendf(err, c->server, "PRIVMSG %s :%s", targ, mesg));
 
+	/* FIXME: wait.... cc? does newline go to cc then not c? is this true elsewhere?*/
 	if ((cc = channel_get(targ, c->server)) == NULL)
 		cc = new_channel(targ, c->server, c, BUFFER_PRIVATE);
 
@@ -530,16 +530,14 @@ send_unignore(char *err, char *mesg, channel *c)
 	if (!c->server)
 		fail("Error: Not connected to server");
 
-	if (!(nick = strtok(mesg, " "))) {
-		newline(c, 0, "TODO", "Ignoring:");
-		/* TODO print ignore list*/
-		return 0;
-	}
+	if (!(nick = getarg(&mesg, " ")))
+		nicklist_print(c);
 
-	if (!avl_del(&(c->server->ignore), nick))
+	else if (!avl_del(&(c->server->ignore), nick))
 		failf("Error: '%s' not on ignore list", nick);
 
-	newlinef(c, 0, "--", "No longer ignoring '%s'", nick);
+	else
+		newlinef(c, 0, "--", "No longer ignoring '%s'", nick);
 
 	return 0;
 }
@@ -578,7 +576,7 @@ send_version(char *err, char *mesg, channel *c)
 		return 0;
 	}
 
-	if ((targ = strtok(mesg, " ")))
+	if ((targ = getarg(&mesg, " ")))
 		return sendf(err, c->server, "VERSION %s", targ);
 	else
 		return sendf(err, c->server, "VERSION");
@@ -673,14 +671,14 @@ recv_ctcp_req(char *err, parsed_mesg *p, server *s)
 	if (avl_get(ccur->server->ignore, p->from, strlen(p->from)))
 		return 0;
 
-	if (!(targ = strtok(p->params, " ")))
+	if (!(targ = getarg(&p->params, " ")))
 		fail("CTCP: target is null");
 
-	if (!(mesg = strtok(p->trailing, "\x01")))
+	if (!(mesg = getarg(&p->trailing, "\x01")))
 		fail("CTCP: invalid markup");
 
 	/* Markup is valid, get command */
-	if (!(cmd = strtok_r(mesg, " ", &mesg)))
+	if (!(cmd = getarg(&mesg, " ")))
 		fail("CTCP: command is null");
 
 	/* Handle the CTCP request if supported */
@@ -784,11 +782,11 @@ recv_ctcp_rpl(char *err, parsed_mesg *p)
 	if (avl_get(ccur->server->ignore, p->from, strlen(p->from)))
 		return 0;
 
-	if (!(mesg = strtok(p->trailing, "\x01")))
+	if (!(mesg = getarg(&p->trailing, "\x01")))
 		fail("CTCP: invalid markup");
 
 	/* Markup is valid, get command */
-	if (!(cmd = strtok_r(mesg, " ", &mesg)))
+	if (!(cmd = getarg(&mesg, " ")))
 		fail("CTCP: command is null");
 
 	newlinef(ccur, 0, p->from, "CTCP %s reply: %s", cmd, mesg);
@@ -819,20 +817,7 @@ recv_join(char *err, parsed_mesg *p, server *s)
 	if (!p->from)
 		fail("JOIN: sender's nick is null");
 
-	/* FIXME:
-	 *
-	 * the channel name can come as the param or trailing... when its in the trailing
-	 * we might try strtok(p->params, " ") first BUT this is NULL so strtok is repeating
-	 * it's previous search!
-	 *
-	 * so clearly we do need some sort of strsep like function that simply returns NULL
-	 * if input is NULL and doesn't try to continue parsing whatever it happens to point to
-	 *
-	 * */
-	/* FIXME: temporary fix for the above issue */
-	if (!p->params)
-		p->params = p->trailing;
-	if (!(chan = strtok(p->params, " ")))
+	if (!(chan = getarg(&p->params, " ")) && !(chan = getarg(&p->trailing, " ")))
 		fail("JOIN: channel is null");
 
 	if (IS_ME(p->from)) {
@@ -873,10 +858,10 @@ recv_kick(char *err, parsed_mesg *p, server *s)
 	if (!p->from)
 		fail("KICK: sender's nick is null");
 
-	if (!(chan = strtok_r(p->params, " ", &p->params)))
+	if (!(chan = getarg(&p->params, " ")))
 		fail("KICK: channel is null");
 
-	if (!(user = strtok_r(p->params, " ", &p->params)))
+	if (!(user = getarg(&p->params, " ")))
 		fail("KICK: user is null");
 
 	if ((c = channel_get(chan, s)) == NULL)
@@ -927,7 +912,7 @@ recv_mode(char *err, parsed_mesg *p, server *s)
 	if (!p->from)
 		fail("MODE: sender's nick is null");
 
-	if (!(targ = strtok(p->params, " ")))
+	if (!(targ = getarg(&p->params, " ")))
 		fail("MODE: target is null");
 
 	/* FIXME: is this true?? why do i even get mode message then? */
@@ -1086,10 +1071,7 @@ recv_nick(char *err, parsed_mesg *p, server *s)
 		fail("NICK: old nick is null");
 
 	/* Some servers seem to send the new nick in the trailing */
-	/* FIXME: temporary fix for the issue strtok issue */
-	if (!p->params)
-		p->params = p->trailing;
-	if (!(nick = strtok(p->params, " ")))
+	if (!(nick = getarg(&p->params, " ")) && !(nick = getarg(&p->trailing, " ")))
 		fail("NICK: new nick is null");
 
 	if (IS_ME(p->from)) {
@@ -1130,7 +1112,7 @@ recv_notice(char *err, parsed_mesg *p, server *s)
 	if (avl_get(ccur->server->ignore, p->from, strlen(p->from)))
 		return 0;
 
-	if (!(targ = strtok(p->params, " ")))
+	if (!(targ = getarg(&p->params, " ")))
 		fail("NOTICE: target is null");
 
 	if ((c = channel_get(targ, s)))
@@ -1160,7 +1142,7 @@ recv_numeric(char *err, parsed_mesg *p, server *s)
 	}
 
 	/* Message target is only used to establish s->nick when registering with a server */
-	if (!(targ = strtok_r(p->params, " ", &p->params))) {
+	if (!(targ = getarg(&p->params, " "))) {
 		server_fatal(s, "NUMERIC: target is null");
 		return 1;
 	}
@@ -1240,7 +1222,7 @@ num_200:
 	/* 328 <channel> :<url> */
 	case RPL_CHANNEL_URL:
 
-		if (!(chan = strtok_r(p->params, " ", &p->params)))
+		if (!(chan = getarg(&p->params, " ")))
 			fail("RPL_CHANNEL_URL: channel is null");
 
 		if ((c = channel_get(chan, s)) == NULL)
@@ -1253,7 +1235,7 @@ num_200:
 	/* 332 <channel> :<topic> */
 	case RPL_TOPIC:
 
-		if (!(chan = strtok_r(p->params, " ", &p->params)))
+		if (!(chan = getarg(&p->params, " ")))
 			fail("RPL_TOPIC: channel is null");
 
 		if ((c = channel_get(chan, s)) == NULL)
@@ -1266,13 +1248,13 @@ num_200:
 	/* 333 <channel> <nick> <time> */
 	case RPL_TOPICWHOTIME:
 
-		if (!(chan = strtok_r(p->params, " ", &p->params)))
+		if (!(chan = getarg(&p->params, " ")))
 			fail("RPL_TOPICWHOTIME: channel is null");
 
-		if (!(nick = strtok_r(p->params, " ", &p->params)))
+		if (!(nick = getarg(&p->params, " ")))
 			fail("RPL_TOPICWHOTIME: nick is null");
 
-		if (!(time = strtok_r(p->params, " ", &p->params)))
+		if (!(time = getarg(&p->params, " ")))
 			fail("RPL_TOPICWHOTIME: time is null");
 
 		if ((c = channel_get(chan, s)) == NULL)
@@ -1289,10 +1271,10 @@ num_200:
 	case RPL_NAMREPLY:
 
 		/* @:secret   *:private   =:public */
-		if (!(type = strtok_r(p->params, " ", &p->params)))
+		if (!(type = getarg(&p->params, " ")))
 			fail("RPL_NAMEREPLY: type is null");
 
-		if (!(chan = strtok_r(p->params, " ", &p->params)))
+		if (!(chan = getarg(&p->params, " ")))
 			fail("RPL_NAMEREPLY: channel is null");
 
 		if ((c = channel_get(chan, s)) == NULL)
@@ -1300,7 +1282,7 @@ num_200:
 
 		c->type_flag = *type;
 
-		while ((nick = strtok_r(p->trailing, " ", &p->trailing))) {
+		while ((nick = getarg(&p->trailing, " "))) {
 			if (*nick == '@' || *nick == '+')
 				nick++;
 			if (avl_add(&c->nicklist, nick, NULL))
@@ -1322,7 +1304,7 @@ num_200:
 	case RPL_LUSERUNKNOWN:   /* 253 <int> :Unknown connections */
 	case RPL_LUSERCHANNELS:  /* 254 <int> :Channels formed */
 
-		if (!(num = strtok_r(p->params, " ", &p->params)))
+		if (!(num = getarg(&p->params, " ")))
 			num = "NULL";
 
 		newlinef(s->channel, 0, "--", "%s %s", num, p->trailing);
@@ -1359,7 +1341,7 @@ num_400:
 
 	case ERR_CANNOTSENDTOCHAN:  /* <channel> :<reason> */
 
-		if (!(chan = strtok_r(p->params, " ", &p->params)))
+		if (!(chan = getarg(&p->params, " ")))
 			fail("ERR_CANNOTSENDTOCHAN: channel is null");
 
 		/* Channel buffer might not exist */
@@ -1375,7 +1357,7 @@ num_400:
 
 	case ERR_ERRONEUSNICKNAME:  /* 432 <nick> :<reason> */
 
-		if (!(nick = strtok_r(p->params, " ", &p->params)))
+		if (!(nick = getarg(&p->params, " ")))
 			fail("ERR_ERRONEUSNICKNAME: nick is null");
 
 		newlinef(s->channel, 0, "-!!-", "'%s' - %s", nick, p->trailing);
@@ -1383,7 +1365,7 @@ num_400:
 
 	case ERR_NICKNAMEINUSE:  /* 433 <nick> :Nickname is already in use */
 
-		if (!(nick = strtok(p->params, " ")))
+		if (!(nick = getarg(&p->params, " ")))
 			fail("ERR_NICKNAMEINUSE: nick is null");
 
 		newlinef(s->channel, 0, "-!!-", "Nick '%s' in use", nick);
@@ -1418,7 +1400,7 @@ recv_part(char *err, parsed_mesg *p, server *s)
 	if (!p->from)
 		fail("PART: sender's nick is null");
 
-	if (!(targ = strtok_r(p->params, " ", &p->params)))
+	if (!(targ = getarg(&p->params, " ")))
 		fail("PART: target is null");
 
 	if (IS_ME(p->from)) {
@@ -1508,7 +1490,7 @@ recv_priv(char *err, parsed_mesg *p, server *s)
 	if (avl_get(ccur->server->ignore, p->from, strlen(p->from)))
 		return 0;
 
-	if (!(targ = strtok_r(p->params, " ", &p->params)))
+	if (!(targ = getarg(&p->params, " ")))
 		fail("PRIVMSG: target is null");
 
 	/* Find the target channel */
@@ -1573,7 +1555,7 @@ recv_topic(char *err, parsed_mesg *p, server *s)
 	if (!p->from)
 		fail("TOPIC: sender's nick is null");
 
-	if (!(targ = strtok_r(p->params, " ", &p->params)))
+	if (!(targ = getarg(&p->params, " ")))
 		fail("TOPIC: target is null");
 
 	if (!p->trailing)

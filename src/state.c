@@ -22,12 +22,24 @@ extern int term_rows, term_cols;
 
 /* Global state of rirc */
 
+
 /* TODO: move all current global state from elsewhere to here */
+/* TODO: subdivide by drawn component */
 #if 0
+/* TODO: in progress */
+static void nav_set_frame_L(void);
+static void nav_set_frame_R(void);
+static void nav_set_frame_C(void);
+
 static struct
 {
 	channel *current_channel;
 	channel *default_channel; /* The serverless 'rirc' buffer */
+
+	struct {
+		channel *frame_L;
+		channel *frame_R;
+	} nav;
 } state;
 #endif
 
@@ -231,6 +243,12 @@ action_close_server(char c)
 	}
 
 	return 0;
+}
+
+void
+nicklist_print(channel *c)
+{
+	newline(c, 0, "TODO", "Print ignore list to channel");
 }
 
 void
