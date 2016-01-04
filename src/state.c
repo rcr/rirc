@@ -5,6 +5,7 @@
  *
  **/
 
+#include <ctype.h>
 #include <stdlib.h>
 #include <string.h>
 #include <strings.h>
@@ -252,15 +253,22 @@ nicklist_print(channel *c)
 }
 
 void
-part_channel(channel *c)
+reset_channel(channel *c)
 {
-	/* Set the state of a parted channel */
+	memset(c->chanmodes, 0, MODE_SIZE);
 
 	free_avl(c->nicklist);
 
-	c->chanmode = 0;
 	c->nick_count = 0;
 	c->nicklist = NULL;
+}
+
+void
+part_channel(channel *c)
+{
+	/* Set the state of a parted channel */
+	reset_channel(c);
+
 	c->parted = 1;
 }
 
@@ -424,4 +432,64 @@ auto_nick(char **autonick, char *nick)
 	*nick = '\0';
 }
 
+static void
+set_mode_str(char mode_str[MODE_SIZE], const char *modes)
+{
+	/* Given a string of modes, eg: +abc, add or remove flags
+	 * from the mode_str set, maintaining alphabetic order */
 
+	char *ptr, pm = 0;
+
+	while (*modes) {
+
+		if (*modes == '-' || *modes == '+')
+			pm = *modes;
+
+		/* Silently skip invalid flags */
+		else if (!isalpha(*modes) || !pm)
+			;
+
+		/* Add flags */
+		else if (pm == '+' && !strchr(mode_str, *modes)) {
+
+			char *tmp;
+
+			/* Find location to insert, alphabetically */
+			for (ptr = mode_str; *ptr && *ptr < *modes; ptr++)
+				;
+
+			/* Shift flags */
+			for (tmp = strchr(mode_str, '\0') + 1; tmp > ptr; tmp--)
+				*tmp = *(tmp - 1);
+
+			*ptr = *modes;
+		}
+
+		/* Remove flags, if found */
+		else if (pm == '-' && (ptr = strchr(mode_str, *modes))) {
+			do {
+				*ptr = *(ptr + 1);
+			} while (*ptr++);
+		}
+
+		modes++;
+	}
+}
+
+void
+server_set_mode(server *s, const char *modes)
+{
+	set_mode_str(s->usermodes, modes);
+
+	if (ccur->server == s)
+		draw(D_STATUS);
+}
+
+void
+channel_set_mode(channel *c, const char *modes)
+{
+	set_mode_str(c->chanmodes, modes);
+
+	if (ccur == c)
+		draw(D_STATUS);
+}

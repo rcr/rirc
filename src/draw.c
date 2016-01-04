@@ -31,19 +31,15 @@
 #define CURSOR_SAVE    "\x1b[s"
 #define CURSOR_RESTORE "\x1b[u"
 
-#ifndef NEUTRAL_FG
+/* TODO: move these things to config file, fix colour issues */
 #define NEUTRAL_FG 239
-#endif
-#ifndef MSG_DEFAULT_FG
 #define MSG_DEFAULT_FG 250
-#endif
-#ifndef MSG_GREEN_FG
 #define MSG_GREEN_FG 113
-#endif
-#ifndef QUOTE_CHAR
 #define QUOTE_CHAR '>'
-#endif
-
+static int nick_colours[] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14};
+static int actv_cols[ACTIVITY_T_SIZE] = {239, 247, 3};
+//#define SEPARATOR "―"
+#define SEPARATOR "-"
 
 static void resize(void);
 static void draw_buffer(channel*);
@@ -54,9 +50,6 @@ static void draw_status(channel*);
 static int nick_col(char*);
 
 int term_rows, term_cols;
-
-static int nick_colours[] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14};
-static int actv_cols[ACTIVITY_T_SIZE] = {239, 247, 3};
 
 void
 redraw(channel *c)
@@ -75,6 +68,17 @@ redraw(channel *c)
 	fflush(stdout);
 }
 
+static int
+nick_col(char *nick)
+{
+	int colour = 0;
+
+	while (*nick)
+		colour += *nick++;
+
+	return nick_colours[colour % sizeof(nick_colours) / sizeof(nick_colours[0])];
+}
+
 static void
 resize(void)
 {
@@ -91,7 +95,7 @@ resize(void)
 
 	/* Draw upper separator */
 	for (int i = 0; i < term_cols; i++)
-		printf("―");
+		printf(SEPARATOR);
 
 	/* Draw bottom bar, set color back to default */
 	printf(MOVE(%d, 1) " >>> " FG(%d), term_rows, MSG_DEFAULT_FG);
@@ -376,7 +380,7 @@ draw_input(channel *c)
 	/* Action messages override the input bar */
 	if (action_message) {
 		printf(MOVE(%d, 6) CLEAR_RIGHT FG(%d) "%s",
-				term_rows, NEUTRAL_FG, action_message);
+				term_rows, MSG_DEFAULT_FG, action_message);
 		return;
 	}
 
@@ -391,7 +395,7 @@ draw_input(channel *c)
 		in->window = (in->window - winsz > in->line->text)
 			? in->window - winsz : in->line->text;
 
-	printf(MOVE(%d, 6) CLEAR_RIGHT FG(%d), term_rows, NEUTRAL_FG);
+	printf(MOVE(%d, 6) CLEAR_RIGHT FG(%d), term_rows, MSG_DEFAULT_FG);
 
 	char *p = in->window;
 	while (p < in->head)
@@ -409,79 +413,94 @@ draw_input(channel *c)
 	printf(MOVE(%d, %d), term_rows, col + 6);
 }
 
-/* TODO:
- * - Could use some cleaning up
- * - Add scrollback status
- * */
-/* Statusbar:
- *
- * server / private chat:
- * --[usermodes]---
- *
- * channel:
- * --[usermodes]--[chantype chanmodes chancount]---
- * */
 static void
 draw_status(channel *c)
 {
-	/* TODO: this should write the status bar to a buffer, up until the ---- terminator,
-	 * and then use that to print to the terminal */
+	/* TODO: scrollback status */
+
+	/* server / private chat:
+	 * --[usermodes]--(latency)-
+	 *
+	 * channel:
+	 * --[usermodes]--[chancount chantype chanmodes]/[priv]--(latency)-
+	 * */
+
+	if (term_cols < 3)
+		return;
 
 	printf(CURSOR_SAVE);
 	printf(MOVE(%d, 1) CLEAR_LINE FG(%d), term_rows - 1, NEUTRAL_FG);
 
-	int i = 0, j, mode;
-	char umode_str[] = UMODE_STR;
-	char cmode_str[] = CMODE_STR;
+	/* Print status to temporary buffer */
+	char status_buff[term_cols + 1];
 
-	/* usermodes */
-	if (c->server && (mode = c->server->usermode)) {
-		i += printf("―[+") - 2;
-		for (j = 0; j < UMODE_MAX; j++) {
-			if (mode & (1 << j)) {
-				putchar(umode_str[j]);
-				i++;
-			}
-		}
-		i += printf("]");
+	int ret, col = 0;
+
+	memset(status_buff, 0, term_cols + 1);
+
+	/* -[usermodes]-*/
+	if (c->server && *c->server->usermodes) {
+		ret = snprintf(status_buff + col, term_cols - col + 1, "%s", SEPARATOR "[+");
+		if (ret < 0 || (col += ret) >= term_cols)
+			goto print_status;
+
+		ret = snprintf(status_buff + col, term_cols - col + 1, "%s", c->server->usermodes);
+		if (ret < 0 || (col += ret) >= term_cols)
+			goto print_status;
+
+		ret = snprintf(status_buff + col, term_cols - col + 1, "%s", "]" SEPARATOR);
+		if (ret < 0 || (col += ret) >= term_cols)
+			goto print_status;
 	}
 
-	/* private chat */
+	/* If private chat buffer:
+	 * -[priv]- */
 	if (c->buffer_type == BUFFER_PRIVATE) {
-		i += printf("―[priv]") - 2;
-	/* chantype, chanmodes, chancount */
-	} else if (c->buffer_type == BUFFER_CHANNEL) {
-		i += printf("―[%c", c->type_flag) - 2;
-
-		if ((mode = c->chanmode)) {
-			i += printf(" +");
-			for (j = 0; j < CMODE_MAX; j++) {
-				if (mode & (1 << j)) {
-					putchar(cmode_str[j]);
-					i++;
-				}
-			}
-		}
-		i += printf(" %d]", c->nick_count);
+		ret = snprintf(status_buff + col, term_cols - col + 1, "%s", SEPARATOR "[priv]" SEPARATOR);
+		if (ret < 0 || (col += ret) >= term_cols)
+			goto print_status;
 	}
 
-	/* If ccur's server is timing out, display latency */
-	if (c->server && c->server->latency_delta)
-		i += printf("―(%llds)", (long long) c->server->latency_delta);
+	/* If IRC channel buffer:
+	 * -[chancount chantype chanmodes]- */
+	if (c->buffer_type == BUFFER_CHANNEL) {
 
-	for (; i < term_cols; i++)
-		printf("―");
+		ret = snprintf(status_buff + col, term_cols - col + 1, SEPARATOR "[%d", c->nick_count);
+		if (ret < 0 || (col += ret) >= term_cols)
+			goto print_status;
+
+		if (c->type_flag) {
+			ret = snprintf(status_buff + col, term_cols - col + 1, " %c", c->type_flag);
+			if (ret < 0 || (col += ret) >= term_cols)
+				goto print_status;
+		}
+
+		if (*c->chanmodes) {
+			ret = snprintf(status_buff + col, term_cols - col + 1, " +%s", c->chanmodes);
+			if (ret < 0 || (col += ret) >= term_cols)
+				goto print_status;
+		}
+
+		ret = snprintf(status_buff + col, term_cols - col + 1, "%s", "]" SEPARATOR);
+		if (ret < 0 || (col += ret) >= term_cols)
+			goto print_status;
+	}
+
+	/* -(latency)- */
+	if (c->server && c->server->latency_delta) {
+		ret = snprintf(status_buff + col, term_cols - col + 1,
+				SEPARATOR "(%llds)" SEPARATOR , (long long) c->server->latency_delta);
+		if (ret < 0 || (col += ret) >= term_cols)
+			goto print_status;
+	}
+
+print_status:
+
+	printf(status_buff);
+
+	/* Trailing separator */
+	while (col++ < term_cols)
+		printf(SEPARATOR);
 
 	printf(CURSOR_RESTORE);
-}
-
-static int
-nick_col(char *nick)
-{
-	int colour = 0;
-
-	while (*nick)
-		colour += *nick++;
-
-	return nick_colours[colour % sizeof(nick_colours) / sizeof(nick_colours[0])];
 }

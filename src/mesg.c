@@ -586,6 +586,8 @@ send_version(char *err, char *mesg, channel *c)
  * Message receiving handlers
  * */
 
+/* FIXME: lots of incorrect instances of ccur below */
+
 void
 recv_mesg(char *inp, int count, server *s)
 {
@@ -904,157 +906,75 @@ recv_kick(char *err, parsed_mesg *p, server *s)
 static int
 recv_mode(char *err, parsed_mesg *p, server *s)
 {
-	/* :nick!user@hostname.domain MODE <targ> :<flags> */
+	/* :nick!user@hostname.domain MODE <targ> *( ( "-" / "+" ) *<modes> *<modeparams> ) */
 
-	int modebit;
-	char *targ, *flags, plusminus = '\0';
-
-	if (!p->from)
-		fail("MODE: sender's nick is null");
+	channel *c;
+	char *targ;
 
 	if (!(targ = getarg(&p->params, " ")))
 		fail("MODE: target is null");
 
-	/* FIXME: is this true?? why do i even get mode message then? */
-	/* Flags can be null */
-	if (!(flags = p->trailing))
-		return 0;
+	/* If the target channel isn't found,  */
+	if (IS_ME(targ))
+		c = s->channel;
+	else
+		c = channel_get(targ, s);
 
-	channel *c;
-	if ((c = channel_get(targ, s))) {
+	char *modes, *modeparams, *modetmp = NULL;
 
-		int *chanmode = &c->chanmode;
+	/* FIXME: Some servers do this...
+	 * MODE user :+abc
+	 * MODE #chan +abc
+	 *
+	 * instead, getarg(parsed_mesg) should try params, then trailing
+	 * */
+	while ((modes = modetmp) || (modes = getarg(&p->params, " ")) || (modes = getarg(&p->trailing, " "))) {
 
-		newlinef(c, 0, "--", "%s set %s mode: [%s]", p->from, targ, flags);
+		if (!(*modes == '+') && !(*modes == '-'))
+			fail("MODE: invalid mode format");
 
-		/* Chanmodes */
-		do {
-			switch (*flags) {
-				case '+':
-				case '-':
-					plusminus = *flags;
-					continue;
-				case 'O':
-					modebit = CMODE_O;
-					break;
-				case 'o':
-					modebit = CMODE_o;
-					break;
-				case 'v':
-					modebit = CMODE_v;
-					break;
-				case 'a':
-					modebit = CMODE_a;
-					break;
-				case 'i':
-					modebit = CMODE_i;
-					break;
-				case 'm':
-					modebit = CMODE_m;
-					break;
-				case 'n':
-					modebit = CMODE_n;
-					break;
-				case 'q':
-					modebit = CMODE_q;
-					break;
-				case 'p':
-					modebit = CMODE_p;
-					break;
-				case 's':
-					modebit = CMODE_s;
-					break;
-				case 'r':
-					modebit = CMODE_r;
-					break;
-				case 't':
-					modebit = CMODE_t;
-					break;
-				case 'k':
-					modebit = CMODE_k;
-					break;
-				case 'l':
-					modebit = CMODE_l;
-					break;
-				case 'b':
-					modebit = CMODE_b;
-					break;
-				case 'e':
-					modebit = CMODE_e;
-					break;
-				case 'I':
-					modebit = CMODE_I;
-					break;
-				default:
-					newlinef(s->channel, 0, "-!!-", "Unknown mode '%c'", *flags);
-					continue;
-			}
+		/* Modeparams are optional, and only used for printing when present */
+		if ((modeparams = getarg(&p->params, " ")) && (*modeparams == '+' || *modeparams == '-'))
+			/* modeparam here is actually a modestring, set modetmp for the next iteration to use */
+			modetmp = modeparams;
+		else
+			modetmp = NULL;
 
-			if (plusminus == '\0')
-				failf("MODE: invalid format (%s)", p->trailing);
-
-			if (plusminus == '+')
-				*chanmode |= modebit;
+		/* Having c set means the target is the server modes or a specific channel's modes */
+		if (c) {
+			if (IS_ME(targ))
+				server_set_mode(s, modes);
 			else
-				*chanmode &= ~modebit;
+				channel_set_mode(c, modes);
 
-		} while (*(++flags) != '\0');
-	}
+			/* [<user> set ]<target> mode: [<mode>][ <modeparams>] */
+			newlinef(c, 0, "--", "%s%s%s mode: [%s%s%s]",
+				(p->from ? p->from : ""),
+				(p->from ? " set " : ""),
+				targ,
+				modes,
+				(modeparams ? " " : ""),
+				(modeparams ? modeparams : "")
+			);
+		} else {
 
-	if (IS_ME(targ)) {
+			/* If the channel isn't found, search for the target as a user in all channels
+			 * and print where found */
+			c = s->channel;
 
-		int *usermode = &s->usermode;
-
-		newlinef(s->channel, 0, "--", "%s mode: [%s]", targ, flags);
-
-		/* Usermodes */
-		do {
-			switch (*flags) {
-				case '+':
-				case '-':
-					plusminus = *flags;
-					continue;
-				case 'a':
-					modebit = UMODE_a;
-					break;
-				case 'i':
-					modebit = UMODE_i;
-					break;
-				case 'w':
-					modebit = UMODE_w;
-					break;
-				case 'r':
-					modebit = UMODE_r;
-					break;
-				case 'R':
-					modebit = UMODE_R;
-					break;
-				case 'o':
-					modebit = UMODE_o;
-					break;
-				case 'O':
-					modebit = UMODE_O;
-					break;
-				case 's':
-					modebit = UMODE_s;
-					break;
-				default:
-					newlinef(s->channel, 0, "-!!-", "Unknown mode '%c'", *flags);
-					continue;
-			}
-
-			if (plusminus == '\0')
-				failf("MODE: invalid format (%s)", p->trailing);
-
-			if (plusminus == '+')
-				*usermode |= modebit;
-			else
-				*usermode &= ~modebit;
-
-		} while (*(++flags) != '\0');
-	} else {
-		/* TODO: Usermode for other users */
-		newlinef(s->channel, 0, "--", "%s mode: [%s]", targ, flags);
+			do {
+				if (avl_get(c->nicklist, targ, strlen(targ)))
+					/* [<user> set ]<target> mode: [<mode>][ <modeparams>] */
+					newlinef(c, 0, "--", "%s%s%s mode: [%s%s%s]",
+						(p->from ? p->from : ""),
+						(p->from ? " set " : ""),
+						targ,
+						modes,
+						(modeparams ? " " : ""),
+						(modeparams ? modeparams : "")
+					);
+			} while ((c = c->next) != s->channel);
+		}
 	}
 
 	return 0;

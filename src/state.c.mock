@@ -99,6 +99,20 @@ server_disconnect(server *s, int err, int kill, char *mesg)
 }
 
 void
+channel_set_mode(channel *c, const char *modes)
+{
+	UNUSED(c);
+	UNUSED(modes);
+}
+
+void
+server_set_mode(server *s, const char *modes)
+{
+	UNUSED(s);
+	UNUSED(modes);
+}
+
+void
 auto_nick(char **autonick, char *nick)
 {
 	UNUSED(autonick);

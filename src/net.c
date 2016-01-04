@@ -340,8 +340,8 @@ server_disconnect(server *s, int err, int kill, char *mesg)
 		close(s->soc);
 
 		/* Set all server attributes back to default */
+		memset(s->usermodes, 0, MODE_SIZE);
 		s->soc = -1;
-		s->usermode = 0;
 		s->iptr = s->input;
 		s->nptr = config.nicks;
 		s->latency_delta = 0;
@@ -354,11 +354,7 @@ server_disconnect(server *s, int err, int kill, char *mesg)
 		do {
 			newline(c, 0, "-!!-", "(disconnected)");
 
-			c->chanmode = 0;
-			c->nick_count = 0;
-
-			free_avl(c->nicklist);
-			c->nicklist = NULL;
+			reset_channel(c);
 
 		} while ((c = c->next) != s->channel);
 	}

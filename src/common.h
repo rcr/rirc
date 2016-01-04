@@ -1,6 +1,9 @@
 #ifndef COMMON_H
 #define COMMON_H
 
+#include <time.h>
+#include <errno.h>
+
 #define VERSION "0.1"
 
 #define SCROLLBACK_BUFFER 200
@@ -10,6 +13,7 @@
 #define CHANSIZE 256
 #define MAX_INPUT 256
 #define RECONNECT_DELTA 15
+#define MODE_SIZE (26 * 2) + 1 /* Supports modes [az-AZ] */
 
 /* When tab completing a nick at the beginning of the line, append the following char */
 #define TAB_COMPLETE_DELIMITER ':'
@@ -19,43 +23,6 @@
 /* Required so input lines can be safely strcpy'ed into a send buffer */
 #error BUFFSIZE must be greater than MAX_INPUT
 #endif
-
-//FIXME: just use an ascii sized buffer and let servers use whatever flag they want
-/* Chan modes */
-#define CMODE_STR "OovaimnqpsrtklbeI"
-#define CMODE_O (1 << 0) /* give "channel creator" status */
-#define CMODE_o (1 << 1) /* give/take channel operator privilege */
-#define CMODE_v (1 << 2) /* give/take voice privilege */
-#define CMODE_a (1 << 3) /* anonymous channel */
-#define CMODE_i (1 << 4) /* invite-only channel */
-#define CMODE_m (1 << 5) /* moderated channel */
-#define CMODE_n (1 << 6) /* no messages to channel from the outside */
-#define CMODE_q (1 << 7) /* quiet channel */
-#define CMODE_p (1 << 8) /* private channel */
-#define CMODE_s (1 << 9) /* secret channel */
-#define CMODE_r (1 << 11) /* server reop channel */
-#define CMODE_t (1 << 12) /* topic settable by channel operator only */
-#define CMODE_k (1 << 13) /* set/remove channel password */
-#define CMODE_l (1 << 14) /* set/remove user limit */
-#define CMODE_b (1 << 15) /* set/remove ban mask */
-#define CMODE_e (1 << 16) /* set/remove exception mask to override a ban */
-#define CMODE_I (1 << 17) /* set/remove mask override invite-only flag */
-#define CMODE_MAX 18
-
-/* User modes */
-#define UMODE_STR "aiwrRoOs"
-#define UMODE_a (1 << 0) /* away */
-#define UMODE_i (1 << 1) /* invisible */
-#define UMODE_w (1 << 2) /* receiving wallops */
-#define UMODE_r (1 << 3) /* restricted user connection */
-#define UMODE_R (1 << 4) /* registered nicknames only*/
-#define UMODE_o (1 << 5) /* operator */
-#define UMODE_O (1 << 6) /* local operator */
-#define UMODE_s (1 << 7) /* receiving server notices */
-#define UMODE_MAX 8
-
-#include <time.h>
-#include <errno.h>
 
 /* Error message length */
 #define MAX_ERROR 512
@@ -182,7 +149,7 @@ typedef struct channel
 	buffer_t buffer_type;
 	char name[CHANSIZE];
 	char type_flag;
-	int chanmode;
+	char chanmodes[MODE_SIZE];
 	int nick_count;
 	int parted;
 	int resized;
@@ -208,8 +175,8 @@ typedef struct server
 	char nick[NICKSIZE + 1];
 	char *nptr;
 	char *port;
+	char usermodes[MODE_SIZE];
 	int soc;
-	int usermode;
 	int pinging;
 	struct avl_node *ignore;
 	struct channel *channel;
