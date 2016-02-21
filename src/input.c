@@ -228,6 +228,7 @@ input_cchar(char c)
 			/* Cancel current input */
 			ccur->input->head = ccur->input->line->text;
 			ccur->input->tail = ccur->input->line->text + MAX_INPUT;
+			ccur->input->window = ccur->input->line->text;
 			draw(D_INPUT);
 			break;
 
