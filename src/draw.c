@@ -9,6 +9,7 @@
 
 #include "common.h"
 #include "state.h"
+#include "config.h"
 
 /* Set foreground/background color */
 #define FG(X) "\x1b[38;5;"#X"m"
@@ -30,16 +31,6 @@
 /* Save and restore the cursor's location */
 #define CURSOR_SAVE    "\x1b[s"
 #define CURSOR_RESTORE "\x1b[u"
-
-/* TODO: move these things to config file, fix colour issues */
-#define NEUTRAL_FG 239
-#define MSG_DEFAULT_FG 250
-#define MSG_GREEN_FG 113
-#define QUOTE_CHAR '>'
-static int nick_colours[] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14};
-static int actv_cols[ACTIVITY_T_SIZE] = {239, 247, 3};
-//#define SEPARATOR "―"
-#define SEPARATOR "-"
 
 static void resize(void);
 static void draw_buffer(channel*);
@@ -95,7 +86,7 @@ resize(void)
 
 	/* Draw upper separator */
 	for (int i = 0; i < term_cols; i++)
-		printf(SEPARATOR);
+		printf(HORIZONTAL_SEPARATOR);
 
 	/* Draw bottom bar, set color back to default */
 	printf(MOVE(%d, 1) " >>> " FG(%d), term_rows, MSG_DEFAULT_FG);
@@ -225,7 +216,7 @@ draw_buffer(channel *c)
 
 		do {
 			printf(MOVE(%d, %d) CLEAR_LINE, print_row++, (int)c->draw.nick_pad + 10);
-			printf(FG(%d) "~" FG(%d) " ", NEUTRAL_FG, text_fg);
+			printf(FG(%d) VERTICAL_SEPARATOR FG(%d) " ", NEUTRAL_FG, text_fg);
 
 			char *print = ptr1;
 			char *wrap = word_wrap(text_cols, &ptr1, ptr2);
@@ -292,7 +283,7 @@ draw_buffer(channel *c)
 				MSG_GREEN_FG : MSG_DEFAULT_FG);
 		
 		/* Line sender and separator */
-		printf("%s" FG(%d) BG_R " ~ " FG(%d),
+		printf("%s" FG(%d) BG_R VERTICAL_SEPARATOR FG(%d),
 				l->from, NEUTRAL_FG, text_fg);
 
 		while (print < wrap)
@@ -304,7 +295,7 @@ draw_buffer(channel *c)
 		/* Draw any line continuations */
 		while (*ptr1) {
 			printf(MOVE(%d, %d) CLEAR_LINE, print_row++, (int)c->draw.nick_pad + 10);
-			printf(FG(%d) "~" FG(%d) " ", NEUTRAL_FG, text_fg);
+			printf(FG(%d) LINE_CONTINUATION FG(%d) " ", NEUTRAL_FG, text_fg);
 
 			char *print = ptr1;
 			char *wrap = word_wrap(text_cols, &ptr1, ptr2);
@@ -440,7 +431,7 @@ draw_status(channel *c)
 
 	/* -[usermodes]-*/
 	if (c->server && *c->server->usermodes) {
-		ret = snprintf(status_buff + col, term_cols - col + 1, "%s", SEPARATOR "[+");
+		ret = snprintf(status_buff + col, term_cols - col + 1, "%s", HORIZONTAL_SEPARATOR "[+");
 		if (ret < 0 || (col += ret) >= term_cols)
 			goto print_status;
 
@@ -448,7 +439,7 @@ draw_status(channel *c)
 		if (ret < 0 || (col += ret) >= term_cols)
 			goto print_status;
 
-		ret = snprintf(status_buff + col, term_cols - col + 1, "%s", "]" SEPARATOR);
+		ret = snprintf(status_buff + col, term_cols - col + 1, "%s", "]" HORIZONTAL_SEPARATOR);
 		if (ret < 0 || (col += ret) >= term_cols)
 			goto print_status;
 	}
@@ -456,7 +447,7 @@ draw_status(channel *c)
 	/* If private chat buffer:
 	 * -[priv]- */
 	if (c->buffer_type == BUFFER_PRIVATE) {
-		ret = snprintf(status_buff + col, term_cols - col + 1, "%s", SEPARATOR "[priv]" SEPARATOR);
+		ret = snprintf(status_buff + col, term_cols - col + 1, "%s", HORIZONTAL_SEPARATOR "[priv]" HORIZONTAL_SEPARATOR);
 		if (ret < 0 || (col += ret) >= term_cols)
 			goto print_status;
 	}
@@ -465,7 +456,7 @@ draw_status(channel *c)
 	 * -[chancount chantype chanmodes]- */
 	if (c->buffer_type == BUFFER_CHANNEL) {
 
-		ret = snprintf(status_buff + col, term_cols - col + 1, SEPARATOR "[%d", c->nick_count);
+		ret = snprintf(status_buff + col, term_cols - col + 1, HORIZONTAL_SEPARATOR "[%d", c->nick_count);
 		if (ret < 0 || (col += ret) >= term_cols)
 			goto print_status;
 
@@ -481,7 +472,7 @@ draw_status(channel *c)
 				goto print_status;
 		}
 
-		ret = snprintf(status_buff + col, term_cols - col + 1, "%s", "]" SEPARATOR);
+		ret = snprintf(status_buff + col, term_cols - col + 1, "%s", "]" HORIZONTAL_SEPARATOR);
 		if (ret < 0 || (col += ret) >= term_cols)
 			goto print_status;
 	}
@@ -489,7 +480,7 @@ draw_status(channel *c)
 	/* -(latency)- */
 	if (c->server && c->server->latency_delta) {
 		ret = snprintf(status_buff + col, term_cols - col + 1,
-				SEPARATOR "(%llds)" SEPARATOR , (long long) c->server->latency_delta);
+				HORIZONTAL_SEPARATOR "(%llds)" HORIZONTAL_SEPARATOR , (long long) c->server->latency_delta);
 		if (ret < 0 || (col += ret) >= term_cols)
 			goto print_status;
 	}
@@ -500,7 +491,7 @@ print_status:
 
 	/* Trailing separator */
 	while (col++ < term_cols)
-		printf(SEPARATOR);
+		printf(HORIZONTAL_SEPARATOR);
 
 	printf(CURSOR_RESTORE);
 }
