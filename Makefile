@@ -18,6 +18,10 @@ SRC_T = $(wildcard $(TDIR)/*.c)
 OBJ_T = $(patsubst $(TDIR)%.c,$(TDIR_O)%.test,$(SRC_T))
 TDIR_O = $(TDIR)/bld
 
+$(SDIR)/config.h:
+	@echo creating $@ from config.def.h
+	@cp $(SDIR)/config.def.h $@
+
 rirc: $(OBJ)
 	$(CC) $(LDFLAGS) -o $@ $^
 
