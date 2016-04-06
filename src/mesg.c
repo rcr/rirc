@@ -436,7 +436,7 @@ send_nick(char *err, char *mesg, channel *c)
 	char *nick;
 
 	if ((nick = getarg(&mesg, " ")))
-		return sendf(err, c->server, "NICK %s", mesg);
+		return sendf(err, c->server, "NICK %s", nick);
 
 	if (!c->server)
 		fail("Error: Not connected to server");

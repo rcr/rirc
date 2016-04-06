@@ -10,6 +10,8 @@ static server mock_s = {
 	.host = "mock-host",
 	.port = "mock-port",
 
+	.nick = "mock-nick",
+
 	.connecting = NULL,
 };
 
@@ -215,7 +217,26 @@ test_send_msg(void)
 static void
 test_send_nick(void)
 {
-	/* TODO */ ;
+	/* /nick [nick] */
+
+	newlinef__called__ = 0;
+	*newlinef__buff__ = 0;
+
+	char str1[] = "";
+	send_nick(err, str1, c);
+
+	assert_equals(newlinef__called__, 1);
+	assert_strcmp(newlinef__buff__, "Your nick is mock-nick");
+
+
+	server_connect__called__ = 0;
+	*sendf__buff__ = 0;
+
+	char str2[] = "nick_test";
+	send_nick(err, str2, c);
+
+	assert_equals(sendf__called__, 1);
+	assert_strcmp(sendf__buff__, "NICK nick_test");
 }
 
 static void
