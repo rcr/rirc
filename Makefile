@@ -6,7 +6,7 @@ SDIR = src
 TDIR = test
 
 # Common header files
-HDS = $(SDIR)/common.h
+HDS = $(SDIR)/common.h $(SDIR)/config.h
 
 # Source and object files
 SRC = $(wildcard $(SDIR)/*.c)
@@ -18,9 +18,11 @@ SRC_T = $(wildcard $(TDIR)/*.c)
 OBJ_T = $(patsubst $(TDIR)%.c,$(TDIR_O)%.test,$(SRC_T))
 TDIR_O = $(TDIR)/bld
 
-$(SDIR)/config.h:
+default: rirc
+
+$(SDIR)/config.h: config.def.h
 	@echo creating $@ from config.def.h
-	@cp $(SDIR)/config.def.h $@
+	@cp config.def.h $@
 
 rirc: $(OBJ)
 	$(CC) $(LDFLAGS) -o $@ $^
@@ -43,4 +45,4 @@ clean:
 	@echo cleaning
 	@rm -f rirc $(SDIR_O)/*.o $(TDIR_O)/*.test
 
-.PHONY: clean
+.PHONY: clean default
