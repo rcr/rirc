@@ -181,38 +181,39 @@ new_command(int (*fptr)(char*, char*, channel *c))
 void
 send_mesg(char *mesg, channel *chan)
 {
-	/* Handle an input line */
+	/* Handle the input to a channel, ie:
+	 *	- a default message to the channel
+	 *	- a default message to the channel beginning with '/'
+	 *	- a handled command beginning with '/'
+	 *	- an unhandled command beginning with '/'
+	 */
 
 	char *cmd_str, errbuff[MAX_ERROR];
 	const avl_node *cmd;
 	int err = 0;
 
 	if (*mesg == '/') {
-		/* Input is a command, skip '/' character */
+
 		mesg++;
 
-		/* Skip the '/' character and try to get the command */
-		if (!(cmd_str = getarg(&mesg, " "))) {
+		if (*mesg == '/')
+			err = send_default(errbuff, mesg, chan);
+
+		else if (!(cmd_str = getarg(&mesg, " ")))
 			newline(chan, 0, "-!!-", "Messages beginning with '/' require a command");
-			return;
-		}
 
-		/* Check if command is defined, and retrieve the handler */
-		if (!(cmd = avl_get(commands, cmd_str, strlen(cmd_str)))) {
+		else if (!(cmd = avl_get(commands, cmd_str, strlen(cmd_str))))
 			newlinef(chan, 0, "-!!-", "Unknown command: '%s'", cmd_str);
-			return;
+
+		else {
+			struct command *c = (struct command*)(cmd->val);
+
+			if (c)
+				err = c->fptr(errbuff, mesg, chan);
+			else
+				err = send_unhandled(errbuff, cmd_str, mesg, chan);
 		}
-
-		struct command *c = (struct command*)(cmd->val);
-
-		/* If the command has no explicit handler, send the input line as-is */
-		if (c)
-			err = c->fptr(errbuff, mesg, chan);
-		else
-			err = send_unhandled(errbuff, cmd_str, mesg, chan);
-
 	} else {
-		/* Non command message, send as privmesg to current buffer */
 		err = send_default(errbuff, mesg, chan);
 	}
 
@@ -229,7 +230,6 @@ send_paste(char *paste)
 	UNUSED(paste);
 }
 
-//TODO: this can be just moved up to send_mesg?
 static int
 send_unhandled(char *err, char *cmd, char *args, channel *c)
 {
@@ -237,7 +237,7 @@ send_unhandled(char *err, char *cmd, char *args, channel *c)
 
 	char *ptr;
 
-	/* /command -> COMMAND */
+	/* command -> COMMAND */
 	for (ptr = cmd; *ptr; ptr++)
 		*ptr = toupper(*ptr);
 
