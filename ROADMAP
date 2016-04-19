@@ -87,9 +87,9 @@ Make sure all the thread related code is using thread-safe functions,
 and that proper cancellation points are used. Make sure no resources
 can be left hanging (eg: sockets left open when a thread is canceled?)
 
-A configuration file and parser
-
 Parsing 004/005 numeric for server specific configuration
+	-> parse PREFIX=(abc)xyz and use this to fix mode messages that are setting,
+	   for example, channel +o when the arg is a username in the channel
 
 buffer logging
 

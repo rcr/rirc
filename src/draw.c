@@ -1,6 +1,8 @@
-/* Draw the elements in state.c to the terminal
- * using terminal using vt-100 compatible escape codes
- * */
+/* draw.c
+ *
+ * Draw the elements in state.c to the terminal.
+ *
+ * Assumes vt-100 compatible escape codes, as such YMMV */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -9,16 +11,14 @@
 
 #include "common.h"
 #include "state.h"
+/* FIXME: this has to be included after common.h for activity cols */
 #include "config.h"
 
-/* Set foreground/background color */
+/* Set foreground/background colour */
 #define FG(X) "\x1b[38;5;"#X"m"
 #define BG(X) "\x1b[48;5;"#X"m"
 
-/* Set bold foreground bold color */
-#define FG_B(X) "\x1b[38;5;"#X";1m"
-
-/* Reset foreground/background color */
+/* Reset foreground/background colour */
 #define FG_R "\x1b[39m"
 #define BG_R "\x1b[49m"
 
@@ -32,15 +32,18 @@
 #define CURSOR_SAVE    "\x1b[s"
 #define CURSOR_RESTORE "\x1b[u"
 
+#define SEPARATOR_FG_COL FG_R
+#define SEPARATOR_BG_COL BG_R
+
 static void resize(void);
 static void draw_buffer(channel*);
-static void draw_chans(channel*);
+static void draw_nav(struct state const*);
 static void draw_input(channel*);
 static void draw_status(channel*);
 
 static int nick_col(char*);
 
-int term_rows, term_cols;
+unsigned int term_rows, term_cols;
 
 void
 redraw(channel *c)
@@ -49,8 +52,11 @@ redraw(channel *c)
 
 	if (draw & D_RESIZE) resize();
 
+	struct state const* st = get_state();
+
+	//TODO: pass st to other draw functions
 	if (draw & D_BUFFER) draw_buffer(c);
-	if (draw & D_CHANS)  draw_chans(c);
+	if (draw & D_CHANS)  draw_nav(st);
 	if (draw & D_INPUT)  draw_input(c);
 	if (draw & D_STATUS) draw_status(c);
 
@@ -70,34 +76,43 @@ nick_col(char *nick)
 	return nick_colours[colour % sizeof(nick_colours) / sizeof(nick_colours[0])];
 }
 
+/* TODO: this sets some global state...
+ *
+ * instead, resize() should be a function in state.c, this should be renamed
+ * draw_full or similar, and should be passed in the state object like the others,
+ * term_cols, term_rows should be moved out of common.h and into the state struct */
 static void
 resize(void)
 {
+	unsigned int i;
 	struct winsize w;
 
 	/* Get terminal dimensions */
 	ioctl(0, TIOCGWINSZ, &w);
 
-	term_rows = w.ws_row;
-	term_cols = w.ws_col;
+	term_rows = (w.ws_row > 0) ? w.ws_row : 0;
+	term_cols = (w.ws_col > 0) ? w.ws_col : 0;
 
-	/* Clear, move to top separator and set color */
-	printf(CLEAR_FULL MOVE(2, 1) FG(%d), NEUTRAL_FG);
+	/* Clear, move to top separator */
+	printf(CLEAR_FULL MOVE(2, 1));
 
 	/* Draw upper separator */
-	for (int i = 0; i < term_cols; i++)
+	printf(SEPARATOR_FG_COL SEPARATOR_BG_COL);
+	for (i = 0; i < term_cols; i++)
 		printf(HORIZONTAL_SEPARATOR);
 
-	/* Draw bottom bar, set color back to default */
-	printf(MOVE(%d, 1) " >>> " FG(%d), term_rows, MSG_DEFAULT_FG);
+	/* Draw bottom bar, set colour back to default */
+	printf(FG_R BG_R);
+	printf(MOVE(%d, 1) " >>> ", term_rows);
 
 	/* Mark all buffers as resized for next draw */
 	rirc->resized = 1;
 
 	channel *c = ccur;
+
 	do {
 		c->resized = 1;
-	} while ((c = channel_switch(c, 1)) != ccur);
+	} while ((c = channel_get_next(c)) != ccur);
 
 	/* Draw everything else */
 	draw(D_FULL);
@@ -105,7 +120,7 @@ resize(void)
 
 /* TODO:
  *
- * Colorize line types
+ * Colourize line types
  *
  * Functional first draft, could use some cleaning up */
 static void
@@ -121,7 +136,7 @@ draw_buffer(channel *c)
 	 * Rows are numbered from the top down, 1 to term_rows, so for term_rows = N,
 	 * the drawable area for the buffer is bounded [r3, rN-2]:
 	 *      __________________________
-	 * r1   |     (channel bar)      |
+	 * r1   |         (nav)          |
 	 * r2   |------------------------|
 	 * r3   |    ::buffer start::    |
 	 *      |                        |
@@ -129,7 +144,7 @@ draw_buffer(channel *c)
 	 *      |                        |
 	 * rN-2 |     ::buffer end::     |
 	 * rN-1 |------------------------|
-	 * rN   |______(input bar) ______|
+	 * rN   |________(input)_________|
 	 *
 	 *
 	 * So the general steps for drawing are:
@@ -158,8 +173,12 @@ draw_buffer(channel *c)
 	int count_row = 0;
 
 	/* Insufficient rows for drawing */
-	if (buffer_end < buffer_start)
+	if (buffer_end < buffer_start) {
+		printf(CURSOR_RESTORE);
 		return;
+	}
+
+	printf(FG_R BG_R);
 
 	/* (#terminal columns) - strlen((widest nick in c)) - strlen(" HH:MM   ~ ") */
 	int text_cols = term_cols - c->draw.nick_pad - 11;
@@ -325,39 +344,125 @@ clear_remainder:
 	printf(CURSOR_RESTORE);
 }
 
-/* TODO:
+
+/* TODO
  *
- * For non-default port, include it with the server name,
- * eg: localhost:9999
+ * | [server-name[:port]] *#chan |
  *
- * Keep the current channel 'framed' similar to the input bar
- *
- * either (#channel) for disconnected/parted channels
- * or a different color/background color
+ * - Disconnected/parted channels are printed (#chan)
+ * - Servers with non-standard ports are printed: server-name:port
+ * - Channels that won't fit are printed at a minimum: #...
+ *     - eg: | ...chan #chan2 chan3 |   Right printing
+ *           | #chan1 #chan2 #ch... |   Left printing
  * */
 static void
-draw_chans(channel *ccur)
+draw_nav(struct state const* st)
 {
+	/* Dynamically draw the nav such that:
+	 *
+	 *  - The current channel is kept framed while navigating
+	 *  - Channels are coloured based on their current activity
+	 *  - The nav is kept framed between the first and last channels
+	 */
+
 	printf(CURSOR_SAVE);
 	printf(MOVE(1, 1) CLEAR_LINE);
 
-	int len, width = 0;
+	static channel *frame_prev, *frame_next;
 
-	/* FIXME: temporary fix */
-	channel *c = (ccur == rirc) ? ccur : ccur->server->channel;
+	channel *tmp, *c = st->current_channel;
 
-	do {
-		len = strlen(c->name);
-		if (width + len + 4 < term_cols) {
+	channel *c_first = channel_get_first();
+	channel *c_last = channel_get_last();
 
-			printf(FG(%d) "  %s  ", (c == ccur) ? 255 : actv_cols[c->active], c->name);
+	/* By default assume drawing starts towards the next channel */
+	unsigned int nextward = 1;
 
-			width += len + 4;
-			c = c->next;
+	size_t len, total_len = 0;
+
+	/* Bump the channel frames, if applicable */
+	if ((total_len = (strlen(c->name) + 2)) >= term_cols) {
+		printf(CURSOR_RESTORE);
+		return;
+	} else if (c == frame_prev && frame_prev != c_first) {
+		frame_prev = channel_get_prev(frame_prev);
+	} else if (c == frame_next && frame_next != c_last) {
+		frame_next = channel_get_next(frame_next);
+	}
+
+	/* Calculate the new frames */
+	channel *tmp_prev = c, *tmp_next = c;
+
+	for (;;) {
+
+		if (tmp_prev == c_first || tmp_prev == frame_prev) {
+
+			/* Pad out nextward */
+
+			tmp = channel_get_next(tmp_next);
+			len = strlen(tmp->name);
+
+			while ((total_len += (len + 2)) < term_cols && tmp != c_first) {
+
+				tmp_next = tmp;
+
+				tmp = channel_get_next(tmp);
+				len = strlen(tmp->name);
+			}
+
+			break;
 		}
-		else break;
-	/* FIXME: temporary fix */
-	} while (c != rirc && c != ccur->server->channel);
+
+		if (tmp_next == c_last || tmp_next == frame_next) {
+
+			/* Pad out prevward */
+
+			tmp = channel_get_prev(tmp_prev);
+			len = strlen(tmp->name);
+
+			while ((total_len += (len + 2)) < term_cols && tmp != c_last) {
+
+				tmp_prev = tmp;
+
+				tmp = channel_get_prev(tmp);
+				len = strlen(tmp->name);
+			}
+
+			break;
+		}
+
+
+		tmp = nextward ? channel_get_next(tmp_next) : channel_get_prev(tmp_prev);
+		len = strlen(tmp->name);
+
+		/* Next channel doesn't fit */
+		if ((total_len += (len + 2)) >= term_cols)
+			break;
+
+		if (nextward)
+			tmp_next = tmp;
+		else
+			tmp_prev = tmp;
+
+		nextward = !nextward;
+	}
+
+	frame_prev = tmp_prev;
+	frame_next = tmp_next;
+
+	/* Draw coloured channel names, from frame to frame */
+	for (c = frame_prev; ; c = channel_get_next(c)) {
+
+		/* Set print colour and print name */
+		if (printf(FG(%d), (c == st->current_channel) ? 255 : actv_cols[c->active]) < 0)
+			break;
+
+		if (printf(" %s ", c->name) < 0)
+			break;
+
+		if (c == frame_next)
+			break;
+	}
 
 	printf(CURSOR_RESTORE);
 }
@@ -375,7 +480,7 @@ draw_input(channel *c)
 		return;
 	}
 
-	int winsz = term_cols / 3;
+	unsigned int winsz = term_cols / 3;
 
 	input *in = c->input;
 
@@ -410,26 +515,32 @@ draw_status(channel *c)
 	/* TODO: scrollback status */
 
 	/* server / private chat:
-	 * --[usermodes]--(latency)-
+	 * |--[usermodes]--(latency)---...|
 	 *
 	 * channel:
-	 * --[usermodes]--[chancount chantype chanmodes]/[priv]--(latency)-
+	 * |--[usermodes]--[chancount chantype chanmodes]/[priv]--(latency)---...|
 	 * */
 
-	if (term_cols < 3)
-		return;
-
 	printf(CURSOR_SAVE);
-	printf(MOVE(%d, 1) CLEAR_LINE FG(%d), term_rows - 1, NEUTRAL_FG);
+	printf(MOVE(%d, 1) CLEAR_LINE, term_rows - 1);
+
+	/* Insufficient columns for meaningful status */
+	if (term_cols < 3) {
+		printf(CURSOR_RESTORE);
+		return;
+	}
+
+	printf(SEPARATOR_FG_COL SEPARATOR_BG_COL);
 
 	/* Print status to temporary buffer */
 	char status_buff[term_cols + 1];
 
-	int ret, col = 0;
+	int ret;
+	unsigned int col = 0;
 
 	memset(status_buff, 0, term_cols + 1);
 
-	/* -[usermodes]-*/
+	/* -[usermodes] */
 	if (c->server && *c->server->usermodes) {
 		ret = snprintf(status_buff + col, term_cols - col + 1, "%s", HORIZONTAL_SEPARATOR "[+");
 		if (ret < 0 || (col += ret) >= term_cols)
@@ -439,21 +550,21 @@ draw_status(channel *c)
 		if (ret < 0 || (col += ret) >= term_cols)
 			goto print_status;
 
-		ret = snprintf(status_buff + col, term_cols - col + 1, "%s", "]" HORIZONTAL_SEPARATOR);
+		ret = snprintf(status_buff + col, term_cols - col + 1, "%s", "]");
 		if (ret < 0 || (col += ret) >= term_cols)
 			goto print_status;
 	}
 
 	/* If private chat buffer:
-	 * -[priv]- */
+	 * -[priv] */
 	if (c->buffer_type == BUFFER_PRIVATE) {
-		ret = snprintf(status_buff + col, term_cols - col + 1, "%s", HORIZONTAL_SEPARATOR "[priv]" HORIZONTAL_SEPARATOR);
+		ret = snprintf(status_buff + col, term_cols - col + 1, "%s", HORIZONTAL_SEPARATOR "[priv]");
 		if (ret < 0 || (col += ret) >= term_cols)
 			goto print_status;
 	}
 
 	/* If IRC channel buffer:
-	 * -[chancount chantype chanmodes]- */
+	 * -[chancount chantype chanmodes] */
 	if (c->buffer_type == BUFFER_CHANNEL) {
 
 		ret = snprintf(status_buff + col, term_cols - col + 1, HORIZONTAL_SEPARATOR "[%d", c->nick_count);
@@ -472,15 +583,15 @@ draw_status(channel *c)
 				goto print_status;
 		}
 
-		ret = snprintf(status_buff + col, term_cols - col + 1, "%s", "]" HORIZONTAL_SEPARATOR);
+		ret = snprintf(status_buff + col, term_cols - col + 1, "%s", "]");
 		if (ret < 0 || (col += ret) >= term_cols)
 			goto print_status;
 	}
 
-	/* -(latency)- */
+	/* -(latency) */
 	if (c->server && c->server->latency_delta) {
 		ret = snprintf(status_buff + col, term_cols - col + 1,
-				HORIZONTAL_SEPARATOR "(%llds)" HORIZONTAL_SEPARATOR , (long long) c->server->latency_delta);
+				HORIZONTAL_SEPARATOR "(%llds)", (long long) c->server->latency_delta);
 		if (ret < 0 || (col += ret) >= term_cols)
 			goto print_status;
 	}

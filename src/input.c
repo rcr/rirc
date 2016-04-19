@@ -30,9 +30,6 @@
 /* Max length of user action message */
 #define MAX_ACTION_MESG 256
 
-/* Defined in draw.c */
-extern int term_cols;
-
 /* Static buffer that accepts input from stdin */
 static char input_buff[MAX_PASTE];
 
@@ -242,25 +239,25 @@ input_cchar(char c)
 		/* ^L */
 		case 0x0C:
 			/* Clear current channel */
-			clear_channel(ccur);
-			break;
-
-		/* ^N */
-		case 0x10:
-			/* Go to next channel */
-			ccur = channel_switch(ccur, 0);
+			channel_clear(ccur);
 			break;
 
 		/* ^P */
-		case 0x0E:
+		case 0x10:
 			/* Go to previous channel */
-			ccur = channel_switch(ccur, 1);
+			channel_move_prev();
+			break;
+
+		/* ^N */
+		case 0x0E:
+			/* Go to next channel */
+			channel_move_next();
 			break;
 
 		/* ^X */
 		case 0x18:
 			/* Close current channel */
-			ccur = channel_close(ccur);
+			channel_close(ccur);
 			break;
 
 		/* ^U */
@@ -604,14 +601,14 @@ search_channels(channel *start, char *search)
 		return NULL;
 
 	/* Start the search one past the input */
-	channel *c = channel_switch(start, 1);
+	channel *c = channel_get_next(start);
 
 	while (c != start) {
 
 		if (strstr(c->name, search))
 			return c;
 
-		c = channel_switch(c, 1);
+		c = channel_get_next(c);
 	}
 
 	return NULL;
@@ -629,7 +626,7 @@ action_find_channel(char c)
 	/* \n confirms selecting the current match */
 	if (c == '\n' && search_cptr) {
 		*(search_ptr = search_buff) = '\0';
-		ccur = search_cptr;
+		channel_set_current(search_cptr);
 		search_cptr = NULL;
 		draw(D_FULL);
 		return 1;

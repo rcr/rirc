@@ -120,17 +120,15 @@ auto_nick(char **autonick, char *nick)
 }
 
 void
-clear_channel(channel *c)
+channel_clear(channel *c)
 {
 	UNUSED(c);
 }
 
-channel*
+void
 channel_close(channel *c)
 {
 	UNUSED(c);
-
-	return NULL;
 }
 
 void
@@ -147,4 +145,16 @@ nicklist_print(channel *c)
 	UNUSED(c);
 
 	nicklist_print__called__ = 1;
+}
+
+struct state const*
+get_state(void)
+{
+	return NULL;
+}
+
+void
+channel_set_current(channel *c)
+{
+	UNUSED(c);
 }

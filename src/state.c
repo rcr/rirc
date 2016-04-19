@@ -17,60 +17,38 @@
 
 static int action_close_server(char);
 
-/* TODO: move to state struct */
-/* Defined in draw.c */
-extern int term_rows, term_cols;
+static void _newline(channel*, line_t, const char*, const char*, size_t);
 
-/* Global state of rirc */
+static struct state state;
 
-
-/* TODO: move all current global state from elsewhere to here */
-/* TODO: subdivide by drawn component */
-#if 0
-/* TODO: in progress */
-static void nav_set_frame_L(void);
-static void nav_set_frame_R(void);
-static void nav_set_frame_C(void);
-
-static struct
-{
-	channel *current_channel;
-	channel *default_channel; /* The serverless 'rirc' buffer */
-
-	struct {
-		channel *frame_L;
-		channel *frame_R;
-	} nav;
-} state;
-#endif
+struct state const* get_state(void) { return &state; }
 
 void
 init_state(void)
 {
-	/* TODO: move these to state struct */
-	rirc = ccur = new_channel("rirc", NULL, NULL, BUFFER_OTHER);
+	state.default_channel = state.current_channel = new_channel("rirc", NULL, NULL, BUFFER_OTHER);
 
 	/* Splashscreen */
-	newline(rirc, 0, "--", "      _");
-	newline(rirc, 0, "--", " _ __(_)_ __ ___");
-	newline(rirc, 0, "--", "| '__| | '__/ __|");
-	newline(rirc, 0, "--", "| |  | | | | (__");
-	newline(rirc, 0, "--", "|_|  |_|_|  \\___|");
-	newline(rirc, 0, "--", "");
-	newline(rirc, 0, "--", " - version " VERSION);
-	newline(rirc, 0, "--", " - compiled " __DATE__ ", " __TIME__);
+	newline(state.default_channel, 0, "--", "      _");
+	newline(state.default_channel, 0, "--", " _ __(_)_ __ ___");
+	newline(state.default_channel, 0, "--", "| '__| | '__/ __|");
+	newline(state.default_channel, 0, "--", "| |  | | | | (__");
+	newline(state.default_channel, 0, "--", "|_|  |_|_|  \\___|");
+	newline(state.default_channel, 0, "--", "");
+	newline(state.default_channel, 0, "--", " - version " VERSION);
+	newline(state.default_channel, 0, "--", " - compiled " __DATE__ ", " __TIME__);
 #ifdef DEBUG
-	newline(rirc, 0, "--", " - compiled with DEBUG flags");
+	newline(state.default_channel, 0, "--", " - compiled with DEBUG flags");
 #endif
 
-	/* Init a full redraw */
+	/* Initiate a full redraw */
 	draw(D_RESIZE);
 }
 
 void
 free_state(void)
 {
-	free_channel(rirc);
+	free_channel(state.default_channel);
 }
 
 void
@@ -97,7 +75,7 @@ newlinef(channel *c, line_t type, const char *from, const char *fmt, ...)
 	_newline(c, type, from, buff, len);
 }
 
-void
+static void
 _newline(channel *c, line_t type, const char *from, const char *mesg, size_t len)
 {
 	/* Static function for handling inserting new lines into buffers */
@@ -172,7 +150,10 @@ new_channel(char *name, server *server, channel *chanlist, buffer_t type)
 	c->draw.scrollback = c->buffer_head;
 
 	/* TODO: if channel name length exceeds CHANSIZE we'll never appropriately
-	 * associate incomming messages with this channel anyways so it shouldn't be allowed */
+	 * associate incomming messages with this channel anyways so it shouldn't be allowed
+	 *
+	 * also... this length never changes and is strlen'ed often when drawing the nav,
+	 * consider caching it as size_t */
 	strncpy(c->name, name, CHANSIZE);
 
 	/* Append the new channel to the list */
@@ -198,6 +179,9 @@ free_channel(channel *c)
 channel*
 channel_get(char *chan, server *s)
 {
+	if (!s)
+		return NULL;
+
 	channel *c = s->channel;
 
 	do {
@@ -210,7 +194,7 @@ channel_get(char *chan, server *s)
 }
 
 void
-clear_channel(channel *c)
+channel_clear(channel *c)
 {
 	free(c->buffer_head->text);
 
@@ -218,7 +202,8 @@ clear_channel(channel *c)
 
 	c->draw.nick_pad = 0;
 
-	draw(D_BUFFER);
+	if (c == ccur)
+		draw(D_BUFFER);
 }
 
 /* Confirm closing a server */
@@ -233,8 +218,8 @@ action_close_server(char c)
 		channel *c = ccur;
 
 		/* If closing the last server */
-		if ((ccur = c->server->next->channel) == c->server->channel)
-			ccur = rirc;
+		if ((state.current_channel = c->server->next->channel) == c->server->channel)
+			state.current_channel = state.default_channel;
 
 		server_disconnect(c->server, 0, 1, DEFAULT_QUIT_MESG);
 
@@ -272,18 +257,16 @@ part_channel(channel *c)
 	c->parted = 1;
 }
 
-channel*
+void
 channel_close(channel *c)
 {
-	/* Close a buffer and return the next
-	 *
-	 * If closing a server buffer, confirm with the user */
+	/* Close a channel. If the current channel is being
+	 * closed, update state appropriately */
 
-	channel *ret = c;
-
-	/* c in this case is the main buffer */
-	if (c->server == NULL)
-		return c;
+	if (c == state.default_channel) {
+		newline(c, 0, "--", "Type /quit to exit rirc");
+		return;
+	}
 
 	if (c->buffer_type == BUFFER_SERVER) {
 		/* Closing a server, confirm the number of channels being closed */
@@ -304,17 +287,17 @@ channel_close(channel *c)
 		if (c->buffer_type == BUFFER_CHANNEL && !c->parted)
 			sendf(NULL, c->server, "PART %s", c->name);
 
-		/* If channel c is last in the list, return the previous channel */
-		ret = !(c->next == c->server->channel) ?
-			c->next : c->prev;
+		/* If closing the current channel, update state to a new channel */
+		if (c == ccur) {
+			state.current_channel = !(c->next == c->server->channel) ? c->next : c->prev;
+			draw(D_FULL);
+		} else {
+			draw(D_CHANS);
+		}
 
 		DLL_DEL(c->server->channel, c);
 		free_channel(c);
-
-		draw(D_FULL);
 	}
-
-	return ret;
 }
 
 /* Get a channel's next/previous, taking into account server wraparound */
@@ -492,4 +475,80 @@ channel_set_mode(channel *c, const char *modes)
 
 	if (ccur == c)
 		draw(D_STATUS);
+}
+
+/* Usefull server/channel structure abstractions for drawing */
+
+channel*
+channel_get_first()
+{
+	server *s = get_server_head();
+
+	/* First channel of the first server */
+	return !s ? state.default_channel : s->channel;
+}
+
+channel*
+channel_get_last()
+{
+	server *s = get_server_head();
+
+	/* Last channel of the last server */
+	return !s ? state.default_channel : s->prev->channel->prev;
+}
+
+channel*
+channel_get_next(channel *c)
+{
+	if (c == state.default_channel)
+		return c;
+	else
+		/* Return the next channel, accounting for server wrap around */
+		return !(c->next == c->server->channel) ?  c->next : c->server->next->channel;
+}
+
+channel*
+channel_get_prev(channel *c)
+{
+	if (c == state.default_channel)
+		return c;
+	else
+		/* Return the previous channel, accounting for server wrap around */
+		return !(c == c->server->channel) ?  c->prev : c->server->prev->channel->prev;
+}
+
+void
+channel_set_current(channel *c)
+{
+	/* Set the state to an arbitrary channel */
+
+	state.current_channel = c;
+
+	draw(D_FULL);
+}
+
+void
+channel_move_prev(void)
+{
+	/* Set the current channel to the previous channel */
+
+	channel *c = channel_get_prev(state.current_channel);
+
+	if (c != state.current_channel) {
+		state.current_channel = c;
+		draw(D_FULL);
+	}
+}
+
+void
+channel_move_next(void)
+{
+	/* Set the current channel to the next channel */
+
+	channel *c = channel_get_next(state.current_channel);
+
+	if (c != state.current_channel) {
+		state.current_channel = c;
+		draw(D_FULL);
+	}
 }

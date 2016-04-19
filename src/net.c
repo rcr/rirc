@@ -58,6 +58,14 @@ static void connected(server*);
 static void* threaded_connect(void*);
 static void threaded_connect_cleanup(void*);
 
+/* FIXME: reorganize, this is a temporary fix in order to retrieve
+ * the first/last channels for drawing purposes. */
+server*
+get_server_head(void)
+{
+	return server_head;
+}
+
 static server*
 new_server(char *host, char *port)
 {
@@ -75,7 +83,7 @@ new_server(char *host, char *port)
 
 	auto_nick(&(s->nptr), s->nick);
 
-	s->channel = ccur = new_channel(host, s, NULL, BUFFER_SERVER);
+	s->channel = new_channel(host, s, NULL, BUFFER_SERVER);
 
 	DLL_ADD(server_head, s);
 
@@ -131,7 +139,7 @@ sendf(char *err, server *s, const char *fmt, ...)
 	}
 
 #ifdef DEBUG
-	_newline(s->channel, 0, "DEBUG >>", sendbuff, len);
+	newline(s->channel, 0, "DEBUG >>", sendbuff);
 #endif
 
 	sendbuff[len++] = '\r';
@@ -164,14 +172,15 @@ server_connect(char *host, char *port)
 
 	/* Check if server is already connected */
 	if (s && s->soc >= 0) {
-		newlinef((ccur = s->channel), 0, "-!!-", "Already connected to %s:%s", host, port);
+		channel_set_current(s->channel);
+		newlinef(s->channel, 0, "-!!-", "Already connected to %s:%s", host, port);
 		return;
 	}
 
 	if (s == NULL)
 		s = new_server(host, port);
 
-	ccur = s->channel;
+	channel_set_current(s->channel);
 
 	if ((ct = calloc(1, sizeof(*ct))) == NULL)
 		fatal("calloc");
@@ -301,7 +310,7 @@ server_disconnect(server *s, int err, int kill, char *mesg)
 	 *   Disconnect initiated by remote host
 	 *
 	 * When kill flag is set:
-	 *   Free the server, update ccur
+	 *   Free the server, update current channel
 	 */
 
 	/* Server connection in progress, cancel the connection attempt */
@@ -474,7 +483,7 @@ check_latency(server *s, time_t t)
 	}
 
 	/* Server hasn't responded to PING, display latency in status */
-	if (delta > SERVER_LATENCY_S && ccur->server == s) {
+	if (delta > SERVER_LATENCY_S && get_state()->current_channel->server == s) {
 		s->latency_delta = delta;
 		draw(D_STATUS);
 	}

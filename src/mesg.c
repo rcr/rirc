@@ -247,12 +247,17 @@ send_unhandled(char *err, char *cmd, char *args, channel *c)
 static int
 send_clear(char *err, char *mesg, channel *c)
 {
-	/* Clear the current buffer */
+	/* /clear [channel] */
 
-	UNUSED(err);
-	UNUSED(mesg);
+	char *targ;
+	channel *cc;
 
-	clear_channel(c);
+	if (!(targ = getarg(&mesg, " ")))
+		channel_clear(c);
+	else if ((cc = channel_get(targ, c->server)))
+		channel_clear(cc);
+	else
+		failf("Error: channel '%s' not found", targ);
 
 	return 0;
 }
@@ -260,13 +265,17 @@ send_clear(char *err, char *mesg, channel *c)
 static int
 send_close(char *err, char *mesg, channel *c)
 {
-	/* TODO: if no args in mesg, close c, else try to find the channel */
+	/* /close [channel] */
 
-	UNUSED(err);
-	UNUSED(mesg);
+	char *targ;
+	channel *cc;
 
-	/* FIXME: state.c should handle this */
-	ccur = channel_close(c);
+	if (!(targ = getarg(&mesg, " ")))
+		channel_close(c);
+	else if ((cc = channel_get(targ, c->server)))
+		channel_close(cc);
+	else
+		failf("Error: channel '%s' not found", targ);
 
 	return 0;
 }
@@ -824,7 +833,7 @@ recv_join(char *err, parsed_mesg *p, server *s)
 
 	if (IS_ME(p->from)) {
 		if ((c = channel_get(chan, s)) == NULL)
-			ccur = new_channel(chan, s, ccur, BUFFER_CHANNEL);
+			channel_set_current(new_channel(chan, s, ccur, BUFFER_CHANNEL));
 		else {
 			c->parted = 0;
 			newlinef(c, 0, ">", "You have rejoined %s", chan);

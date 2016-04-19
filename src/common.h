@@ -137,7 +137,7 @@ typedef struct input
 	char *head;
 	char *tail;
 	char *window;
-	int count;
+	unsigned int count;
 	struct input_line *line;
 	struct input_line *list_head;
 } input;
@@ -199,21 +199,15 @@ typedef struct parsed_mesg
 	char *trailing;
 } parsed_mesg;
 
-/* rirc.c */
-//TODO: move to state
-channel *rirc;
-channel *ccur;
-
 /* net.c */
 int sendf(char*, server*, const char*, ...);
+server* get_server_head(void);
 void check_servers(void);
 void server_connect(char*, char*);
 void server_disconnect(server*, int, int, char*);
 
 /* draw.c */
 unsigned int draw;
-//FIXME: draw(state) (should be the only thing rirc needs to know about draw.c
-//       set_draw() as a function
 void redraw(channel*);
 #define draw(X) draw |= X
 #define D_RESIZE (1 << 0)
@@ -221,7 +215,8 @@ void redraw(channel*);
 #define D_CHANS  (1 << 2)
 #define D_INPUT  (1 << 3)
 #define D_STATUS (1 << 4)
-#define D_FULL ~((draw & 0) | D_RESIZE);
+#define D_FULL ~((draw & 0) | D_RESIZE)
+extern unsigned int term_cols, term_rows;
 
 /* input.c */
 char *action_message;
@@ -254,5 +249,10 @@ void free_mesg(void);
 void recv_mesg(char*, int, server*);
 void send_mesg(char*, channel*);
 void send_paste(char*);
+
+/* state.c */
+/* FIXME: terrible, until i remove references to ccur/rirc */
+#define rirc (get_state()->default_channel)
+#define ccur (get_state()->current_channel)
 
 #endif
