@@ -1,6 +1,14 @@
 CC = cc
-CFLAGS = -pthread -std=c99 -Wall -Wextra -pedantic -O2
-LDFLAGS = -pthread
+CFLAGS       = -std=c99 -Wall -Wextra -pedantic -O2
+CFLAGS_DEBUG = -std=c99 -Wall -Wextra -pedantic -O0 -g -DDEBUG
+LDFLAGS      = -pthread
+
+# If using gcc for debug and sanitization, eg:
+#   > make -e CC=gcc debug
+ifeq ($(CC),gcc)
+	CFLAGS_DEBUG += -fsanitize=undefined,address
+	LDFLAGS_DEBUG = -pthread -lubsan -lasan
+endif
 
 SDIR = src
 TDIR = test
@@ -30,19 +38,19 @@ rirc: $(OBJ)
 $(SDIR_O)/%.o: $(SDIR)/%.c $(HDS)
 	$(CC) $(CFLAGS) -c -o $@ $<
 
-# link to math libs for some avl tree calculations
-test: CFLAGS += -lm -g
-test: $(OBJ_T)
+# Testcases link to math libs for some calculations
+$(TDIR_O)/%.test: $(TDIR)/%.c
+	$(CC) $(CFLAGS_DEBUG) $(LDFLAGS_DEBUG) -lm -o $@ $<
+
+test: clean $(OBJ_T)
 	@for test in $(OBJ_T); do ./$$test; done
 
-$(TDIR_O)/%.test: $(TDIR)/%.c
-	@$(CC) $(CFLAGS) -o $@ $<
-
-debug: CFLAGS += -g -DDEBUG
-debug: rirc
+debug: CFLAGS   = $(CFLAGS_DEBUG)
+debug: LDFLAGS += $(LDFLAGS_DEBUG)
+debug: clean rirc
 
 clean:
 	@echo cleaning
 	@rm -f rirc $(SDIR_O)/*.o $(TDIR_O)/*.test
 
-.PHONY: clean default
+.PHONY: clean debug default test
