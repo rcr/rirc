@@ -291,11 +291,11 @@ send_connect(char *err, char *mesg, channel *c)
 
 		/* If no hostname arg is given, attempt to reconnect on the current server */
 
-		if (c->server->soc >= 0 || c->server->connecting)
-			fail("Error: Already connected or reconnecting to server");
-
 		if (!c->server)
-			fail("Error: Connect requires a hostname argument");
+			fail("Error: /connect <host | host:port | host port>");
+
+		else if (c->server->soc >= 0 || c->server->connecting)
+			fail("Error: Already connected or reconnecting to server");
 
 		host = c->server->host;
 		port = c->server->port;

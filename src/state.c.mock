@@ -137,6 +137,12 @@ free_channel(channel *c)
 	UNUSED(c);
 }
 
+void
+part_channel(channel *c)
+{
+	UNUSED(c);
+}
+
 static int nicklist_print__called__;
 
 void

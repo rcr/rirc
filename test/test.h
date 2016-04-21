@@ -56,7 +56,8 @@ _assert_strcmp(char *p1, char *p2)
 static int
 _run_tests_(const char *filename, testcase testcases[], size_t len)
 {
-	printf("%s...", filename);
+	printf("%s... ", filename);
+	fflush(stdout);
 
 	testcase *tc;
 
@@ -75,7 +76,7 @@ _run_tests_(const char *filename, testcase testcases[], size_t len)
 		printf("  %d failure%c total\n", _failures_t_, (_failures_t_ > 1) ? 's' : 0);
 		return EXIT_FAILURE;
 	} else {
-		printf("  OK\n");
+		printf(" OK\n");
 		return EXIT_SUCCESS;
 	}
 }
