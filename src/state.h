@@ -22,8 +22,8 @@ struct state const* get_state(void);
 
 /* Useful state retrieval abstractions */
 channel* channel_get(char*, server*);
-channel* channel_get_first();
-channel* channel_get_last();
+channel* channel_get_first(void);
+channel* channel_get_last(void);
 channel* channel_get_next(channel*);
 channel* channel_get_prev(channel*);
 

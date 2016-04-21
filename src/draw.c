@@ -515,10 +515,10 @@ draw_status(channel *c)
 	/* TODO: scrollback status */
 
 	/* server / private chat:
-	 * |--[usermodes]--(latency)---...|
+	 * |-[usermodes]-(latency)---...|
 	 *
 	 * channel:
-	 * |--[usermodes]--[chancount chantype chanmodes]/[priv]--(latency)---...|
+	 * |-[usermodes]-[chancount chantype chanmodes]/[priv]-(latency)---...|
 	 * */
 
 	printf(CURSOR_SAVE);

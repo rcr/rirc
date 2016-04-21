@@ -257,7 +257,7 @@ send_clear(char *err, char *mesg, channel *c)
 	else if ((cc = channel_get(targ, c->server)))
 		channel_clear(cc);
 	else
-		failf("Error: channel '%s' not found", targ);
+		failf("Error: Channel '%s' not found", targ);
 
 	return 0;
 }
@@ -275,7 +275,7 @@ send_close(char *err, char *mesg, channel *c)
 	else if ((cc = channel_get(targ, c->server)))
 		channel_close(cc);
 	else
-		failf("Error: channel '%s' not found", targ);
+		failf("Error: Channel '%s' not found", targ);
 
 	return 0;
 }

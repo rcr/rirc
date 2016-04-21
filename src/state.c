@@ -480,7 +480,7 @@ channel_set_mode(channel *c, const char *modes)
 /* Usefull server/channel structure abstractions for drawing */
 
 channel*
-channel_get_first()
+channel_get_first(void)
 {
 	server *s = get_server_head();
 
@@ -489,7 +489,7 @@ channel_get_first()
 }
 
 channel*
-channel_get_last()
+channel_get_last(void)
 {
 	server *s = get_server_head();
 
