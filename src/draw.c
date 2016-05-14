@@ -314,7 +314,7 @@ draw_buffer(channel *c)
 		/* Draw any line continuations */
 		while (*ptr1) {
 			printf(MOVE(%d, %d) CLEAR_LINE, print_row++, (int)c->draw.nick_pad + 10);
-			printf(FG(%d) LINE_CONTINUATION FG(%d) " ", NEUTRAL_FG, text_fg);
+			printf(FG(%d) VERTICAL_SEPARATOR FG(%d) " ", NEUTRAL_FG, text_fg);
 
 			char *print = ptr1;
 			char *wrap = word_wrap(text_cols, &ptr1, ptr2);

@@ -9,8 +9,6 @@ static int nick_colours[] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14};
 /* Characters */
 #define QUOTE_CHAR '>'
 #define HORIZONTAL_SEPARATOR "-"
-//#define HORIZONTAL_SEPARATOR "-"
-#define VERTICAL_SEPARATOR " ~ "
-#define LINE_CONTINUATION "~"
+#define VERTICAL_SEPARATOR "~"
 
 static int actv_cols[ACTIVITY_T_SIZE] = {239, 247, 3};
