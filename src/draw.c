@@ -302,7 +302,7 @@ draw_buffer(channel *c)
 				MSG_GREEN_FG : MSG_DEFAULT_FG);
 		
 		/* Line sender and separator */
-		printf("%s" FG(%d) BG_R VERTICAL_SEPARATOR FG(%d),
+		printf("%s" FG(%d) BG_R " " VERTICAL_SEPARATOR " " FG(%d),
 				l->from, NEUTRAL_FG, text_fg);
 
 		while (print < wrap)
@@ -463,6 +463,8 @@ draw_nav(struct state const* st)
 		if (c == frame_next)
 			break;
 	}
+
+	c->active = 0;
 
 	printf(CURSOR_RESTORE);
 }
