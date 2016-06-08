@@ -464,7 +464,7 @@ draw_nav(struct state const* st)
 			break;
 	}
 
-	c->active = 0;
+	st->current_channel = 0;
 
 	printf(CURSOR_RESTORE);
 }
