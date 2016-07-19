@@ -320,73 +320,125 @@ test_check_pinged(void)
 void
 test_word_wrap(void)
 {
-	/* Test edge cases for word wrap algorithm */
+	/*	_test_word_wrap(
+	 *		<string>,
+	 *		<substring>
+	 *	)
+	 *
+	 *	Where substring represents the available width, i.e. n = strlen(substring)
+	 * */
 
-	int len;
-	char *ptr1, *ptr2, *ret, *end;
+	char *ret, *seg1, *seg2, *end, str[256] = {0};
 
-	/* Test wraping mid-word */
-	char mesg1[] = "testing1 testing2";
-	ptr1 = mesg1, ptr2 = mesg1, end = (mesg1 + strlen(mesg1));
-	len = strlen("testing1 test");
+#define _test_word_wrap(S, SS)               \
+	strncpy(str, (S), sizeof(str) - 1);      \
+	end = str + strlen(str);                 \
+	seg1 = seg2 = str;                       \
+	ret = word_wrap(strlen(SS), &seg2, end); \
+	*ret = 0;
 
-	ret = word_wrap(len, &ptr2, end), *ret = '\0';
-	assert_strcmp(ptr1, "testing1");
-	assert_strcmp(ptr2, "testing2");
+	/* Test fits */
+	_test_word_wrap(
+		"test1 test2 test3",
+		"test1 test2 test3"
+	);
+	assert_strcmp(seg1, "test1 test2 test3");
+	assert_strcmp(seg2, "");
+
+	_test_word_wrap(
+		"test1 test2 test3",
+		"test1 test2 test3xxxxx"
+	);
+	assert_strcmp(seg1, "test1 test2 test3");
+	assert_strcmp(seg2, "");
+
+	/* Test wrap on word */
+	_test_word_wrap(
+		"test1 test2 test3",
+		"test1 t"
+	);
+	assert_strcmp(seg1, "test1");
+	assert_strcmp(seg2, "test2 test3");
+
+	_test_word_wrap(
+		"test1 test2 test3",
+		"test1 test"
+	);
+	assert_strcmp(seg1, "test1");
+	assert_strcmp(seg2, "test2 test3");
+
+	_test_word_wrap(
+		"test1 test2 test3",
+		"test1 test2"
+	);
+	assert_strcmp(seg1, "test1 test2");
+	assert_strcmp(seg2, "test3");
 
 	/* Test wrap on whitespace */
-	char mesg2[] = "testing1 testing2";
-	ptr1 = mesg2, ptr2 = mesg2, end = (mesg2 + strlen(mesg2));
-	len = strlen("testing1");
+	_test_word_wrap(
+		"test1 test2 test3",
+		"test1 test2 "
+	);
+	assert_strcmp(seg1, "test1 test2");
+	assert_strcmp(seg2, "test3");
 
-	ret = word_wrap(len, &ptr2, end), *ret = '\0';
-	assert_strcmp(ptr1, "testing1");
-	assert_strcmp(ptr2, "testing2");
+	_test_word_wrap(
+		"test1 test2   test3",
+		"test1 test2"
+	);
+	assert_strcmp(seg1, "test1 test2");
+	assert_strcmp(seg2, "test3");
 
-	/* Test wrap on extraneous whitespace */
-	char mesg3[] = "testing1     testing2";
-	ptr1 = mesg3, ptr2 = mesg3, end = (mesg3 + strlen(mesg3));
-	len = strlen("testing1   ");
+	_test_word_wrap(
+		"test1 test2   test3",
+		"test1 test2 "
+	);
+	assert_strcmp(seg1, "test1 test2");
+	assert_strcmp(seg2, "test3");
 
-	ret = word_wrap(len, &ptr2, end), *ret = '\0';
-	assert_strcmp(ptr1, "testing1");
-	assert_strcmp(ptr2, "testing2");
+	_test_word_wrap(
+		"test1 test2   test3",
+		"test1 test2   "
+	);
+	assert_strcmp(seg1, "test1 test2");
+	assert_strcmp(seg2, "test3");
 
-	/* Test wrap on exact length */
-	char mesg4[] = "testing1 testing2";
-	ptr1 = mesg4, ptr2 = mesg4, end = (mesg4 + strlen(mesg4));
-	len = strlen("testing1 testing2");
+	/* Test edge case: nowhere to wrap */
+	_test_word_wrap(
+		"test1test2 test3",
+		"test1"
+	);
+	*ret = '!';
+	assert_strcmp(seg1, "test1!est2 test3");
+	assert_strcmp(seg2, "!est2 test3");
 
-	ret = word_wrap(len, &ptr2, end), *ret = '\0';
-	assert_strcmp(ptr1, "testing1 testing2");
-	assert_strcmp(ptr2, "");
+	/* Test edge case: whitespace prefix */
+	_test_word_wrap(
+		" testing",
+		"   "
+	);
+	*ret = '!';
+	assert_strcmp(seg1, " te!ting");
+	assert_strcmp(seg2, "!ting");
 
-	/* Test whole string fits */
-	char mesg5[] = "testing";
-	ptr1 = mesg5, ptr2 = mesg5, end = (mesg5 + strlen(mesg5));
-	len = strlen("testing") * 2;
+	/* Test edge case: single space */
+	_test_word_wrap(
+		" ",
+		"   "
+	);
+	assert_strcmp(seg1, " ");
+	assert_strcmp(seg2, "");
 
-	ret = word_wrap(len, &ptr2, end), *ret = '\0';
-	assert_strcmp(ptr1, "testing");
-	assert_strcmp(ptr2, "");
+	/* Test edge case: empty string*/
+	_test_word_wrap(
+		"",
+		"   "
+	);
+	assert_strcmp(seg1, "");
+	assert_strcmp(seg2, "");
 
-	/* Test all whitespace */
-	char mesg6[] = "                  ";
-	ptr1 = mesg6, ptr2 = mesg6, end = (mesg6 + strlen(mesg6));
-	len = strlen("   ");
-
-	ret = word_wrap(len, &ptr2, end), *ret = '\0';
-	assert_strcmp(ptr1, "");
-	assert_strcmp(ptr2, "");
-
-	/* Test empty string */
-	char mesg7[] = "";
-	ptr1 = mesg7, ptr2 = mesg7, end = (mesg7 + strlen(mesg7));
-	len = strlen("   ");
-
-	ret = word_wrap(len, &ptr2, end), *ret = '\0';
-	assert_strcmp(ptr1, "");
-	assert_strcmp(ptr2, "");
+	if (seg1 != seg2 || seg2 != end)
+		fail_test("seg1 should be advanced to end of string");
 }
 
 void

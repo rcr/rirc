@@ -79,6 +79,9 @@ _run_tests_(const char *filename, testcase testcases[], size_t len)
 		printf(" OK\n");
 		return EXIT_SUCCESS;
 	}
+
+	/* Silence compiler warnings for test functions that are included but not used */
+	((void)(_assert_strcmp));
 }
 
 /* Macro so the proper filename is printed */

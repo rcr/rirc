@@ -230,57 +230,61 @@ check_pinged(const char *mesg, const char *nick)
 }
 
 char*
-word_wrap(int text_cols, char **ptr1, char *ptr2)
+word_wrap(int n, char **str, char *end)
 {
 	/* Greedy word wrap algorithm.
 	 *
-	 * Given a string bounded by [start, end), return a pointer to the
-	 * character one past the maximum printable character for this string segment
-	 * within text_cols wrapped on whitespace, and set ptr1 to the first character
-	 * that is printable on the next line.
+	 * Given a string bounded by [start, end), return a pointer to the character one
+	 * past the maximum printable character for this string segment and advance the string
+	 * pointer to the next printable character or the null terminator.
 	 *
-	 * This algorithm never discards whitespace at the beginning of lines, but
-	 * does discard whitespace between line continuations and at end of lines.
+	 * For example, with 7 text columns and the string "wrap     testing":
 	 *
-	 * text_cols: the number of printable columns
-	 * ptr1:      the first character in string
-	 * ptr2:      the string's null terminator
+	 *     word_wrap(7, &str, str + strlen(str));
+	 *
+	 *              split here
+	 *                  |
+	 *                  v
+	 *            .......
+	 *           "wrap     testing"
+	 *                ^    ^
+	 *     returns ___|    |___ str
+	 *
+	 * A subsequent call to wrap on the remainder, "testing", yields the case
+	 * where the whole string fits and str is advanced to the end and returned.
+	 *
+	 * The caller should check that (str != end) before subsequent calls
 	 */
 
-	char *tmp, *ret = (*ptr1) + text_cols;
+	char *ret, *tmp;
 
-	if (text_cols <= 0)
-		fatal("Insufficient columns");
+	if (n < 1)
+		fatal("insufficient columns");
 
-	/* Entire line fits within text_cols */
-	if (ret >= ptr2)
-		return (*ptr1 = ptr2);
+	/* All fits */
+	if ((end - *str) <= n)
+		return (*str = end);
 
-	/* At least one char exists that can print on current line */
+	/* Find last occuring ' ' character */
+	ret = (*str + n);
 
-	if (*ret == ' ') {
+	while (ret > *str && *ret != ' ')
+		ret--;
 
-		/* Wrap on this space, find printable character for next line */
-		for (tmp = ret; *tmp == ' '; tmp++)
-			;
+	/* Nowhere to wrap */
+	if (ret == *str)
+		return (*str = ret + n);
 
-		*ptr1 = tmp;
+	/* Discard whitespace between wraps */
+	tmp = ret;
 
-		/* Return only the printable segment */
-		while (*(ret - 1) == ' ')
-			ret--;
-	} else {
+	while (ret > *str && *(ret - 1) == ' ')
+		ret--;
 
-		/* Find a space to wrap on, or wrap on */
-		for (tmp = (*ptr1) + 1; *ret != ' ' && ret > tmp; ret--)
-			;
+	while (*tmp == ' ')
+		tmp++;
 
-		/* No space found, wrap on entire segment */
-		if (ret == tmp)
-			return (*ptr1 = (*ptr1) + text_cols);
-
-		*ptr1 = ret + 1;
-	}
+	*str = tmp;
 
 	return ret;
 }
