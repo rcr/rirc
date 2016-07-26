@@ -600,7 +600,7 @@ draw_status(channel *c)
 
 print_status:
 
-	printf(status_buff);
+	printf("%s", status_buff);
 
 	/* Trailing separator */
 	while (col++ < term_cols)
