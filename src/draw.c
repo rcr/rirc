@@ -43,7 +43,8 @@ static void draw_status(channel*);
 
 static int nick_col(char*);
 
-unsigned int term_rows, term_cols;
+/* extern in common.h */
+unsigned int draw, term_rows, term_cols;
 
 void
 redraw(channel *c)
