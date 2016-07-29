@@ -6,6 +6,8 @@
 
 #define VERSION "0.1"
 
+#define NUM_SERVERS 32
+
 #define SCROLLBACK_BUFFER 200
 #define SCROLLBACK_INPUT 15
 #define BUFFSIZE 512
@@ -88,18 +90,6 @@ typedef enum {
 	LINE_CHAT,
 	LINE_T_SIZE
 } line_t;
-
-/* Global configuration */
-struct config
-{
-	int join_part_quit_threshold;
-	char *username;
-	char *realname;
-	char *nicks;
-	char *auto_connect;
-	char *auto_port;
-	char *auto_join;
-} config;
 
 /* Nicklist AVL tree node */
 typedef struct avl_node
@@ -198,6 +188,19 @@ typedef struct parsed_mesg
 	char *params;
 	char *trailing;
 } parsed_mesg;
+
+/* rirc.c */
+extern struct config
+{
+	int join_part_quit_threshold;
+	char *username;
+	char *realname;
+	/* TODO: WIP, these will be per-server from cli: */
+	char *nicks;
+	char *auto_connect;
+	char *auto_port;
+	char *auto_join;
+} config;
 
 /* net.c */
 int sendf(char*, server*, const char*, ...);

@@ -21,7 +21,7 @@ make clean debug
 
 ##Usage:
 ```
-  rirc [-c server [OPTIONS]]
+  rirc [-c server [OPTIONS]]*
 
 Help:
   -h, --help             Print this message
@@ -34,8 +34,9 @@ Options:
   -v, --version          Print rirc version and exit
 
 Examples:
-  rirc -c server.tld -j '#chan'
-  rirc -c server.tld -p 1234 -j '#chan1,#chan2' -n 'nick, nick_, nick__'
+  rirc -c server -j '#chan'
+  rirc -c server -j '#chan' -c server2 -j '#chan2'
+  rirc -c server -p 1234 -j '#chan1,#chan2' -n 'nick, nick_, nick__'
 ```
 
 Hotkeys:

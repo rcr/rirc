@@ -15,34 +15,32 @@
 #include "common.h"
 #include "state.h"
 
+#define opt_error(MESG) \
+	do { puts((MESG)); exit(EXIT_FAILURE); } while (0);
+
 static void cleanup(void);
-static void configure(void);
-static void getopts(int, char**);
+static void startup(int, char**);
 static void main_loop(void);
-static void startup(void);
 static void usage(void);
 static void signal_sigwinch(int);
 
+static struct termios oterm, nterm;
 static struct sigaction sa_sigwinch;
 static volatile sig_atomic_t flag_sigwinch;
 
-/* Values parsed from getopts */
-static struct
+/* Global configuration */
+struct config config =
 {
-	char *connect;
-	char *port;
-	char *join;
-	char *nicks;
-} opts;
-
-static struct termios oterm, nterm;
+	.username = "rirc_v" VERSION,
+	.realname = "rirc v" VERSION,
+	.join_part_quit_threshold = 100
+};
 
 int
 main(int argc, char **argv)
 {
-	getopts(argc, argv);
-	configure();
-	startup();
+	startup(argc, argv);
+
 	main_loop();
 
 	return EXIT_SUCCESS;
@@ -56,7 +54,7 @@ usage(void)
 	"rirc version " VERSION " ~ Richard C. Robbins <mail@rcr.io>\n"
 	"\n"
 	"Usage:\n"
-	"  rirc [-c server [OPTIONS]]\n"
+	"  rirc [-c server [OPTIONS]]*\n"
 	"\n"
 	"Help:\n"
 	"  -h, --help             Print this message\n"
@@ -69,22 +67,18 @@ usage(void)
 	"  -v, --version          Print rirc version and exit\n"
 	"\n"
 	"Examples:\n"
-	"  rirc -c server.tld -j '#chan'\n"
-	"  rirc -c server.tld -p 1234 -j '#chan1,#chan2' -n 'nick, nick_, nick__'\n"
+	"  rirc -c server -j '#chan'\n"
+	"  rirc -c server -j '#chan' -c server2 -j '#chan2'\n"
+	"  rirc -c server -p 1234 -j '#chan1,#chan2' -n 'nick, nick_, nick__'\n"
 	);
 }
 
 static void
-getopts(int argc, char **argv)
+startup(int argc, char **argv)
 {
-	opts.connect = NULL;
-	opts.port    = NULL;
-	opts.join    = NULL;
-	opts.nicks   = NULL;
+	int c, i, opt_i = 0, server_i = -1;
 
-	int c, opt_i = 0;
-
-	static struct option long_opts[] =
+	struct option long_opts[] =
 	{
 		{"connect", required_argument, 0, 'c'},
 		{"port",    required_argument, 0, 'p'},
@@ -95,6 +89,13 @@ getopts(int argc, char **argv)
 		{0, 0, 0, 0}
 	};
 
+	struct auto_server {
+		char *host;
+		char *port;
+		char *join;
+		char *nicks;
+	} servers[NUM_SERVERS] = {0};
+
 	while ((c = getopt_long(argc, argv, "c:p:n:j:vh", long_opts, &opt_i))) {
 
 		if (c == -1)
@@ -104,38 +105,46 @@ getopts(int argc, char **argv)
 
 			/* Connect to server */
 			case 'c':
-				if (*optarg == '-') {
-					puts("-c/--connect requires an argument");
-					exit(EXIT_FAILURE);
-				}
-				opts.connect = optarg;
+				if (*optarg == '-')
+					opt_error("-c/--connect requires an argument");
+
+				if (server_i == NUM_SERVERS)
+					opt_error("exceeded maximum number of servers (" STR(NUM_SERVERS) ")");
+
+				servers[++server_i].host = optarg;
 				break;
 
 			/* Connect using port */
 			case 'p':
-				if (*optarg == '-') {
-					puts("-p/--port requires an argument");
-					exit(EXIT_FAILURE);
-				}
-				opts.port = optarg;
+				if (*optarg == '-')
+					opt_error("-p/--port requires an argument");
+
+				if (server_i < 0)
+					opt_error("-p/--port requires a server argument first");
+
+				servers[server_i].port = optarg;
 				break;
 
 			/* Comma and/or space separated list of nicks to use */
 			case 'n':
-				if (*optarg == '-') {
-					puts("-n/--nick requires an argument");
-					exit(EXIT_FAILURE);
-				}
-				opts.nicks = optarg;
+				if (*optarg == '-')
+					opt_error("-n/--nick requires an argument");
+
+				if (server_i < 0)
+					opt_error("-n/--nick requires a server argument first");
+
+				servers[server_i].nicks = optarg;
 				break;
 
 			/* Comma separated list of channels to join */
 			case 'j':
-				if (*optarg == '-') {
-					puts("-j/--join requires an argument");
-					exit(EXIT_FAILURE);
-				}
-				opts.join = optarg;
+				if (*optarg == '-')
+					opt_error("-j/--join requires an argument");
+
+				if (server_i < 0)
+					opt_error("-j/--join requires a server argument first");
+
+				servers[server_i].join = optarg;
 				break;
 
 			/* Print rirc version and exit */
@@ -153,49 +162,7 @@ getopts(int argc, char **argv)
 				exit(EXIT_FAILURE);
 		}
 	}
-}
 
-static void
-configure(void)
-{
-	/* TODO: this should create a series of server objects, and begin a connection on them
-	 * things like autojoin for these servers will be a one-time property of the server
-	 * instead of an awkward global config. in this sense, it will be required for a -c
-	 * configuration to be present before any -j/-p/-n etc */
-	/* Build a linked list of server objects, and delete the linked list as they're sent
-	 * off for connection */
-
-	if (opts.connect) {
-		config.auto_connect = opts.connect;
-		config.auto_port = opts.port ? opts.port : "6667";
-		config.auto_join = opts.join;
-		config.nicks = opts.nicks ? opts.nicks : getenv("USER");
-	} else {
-		config.auto_connect = NULL;
-		config.auto_port = NULL;
-		config.auto_join = NULL;
-		config.nicks = getenv("USER");
-	}
-
-	//FIXME: these would become global_config as oppose to each s.config
-	//options in this struct can be /set, or :set
-
-	config.username = "rirc_v" VERSION;
-	config.realname = "rirc v" VERSION;
-	config.join_part_quit_threshold = 100;
-}
-
-static void
-signal_sigwinch(int signum)
-{
-	UNUSED(signum);
-
-	flag_sigwinch = 1;
-}
-
-static void
-startup(void)
-{
 	/* stdout is fflush()'ed on every redraw */
 	setvbuf(stdout, NULL, _IOFBF, 0);
 
@@ -222,12 +189,19 @@ startup(void)
 	/* Register cleanup() for exit() */
 	atexit(cleanup);
 
-	/* FIXME: if the initial connect fails the autojoin channels
-	 * will be used by whatever server next connects */
-	/* TODO: for multiple server on cli, it will be a linked list
-	 * and for each, we will send a server autoconnect and then free it */
-	if (config.auto_connect)
-		server_connect(config.auto_connect, config.auto_port);
+	config.nicks = getenv("USER");
+
+	/* TODO: WIP,
+	 * set nicks for this server from -n,
+	 * set autocmd (eg: -j)
+	 * refactor to new_server, server_connect(server*)
+	 * */
+	for (i = 0; i <= server_i; i++) {
+		server_connect(
+			servers[i].host,
+			servers[i].port ? servers[i].port : "6667"
+		);
+	}
 }
 
 static void
@@ -248,6 +222,14 @@ cleanup(void)
 	/* Clear screen */
 	printf("\x1b[H\x1b[J");
 #endif
+}
+
+static void
+signal_sigwinch(int signum)
+{
+	UNUSED(signum);
+
+	flag_sigwinch = 1;
 }
 
 static void
