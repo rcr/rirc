@@ -164,30 +164,36 @@ startup(int argc, char **argv)
 	}
 
 	/* stdout is fflush()'ed on every redraw */
-	setvbuf(stdout, NULL, _IOFBF, 0);
+	errno = 0; /* "may set errno" */
+	if (setvbuf(stdout, NULL, _IOFBF, 0) < 0)
+		fatal("setvbuf");
 
 	/* Set terminal to raw mode */
-	tcgetattr(0, &oterm);
+	if (tcgetattr(0, &oterm) < 0)
+		fatal("tcgetattr");
+
 	nterm = oterm;
 	nterm.c_lflag &= ~(ECHO | ICANON | ISIG);
 	nterm.c_cc[VMIN] = 1;
 	nterm.c_cc[VTIME] = 0;
+
 	if (tcsetattr(0, TCSADRAIN, &nterm) < 0)
 		fatal("tcsetattr");
 
 	srand(time(NULL));
-
-	/* Initialize submodules */
-	init_mesg();
-	init_state();
 
 	/* Set up signal handlers */
 	sa_sigwinch.sa_handler = signal_sigwinch;
 	if (sigaction(SIGWINCH, &sa_sigwinch, NULL) == -1)
 		fatal("sigaction - SIGWINCH");
 
-	/* Register cleanup() for exit() */
-	atexit(cleanup);
+	errno = 0; /* doesn't set errno */
+	if (atexit(cleanup) != 0)
+		fatal("atexit");
+
+	/* Initialize submodules */
+	init_mesg();
+	init_state();
 
 	config.nicks = getenv("USER");
 
