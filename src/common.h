@@ -210,7 +210,6 @@ void server_connect(char*, char*);
 void server_disconnect(server*, int, int, char*);
 
 /* draw.c */
-unsigned int draw;
 void redraw(channel*);
 #define draw(X) draw |= X
 #define D_RESIZE (1 << 0)
@@ -219,14 +218,14 @@ void redraw(channel*);
 #define D_INPUT  (1 << 3)
 #define D_STATUS (1 << 4)
 #define D_FULL ~((draw & 0) | D_RESIZE)
-extern unsigned int term_cols, term_rows;
+extern unsigned int draw, term_cols, term_rows;
 
 /* input.c */
-char *action_message;
 input* new_input(void);
 void action(int(*)(char), const char*, ...);
 void free_input(input*);
 void poll_input(void);
+extern char *action_message;
 
 /* utils.c */
 char* getarg(char**, const char*);
@@ -246,12 +245,12 @@ void free_avl(avl_node*);
 	do { error(errno, "ERROR in %s: %s", __func__, mesg); } while (0)
 
 /* mesg.c */
-avl_node* commands;
 void init_mesg(void);
 void free_mesg(void);
 void recv_mesg(char*, int, server*);
 void send_mesg(char*, channel*);
 void send_paste(char*);
+extern avl_node* commands;
 
 /* state.c */
 /* FIXME: terrible, until i remove references to ccur/rirc */

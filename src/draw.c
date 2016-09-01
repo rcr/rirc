@@ -43,7 +43,8 @@ static void draw_status(channel*);
 
 static int nick_col(char*);
 
-unsigned int term_rows, term_cols;
+/* extern in common.h */
+unsigned int draw, term_rows, term_cols;
 
 void
 redraw(channel *c)
@@ -600,7 +601,7 @@ draw_status(channel *c)
 
 print_status:
 
-	printf(status_buff);
+	printf("%s", status_buff);
 
 	/* Trailing separator */
 	while (col++ < term_cols)

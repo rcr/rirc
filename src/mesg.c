@@ -92,6 +92,9 @@
 HANDLED_SEND_CMDS
 #undef X
 
+/* extern in common.h */
+avl_node* commands;
+
 /* Handler for errors deemed fatal to a server's state */
 static void server_fatal(server*, char*, ...);
 
