@@ -94,7 +94,7 @@ startup(int argc, char **argv)
 		char *port;
 		char *join;
 		char *nicks;
-	} servers[NUM_SERVERS] = {0};
+	} auto_servers[MAX_SERVERS] = {0};
 
 	while ((c = getopt_long(argc, argv, "c:p:n:j:vh", long_opts, &opt_i))) {
 
@@ -108,10 +108,10 @@ startup(int argc, char **argv)
 				if (*optarg == '-')
 					opt_error("-c/--connect requires an argument");
 
-				if (server_i == NUM_SERVERS)
-					opt_error("exceeded maximum number of servers (" STR(NUM_SERVERS) ")");
+				if (server_i == MAX_SERVERS)
+					opt_error("exceeded maximum number of servers (" STR(MAX_SERVERS) ")");
 
-				servers[++server_i].host = optarg;
+				auto_servers[++server_i].host = optarg;
 				break;
 
 			/* Connect using port */
@@ -122,7 +122,7 @@ startup(int argc, char **argv)
 				if (server_i < 0)
 					opt_error("-p/--port requires a server argument first");
 
-				servers[server_i].port = optarg;
+				auto_servers[server_i].port = optarg;
 				break;
 
 			/* Comma and/or space separated list of nicks to use */
@@ -133,7 +133,7 @@ startup(int argc, char **argv)
 				if (server_i < 0)
 					opt_error("-n/--nick requires a server argument first");
 
-				servers[server_i].nicks = optarg;
+				auto_servers[server_i].nicks = optarg;
 				break;
 
 			/* Comma separated list of channels to join */
@@ -144,7 +144,7 @@ startup(int argc, char **argv)
 				if (server_i < 0)
 					opt_error("-j/--join requires a server argument first");
 
-				servers[server_i].join = optarg;
+				auto_servers[server_i].join = optarg;
 				break;
 
 			/* Print rirc version and exit */
@@ -204,8 +204,8 @@ startup(int argc, char **argv)
 	 * */
 	for (i = 0; i <= server_i; i++) {
 		server_connect(
-			servers[i].host,
-			servers[i].port ? servers[i].port : "6667"
+			auto_servers[i].host,
+			auto_servers[i].port ? auto_servers[i].port : "6667"
 		);
 	}
 }
@@ -214,7 +214,8 @@ static void
 cleanup(void)
 {
 	/* Reset terminal modes */
-	tcsetattr(0, TCSADRAIN, &oterm);
+	if (tcsetattr(0, TCSADRAIN, &oterm) < 0)
+		fatal("tcsetattr");
 
 	/* Free submodules */
 	free_mesg();

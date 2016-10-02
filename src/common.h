@@ -6,7 +6,7 @@
 
 #define VERSION "0.1"
 
-#define NUM_SERVERS 32
+#define MAX_SERVERS 32
 
 #define SCROLLBACK_BUFFER 200
 #define SCROLLBACK_INPUT 15
