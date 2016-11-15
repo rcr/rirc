@@ -101,17 +101,6 @@ typedef struct avl_node
 	void *val;
 } avl_node;
 
-/* Chat buffer line */
-typedef struct buffer_line
-{
-	int rows;
-	size_t len;
-	time_t time;
-	char *text;
-	char from[NICKSIZE + 1];
-	line_t type;
-} buffer_line;
-
 /* Channel input line */
 typedef struct input_line
 {
@@ -132,28 +121,47 @@ typedef struct input
 	struct input_line *list_head;
 } input;
 
+/* Channel buffer line */
+typedef struct buffer_line
+{
+	int rows;
+	size_t len;
+	time_t time;
+	char *text;
+	char from[NICKSIZE + 1];
+	line_t type;
+} buffer_line;
+
+/* TODO:
+ * abstract away getting the first lines, last line, advancing a line
+ * */
+
 /* Channel buffer */
+typedef struct buffer
+{
+	buffer_t type;
+	size_t nick_pad;
+	struct buffer_line *scrollback;
+	struct buffer_line *head;
+	struct buffer_line lines[SCROLLBACK_BUFFER];
+} buffer;
+
+/* Channel */
 typedef struct channel
 {
 	activity_t active;
-	buffer_t buffer_type;
 	char name[CHANSIZE];
 	char type_flag;
 	char chanmodes[MODE_SIZE];
 	int nick_count;
 	int parted;
 	int resized;
+	struct buffer buffer;
 	struct channel *next;
 	struct channel *prev;
-	struct buffer_line *buffer_head;
-	struct buffer_line buffer[SCROLLBACK_BUFFER];
 	struct avl_node *nicklist;
 	struct server *server;
 	struct input *input;
-	struct {
-		size_t nick_pad;
-		struct buffer_line *scrollback;
-	} draw;
 } channel;
 
 /* Server */

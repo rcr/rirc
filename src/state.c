@@ -82,20 +82,20 @@ _newline(channel *c, line_t type, const char *from, const char *mesg, size_t len
 
 	buffer_line *new_line;
 
-	/* c->buffer_head points to the first printable line, so get the next line in the
+	/* c->buffer.head points to the first printable line, so get the next line in the
 	 * circular buffer */
-	if ((new_line = c->buffer_head + 1) == &c->buffer[SCROLLBACK_BUFFER])
-		new_line = c->buffer;
+	if ((new_line = c->buffer.head + 1) == &c->buffer.lines[SCROLLBACK_BUFFER])
+		new_line = c->buffer.lines;
 
 	/* Increment the channel's scrollback pointer if it pointed to the first or last line, ie:
-	 *  - if it points to c->buffer_head, it pointed to the previous first line in the buffer
+	 *  - if it points to c->buffer.head, it pointed to the previous first line in the buffer
 	 *  - if it points to new_line, it pointed to the previous last line in the buffer
 	 *  */
-	if (c->draw.scrollback == c->buffer_head || c->draw.scrollback == new_line)
-		if (++c->draw.scrollback == &c->buffer[SCROLLBACK_BUFFER])
-			c->draw.scrollback = c->buffer;
+	if (c->buffer.scrollback == c->buffer.head || c->buffer.scrollback == new_line)
+		if (++c->buffer.scrollback == &c->buffer.lines[SCROLLBACK_BUFFER])
+			c->buffer.scrollback = c->buffer.lines;
 
-	c->buffer_head = new_line;
+	c->buffer.head = new_line;
 
 	/* new_channel() memsets c->buffer to 0, so this will either free(NULL) or an old line */
 	free(new_line->text);
@@ -115,8 +115,8 @@ _newline(channel *c, line_t type, const char *from, const char *mesg, size_t len
 	strncpy(new_line->from, (from) ? from : c->name, NICKSIZE);
 
 	size_t len_from;
-	if ((len_from = strlen(new_line->from)) > c->draw.nick_pad)
-		c->draw.nick_pad = len_from;
+	if ((len_from = strlen(new_line->from)) > c->buffer.nick_pad)
+		c->buffer.nick_pad = len_from;
 
 	if (mesg == NULL)
 		fatal("mesg is null");
@@ -143,11 +143,11 @@ new_channel(char *name, server *server, channel *chanlist, buffer_t type)
 		fatal("calloc");
 
 	c->server = server;
-	c->buffer_type = type;
-	c->buffer_head = c->buffer;
+	c->buffer.type = type;
+	c->buffer.head = c->buffer.lines;
 	c->active = ACTIVITY_DEFAULT;
 	c->input = new_input();
-	c->draw.scrollback = c->buffer_head;
+	c->buffer.scrollback = c->buffer.head;
 
 	/* TODO: if channel name length exceeds CHANSIZE we'll never appropriately
 	 * associate incomming messages with this channel anyways so it shouldn't be allowed
@@ -168,7 +168,7 @@ void
 free_channel(channel *c)
 {
 	buffer_line *l;
-	for (l = c->buffer; l < c->buffer + SCROLLBACK_BUFFER; l++)
+	for (l = c->buffer.lines; l < c->buffer.lines + SCROLLBACK_BUFFER; l++)
 		free(l->text);
 
 	free_avl(c->nicklist);
@@ -193,14 +193,15 @@ channel_get(char *chan, server *s)
 	return NULL;
 }
 
+/* FIXME: functions that operate on a buffer should just take the buffer as an argument */
 void
 channel_clear(channel *c)
 {
-	free(c->buffer_head->text);
+	free(c->buffer.head->text);
 
-	c->buffer_head->text = NULL;
+	c->buffer.head->text = NULL;
 
-	c->draw.nick_pad = 0;
+	c->buffer.nick_pad = 0;
 
 	if (c == ccur)
 		draw(D_BUFFER);
@@ -268,12 +269,12 @@ channel_close(channel *c)
 		return;
 	}
 
-	if (c->buffer_type == BUFFER_SERVER) {
+	if (c->buffer.type == BUFFER_SERVER) {
 		/* Closing a server, confirm the number of channels being closed */
 
 		int num_chans = 0;
 
-		while ((c = c->next)->buffer_type != BUFFER_SERVER)
+		while ((c = c->next)->buffer.type != BUFFER_SERVER)
 			num_chans++;
 
 		if (num_chans)
@@ -284,7 +285,7 @@ channel_close(channel *c)
 	} else {
 		/* Closing a channel */
 
-		if (c->buffer_type == BUFFER_CHANNEL && !c->parted)
+		if (c->buffer.type == BUFFER_CHANNEL && !c->parted)
 			sendf(NULL, c->server, "PART %s", c->name);
 
 		/* If closing the current channel, update state to a new channel */
@@ -331,24 +332,24 @@ buffer_scrollback_back(channel *c)
 {
 	/* Scroll a buffer back one page */
 
-	buffer_line *l = c->draw.scrollback;
+	buffer_line *l = c->buffer.scrollback;
 
 	/* Terminal rows - nav - separator*2 - input */
 	int rows = term_rows - 4;
 
 	do {
 		/* Circular buffer prev */
-		l = (l == c->buffer) ? &c->buffer[SCROLLBACK_BUFFER - 1] : l - 1;
+		l = (l == c->buffer.lines) ? &c->buffer.lines[SCROLLBACK_BUFFER - 1] : l - 1;
 
 		/* If last scrollback line is found before a full page is counted, do nothing */
-		if (l->text == NULL || l == c->buffer_head)
+		if (l->text == NULL || l == c->buffer.head)
 			return;
 
 		rows -= l->rows;
 
 	} while (rows > 0);
 
-	c->draw.scrollback = l;
+	c->buffer.scrollback = l;
 
 	draw(D_BUFFER);
 }
@@ -358,17 +359,17 @@ buffer_scrollback_forw(channel *c)
 {
 	/* Scroll a buffer forward one page */
 
-	buffer_line *l = c->draw.scrollback;
+	buffer_line *l = c->buffer.scrollback;
 
 	/* Terminal rows - nav - separator*2 - input */
 	int rows = term_rows - 4;
 
 	/* Unfortunately Scrolling forward might encountej
 	 * lines that haven't been drawn since resizing */
-	int text_cols = term_cols - c->draw.nick_pad - 11;
+	int text_cols = term_cols - c->buffer.nick_pad - 11;
 
 	do {
-		if (l == c->buffer_head)
+		if (l == c->buffer.head)
 			break;
 
 		if (l->rows == 0)
@@ -377,11 +378,11 @@ buffer_scrollback_forw(channel *c)
 		rows -= l->rows;
 
 		/* Circular buffer next */
-		l = (l == &c->buffer[SCROLLBACK_BUFFER - 1]) ? c->buffer : l + 1;
+		l = (l == &c->buffer.lines[SCROLLBACK_BUFFER - 1]) ? c->buffer.lines : l + 1;
 
 	} while (rows > 0);
 
-	c->draw.scrollback = l;
+	c->buffer.scrollback = l;
 
 	draw(D_BUFFER);
 }

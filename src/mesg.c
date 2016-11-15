@@ -341,7 +341,7 @@ send_default(char *err, char *mesg, channel *c)
 {
 	/* All messages not beginning with '/'  */
 
-	if (c->buffer_type == BUFFER_SERVER)
+	if (c->buffer.type == BUFFER_SERVER)
 		fail("Error: This is not a channel");
 
 	if (c->parted)
@@ -375,7 +375,7 @@ send_me(char *err, char *mesg, channel *c)
 {
 	/* /me <message> */
 
-	if (c->buffer_type == BUFFER_SERVER)
+	if (c->buffer.type == BUFFER_SERVER)
 		fail("Error: This is not a channel");
 
 	if (c->parted)
@@ -420,10 +420,10 @@ send_join(char *err, char *mesg, channel *c)
 	if ((targ = getarg(&mesg, " ")))
 		return sendf(err, c->server, "JOIN %s", targ);
 
-	if (c->buffer_type == BUFFER_SERVER)
+	if (c->buffer.type == BUFFER_SERVER)
 		fail("Error: JOIN requires a target");
 
-	if (c->buffer_type == BUFFER_PRIVATE)
+	if (c->buffer.type == BUFFER_PRIVATE)
 		fail("Error: Can't rejoin private buffers");
 
 	if (!c->parted)
@@ -468,10 +468,10 @@ send_part(char *err, char *mesg, channel *c)
 	if ((targ = getarg(&mesg, " ")))
 		return sendf(err, c->server, "PART %s :%s", targ, (*mesg) ? mesg : DEFAULT_QUIT_MESG);
 
-	if (c->buffer_type == BUFFER_SERVER)
+	if (c->buffer.type == BUFFER_SERVER)
 		fail("Error: PART requires a target");
 
-	if (c->buffer_type == BUFFER_PRIVATE)
+	if (c->buffer.type == BUFFER_PRIVATE)
 		fail("Error: Can't part private buffers");
 
 	if (c->parted)
@@ -1113,7 +1113,7 @@ recv_numeric(char *err, parsed_mesg *p, server *s)
 			/* If reconnecting to server, join any non-parted channels */
 			c = s->channel;
 			do {
-				if (c->buffer_type == BUFFER_CHANNEL && !c->parted)
+				if (c->buffer.type == BUFFER_CHANNEL && !c->parted)
 					fail_if(sendf(err, s, "JOIN %s", c->name));
 				c = c->next;
 			} while (c != s->channel);

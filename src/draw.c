@@ -158,7 +158,7 @@ draw_buffer(channel *c)
 	 *    to draw in full, so discard the excessive word-wrapped segments and
 	 *    draw the remainder
 	 *
-	 * 3. Traverse forward through the buffer, drawing lines until buffer_head
+	 * 3. Traverse forward through the buffer, drawing lines until buffer.head
 	 *    is encountered
 	 *
 	 * 4. Clear any remaining rows that might exist in the case where the lines
@@ -182,13 +182,13 @@ draw_buffer(channel *c)
 	printf(FG_R BG_R);
 
 	/* (#terminal columns) - strlen((widest nick in c)) - strlen(" HH:MM   ~ ") */
-	int text_cols = term_cols - c->draw.nick_pad - 11;
+	int text_cols = term_cols - c->buffer.nick_pad - 11;
 
 	/* Insufficient columns for drawing */
 	if (text_cols < 1)
 		goto clear_remainder;
 
-	buffer_line *tmp, *l = c->draw.scrollback;
+	buffer_line *tmp, *l = c->buffer.scrollback;
 
 
 	/* Empty buffer */
@@ -197,7 +197,7 @@ draw_buffer(channel *c)
 
 	/* If the window has been resized, force all cached line rows to be recalculated */
 	if (c->resized) {
-		for (tmp = c->buffer; tmp < &c->buffer[SCROLLBACK_BUFFER]; tmp++)
+		for (tmp = c->buffer.lines; tmp < &c->buffer.lines[SCROLLBACK_BUFFER]; tmp++)
 			tmp->rows = 0;
 
 		c->resized = 0;
@@ -215,9 +215,9 @@ draw_buffer(channel *c)
 		if (count_row >= max_row)
 			break;
 
-		tmp = (l == c->buffer) ? &c->buffer[SCROLLBACK_BUFFER - 1] : l - 1;
+		tmp = (l == c->buffer.lines) ? &c->buffer.lines[SCROLLBACK_BUFFER - 1] : l - 1;
 
-		if (tmp->text == NULL || tmp == c->buffer_head)
+		if (tmp->text == NULL || tmp == c->buffer.head)
 			break;
 
 		l = tmp;
@@ -235,7 +235,7 @@ draw_buffer(channel *c)
 			word_wrap(text_cols, &ptr1, ptr2);
 
 		do {
-			printf(MOVE(%d, %d) CLEAR_LINE, print_row++, (int)c->draw.nick_pad + 10);
+			printf(MOVE(%d, %d) CLEAR_LINE, print_row++, (int)c->buffer.nick_pad + 10);
 			printf(FG(%d) VERTICAL_SEPARATOR FG(%d) " ", NEUTRAL_FG, text_fg);
 
 			char *print = ptr1;
@@ -246,10 +246,10 @@ draw_buffer(channel *c)
 		} while (*ptr1);
 
 
-		if (l == c->buffer_head)
+		if (l == c->buffer.head)
 			goto clear_remainder;
 
-		l = (l == &c->buffer[SCROLLBACK_BUFFER - 1]) ? c->buffer : l + 1;
+		l = (l == &c->buffer.lines[SCROLLBACK_BUFFER - 1]) ? c->buffer.lines : l + 1;
 
 		if (l->text == NULL)
 			goto clear_remainder;
@@ -284,7 +284,7 @@ draw_buffer(channel *c)
 		/* Timestamp and padding */
 		printf(FG(%d) " %02d:%02d  %*s",
 				NEUTRAL_FG, tmp->tm_hour, tmp->tm_min,
-				(int)(c->draw.nick_pad - strlen(l->from)), "");
+				(int)(c->buffer.nick_pad - strlen(l->from)), "");
 
 		/* Set foreground and background for the line sender */
 		if (from_fg >= 0)
@@ -314,7 +314,7 @@ draw_buffer(channel *c)
 
 		/* Draw any line continuations */
 		while (*ptr1) {
-			printf(MOVE(%d, %d) CLEAR_LINE, print_row++, (int)c->draw.nick_pad + 10);
+			printf(MOVE(%d, %d) CLEAR_LINE, print_row++, (int)c->buffer.nick_pad + 10);
 			printf(FG(%d) VERTICAL_SEPARATOR FG(%d) " ", NEUTRAL_FG, text_fg);
 
 			char *print = ptr1;
@@ -327,10 +327,10 @@ draw_buffer(channel *c)
 				break;
 		}
 
-		if (l == c->buffer_head)
+		if (l == c->buffer.head)
 			break;
 
-		l = (l == &c->buffer[SCROLLBACK_BUFFER - 1]) ? c->buffer : l + 1;
+		l = (l == &c->buffer.lines[SCROLLBACK_BUFFER - 1]) ? c->buffer.lines : l + 1;
 
 		if (l->text == NULL)
 			break;
@@ -560,7 +560,7 @@ draw_status(channel *c)
 
 	/* If private chat buffer:
 	 * -[priv] */
-	if (c->buffer_type == BUFFER_PRIVATE) {
+	if (c->buffer.type == BUFFER_PRIVATE) {
 		ret = snprintf(status_buff + col, term_cols - col + 1, "%s", HORIZONTAL_SEPARATOR "[priv]");
 		if (ret < 0 || (col += ret) >= term_cols)
 			goto print_status;
@@ -568,7 +568,7 @@ draw_status(channel *c)
 
 	/* If IRC channel buffer:
 	 * -[chancount chantype chanmodes] */
-	if (c->buffer_type == BUFFER_CHANNEL) {
+	if (c->buffer.type == BUFFER_CHANNEL) {
 
 		ret = snprintf(status_buff + col, term_cols - col + 1, HORIZONTAL_SEPARATOR "[%d", c->nick_count);
 		if (ret < 0 || (col += ret) >= term_cols)
