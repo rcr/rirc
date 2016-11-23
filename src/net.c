@@ -1,3 +1,9 @@
+/* TODO:
+ * net.c should be stateless,
+ * shouldnt include state.h
+ * shouldnt be calling newline, new_channel, auto_nick, etc
+ * */
+
 /* For addrinfo, getaddrinfo, getnameinfo */
 #define _POSIX_C_SOURCE 200112L
 

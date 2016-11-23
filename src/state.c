@@ -331,23 +331,33 @@ void
 buffer_scrollback_back(channel *c)
 {
 	/* Scroll a buffer back one page */
+	/* FIXME: this working scrollback is taken from draw.c and should be abstracted */
 
-	buffer_line *l = c->buffer.scrollback;
+	int buffer_start = 3, buffer_end = term_rows - 2;
+	int count_row = 0;
+	int max_row = buffer_end - buffer_start + 1;
+	int text_cols = term_cols - c->buffer.nick_pad - 11;
 
-	/* Terminal rows - nav - separator*2 - input */
-	int rows = term_rows - 4;
+	buffer_line *tmp, *l = c->buffer.scrollback;
 
-	do {
-		/* Circular buffer prev */
-		l = (l == c->buffer.lines) ? &c->buffer.lines[SCROLLBACK_BUFFER - 1] : l - 1;
+	for (;;) {
 
-		/* If last scrollback line is found before a full page is counted, do nothing */
-		if (l->text == NULL || l == c->buffer.head)
-			return;
+		/* Store the number of rows until a resize */
+		if (l->rows == 0)
+			l->rows = count_line_rows(text_cols, l);
 
-		rows -= l->rows;
+		count_row += l->rows;
 
-	} while (rows > 0);
+		if (count_row >= max_row)
+			break;
+
+		tmp = (l == c->buffer.lines) ? &c->buffer.lines[SCROLLBACK_BUFFER - 1] : l - 1;
+
+		if (tmp->text == NULL || tmp == c->buffer.head)
+			break;
+
+		l = tmp;
+	}
 
 	c->buffer.scrollback = l;
 
