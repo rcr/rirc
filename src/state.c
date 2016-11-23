@@ -197,9 +197,11 @@ channel_get(char *chan, server *s)
 void
 channel_clear(channel *c)
 {
-	free(c->buffer.head->text);
-
-	c->buffer.head->text = NULL;
+	buffer_line *l;
+	for (l = c->buffer.lines; l < c->buffer.lines + SCROLLBACK_BUFFER; l++) {
+		free(l->text);
+		l->text = NULL;
+	}
 
 	c->buffer.nick_pad = 0;
 
@@ -368,6 +370,11 @@ void
 buffer_scrollback_forw(channel *c)
 {
 	/* Scroll a buffer forward one page */
+
+	/* TODO: there's a special case here, when scrolling forward and the new line
+	 * doesn't or exactly reaches the bottom that was last drawn, we actually want to
+	 * put that line (if incompletely drawn) or the line after it at the top of the buffer
+	 * and draw from there */
 
 	buffer_line *l = c->buffer.scrollback;
 
