@@ -32,6 +32,8 @@
 #define RPL_MOTDSTART        375
 #define RPL_ENDOFMOTD        376
 #define ERR_NOSUCHNICK       401
+#define ERR_NOSUCHSERVER     402
+#define ERR_NOSUCHCHANNEL    403
 #define ERR_CANNOTSENDTOCHAN 404
 #define ERR_ERRONEUSNICKNAME 432
 #define ERR_NICKNAMEINUSE    433
@@ -1271,19 +1273,27 @@ num_400:
 	/* Numeric types (400, 600) */
 	switch (code) {
 
-	case ERR_NOSUCHNICK:  /* <nick> :<reason> */
+	case ERR_NOSUCHNICK:    /* <nick> :<reason> */
+	case ERR_NOSUCHSERVER:  /* <server> :<reason> */
+	case ERR_NOSUCHCHANNEL: /* <channel> :<reason> */
 
-		if (!(nick = getarg(&p->params, " ")))
-			fail("ERR_NOSUCHNICK: nick is null");
+		if (!(targ = getarg(&p->params, " "))) {
+			if (code == ERR_NOSUCHNICK)
+				fail("ERR_NOSUCHNICK: nick is null");
+			if (code == ERR_NOSUCHSERVER)
+				fail("ERR_NOSUCHSERVER: server is null");
+			if (code == ERR_NOSUCHCHANNEL)
+				fail("ERR_NOSUCHCHANNEL: channel is null");
+		}
 
 		/* Private buffer might not exist */
-		if ((c = channel_get(nick, s)) == NULL)
+		if ((c = channel_get(targ, s)) == NULL)
 			c = s->channel;
 
 		if (p->trailing)
-			newlinef(c, 0, "--", "Cannot send to '%s': %s", nick, p->trailing);
+			newlinef(c, 0, "--", "Cannot send to '%s': %s", targ, p->trailing);
 		else
-			newlinef(c, 0, "--", "Cannot send to '%s'", nick);
+			newlinef(c, 0, "--", "Cannot send to '%s'", targ);
 		return 0;
 
 
