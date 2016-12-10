@@ -3,6 +3,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 typedef void (*testcase)(void);
 
@@ -80,8 +81,9 @@ _run_tests_(const char *filename, testcase testcases[], size_t len)
 		return EXIT_SUCCESS;
 	}
 
-	/* Silence compiler warnings for test functions that are included but not used */
+	/* Silence compiler warnings for test functions/vars that are included but not used */
 	((void)(_assert_strcmp));
+	((void)(_failure_printed_));
 }
 
 /* Macro so the proper filename is printed */
