@@ -22,7 +22,7 @@ OBJ = $(patsubst $(SRCDIR)%.c, $(BLDDIR)%.o, $(SRC))
 
 # Test source and build files
 SRC_T = $(wildcard $(SRCDIR_T)*.c)
-OBJ_T = $(patsubst $(SRCDIR_T)%.c, $(BLDDIR_T)%.test, $(SRC_T))
+OBJ_T = $(patsubst $(SRCDIR_T)%.c, $(BLDDIR_T)%.t, $(SRC_T))
 
 rirc: $(OBJ)
 	@echo $@
@@ -33,8 +33,8 @@ $(BLDDIR)%.o: $(SRCDIR)%.c
 	@$(CPP) $(CFLAGS) -MM -MP -MT $@ $< -MF $(@:.o=.d)
 	@$(CC) $(CFLAGS) -c -o $@ $<
 
-$(BLDDIR_T)%.test: $(SRCDIR_T)%.c
-	@$(CPP) $(CFLAGS) -MM -MP -MT $@ $< -MF $(@:.test=.d)
+$(BLDDIR_T)%.t: $(SRCDIR_T)%.c
+	@$(CPP) $(CFLAGS) -MM -MP -MT $@ $< -MF $(@:.t=.d)
 	@$(CC) $(CFLAGS_DEBUG) $(LDFLAGS_DEBUG) -lm -o $@ $<
 	@./$@
 
@@ -42,13 +42,13 @@ $(BLDDIR_T)%.test: $(SRCDIR_T)%.c
 
 clean:
 	@echo cleaning
-	@rm -f rirc $(BLDDIR)*.{o,d} $(BLDDIR_T)*.{test,d}
-
-default: rirc
+	@rm -f rirc $(BLDDIR)*.{o,d} $(BLDDIR_T)*.{t,d}
 
 debug: CFLAGS   = $(CFLAGS_DEBUG)
 debug: LDFLAGS += $(LDFLAGS_DEBUG)
 debug: rirc
+
+default: rirc
 
 test: $(OBJ_T)
 

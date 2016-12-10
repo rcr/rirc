@@ -31,6 +31,7 @@
 #define RPL_MOTD             372
 #define RPL_MOTDSTART        375
 #define RPL_ENDOFMOTD        376
+#define ERR_NOSUCHNICK       401
 #define ERR_CANNOTSENDTOCHAN 404
 #define ERR_ERRONEUSNICKNAME 432
 #define ERR_NICKNAMEINUSE    433
@@ -496,11 +497,10 @@ send_privmsg(char *err, char *mesg, channel *c)
 
 	fail_if(sendf(err, c->server, "PRIVMSG %s :%s", targ, mesg));
 
-	/* FIXME: wait.... cc? does newline go to cc then not c? is this true elsewhere?*/
 	if ((cc = channel_get(targ, c->server)) == NULL)
 		cc = new_channel(targ, c->server, c, BUFFER_PRIVATE);
 
-	newline(c, LINE_CHAT, c->server->nick, mesg);
+	newline(cc, LINE_CHAT, c->server->nick, mesg);
 
 	return 0;
 }
@@ -1270,6 +1270,22 @@ num_400:
 
 	/* Numeric types (400, 600) */
 	switch (code) {
+
+	case ERR_NOSUCHNICK:  /* <nick> :<reason> */
+
+		if (!(nick = getarg(&p->params, " ")))
+			fail("ERR_NOSUCHNICK: nick is null");
+
+		/* Private buffer might not exist */
+		if ((c = channel_get(nick, s)) == NULL)
+			c = s->channel;
+
+		if (p->trailing)
+			newlinef(c, 0, "--", "Cannot send to '%s': %s", nick, p->trailing);
+		else
+			newlinef(c, 0, "--", "Cannot send to '%s'", nick);
+		return 0;
+
 
 	case ERR_CANNOTSENDTOCHAN:  /* <channel> :<reason> */
 
