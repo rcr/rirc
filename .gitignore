@@ -1,5 +1,4 @@
 *.o
-*.test
+*.t
 tags
 rirc
-config.h

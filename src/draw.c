@@ -12,7 +12,7 @@
 #include "common.h"
 #include "state.h"
 /* FIXME: this has to be included after common.h for activity cols */
-#include "config.h"
+#include "../config.h"
 
 /* Set foreground/background colour */
 #define FG(X) "\x1b[38;5;"#X"m"

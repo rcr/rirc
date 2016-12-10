@@ -44,8 +44,6 @@ Implement a mesg.c test framework before adding new message types, then:
 	351 reply from server for /version
 		 on freenode it sends me 005...
 
-	401 no such nick or channel (eg /version <unknown nick>)
-
 	402 no such server
 
 	403 :no such channel (Getting this from privmsg sometimes)
