@@ -407,27 +407,37 @@ buffer_scrollback_forw(channel *c)
 void
 auto_nick(char **autonick, char *nick)
 {
+	/* Copy the next choice in a server's nicks to it's nick pointer, e.g.:
+	 *   "nick, nick_, nick__"
+	 *
+	 * If the server's options are exhausted (or NULL) set a randomized default */
+
 	char *p = *autonick;
-	while (*p == ' ' || *p == ',')
+	int i;
+
+	while (p && (*p == ' ' || *p == ','))
 		p++;
 
-	if (*p == '\0') {
+	if (p && *p != '\0') {
+		/* Copy the next choice into nick */
 
+		for (i = 0; i < NICKSIZE && *p && *p != ' ' && *p != ','; i++)
+			*nick++ = *p++;
+
+		*autonick = p;
+	} else {
 		/* Autonicks exhausted, generate a random nick */
+
 		char *base = "rirc_";
 		char *cset = "0123456789ABCDEF";
 
 		strcpy(nick, base);
 		nick += strlen(base);
 
-		int i, len = strlen(cset);
+		size_t len = strlen(cset);
+
 		for (i = 0; i < 4; i++)
 			*nick++ = cset[rand() % len];
-	} else {
-		int c = 0;
-		while (*p != ' ' && *p != ',' && *p != '\0' && c++ < NICKSIZE)
-			*nick++ = *p++;
-		*autonick = p;
 	}
 
 	*nick = '\0';

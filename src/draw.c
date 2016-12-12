@@ -570,7 +570,8 @@ draw_status(channel *c)
 	 * -[chancount chantype chanmodes] */
 	if (c->buffer.type == BUFFER_CHANNEL) {
 
-		ret = snprintf(status_buff + col, term_cols - col + 1, HORIZONTAL_SEPARATOR "[%d", c->nick_count);
+		ret = snprintf(status_buff + col, term_cols - col + 1,
+				HORIZONTAL_SEPARATOR "[%d", c->nick_count);
 		if (ret < 0 || (col += ret) >= term_cols)
 			goto print_status;
 

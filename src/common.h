@@ -171,8 +171,10 @@ typedef struct server
 	char input[BUFFSIZE];
 	char *iptr;
 	char nick[NICKSIZE + 1];
+	char *nicks;
 	char *nptr;
 	char *port;
+	char *join;
 	char usermodes[MODE_SIZE];
 	int soc;
 	int pinging;
@@ -203,18 +205,14 @@ extern struct config
 	int join_part_quit_threshold;
 	char *username;
 	char *realname;
-	/* TODO: WIP, these will be per-server from cli: */
-	char *nicks;
-	char *auto_connect;
-	char *auto_port;
-	char *auto_join;
+	char *default_nick;
 } config;
 
 /* net.c */
 int sendf(char*, server*, const char*, ...);
 server* get_server_head(void);
 void check_servers(void);
-void server_connect(char*, char*);
+void server_connect(char*, char*, char*, char*);
 void server_disconnect(server*, int, int, char*);
 
 /* draw.c */

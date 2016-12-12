@@ -310,7 +310,7 @@ send_connect(char *err, char *mesg, channel *c)
 		port = "6667";
 	}
 
-	server_connect(host, port);
+	server_connect(host, port, NULL, NULL);
 
 	return 0;
 }
@@ -1064,7 +1064,7 @@ recv_numeric(char *err, parsed_mesg *p, server *s)
 
 	channel *c;
 	char *targ, *nick, *chan, *time, *type, *num;
-	int code;
+	int code, ret;
 
 	/* Extract numeric code */
 	for (code = 0; isdigit(*p->command); p->command++) {
@@ -1098,19 +1098,20 @@ recv_numeric(char *err, parsed_mesg *p, server *s)
 
 	/* 001 :<Welcome message> */
 	case RPL_WELCOME:
-
 		/* Establishing new connection with a server, set initial nick,
 		 * handle any channel auto-join or rejoins */
 
 		strncpy(s->nick, targ, NICKSIZE);
 
 		/* Reset list of auto nicks */
-		s->nptr = config.nicks;
+		s->nptr = s->nicks;
 
-		if (config.auto_join) {
-			/* Only send the autojoin on command-line connect */
-			fail_if(sendf(err, s, "JOIN %s", config.auto_join));
-			config.auto_join = NULL;
+		/* Auto join channels if first time connecting */
+		if (s->join) {
+			ret = sendf(err, s, "JOIN %s", s->join);
+			free(s->join);
+			s->join = NULL;
+			fail_if(ret);
 		} else {
 			/* If reconnecting to server, join any non-parted channels */
 			c = s->channel;

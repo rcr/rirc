@@ -51,7 +51,7 @@ typedef struct connection_thread {
 /* DLL of current servers */
 static server *server_head;
 
-static server* new_server(char*, char*);
+static server* new_server(char*, char*, char*, char*);
 static void free_server(server*);
 
 static int check_connect(server*);
@@ -73,7 +73,7 @@ get_server_head(void)
 }
 
 static server*
-new_server(char *host, char *port)
+new_server(char *host, char *port, char *join, char *nicks)
 {
 	server *s;
 
@@ -83,9 +83,18 @@ new_server(char *host, char *port)
 	/* Set non-zero default fields */
 	s->soc = -1;
 	s->iptr = s->input;
-	s->nptr = config.nicks;
 	s->host = strdup(host);
 	s->port = strdup(port);
+
+	if (nicks)
+		s->nicks = strdup(nicks);
+	else if (config.default_nick)
+		s->nicks = strdup(config.default_nick);
+
+	if (join)
+		s->join = strdup(join);
+
+	s->nptr = s->nicks;
 
 	auto_nick(&(s->nptr), s->nick);
 
@@ -109,6 +118,8 @@ free_server(server *s)
 
 	free(s->host);
 	free(s->port);
+	free(s->join);
+	free(s->nicks);
 	free(s);
 }
 
@@ -161,7 +172,7 @@ sendf(char *err, server *s, const char *fmt, ...)
 
 //FIXME: move the stateful stuff to state.c, only the connection relavent stuff should be here
 void
-server_connect(char *host, char *port)
+server_connect(char *host, char *port, char *nicks, char *join)
 {
 	connection_thread *ct;
 	server *tmp, *s = NULL;
@@ -184,7 +195,7 @@ server_connect(char *host, char *port)
 	}
 
 	if (s == NULL)
-		s = new_server(host, port);
+		s = new_server(host, port, join, nicks);
 
 	channel_set_current(s->channel);
 
@@ -228,6 +239,7 @@ connected(server *s)
 	s->latency_time = time(NULL);
 	s->latency_delta = 0;
 
+	//TODO: refactor these to mesg.c
 	sendf(NULL, s, "NICK %s", s->nick);
 	sendf(NULL, s, "USER %s 8 * :%s", config.username, config.realname);
 
@@ -358,7 +370,7 @@ server_disconnect(server *s, int err, int kill, char *mesg)
 		memset(s->usermodes, 0, MODE_SIZE);
 		s->soc = -1;
 		s->iptr = s->input;
-		s->nptr = config.nicks;
+		s->nptr = s->nicks;
 		s->latency_delta = 0;
 
 		/* Reset the nick that reconnects will attempt to register with */
@@ -503,7 +515,7 @@ check_reconnect(server *s, time_t t)
 	/* Check if the server is in auto-reconnect mode, and issue a reconnect if needed */
 
 	if (s->reconnect_time && t > s->reconnect_time) {
-		server_connect(s->host, s->port);
+		server_connect(s->host, s->port, NULL, NULL);
 		return 1;
 	}
 

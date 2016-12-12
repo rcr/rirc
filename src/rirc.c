@@ -195,17 +195,14 @@ startup(int argc, char **argv)
 	init_mesg();
 	init_state();
 
-	config.nicks = getenv("USER");
+	config.default_nick = getenv("USER");
 
-	/* TODO: WIP,
-	 * set nicks for this server from -n,
-	 * set autocmd (eg: -j)
-	 * refactor to new_server, server_connect(server*)
-	 * */
 	for (i = 0; i <= server_i; i++) {
 		server_connect(
 			auto_servers[i].host,
-			auto_servers[i].port ? auto_servers[i].port : "6667"
+			auto_servers[i].port ? auto_servers[i].port : "6667",
+			auto_servers[i].nicks,
+			auto_servers[i].join
 		);
 	}
 }
