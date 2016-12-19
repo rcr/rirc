@@ -8,6 +8,7 @@
 struct buffer_line
 {
 	char text[LINE_LENGTH_MAX + 1];
+	size_t len;
 };
 
 struct buffer

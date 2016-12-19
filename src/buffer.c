@@ -29,23 +29,38 @@ buffer_push(struct buffer *b)
 struct buffer_line*
 buffer_f(struct buffer *b)
 {
+	/* Return the first printable line in a buffer */
+
 	return &b->buffer_lines[MASK(b->head - 1)];
 }
 
 struct buffer_line*
 buffer_l(struct buffer *b)
 {
+	/* Return the last printable line in a buffer */
+
 	return &b->buffer_lines[MASK(b->tail)];
 }
 
 void
 newline(struct buffer *b, char *text)
 {
-	/* TODO: lines > max length, recursively call newline on remainder */
-
 	struct buffer_line *l = buffer_push(b);
 
-	strncpy(l->text, text, LINE_LENGTH_MAX);
+	size_t remainder = 0, len = strlen(text);
 
-	*(l->text + LINE_LENGTH_MAX) = 0;
+	if (len > LINE_LENGTH_MAX) {
+		remainder = len - LINE_LENGTH_MAX;
+		len = LINE_LENGTH_MAX;
+	}
+
+	memcpy(l->text, text, len);
+
+	*(l->text + len) = '\0';
+
+	l->len = len;
+
+	if (remainder) {
+		newline(b, text + LINE_LENGTH_MAX);
+	}
 }

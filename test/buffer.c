@@ -80,13 +80,60 @@ test_buffer_index_overflow(void)
 	assert_strcmp(b.buffer_lines[0].text, _fmt_int(-1));
 }
 
+static void
+test_buffer_line_overlength(void)
+{
+	/* Test that lines over the maximum length are recursively split and added separately */
+
+	struct buffer b = {0};
+
+	/* Indices to first and last positions of lines, total length = 2.5 times the maximum */
+	unsigned int f1 = 0,
+				 l1 = LINE_LENGTH_MAX - 1,
+				 f2 = LINE_LENGTH_MAX,
+				 l2 = LINE_LENGTH_MAX * 2 - 1,
+				 f3 = LINE_LENGTH_MAX * 2,
+				 l3 = LINE_LENGTH_MAX * 2 + LINE_LENGTH_MAX / 2 - 1;
+
+	/* Add a line that's 2.5 times the maximum length */
+	char text[l3 + 1];
+
+	memset(&text, ' ', sizeof(text) - 1);
+
+	text[f1] = 'a';
+	text[l1] = 'A';
+	text[f2] = 'b';
+	text[l2] = 'B';
+	text[f3] = 'c';
+	text[l3] = 'C';
+
+	text[sizeof(text)] = 0;
+
+	newline(&b, text);
+
+	assert_equals((int)b.buffer_lines[0].len, LINE_LENGTH_MAX);
+	assert_equals((int)b.buffer_lines[2].len, LINE_LENGTH_MAX / 2);
+
+	assert_equals(buffer_size(&b), 3);
+
+	assert_equals(b.buffer_lines[0].text[0], 'a');
+	assert_equals(b.buffer_lines[0].text[LINE_LENGTH_MAX - 1], 'A');
+
+	assert_equals(b.buffer_lines[1].text[0], 'b');
+	assert_equals(b.buffer_lines[1].text[LINE_LENGTH_MAX - 1], 'B');
+
+	assert_equals(b.buffer_lines[2].text[0], 'c');
+	assert_equals(b.buffer_lines[2].text[LINE_LENGTH_MAX / 2 - 1], 'C');
+}
+
 int
 main(void)
 {
 	testcase tests[] = {
 		&test_buffer_f,
 		&test_buffer_l,
-		&test_buffer_index_overflow
+		&test_buffer_index_overflow,
+		&test_buffer_line_overlength
 	};
 
 	return run_tests(tests);
