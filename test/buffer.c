@@ -16,6 +16,14 @@ _fmt_int(int i)
 }
 
 static void
+_newline(struct buffer *b, const char *t)
+{
+	/* abstract newline with default values */
+
+	newline(b, BUFFER_LINE_OTHER, "", t);
+}
+
+static void
 test_buffer_f(void)
 {
 	/* Test retrieving the first line after pushing to a full buffer */
@@ -27,7 +35,7 @@ test_buffer_f(void)
 	assert_equals(buffer_size(&b), 0);
 
 	for (i = 0; i < BUFFER_LINES_MAX + 1; i++)
-		newline(&b, _fmt_int(i + 1));
+		_newline(&b, _fmt_int(i + 1));
 
 	assert_strcmp(buffer_f(&b)->text, _fmt_int(BUFFER_LINES_MAX + 1));
 	assert_equals(buffer_size(&b), BUFFER_LINES_MAX);
@@ -45,12 +53,12 @@ test_buffer_l(void)
 	assert_equals(buffer_size(&b), 0);
 
 	for (i = 0; i < BUFFER_LINES_MAX; i++)
-		newline(&b, _fmt_int(i + 1));
+		_newline(&b, _fmt_int(i + 1));
 
 	assert_strcmp(buffer_l(&b)->text, _fmt_int(1));
 	assert_equals(buffer_size(&b), BUFFER_LINES_MAX);
 
-	newline(&b, _fmt_int(i + 1));
+	_newline(&b, _fmt_int(i + 1));
 
 	assert_strcmp(buffer_l(&b)->text, _fmt_int(2));
 	assert_equals(buffer_size(&b), BUFFER_LINES_MAX);
@@ -69,12 +77,12 @@ test_buffer_index_overflow(void)
 	assert_equals(buffer_size(&b), 1);
 	assert_equals(MASK(b.head), (BUFFER_LINES_MAX - 1));
 
-	newline(&b, _fmt_int(0));
+	_newline(&b, _fmt_int(0));
 
 	assert_equals(buffer_size(&b), 2);
 	assert_equals(MASK(b.head), 0);
 
-	newline(&b, _fmt_int(-1));
+	_newline(&b, _fmt_int(-1));
 
 	assert_equals(buffer_size(&b), 3);
 	assert_strcmp(b.buffer_lines[0].text, _fmt_int(-1));
@@ -89,11 +97,11 @@ test_buffer_line_overlength(void)
 
 	/* Indices to first and last positions of lines, total length = 2.5 times the maximum */
 	unsigned int f1 = 0,
-				 l1 = LINE_LENGTH_MAX - 1,
-				 f2 = LINE_LENGTH_MAX,
-				 l2 = LINE_LENGTH_MAX * 2 - 1,
-				 f3 = LINE_LENGTH_MAX * 2,
-				 l3 = LINE_LENGTH_MAX * 2 + LINE_LENGTH_MAX / 2 - 1;
+				 l1 = TEXT_LENGTH_MAX - 1,
+				 f2 = TEXT_LENGTH_MAX,
+				 l2 = TEXT_LENGTH_MAX * 2 - 1,
+				 f3 = TEXT_LENGTH_MAX * 2,
+				 l3 = TEXT_LENGTH_MAX * 2 + TEXT_LENGTH_MAX / 2 - 1;
 
 	/* Add a line that's 2.5 times the maximum length */
 	char text[l3 + 1];
@@ -109,21 +117,21 @@ test_buffer_line_overlength(void)
 
 	text[sizeof(text)] = 0;
 
-	newline(&b, text);
+	_newline(&b, text);
 
-	assert_equals((int)b.buffer_lines[0].len, LINE_LENGTH_MAX);
-	assert_equals((int)b.buffer_lines[2].len, LINE_LENGTH_MAX / 2);
+	assert_equals((int)b.buffer_lines[0].len, TEXT_LENGTH_MAX);
+	assert_equals((int)b.buffer_lines[2].len, TEXT_LENGTH_MAX / 2);
 
 	assert_equals(buffer_size(&b), 3);
 
 	assert_equals(b.buffer_lines[0].text[0], 'a');
-	assert_equals(b.buffer_lines[0].text[LINE_LENGTH_MAX - 1], 'A');
+	assert_equals(b.buffer_lines[0].text[TEXT_LENGTH_MAX - 1], 'A');
 
 	assert_equals(b.buffer_lines[1].text[0], 'b');
-	assert_equals(b.buffer_lines[1].text[LINE_LENGTH_MAX - 1], 'B');
+	assert_equals(b.buffer_lines[1].text[TEXT_LENGTH_MAX - 1], 'B');
 
 	assert_equals(b.buffer_lines[2].text[0], 'c');
-	assert_equals(b.buffer_lines[2].text[LINE_LENGTH_MAX / 2 - 1], 'C');
+	assert_equals(b.buffer_lines[2].text[TEXT_LENGTH_MAX / 2 - 1], 'C');
 }
 
 int
