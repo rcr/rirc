@@ -4,6 +4,17 @@
 
 #include <limits.h>
 
+static char*
+_fmt_int(int i)
+{
+	static char buff[1024] = {0};
+
+	if ((snprintf(buff, sizeof(buff) - 1, "%d", i)) < 0)
+		fail_test("snprintf");
+
+	return buff;
+}
+
 static void
 test_buffer_f(void)
 {
@@ -11,18 +22,14 @@ test_buffer_f(void)
 
 	int i;
 
-	struct buffer b = {
-		.head = 0,
-		.tail = 0,
-		.vals = {0}
-	};
+	struct buffer b = {0};
 
 	assert_equals(buffer_size(&b), 0);
 
 	for (i = 0; i < BUFFER_LINES_MAX + 1; i++)
-		buffer_push(&b, i + 1);
+		newline(&b, _fmt_int(i + 1));
 
-	assert_equals(buffer_f(&b), BUFFER_LINES_MAX + 1);
+	assert_strcmp(buffer_f(&b)->text, _fmt_int(BUFFER_LINES_MAX + 1));
 	assert_equals(buffer_size(&b), BUFFER_LINES_MAX);
 }
 
@@ -33,24 +40,19 @@ test_buffer_l(void)
 
 	int i;
 
-	struct buffer b = {
-		.head = 0,
-		.tail = 0,
-		.vals = {0}
-	};
+	struct buffer b = {0};
 
 	assert_equals(buffer_size(&b), 0);
 
 	for (i = 0; i < BUFFER_LINES_MAX; i++)
-		buffer_push(&b, i + 1);
+		newline(&b, _fmt_int(i + 1));
 
-
-	assert_equals(buffer_l(&b), 1);
+	assert_strcmp(buffer_l(&b)->text, _fmt_int(1));
 	assert_equals(buffer_size(&b), BUFFER_LINES_MAX);
 
-	buffer_push(&b, i + 1);
+	newline(&b, _fmt_int(i + 1));
 
-	assert_equals(buffer_l(&b), 2);
+	assert_strcmp(buffer_l(&b)->text, _fmt_int(2));
 	assert_equals(buffer_size(&b), BUFFER_LINES_MAX);
 }
 
@@ -61,22 +63,21 @@ test_buffer_index_overflow(void)
 
 	struct buffer b = {
 		.head = UINT_MAX,
-		.tail = UINT_MAX - 1,
-		.vals = {0}
+		.tail = UINT_MAX - 1
 	};
 
 	assert_equals(buffer_size(&b), 1);
 	assert_equals(MASK(b.head), (BUFFER_LINES_MAX - 1));
 
-	buffer_push(&b, 0);
+	newline(&b, _fmt_int(0));
 
 	assert_equals(buffer_size(&b), 2);
 	assert_equals(MASK(b.head), 0);
 
-	buffer_push(&b, -1);
+	newline(&b, _fmt_int(-1));
 
 	assert_equals(buffer_size(&b), 3);
-	assert_equals(b.vals[0], -1);
+	assert_strcmp(b.buffer_lines[0].text, _fmt_int(-1));
 }
 
 int
