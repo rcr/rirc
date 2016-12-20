@@ -438,12 +438,6 @@ test_word_wrap(void)
 		fail_test("seg1 should be advanced to end of string");
 }
 
-void
-test_count_line_rows(void)
-{
-	/* TODO */
-}
-
 int
 main(void)
 {
@@ -452,8 +446,7 @@ main(void)
 		&test_parse,
 		&test_getarg,
 		&test_check_pinged,
-		&test_word_wrap,
-		&test_count_line_rows,
+		&test_word_wrap
 	};
 
 	return run_tests(tests);

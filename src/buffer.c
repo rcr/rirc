@@ -51,25 +51,54 @@ buffer_l(struct buffer *b)
 	return &b->buffer_lines[MASK(b->tail)];
 }
 
+unsigned int
+buffer_line_rows(struct buffer_line *l, unsigned int w)
+{
+	/* Return the number of times a buffer line will wrap within w columns */
+
+	if (w == 0)
+		fatal("width is zero");
+
+	if (l->w != w) {
+		unsigned int count = 0;
+
+		char *ptr1 = l->text;
+		char *ptr2 = l->text + l->text_len;
+
+		do {
+			word_wrap(w, &ptr1, ptr2);
+			count++;
+		} while (*ptr1);
+
+		l->w = w;
+		l->rows = count;
+	}
+
+	return l->rows;
+}
+
 void
-buffer_newline(struct buffer *b, buffer_line_t type, const char *from, const char *text)
+buffer_newline(struct buffer *b, enum buffer_line_t type, const char *from, const char *text)
 {
 	struct buffer_line *l = buffer_push(b);
 
-	/* FIXME: move fatal to utils.h, move some utils stuff here
-	if (from == NULL || text == NULL)
-		fatal("buffer_newline");
-	*/
+	if (from == NULL)
+		fatal("from is NULL");
+
+	if (text == NULL)
+		fatal("text is NULL");
 
 	size_t remainder = 0,
 		   text_len = strlen(text),
 		   from_len = strlen(from);
 
+	/* Split overlength lines into continuations */
 	if (text_len > TEXT_LENGTH_MAX) {
 		remainder = text_len - TEXT_LENGTH_MAX;
 		text_len = TEXT_LENGTH_MAX;
 	}
 
+	/* Silently truncate */
 	if (from_len > FROM_LENGTH_MAX)
 		from_len = FROM_LENGTH_MAX;
 
@@ -94,38 +123,16 @@ buffer_newline(struct buffer *b, buffer_line_t type, const char *from, const cha
 		buffer_newline(b, type, from, text + TEXT_LENGTH_MAX);
 }
 
-unsigned int
-buffer_line_rows(struct buffer_line *l, unsigned int w)
-{
-	/* Count the number of times a buffer line will wrap within w columns */
-
-	int count = 0;
-
-	char *ptr1 = l->text;
-	char *ptr2 = l->text + l->len;
-
-	do {
-		word_wrap(w, &ptr1, ptr2);
-		count++;
-	} while (*ptr1);
-
-	return count;
-}
-
-
 /* TODO
- * line rows, scrollback, activity
- *
- * reimplement old functionality:
- * buffer_line:
- *	unsigned int rows;
- *	unsigned int w
- * buffer:
- *	struct buffer_line *scrollback;
- *	unsigned int w
- * set buffer activity
- * set draw bits
- * move newline and newlinef here as functions of a buffer?
+ * scrollback
+ *   ensure always >= buffer_l, < buffer_f
+ *     conditionally increment on buffer_push
+ *   buffer_page_f(buffer, unsigned int rows)
+ *     don't redraw if advance wouldn't change lines on screen
+ *     special case when scrolling forward from back of buffer
+ *   buffer_page_b(buffer, unsigned int rows)
+ * activity, draw bits
+ *   set when newline is called on a channel
  *
  * buffer_reset <- clear/reset all fields (pretty much just memset 0)
  *

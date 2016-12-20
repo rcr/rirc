@@ -10,24 +10,24 @@
 
 #define BUFFER_LINES_MAX (1 << 10)
 
-typedef enum {
+enum buffer_line_t {
+	BUFFER_LINE_OTHER,  /* Default/all other lines */
+	BUFFER_LINE_CHAT,   /* Line of text from another IRC user */
+	BUFFER_LINE_PINGED, /* Line of text from another IRC user containing current nick */
+	BUFFER_LINE_T_SIZE
+};
+
+enum buffer_t {
 	BUFFER_OTHER,   /* Default/all other buffers */
 	BUFFER_CHANNEL, /* Channel message buffer */
 	BUFFER_SERVER,  /* Server message buffer */
 	BUFFER_PRIVATE, /* Private message buffer */
 	BUFFER_T_SIZE
-} buffer_t;
-
-typedef enum {
-	BUFFER_LINE_OTHER,  /* Default/all other lines */
-	BUFFER_LINE_CHAT,   /* Line of text from another IRC user */
-	BUFFER_LINE_PINGED, /* Line of text from another IRC user containing current nick */
-	BUFFER_LINE_T_SIZE
-} buffer_line_t;
+};
 
 struct buffer_line
 {
-	buffer_line_t type;
+	enum buffer_line_t type;
 	char from[FROM_LENGTH_MAX + 1];
 	char text[TEXT_LENGTH_MAX + 1];
 	size_t from_len;
@@ -39,13 +39,10 @@ struct buffer_line
 
 struct buffer
 {
-	buffer_t type; /* TODO: set when new_channel */
-
+	enum buffer_t type; /* TODO: set when new_channel */
 	unsigned int head;
 	unsigned int tail;
-
-	size_t pad;
-
+	size_t pad; /* TODO: rename? widest_nick? */
 	struct buffer_line buffer_lines[BUFFER_LINES_MAX];
 };
 
@@ -54,6 +51,6 @@ unsigned int buffer_line_rows(struct buffer_line*, unsigned int);
 struct buffer_line* buffer_f(struct buffer*);
 struct buffer_line* buffer_l(struct buffer*);
 
-void buffer_newline(struct buffer*, buffer_line_t, const char*, const char*);
+void buffer_newline(struct buffer*, enum buffer_line_t, const char*, const char*);
 
 #endif

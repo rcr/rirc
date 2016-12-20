@@ -98,11 +98,11 @@ test_buffer_line_overlength(void)
 
 	/* Indices to first and last positions of lines, total length = 2.5 times the maximum */
 	unsigned int f1 = 0,
-				 l1 = TEXT_LENGTH_MAX - 1,
-				 f2 = TEXT_LENGTH_MAX,
-				 l2 = TEXT_LENGTH_MAX * 2 - 1,
-				 f3 = TEXT_LENGTH_MAX * 2,
-				 l3 = TEXT_LENGTH_MAX * 2 + TEXT_LENGTH_MAX / 2 - 1;
+	             l1 = TEXT_LENGTH_MAX - 1,
+	             f2 = TEXT_LENGTH_MAX,
+	             l2 = TEXT_LENGTH_MAX * 2 - 1,
+	             f3 = TEXT_LENGTH_MAX * 2,
+	             l3 = TEXT_LENGTH_MAX * 2 + TEXT_LENGTH_MAX / 2 - 1;
 
 	/* Add a line that's 2.5 times the maximum length */
 	char text[l3 + 1];
@@ -135,6 +135,44 @@ test_buffer_line_overlength(void)
 	assert_equals(b.buffer_lines[2].text[TEXT_LENGTH_MAX / 2 - 1], 'C');
 }
 
+static void
+test_buffer_line_rows(void)
+{
+	/* Test calculating the number of rows a buffer line occupies */
+
+	struct buffer b = {0};
+	struct buffer_line *l;
+
+	char *text = "aa bb cc";
+
+	_buffer_newline(&b, text);
+
+	l = buffer_f(&b);
+
+	/* 1 column: 6 rows. word wrap skips whitespace prefix in line continuations:
+	 * a
+	 * a
+	 * b
+	 * b
+	 * c
+	 * c
+	 * */
+	assert_equals(buffer_line_rows(l, 1), 6);
+
+	/* 4 columns: 3 rows:
+	 * 'aa b' -> wraps to
+	 *   'aa'
+	 *   'bb c'
+	 * 'bb c' -> wraps to
+	 *   'bb'
+	 *   'cc'
+	 * */
+	assert_equals(buffer_line_rows(l, 4), 3);
+
+	/* Greater columns than length should always return one row */
+	assert_equals(buffer_line_rows(l, sizeof(text) + 1), 1);
+}
+
 int
 main(void)
 {
@@ -142,7 +180,8 @@ main(void)
 		&test_buffer_f,
 		&test_buffer_l,
 		&test_buffer_index_overflow,
-		&test_buffer_line_overlength
+		&test_buffer_line_overlength,
+		&test_buffer_line_rows
 	};
 
 	return run_tests(tests);
