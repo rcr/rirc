@@ -75,6 +75,8 @@ newlinef(channel *c, line_t type, const char *from, const char *fmt, ...)
 	_newline(c, type, from, buff, len);
 }
 
+/* TODO: call buffer_newline(c->buffer, ...);
+ *       set channel attributes, eg activity */
 static void
 _newline(channel *c, line_t type, const char *from, const char *mesg, size_t len)
 {

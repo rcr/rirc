@@ -52,13 +52,13 @@ buffer_l(struct buffer *b)
 }
 
 void
-newline(struct buffer *b, buffer_line_t type, const char *from, const char *text)
+buffer_newline(struct buffer *b, buffer_line_t type, const char *from, const char *text)
 {
 	struct buffer_line *l = buffer_push(b);
 
 	/* FIXME: move fatal to utils.h, move some utils stuff here
 	if (from == NULL || text == NULL)
-		fatal("newline");
+		fatal("buffer_newline");
 	*/
 
 	size_t remainder = 0,
@@ -83,12 +83,14 @@ newline(struct buffer *b, buffer_line_t type, const char *from, const char *text
 	l->time = time(NULL);
 	l->type = type;
 
+	l->rows = 0;
+	l->w = 0;
+
 	if (from_len > b->pad)
 		b->pad = from_len;
 
 	if (remainder)
-		newline(b, type, from, text + TEXT_LENGTH_MAX);
-
+		buffer_newline(b, type, from, text + TEXT_LENGTH_MAX);
 }
 
 /* TODO

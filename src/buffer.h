@@ -30,6 +30,8 @@ struct buffer_line
 	char text[TEXT_LENGTH_MAX + 1];
 	size_t len;
 	time_t time;
+	unsigned int rows;
+	unsigned int w;
 };
 
 struct buffer
@@ -47,6 +49,6 @@ struct buffer
 struct buffer_line* buffer_f(struct buffer*);
 struct buffer_line* buffer_l(struct buffer*);
 
-void newline(struct buffer*, buffer_line_t, const char*, const char*);
+void buffer_newline(struct buffer*, buffer_line_t, const char*, const char*);
 
 #endif

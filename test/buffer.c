@@ -16,11 +16,11 @@ _fmt_int(int i)
 }
 
 static void
-_newline(struct buffer *b, const char *t)
+_buffer_newline(struct buffer *b, const char *t)
 {
 	/* abstract newline with default values */
 
-	newline(b, BUFFER_LINE_OTHER, "", t);
+	buffer_newline(b, BUFFER_LINE_OTHER, "", t);
 }
 
 static void
@@ -35,7 +35,7 @@ test_buffer_f(void)
 	assert_equals(buffer_size(&b), 0);
 
 	for (i = 0; i < BUFFER_LINES_MAX + 1; i++)
-		_newline(&b, _fmt_int(i + 1));
+		_buffer_newline(&b, _fmt_int(i + 1));
 
 	assert_strcmp(buffer_f(&b)->text, _fmt_int(BUFFER_LINES_MAX + 1));
 	assert_equals(buffer_size(&b), BUFFER_LINES_MAX);
@@ -53,12 +53,12 @@ test_buffer_l(void)
 	assert_equals(buffer_size(&b), 0);
 
 	for (i = 0; i < BUFFER_LINES_MAX; i++)
-		_newline(&b, _fmt_int(i + 1));
+		_buffer_newline(&b, _fmt_int(i + 1));
 
 	assert_strcmp(buffer_l(&b)->text, _fmt_int(1));
 	assert_equals(buffer_size(&b), BUFFER_LINES_MAX);
 
-	_newline(&b, _fmt_int(i + 1));
+	_buffer_newline(&b, _fmt_int(i + 1));
 
 	assert_strcmp(buffer_l(&b)->text, _fmt_int(2));
 	assert_equals(buffer_size(&b), BUFFER_LINES_MAX);
@@ -77,12 +77,12 @@ test_buffer_index_overflow(void)
 	assert_equals(buffer_size(&b), 1);
 	assert_equals(MASK(b.head), (BUFFER_LINES_MAX - 1));
 
-	_newline(&b, _fmt_int(0));
+	_buffer_newline(&b, _fmt_int(0));
 
 	assert_equals(buffer_size(&b), 2);
 	assert_equals(MASK(b.head), 0);
 
-	_newline(&b, _fmt_int(-1));
+	_buffer_newline(&b, _fmt_int(-1));
 
 	assert_equals(buffer_size(&b), 3);
 	assert_strcmp(b.buffer_lines[0].text, _fmt_int(-1));
@@ -117,7 +117,7 @@ test_buffer_line_overlength(void)
 
 	text[sizeof(text)] = 0;
 
-	_newline(&b, text);
+	_buffer_newline(&b, text);
 
 	assert_equals((int)b.buffer_lines[0].len, TEXT_LENGTH_MAX);
 	assert_equals((int)b.buffer_lines[2].len, TEXT_LENGTH_MAX / 2);
