@@ -1,5 +1,6 @@
 #include "test.h"
 
+#include "../src/utils.c" /* FIXME: word_wrap */
 #include "../src/buffer.c"
 
 #include <limits.h>

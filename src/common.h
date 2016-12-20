@@ -1,8 +1,8 @@
 #ifndef COMMON_H
 #define COMMON_H
 
-#include <time.h>
-#include <errno.h>
+/* FIXME: refactoring */
+#include "utils.h"
 
 #define VERSION "0.1"
 
@@ -11,7 +11,6 @@
 #define SCROLLBACK_BUFFER 200
 #define SCROLLBACK_INPUT 15
 #define BUFFSIZE 512
-#define NICKSIZE 256
 #define CHANSIZE 256
 #define MAX_INPUT 256
 #define RECONNECT_DELTA 15
@@ -83,24 +82,6 @@ typedef enum {
 	ACTIVITY_T_SIZE
 } activity_t;
 
-/* Buffer line types */
-typedef enum {
-	LINE_DEFAULT,
-	LINE_PINGED,
-	LINE_CHAT,
-	LINE_T_SIZE
-} line_t;
-
-/* Nicklist AVL tree node */
-typedef struct avl_node
-{
-	int height;
-	struct avl_node *l;
-	struct avl_node *r;
-	char *key;
-	void *val;
-} avl_node;
-
 /* Channel input line */
 typedef struct input_line
 {
@@ -121,17 +102,6 @@ typedef struct input
 	struct input_line *list_head;
 } input;
 
-/* Channel buffer line */
-typedef struct buffer_line
-{
-	int rows;
-	size_t len;
-	time_t time;
-	char *text;
-	char from[NICKSIZE + 1];
-	line_t type;
-} buffer_line;
-
 /* TODO:
  * abstract away getting the first lines, last line, advancing a line
  * */
@@ -141,9 +111,9 @@ typedef struct buffer
 {
 	buffer_t type;
 	size_t nick_pad;
-	struct buffer_line *scrollback;
-	struct buffer_line *head;
-	struct buffer_line lines[SCROLLBACK_BUFFER];
+	struct _buffer_line *scrollback;
+	struct _buffer_line *head;
+	struct _buffer_line lines[SCROLLBACK_BUFFER];
 } buffer;
 
 /* Channel */
@@ -189,16 +159,6 @@ typedef struct server
 	void *connecting;
 } server;
 
-/* Parsed IRC message */
-typedef struct parsed_mesg
-{
-	char *from;
-	char *hostinfo;
-	char *command;
-	char *params;
-	char *trailing;
-} parsed_mesg;
-
 /* rirc.c */
 extern struct config
 {
@@ -232,23 +192,6 @@ void action(int(*)(char), const char*, ...);
 void free_input(input*);
 void poll_input(void);
 extern char *action_message;
-
-/* utils.c */
-char* getarg(char**, const char*);
-char* strdup(const char*);
-char* word_wrap(int, char**, char*);
-const avl_node* avl_get(avl_node*, const char*, size_t);
-int avl_add(avl_node**, const char*, void*);
-int avl_del(avl_node**, const char*);
-int check_pinged(const char*, const char*);
-int count_line_rows(int, buffer_line*);
-parsed_mesg* parse(parsed_mesg*, char*);
-void error(int status, const char*, ...);
-void free_avl(avl_node*);
-
-/* Irrecoverable error */
-#define fatal(mesg) \
-	do { error(errno, "ERROR in %s: %s", __func__, mesg); } while (0)
 
 /* mesg.c */
 void init_mesg(void);

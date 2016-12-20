@@ -188,7 +188,7 @@ draw_buffer(channel *c)
 	if (text_cols < 1)
 		goto clear_remainder;
 
-	buffer_line *tmp, *l = c->buffer.scrollback;
+	_buffer_line *tmp, *l = c->buffer.scrollback;
 
 
 	/* Empty buffer */

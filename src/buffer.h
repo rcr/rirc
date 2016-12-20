@@ -3,6 +3,8 @@
 
 #include <time.h>
 
+#include "utils.h"
+
 #define TEXT_LENGTH_MAX 510
 #define FROM_LENGTH_MAX 100
 
@@ -45,6 +47,8 @@ struct buffer
 
 	struct buffer_line buffer_lines[BUFFER_LINES_MAX];
 };
+
+unsigned int buffer_line_rows(struct buffer_line*, unsigned int);
 
 struct buffer_line* buffer_f(struct buffer*);
 struct buffer_line* buffer_l(struct buffer*);

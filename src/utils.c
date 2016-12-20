@@ -6,7 +6,7 @@
 #include <string.h>
 #include <strings.h>
 
-#include "common.h"
+#include "utils.h"
 
 #define H(N) (N == NULL ? 0 : N->height)
 #define MAX(A, B) (A > B ? A : B)
@@ -290,7 +290,7 @@ word_wrap(int n, char **str, char *end)
 }
 
 int
-count_line_rows(int text_cols, buffer_line *l)
+count_line_rows(int text_cols, _buffer_line *l)
 {
 	/* Count the number of times a line will wrap within text_cols columns */
 

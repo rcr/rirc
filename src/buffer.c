@@ -93,6 +93,25 @@ buffer_newline(struct buffer *b, buffer_line_t type, const char *from, const cha
 		buffer_newline(b, type, from, text + TEXT_LENGTH_MAX);
 }
 
+unsigned int
+buffer_line_rows(struct buffer_line *l, unsigned int w)
+{
+	/* Count the number of times a buffer line will wrap within w columns */
+
+	int count = 0;
+
+	char *ptr1 = l->text;
+	char *ptr2 = l->text + l->len;
+
+	do {
+		word_wrap(w, &ptr1, ptr2);
+		count++;
+	} while (*ptr1);
+
+	return count;
+}
+
+
 /* TODO
  * line rows, scrollback, activity
  *

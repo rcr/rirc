@@ -82,7 +82,7 @@ _newline(channel *c, line_t type, const char *from, const char *mesg, size_t len
 {
 	/* Static function for handling inserting new lines into buffers */
 
-	buffer_line *new_line;
+	_buffer_line *new_line;
 
 	/* c->buffer.head points to the first printable line, so get the next line in the
 	 * circular buffer */
@@ -169,7 +169,7 @@ new_channel(char *name, server *server, channel *chanlist, buffer_t type)
 void
 free_channel(channel *c)
 {
-	buffer_line *l;
+	_buffer_line *l;
 	for (l = c->buffer.lines; l < c->buffer.lines + SCROLLBACK_BUFFER; l++)
 		free(l->text);
 
@@ -199,7 +199,7 @@ channel_get(char *chan, server *s)
 void
 channel_clear(channel *c)
 {
-	buffer_line *l;
+	_buffer_line *l;
 	for (l = c->buffer.lines; l < c->buffer.lines + SCROLLBACK_BUFFER; l++) {
 		free(l->text);
 		l->text = NULL;
@@ -342,7 +342,7 @@ buffer_scrollback_back(channel *c)
 	int max_row = buffer_end - buffer_start + 1;
 	int text_cols = term_cols - c->buffer.nick_pad - 11;
 
-	buffer_line *tmp, *l = c->buffer.scrollback;
+	_buffer_line *tmp, *l = c->buffer.scrollback;
 
 	for (;;) {
 
@@ -378,7 +378,7 @@ buffer_scrollback_forw(channel *c)
 	 * put that line (if incompletely drawn) or the line after it at the top of the buffer
 	 * and draw from there */
 
-	buffer_line *l = c->buffer.scrollback;
+	_buffer_line *l = c->buffer.scrollback;
 
 	/* Terminal rows - nav - separator*2 - input */
 	int rows = term_rows - 4;
