@@ -30,10 +30,11 @@ struct buffer_line
 	buffer_line_t type;
 	char from[FROM_LENGTH_MAX + 1];
 	char text[TEXT_LENGTH_MAX + 1];
-	size_t len;
+	size_t from_len;
+	size_t text_len;
 	time_t time;
-	unsigned int rows;
-	unsigned int w;
+	unsigned int rows; /* Cached number of rows occupied when wrapping on w columns */
+	unsigned int w;    /* Cached width for rows */
 };
 
 struct buffer

@@ -73,16 +73,17 @@ buffer_newline(struct buffer *b, buffer_line_t type, const char *from, const cha
 	if (from_len > FROM_LENGTH_MAX)
 		from_len = FROM_LENGTH_MAX;
 
-	memcpy(l->text, text, text_len);
 	memcpy(l->from, from, from_len);
+	memcpy(l->text, text, text_len);
 
-	*(l->text + text_len) = '\0';
 	*(l->from + text_len) = '\0';
+	*(l->text + text_len) = '\0';
 
-	l->len = text_len;
+	l->from_len = from_len;
+	l->text_len = text_len;
+
 	l->time = time(NULL);
 	l->type = type;
-
 	l->rows = 0;
 	l->w = 0;
 

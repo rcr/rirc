@@ -120,8 +120,8 @@ test_buffer_line_overlength(void)
 
 	_buffer_newline(&b, text);
 
-	assert_equals((int)b.buffer_lines[0].len, TEXT_LENGTH_MAX);
-	assert_equals((int)b.buffer_lines[2].len, TEXT_LENGTH_MAX / 2);
+	assert_equals((int)b.buffer_lines[0].text_len, TEXT_LENGTH_MAX);
+	assert_equals((int)b.buffer_lines[2].text_len, TEXT_LENGTH_MAX / 2);
 
 	assert_equals(buffer_size(&b), 3);
 
