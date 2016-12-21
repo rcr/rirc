@@ -25,7 +25,7 @@ _buffer_newline(struct buffer *b, const char *t)
 }
 
 static void
-test_buffer_f(void)
+test_buffer_head(void)
 {
 	/* Test retrieving the first line after pushing to a full buffer */
 
@@ -38,12 +38,12 @@ test_buffer_f(void)
 	for (i = 0; i < BUFFER_LINES_MAX + 1; i++)
 		_buffer_newline(&b, _fmt_int(i + 1));
 
-	assert_strcmp(buffer_f(&b)->text, _fmt_int(BUFFER_LINES_MAX + 1));
+	assert_strcmp(buffer_head(&b)->text, _fmt_int(BUFFER_LINES_MAX + 1));
 	assert_equals(buffer_size(&b), BUFFER_LINES_MAX);
 }
 
 static void
-test_buffer_l(void)
+test_buffer_tail(void)
 {
 	/* Test retrieving the last line after pushing to a full buffer */
 
@@ -56,13 +56,56 @@ test_buffer_l(void)
 	for (i = 0; i < BUFFER_LINES_MAX; i++)
 		_buffer_newline(&b, _fmt_int(i + 1));
 
-	assert_strcmp(buffer_l(&b)->text, _fmt_int(1));
+	assert_strcmp(buffer_tail(&b)->text, _fmt_int(1));
 	assert_equals(buffer_size(&b), BUFFER_LINES_MAX);
 
 	_buffer_newline(&b, _fmt_int(i + 1));
 
-	assert_strcmp(buffer_l(&b)->text, _fmt_int(2));
+	assert_strcmp(buffer_tail(&b)->text, _fmt_int(2));
 	assert_equals(buffer_size(&b), BUFFER_LINES_MAX);
+}
+
+static void
+test_buffer_sb(void)
+{
+	/* Test features of the buffer scrollback:
+	 *   Empty buffer returns NULL for scrollback
+	 *   Buffer scrollback stays locked to the head when incrementing
+	 *   Buffer scrollback stays between [tail, head) when scrolled back
+	 *   Buffer scrollback stays locked to the tail when incrementing
+	 * */
+
+	struct buffer b = {0};
+
+	/* Empty buffer returns NULL */
+	assert_null(buffer_sb(&b));
+
+	/* Buffer scrollback stays locked to the buffer head when incrementing */
+	_buffer_newline(&b, "a");
+	assert_strcmp(buffer_sb(&b)->text, "a");
+
+	_buffer_newline(&b, "b");
+	assert_strcmp(buffer_sb(&b)->text, "b");
+
+	_buffer_newline(&b, "c");
+	assert_strcmp(buffer_sb(&b)->text, "c");
+
+	/* Buffer scrollback stays between [tail, head) when scrolled back */
+	b.scrollback = b.tail + 1;
+	assert_strcmp(buffer_sb(&b)->text, "b");
+
+	_buffer_newline(&b, "d");
+	assert_strcmp(buffer_sb(&b)->text, "b");
+
+	/* Buffer scrollback stays locked to the buffer tail when incrementing */
+	b.head = b.tail + BUFFER_LINES_MAX;
+	assert_true(buffer_full(&b));
+
+	_buffer_newline(&b, "e");
+	assert_strcmp(buffer_sb(&b)->text, "b");
+
+	_buffer_newline(&b, "f");
+	assert_strcmp(buffer_sb(&b)->text, "c");
 }
 
 static void
@@ -147,7 +190,7 @@ test_buffer_line_rows(void)
 
 	_buffer_newline(&b, text);
 
-	l = buffer_f(&b);
+	l = buffer_head(&b);
 
 	/* 1 column: 6 rows. word wrap skips whitespace prefix in line continuations:
 	 * a
@@ -177,8 +220,9 @@ int
 main(void)
 {
 	testcase tests[] = {
-		&test_buffer_f,
-		&test_buffer_l,
+		&test_buffer_head,
+		&test_buffer_tail,
+		&test_buffer_sb,
 		&test_buffer_index_overflow,
 		&test_buffer_line_overlength,
 		&test_buffer_line_rows

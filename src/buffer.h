@@ -42,14 +42,16 @@ struct buffer
 	enum buffer_t type; /* TODO: set when new_channel */
 	unsigned int head;
 	unsigned int tail;
-	size_t pad; /* TODO: rename? widest_nick? */
+	unsigned int scrollback; /* Index of the current line between [tail, head) for scrollback */
+	size_t pad;
 	struct buffer_line buffer_lines[BUFFER_LINES_MAX];
 };
 
 unsigned int buffer_line_rows(struct buffer_line*, unsigned int);
 
-struct buffer_line* buffer_f(struct buffer*);
-struct buffer_line* buffer_l(struct buffer*);
+struct buffer_line* buffer_head(struct buffer*);
+struct buffer_line* buffer_tail(struct buffer*);
+struct buffer_line* buffer_sb(struct buffer*);
 
 void buffer_newline(struct buffer*, enum buffer_line_t, const char*, const char*);
 

@@ -29,14 +29,31 @@ buffer_full(struct buffer *b)
 static struct buffer_line*
 buffer_push(struct buffer *b)
 {
+	/* TODO: cleanup */
+
+	int tail_locked = 0,
+	    head_locked = 0;
+
+	if (buffer_sb(b) == buffer_tail(b))
+		tail_locked = 1;
+
+	if (buffer_sb(b) == buffer_head(b))
+		head_locked = 1;
+
 	if (buffer_full(b))
 		b->tail++;
+
+	if (head_locked)
+		b->scrollback = b->head;
+
+	else if (tail_locked)
+		b->scrollback = b->tail;
 
 	return &b->buffer_lines[MASK(b->head++)];
 }
 
 struct buffer_line*
-buffer_f(struct buffer *b)
+buffer_head(struct buffer *b)
 {
 	/* Return the first printable line in a buffer */
 
@@ -44,11 +61,22 @@ buffer_f(struct buffer *b)
 }
 
 struct buffer_line*
-buffer_l(struct buffer *b)
+buffer_tail(struct buffer *b)
 {
 	/* Return the last printable line in a buffer */
 
 	return &b->buffer_lines[MASK(b->tail)];
+}
+
+struct buffer_line*
+buffer_sb(struct buffer *b)
+{
+	/* Return the buffer scrollback line or NULL if buffer is empty */
+
+	if (buffer_size(b) == 0)
+		return NULL;
+
+	return &b->buffer_lines[MASK(b->scrollback)];
 }
 
 unsigned int
