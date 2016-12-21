@@ -4,6 +4,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <inttypes.h>
+
 
 typedef void (*testcase)(void);
 
@@ -43,6 +45,18 @@ static int _assert_strcmp(char*, char*);
 	do { \
 		if ((X) != (Y)) \
 			fail_testf(#X " expected '%d', got '%d'", (Y), (X)); \
+	} while (0)
+
+#define assert_ptrequals(X, Y) \
+	do { \
+		if ((X) != (Y)) \
+			fail_testf(#X " expected '%016" PRIxPTR "', got '%016" PRIxPTR "'", (uintptr_t)(Y), (uintptr_t)(X)); \
+	} while (0)
+
+#define assert_null(X) \
+	do { \
+		if ((X) != NULL) \
+			fail_testf(#X " expected NULL, got '%016" PRIxPTR "'", (uintptr_t)(X)); \
 	} while (0)
 
 static int
