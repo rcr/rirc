@@ -47,6 +47,18 @@ static int _assert_strcmp(char*, char*);
 			fail_testf(#X " expected '%d', got '%d'", (Y), (X)); \
 	} while (0)
 
+#define assert_true(X) \
+	do { \
+		if ((X) != 1) \
+			fail_test(#X " expected true"); \
+	} while (0)
+
+#define assert_false(X) \
+	do { \
+		if ((X) != 0) \
+			fail_test(#X " expected false"); \
+	} while (0)
+
 #define assert_ptrequals(X, Y) \
 	do { \
 		if ((X) != (Y)) \
