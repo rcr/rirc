@@ -66,7 +66,8 @@
 	} while (0)
 
 /* Buffer types */
-typedef enum {
+typedef enum
+{
 	BUFFER_OTHER,   /* Default/all other buffers */
 	BUFFER_CHANNEL, /* IRC channel buffer */
 	BUFFER_SERVER,  /* Server message buffer */
@@ -75,7 +76,8 @@ typedef enum {
 } buffer_t;
 
 /* Buffer bar activity types */
-typedef enum {
+typedef enum
+{
 	ACTIVITY_DEFAULT,
 	ACTIVITY_ACTIVE,
 	ACTIVITY_PINGED,
