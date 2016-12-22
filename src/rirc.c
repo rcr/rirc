@@ -108,10 +108,10 @@ startup(int argc, char **argv)
 				if (*optarg == '-')
 					opt_error("-c/--connect requires an argument");
 
-				if (server_i == MAX_SERVERS)
+				if (++server_i == MAX_SERVERS)
 					opt_error("exceeded maximum number of servers (" STR(MAX_SERVERS) ")");
 
-				auto_servers[++server_i].host = optarg;
+				auto_servers[server_i].host = optarg;
 				break;
 
 			/* Connect using port */
