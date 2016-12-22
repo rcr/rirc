@@ -106,6 +106,8 @@ test_buffer_sb(void)
 
 	_buffer_newline(&b, "f");
 	assert_strcmp(buffer_sb(&b)->text, "c");
+
+	/* TODO: ensure this is still true at overflow */
 }
 
 static void
@@ -184,13 +186,13 @@ test_buffer_line_rows(void)
 	/* Test calculating the number of rows a buffer line occupies */
 
 	struct buffer b = {0};
-	struct buffer_line *l;
+	struct buffer_line *line;
 
 	char *text = "aa bb cc";
 
 	_buffer_newline(&b, text);
 
-	l = buffer_head(&b);
+	line = buffer_head(&b);
 
 	/* 1 column: 6 rows. word wrap skips whitespace prefix in line continuations:
 	 * a
@@ -200,7 +202,7 @@ test_buffer_line_rows(void)
 	 * c
 	 * c
 	 * */
-	assert_equals(buffer_line_rows(l, 1), 6);
+	assert_equals(buffer_line_rows(line, 1), 6);
 
 	/* 4 columns: 3 rows:
 	 * 'aa b' -> wraps to
@@ -210,10 +212,10 @@ test_buffer_line_rows(void)
 	 *   'bb'
 	 *   'cc'
 	 * */
-	assert_equals(buffer_line_rows(l, 4), 3);
+	assert_equals(buffer_line_rows(line, 4), 3);
 
 	/* Greater columns than length should always return one row */
-	assert_equals(buffer_line_rows(l, sizeof(text) + 1), 1);
+	assert_equals(buffer_line_rows(line, sizeof(text) + 1), 1);
 }
 
 int

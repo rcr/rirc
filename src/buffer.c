@@ -29,25 +29,21 @@ buffer_full(struct buffer *b)
 static struct buffer_line*
 buffer_push(struct buffer *b)
 {
-	/* TODO: cleanup */
-
-	int tail_locked = 0,
-	    head_locked = 0;
-
-	if (buffer_sb(b) == buffer_tail(b))
-		tail_locked = 1;
+	/* Return a new buffer_line pushed to a buffer, ensure that:
+	 *  - scrollback stays between [tail, head)
+	 *  - tail increments when the buffer is full */
 
 	if (buffer_sb(b) == buffer_head(b))
-		head_locked = 1;
-
-	if (buffer_full(b))
-		b->tail++;
-
-	if (head_locked)
 		b->scrollback = b->head;
 
-	else if (tail_locked)
-		b->scrollback = b->tail;
+	if (buffer_full(b)) {
+
+		/* scrollback locked to tail */
+		if (b->scrollback == b->tail)
+			b->scrollback++;
+
+		b->tail++;
+	}
 
 	return &b->buffer_lines[MASK(b->head++)];
 }
@@ -116,13 +112,13 @@ buffer_newline(struct buffer *b, enum buffer_line_t type, const char *from, cons
 	if (text == NULL)
 		fatal("text is NULL");
 
-	size_t remainder = 0,
-		   text_len = strlen(text),
-		   from_len = strlen(from);
+	size_t remainder_len = 0,
+	       text_len = strlen(text),
+	       from_len = strlen(from);
 
 	/* Split overlength lines into continuations */
 	if (text_len > TEXT_LENGTH_MAX) {
-		remainder = text_len - TEXT_LENGTH_MAX;
+		remainder_len = text_len - TEXT_LENGTH_MAX;
 		text_len = TEXT_LENGTH_MAX;
 	}
 
@@ -147,14 +143,12 @@ buffer_newline(struct buffer *b, enum buffer_line_t type, const char *from, cons
 	if (from_len > b->pad)
 		b->pad = from_len;
 
-	if (remainder)
+	if (remainder_len)
 		buffer_newline(b, type, from, text + TEXT_LENGTH_MAX);
 }
 
 /* TODO
  * scrollback
- *   ensure always >= buffer_l, < buffer_f
- *     conditionally increment on buffer_push
  *   buffer_page_f(buffer, unsigned int rows)
  *     don't redraw if advance wouldn't change lines on screen
  *     special case when scrolling forward from back of buffer
