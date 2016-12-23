@@ -147,6 +147,15 @@ buffer_newline(struct buffer *b, enum buffer_line_t type, const char *from, cons
 		buffer_newline(b, type, from, text + TEXT_LENGTH_MAX);
 }
 
+struct buffer
+buffer_init(enum buffer_t type)
+{
+	/* Initialize a buffer */
+
+	return (struct buffer) { .type = type };
+}
+
+
 /* TODO
  * scrollback
  *   buffer_page_f(buffer, unsigned int rows)

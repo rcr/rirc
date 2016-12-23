@@ -8,7 +8,7 @@
 static char*
 _fmt_int(int i)
 {
-	static char buff[1024] = {0};
+	static char buff[1024];
 
 	if ((snprintf(buff, sizeof(buff) - 1, "%d", i)) < 0)
 		fail_test("snprintf");
@@ -31,7 +31,7 @@ test_buffer_head(void)
 
 	int i;
 
-	struct buffer b = {0};
+	struct buffer b = buffer_init(BUFFER_OTHER);
 
 	assert_equals(buffer_size(&b), 0);
 
@@ -49,7 +49,7 @@ test_buffer_tail(void)
 
 	int i;
 
-	struct buffer b = {0};
+	struct buffer b = buffer_init(BUFFER_OTHER);
 
 	assert_equals(buffer_size(&b), 0);
 
@@ -75,7 +75,7 @@ test_buffer_sb(void)
 	 *   Buffer scrollback stays locked to the tail when incrementing
 	 * */
 
-	struct buffer b = {0};
+	struct buffer b = buffer_init(BUFFER_OTHER);
 
 	/* Empty buffer returns NULL */
 	assert_null(buffer_sb(&b));
@@ -139,7 +139,7 @@ test_buffer_line_overlength(void)
 {
 	/* Test that lines over the maximum length are recursively split and added separately */
 
-	struct buffer b = {0};
+	struct buffer b = buffer_init(BUFFER_OTHER);
 
 	/* Indices to first and last positions of lines, total length = 2.5 times the maximum */
 	unsigned int f1 = 0,
@@ -185,7 +185,7 @@ test_buffer_line_rows(void)
 {
 	/* Test calculating the number of rows a buffer line occupies */
 
-	struct buffer b = {0};
+	struct buffer b = buffer_init(BUFFER_OTHER);
 	struct buffer_line *line;
 
 	char *text = "aa bb cc";

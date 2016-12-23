@@ -51,6 +51,8 @@ struct buffer
 
 unsigned int buffer_line_rows(struct buffer_line*, unsigned int);
 
+struct buffer buffer_init(enum buffer_t);
+
 struct buffer_line* buffer_head(struct buffer*);
 struct buffer_line* buffer_tail(struct buffer*);
 struct buffer_line* buffer_sb(struct buffer*);
