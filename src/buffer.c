@@ -53,7 +53,7 @@ buffer_head(struct buffer *b)
 {
 	/* Return the first printable line in a buffer */
 
-	return &b->buffer_lines[MASK(b->head - 1)];
+	return buffer_size(b) == 0 ? NULL : &b->buffer_lines[MASK(b->head - 1)];
 }
 
 struct buffer_line*
@@ -61,7 +61,7 @@ buffer_tail(struct buffer *b)
 {
 	/* Return the last printable line in a buffer */
 
-	return &b->buffer_lines[MASK(b->tail)];
+	return buffer_size(b) == 0 ? NULL : &b->buffer_lines[MASK(b->tail)];
 }
 
 struct buffer_line*

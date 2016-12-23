@@ -19,9 +19,34 @@ _fmt_int(int i)
 static void
 _buffer_newline(struct buffer *b, const char *t)
 {
-	/* abstract newline with default values */
+	/* Abstract newline with default values */
 
 	buffer_newline(b, BUFFER_LINE_OTHER, "", t);
+}
+
+static void
+test_buffer_init(void)
+{
+	/* Test retrieving values from an initialized buffer and resetting it */
+
+	struct buffer b = buffer_init(BUFFER_T_SIZE);
+
+	assert_equals(b.type, BUFFER_T_SIZE);
+
+	assert_equals(buffer_size(&b), 0);
+	assert_null(buffer_head(&b));
+	assert_null(buffer_tail(&b));
+	assert_null(buffer_sb(&b));
+
+	/* Reset the buffer, check values again */
+	b = buffer_init(BUFFER_T_SIZE);
+
+	assert_equals(b.type, BUFFER_T_SIZE);
+
+	assert_equals(buffer_size(&b), 0);
+	assert_null(buffer_head(&b));
+	assert_null(buffer_tail(&b));
+	assert_null(buffer_sb(&b));
 }
 
 static void
@@ -222,6 +247,7 @@ int
 main(void)
 {
 	testcase tests[] = {
+		&test_buffer_init,
 		&test_buffer_head,
 		&test_buffer_tail,
 		&test_buffer_sb,
