@@ -147,6 +147,17 @@ buffer_newline(struct buffer *b, enum buffer_line_t type, const char *from, cons
 		buffer_newline(b, type, from, text + TEXT_LENGTH_MAX);
 }
 
+unsigned int
+buffer_sb_status(struct buffer *b)
+{
+	/* Return the buffer scrollback status as a number between [0, 100] */
+
+	if (buffer_sb(b) == buffer_head(b))
+		return 0;
+
+	return (unsigned int)(100 * ((float)(b->head - b->scrollback) / (float)(BUFFER_LINES_MAX)));
+}
+
 struct buffer
 buffer_init(enum buffer_t type)
 {

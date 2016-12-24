@@ -136,6 +136,28 @@ test_buffer_sb(void)
 }
 
 static void
+test_buffer_sb_status(void)
+{
+	/* Test retrieving buffer scrollback status */
+
+	struct buffer b = {
+		.head = (BUFFER_LINES_MAX / 2) - 1,
+		.tail = UINT_MAX - (BUFFER_LINES_MAX / 2)
+	};
+
+	assert_true(buffer_full(&b));
+
+	b.scrollback = b.tail;
+	assert_equals(buffer_sb_status(&b), 100);
+
+	b.scrollback = b.tail + (BUFFER_LINES_MAX / 2);
+	assert_equals(buffer_sb_status(&b), 50);
+
+	b.scrollback = b.head - 1;
+	assert_equals(buffer_sb_status(&b), 0);
+}
+
+static void
 test_buffer_index_overflow(void)
 {
 	/* Test masked indexing after unsigned integer overflow */
@@ -251,6 +273,7 @@ main(void)
 		&test_buffer_head,
 		&test_buffer_tail,
 		&test_buffer_sb,
+		&test_buffer_sb_status,
 		&test_buffer_index_overflow,
 		&test_buffer_line_overlength,
 		&test_buffer_line_rows

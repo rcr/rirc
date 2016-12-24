@@ -41,14 +41,15 @@ struct buffer_line
 
 struct buffer
 {
-	enum buffer_t type; /* TODO: set when new_channel */
+	enum buffer_t type;
 	unsigned int head;
 	unsigned int tail;
 	unsigned int scrollback; /* Index of the current line between [tail, head) for scrollback */
-	size_t pad;
+	size_t pad;              /* Pad 'from' when printing to be at least this wide */
 	struct buffer_line buffer_lines[BUFFER_LINES_MAX];
 };
 
+unsigned int buffer_sb_status(struct buffer *b);
 unsigned int buffer_line_rows(struct buffer_line*, unsigned int);
 
 struct buffer buffer_init(enum buffer_t);
