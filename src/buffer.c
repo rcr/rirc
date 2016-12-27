@@ -158,6 +158,60 @@ buffer_sb_status(struct buffer *b)
 	return (unsigned int)(100 * ((float)(b->head - b->scrollback) / (float)(BUFFER_LINES_MAX)));
 }
 
+int
+buffer_page_back(struct buffer *b, unsigned int rows, unsigned int cols)
+{
+	unsigned int r;
+
+	if (!rows)
+		fatal("rows are 0");
+
+	if (!cols)
+		fatal("cols are 0");
+
+	/* Should always go back at least one line */
+	while (buffer_sb(b) != buffer_tail(b)) {
+
+		b->scrollback--;
+
+		r = buffer_line_rows(&b->buffer_lines[MASK(b->scrollback)], cols);
+
+		if (r > rows)
+			return 1;
+
+		rows -= r;
+	}
+
+	return 0;
+}
+
+int
+buffer_page_forw(struct buffer *b, unsigned int rows, unsigned int cols)
+{
+	unsigned int r;
+
+	if (!rows)
+		fatal("rows are 0");
+
+	if (!cols)
+		fatal("cols are 0");
+
+	while (buffer_sb(b) != buffer_head(b)) {
+
+		b->scrollback++;
+
+		r = buffer_line_rows(&b->buffer_lines[MASK(b->scrollback)], cols);
+
+		if (r > rows)
+			return 1;
+
+		rows -= r;
+	}
+
+
+	return 0;
+}
+
 struct buffer
 buffer_init(enum buffer_t type)
 {
@@ -168,15 +222,8 @@ buffer_init(enum buffer_t type)
 
 
 /* TODO
- * scrollback
- *   buffer_page_f(buffer, unsigned int rows)
- *     don't redraw if advance wouldn't change lines on screen
- *     special case when scrolling forward from back of buffer
- *   buffer_page_b(buffer, unsigned int rows)
  * activity, draw bits
  *   set when newline is called on a channel
- *
- * buffer_reset <- clear/reset all fields (pretty much just memset 0)
  *
  * reimplement draw functions to use these abstractions
  * */

@@ -49,6 +49,9 @@ struct buffer
 	struct buffer_line buffer_lines[BUFFER_LINES_MAX];
 };
 
+int buffer_page_back(struct buffer*, unsigned int, unsigned int);
+int buffer_page_forw(struct buffer*, unsigned int, unsigned int);
+
 unsigned int buffer_sb_status(struct buffer *b);
 unsigned int buffer_line_rows(struct buffer_line*, unsigned int);
 
