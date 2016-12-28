@@ -131,6 +131,7 @@ _run_tests_(const char *filename, testcase testcases[], size_t len)
 
 	/* Silence compiler warnings for test functions/vars that are included but not used */
 	((void)(_assert_strcmp));
+	((void)(_assert_fatal_));
 	((void)(_failure_printed_));
 }
 
