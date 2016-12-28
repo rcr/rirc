@@ -47,7 +47,6 @@ typedef struct parsed_mesg
 	char *trailing;
 } parsed_mesg;
 
-
 char* getarg(char**, const char*);
 char* strdup(const char*);
 char* word_wrap(int, char**, char*);
@@ -60,8 +59,11 @@ parsed_mesg* parse(parsed_mesg*, char*);
 void error(int status, const char*, ...);
 void free_avl(avl_node*);
 
-/* Irrecoverable error */
+/* Irrecoverable error
+ *   this define is precluded in test.h to aggregate fatal errors in testcases */
+#ifndef fatal
 #define fatal(mesg) \
 	do { error(errno, "ERROR in %s: %s", __func__, mesg); } while (0)
+#endif
 
 #endif

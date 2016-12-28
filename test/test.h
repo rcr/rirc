@@ -6,7 +6,6 @@
 #include <string.h>
 #include <inttypes.h>
 
-
 typedef void (*testcase)(void);
 
 static int _failures_, _failures_t_, _failure_printed_;
@@ -34,6 +33,16 @@ static int _assert_strcmp(char*, char*);
 		printf(__VA_ARGS__); \
 		printf("\n"); \
 	} while (0)
+
+/* Precludes the definition in utils.h
+ *   in normal operation should fatally exit the program
+ *   in testing should be considered a testcase failure */
+#ifdef fatal
+	#error "test.h" should be the first include within testcase files
+#else
+	#define fatal(mesg) \
+		do { fail_testf("ERROR in %s: %s", __func__, mesg); } while (0)
+#endif
 
 #define assert_strcmp(X, Y) \
 	do { \
