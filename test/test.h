@@ -8,7 +8,7 @@
 
 typedef void (*testcase)(void);
 
-static int _failures_, _failures_t_, _failure_printed_;
+static int _assert_fatal_, _failures_, _failures_t_, _failure_printed_;
 
 static int _assert_strcmp(char*, char*);
 
@@ -41,8 +41,21 @@ static int _assert_strcmp(char*, char*);
 	#error "test.h" should be the first include within testcase files
 #else
 	#define fatal(mesg) \
-		do { fail_testf("ERROR in %s: %s", __func__, mesg); } while (0)
+	do { \
+		if (!_assert_fatal_) \
+			fail_testf("fatal in %s: %s", __func__, mesg); \
+		_assert_fatal_ = 0; \
+	} while (0)
 #endif
+
+#define assert_fatal(X) \
+	do { \
+		_assert_fatal_ = 1; \
+		(X); \
+		if (_assert_fatal_) \
+			fail_test(#X " should have exited fatally"); \
+		_assert_fatal_ = 0; \
+	} while (0)
 
 #define assert_strcmp(X, Y) \
 	do { \
