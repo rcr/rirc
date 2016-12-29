@@ -83,6 +83,7 @@ test_avl(void)
 		fail_test("_avl_is_binary() failed");
 
 	/* Check that the height of root stays within the mathematical bounds AVL trees allow */
+	//FIXME: hardcode this calculation, remove link to math libs
 	double max_height = 1.44 * log2(count + 2) - 0.328;
 
 	if ((ret = _avl_height(root)) >= max_height)
@@ -442,11 +443,11 @@ int
 main(void)
 {
 	testcase tests[] = {
-		&test_avl,
-		&test_parse,
-		&test_getarg,
-		&test_check_pinged,
-		&test_word_wrap
+		TESTCASE(test_avl),
+		TESTCASE(test_parse),
+		TESTCASE(test_getarg),
+		TESTCASE(test_check_pinged),
+		TESTCASE(test_word_wrap)
 	};
 
 	return run_tests(tests);

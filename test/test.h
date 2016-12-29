@@ -1,50 +1,61 @@
 #ifndef TEST_H
 #define TEST_H
 
+#include <inttypes.h>
+#include <setjmp.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <inttypes.h>
 
-typedef void (*testcase)(void);
+#define TESTCASE(X) { &(X), #X }
+
+typedef struct testcase
+{
+	void (*tc_ptr)(void);
+	const char *tc_str;
+} testcase;
+
+/* Fatal errors in functions called by testcases will long jump
+ * rather than fatally exit the program */
+static jmp_buf _testcase_jmp_buf_;
 
 static int _assert_fatal_, _failures_, _failures_t_, _failure_printed_;
+static char _tc_errbuf_[512];
 
 static int _assert_strcmp(char*, char*);
 
+static void _print_testcase_name_(const char*);
+
 #define fail_test(M) \
 	do { \
-		if (!_failure_printed_) { \
-			_failure_printed_ = 1; \
-			printf("\n  %s:\n", __func__); \
-		} \
-		_failures_++; \
+		_print_testcase_name_(__func__); \
 		printf("    %d: " M "\n", __LINE__); \
+		_failures_++; \
 	} while (0)
 
 #define fail_testf(...) \
 	do { \
-		if (!_failure_printed_) { \
-			_failure_printed_ = 1; \
-			printf("\n  %s:\n", __func__); \
-		} \
-		_failures_++; \
+		_print_testcase_name_(__func__); \
 		printf("    %d: ", __LINE__); \
 		printf(__VA_ARGS__); \
 		printf("\n"); \
+		_failures_++; \
 	} while (0)
 
 /* Precludes the definition in utils.h
  *   in normal operation should fatally exit the program
- *   in testing should be considered a testcase failure */
+ *   in testing should be considered a failure but should NOT continue running the testcase */
 #ifdef fatal
 	#error "test.h" should be the first include within testcase files
 #else
 	#define fatal(mesg) \
 	do { \
-		if (!_assert_fatal_) \
-			fail_testf("fatal in %s: %s", __func__, mesg); \
-		_assert_fatal_ = 0; \
+		if (_assert_fatal_) \
+			_assert_fatal_ = 0; \
+		else { \
+			snprintf(_tc_errbuf_, sizeof(_tc_errbuf_) - 1, "FATAL in "__FILE__" - %s : '%s'", __func__, mesg); \
+			longjmp(_testcase_jmp_buf_, 1); \
+		} \
 	} while (0)
 #endif
 
@@ -53,7 +64,7 @@ static int _assert_strcmp(char*, char*);
 		_assert_fatal_ = 1; \
 		(X); \
 		if (_assert_fatal_) \
-			fail_test(#X " should have exited fatally"); \
+			fail_test("'"#X "' should have exited fatally"); \
 		_assert_fatal_ = 0; \
 	} while (0)
 
@@ -102,6 +113,20 @@ _assert_strcmp(char *p1, char *p2)
 	return strcmp(p1, p2);
 }
 
+static void
+_print_testcase_name_(const char *name)
+{
+	/* Print the testcase name only one */
+	if (!_failure_printed_) {
+		_failure_printed_ = 1;
+
+		if (!_failures_t_)
+			puts("");
+
+		printf("  %s:\n", name);
+	}
+}
+
 static int
 _run_tests_(const char *filename, testcase testcases[], size_t len)
 {
@@ -112,11 +137,17 @@ _run_tests_(const char *filename, testcase testcases[], size_t len)
 
 	for (tc = testcases; len--; tc++) {
 		_failures_ = 0;
-		(*tc)();
+		_failure_printed_ = 0;
+
+		if (setjmp(_testcase_jmp_buf_)) {
+			_print_testcase_name_(tc->tc_str);
+			printf("    %s - aborting testcase\n", _tc_errbuf_);
+			_failures_++;
+		} else
+			(*tc->tc_ptr)();
 
 		if (_failures_) {
 			printf("      %d failure%c\n", _failures_, (_failures_ > 1) ? 's' : 0);
-
 			_failures_t_ += _failures_;
 		}
 	}
@@ -133,6 +164,7 @@ _run_tests_(const char *filename, testcase testcases[], size_t len)
 	((void)(_assert_strcmp));
 	((void)(_assert_fatal_));
 	((void)(_failure_printed_));
+	((void)(_testcase_jmp_buf_));
 }
 
 /* Macro so the proper filename is printed */

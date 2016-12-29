@@ -254,7 +254,7 @@ int
 main(void)
 {
 	testcase tests[] = {
-		&test_dummy
+		TESTCASE(test_dummy)
 	};
 
 	return run_tests(tests);

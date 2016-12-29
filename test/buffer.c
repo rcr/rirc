@@ -283,16 +283,17 @@ int
 main(void)
 {
 	testcase tests[] = {
-		&test_buffer_init,
-		&test_buffer_head,
-		&test_buffer_tail,
-		&test_buffer_sb,
-		&test_buffer_sb_status,
-		&test_buffer_index_overflow,
-		&test_buffer_line_overlength,
-		&test_buffer_line_rows,
-		&test_buffer_page_back,
-		&test_buffer_page_forw
+		TESTCASE(test_buffer_init),
+		TESTCASE(test_buffer_head),
+		TESTCASE(test_buffer_tail),
+		TESTCASE(test_buffer_line),
+		TESTCASE(test_buffer_scrollback),
+		TESTCASE(test_buffer_scrollback_status),
+		TESTCASE(test_buffer_index_overflow),
+		TESTCASE(test_buffer_line_overlength),
+		TESTCASE(test_buffer_line_rows),
+		TESTCASE(test_buffer_page_back),
+		TESTCASE(test_buffer_page_forw)
 	};
 
 	return run_tests(tests);
