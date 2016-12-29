@@ -36,7 +36,7 @@ $(BLDDIR)%.o: $(SRCDIR)%.c
 $(BLDDIR_T)%.t: $(SRCDIR_T)%.c
 	@$(CPP) $(CFLAGS) -MM -MP -MT $@ $< -MF $(@:.t=.d)
 	@$(CC) $(CFLAGS_DEBUG) $(LDFLAGS_DEBUG) -lm -o $@ $<
-	@./$@
+	-@./$@ || rm $@
 
 -include $(BLDDIR)*.d $(BLDDIR_T)*.d
 
