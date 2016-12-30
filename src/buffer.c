@@ -72,19 +72,24 @@ buffer_line(struct buffer *b, unsigned int i)
 	if (buffer_size(b) == 0)
 		return NULL;
 
-	else if ((b->head > b->tail) && (i < b->tail || i >= b->head))
-		fatal("testing 1");
-	else if ((i < b->tail && i >= b->head))
-		fatal("testing 2");
-
-
-
-#if 0
-	else if ((b->head > b->tail) && (i < b->tail || i >= b->head))
-		fatal("testing 1");
-	else if ((i < b->tail && i >= b->head))
-		fatal("testing 2");
-#endif
+	/* Check that the index is between [tail, head) in a way that accounts for unsigned overflow
+	 *
+	 * Normally:
+	 *   |-----T-----H-----|
+	 *      a     b     c
+	 *
+	 *  a, c : invalid
+	 *  b    : valid
+	 *
+	 * Inverted after overflow of head:
+	 *   |-----H-----T-----|
+	 *      a     b     c
+	 *
+	 *  a, c : valid
+	 *  b    : invalid
+	 *  */
+	if (((b->head > b->tail) && (i < b->tail || i >= b->head)) || (i < b->tail && i >= b->head))
+		fatal("invalid index");
 
 	return &b->buffer_lines[MASK(i)];
 }
