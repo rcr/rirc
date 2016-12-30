@@ -289,24 +289,6 @@ word_wrap(int n, char **str, char *end)
 	return ret;
 }
 
-int
-count_line_rows(int text_cols, _buffer_line *l)
-{
-	/* Count the number of times a line will wrap within text_cols columns */
-
-	int count = 0;
-
-	char *ptr1 = l->text;
-	char *ptr2 = l->text + l->len;
-
-	do {
-		word_wrap(text_cols, &ptr1, ptr2);
-		count++;
-	} while (*ptr1);
-
-	return count;
-}
-
 /* AVL tree functions */
 
 void

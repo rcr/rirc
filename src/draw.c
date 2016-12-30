@@ -165,6 +165,11 @@ draw_buffer(channel *c)
 	 *    in the channel's buffer are insufficient to fill all rows
 	 */
 
+
+	/* TODO: rewrite with new buffer functions */
+
+
+#if 0
 	printf(CURSOR_SAVE);
 
 	/* Establish current, min and max row for drawing */
@@ -343,6 +348,8 @@ clear_remainder:
 		printf(MOVE(%d, 1) CLEAR_LINE, print_row++);
 
 	printf(CURSOR_RESTORE);
+
+#endif
 }
 
 

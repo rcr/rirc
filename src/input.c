@@ -316,6 +316,8 @@ input_cseq(char *input, ssize_t len)
 		buffer_scrollback_forw(ccur);
 }
 
+//TODO: third option Y, N, [S]trip newlines
+//       - skip repeated newlines, but replace single ones with ' ' and input it
 /* TODO:
  *
  * Rather than render with \r\n, separate messages with \0. The handler for this will

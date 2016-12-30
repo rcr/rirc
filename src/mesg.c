@@ -352,7 +352,7 @@ send_default(char *err, char *mesg, channel *c)
 
 	fail_if(sendf(err, c->server, "PRIVMSG %s :%s", c->name, mesg));
 
-	newline(c, LINE_CHAT, c->server->nick, mesg);
+	newline(c, BUFFER_LINE_CHAT, c->server->nick, mesg);
 
 	return 0;
 }
@@ -502,7 +502,7 @@ send_privmsg(char *err, char *mesg, channel *c)
 	if ((cc = channel_get(targ, c->server)) == NULL)
 		cc = new_channel(targ, c->server, c, BUFFER_PRIVATE);
 
-	newline(cc, LINE_CHAT, c->server->nick, mesg);
+	newline(cc, BUFFER_LINE_CHAT, c->server->nick, mesg);
 
 	return 0;
 }
@@ -1469,9 +1469,9 @@ recv_priv(char *err, parsed_mesg *p, server *s)
 		if (c != ccur)
 			c->active = ACTIVITY_PINGED;
 
-		newline(c, LINE_PINGED, p->from, p->trailing);
+		newline(c, BUFFER_LINE_PINGED, p->from, p->trailing);
 	} else
-		newline(c, LINE_CHAT, p->from, p->trailing);
+		newline(c, BUFFER_LINE_CHAT, p->from, p->trailing);
 
 	return 0;
 }

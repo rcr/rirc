@@ -33,7 +33,7 @@ buffer_push(struct buffer *b)
 	 *  - scrollback stays between [tail, head)
 	 *  - tail increments when the buffer is full */
 
-	if (buffer_sb(b) == buffer_head(b))
+	if (buffer_line(b, b->scrollback) == buffer_head(b))
 		b->scrollback = b->head;
 
 	if (buffer_full(b)) {
@@ -65,14 +65,28 @@ buffer_tail(struct buffer *b)
 }
 
 struct buffer_line*
-buffer_sb(struct buffer *b)
+buffer_line(struct buffer *b, unsigned int i)
 {
-	/* Return the buffer scrollback line or NULL if buffer is empty */
+	/* Return the buffer line indexed by i */
 
 	if (buffer_size(b) == 0)
 		return NULL;
 
-	return &b->buffer_lines[MASK(b->scrollback)];
+	else if ((b->head > b->tail) && (i < b->tail || i >= b->head))
+		fatal("testing 1");
+	else if ((i < b->tail && i >= b->head))
+		fatal("testing 2");
+
+
+
+#if 0
+	else if ((b->head > b->tail) && (i < b->tail || i >= b->head))
+		fatal("testing 1");
+	else if ((i < b->tail && i >= b->head))
+		fatal("testing 2");
+#endif
+
+	return &b->buffer_lines[MASK(i)];
 }
 
 unsigned int
@@ -147,15 +161,15 @@ buffer_newline(struct buffer *b, enum buffer_line_t type, const char *from, cons
 		buffer_newline(b, type, from, text + TEXT_LENGTH_MAX);
 }
 
-unsigned int
-buffer_sb_status(struct buffer *b)
+float
+buffer_scrollback_status(struct buffer *b)
 {
 	/* Return the buffer scrollback status as a number between [0, 100] */
 
-	if (buffer_sb(b) == buffer_head(b))
+	if (buffer_line(b, b->scrollback) == buffer_head(b))
 		return 0;
 
-	return (unsigned int)(100 * ((float)(b->head - b->scrollback) / (float)(BUFFER_LINES_MAX)));
+	return (float)(b->head - b->scrollback) / (float)(BUFFER_LINES_MAX);
 }
 
 int
@@ -170,7 +184,7 @@ buffer_page_back(struct buffer *b, unsigned int rows, unsigned int cols)
 		fatal("cols are 0");
 
 	/* Should always go back at least one line */
-	while (buffer_sb(b) != buffer_tail(b)) {
+	while (buffer_line(b, b->scrollback) != buffer_tail(b)) {
 
 		b->scrollback--;
 
@@ -196,7 +210,7 @@ buffer_page_forw(struct buffer *b, unsigned int rows, unsigned int cols)
 	if (!cols)
 		fatal("cols are 0");
 
-	while (buffer_sb(b) != buffer_head(b)) {
+	while (buffer_line(b, b->scrollback) != buffer_head(b)) {
 
 		b->scrollback++;
 

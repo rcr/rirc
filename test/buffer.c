@@ -36,7 +36,7 @@ test_buffer_init(void)
 	assert_equals(buffer_size(&b), 0);
 	assert_null(buffer_head(&b));
 	assert_null(buffer_tail(&b));
-	assert_null(buffer_sb(&b));
+	assert_null(buffer_line(&b, b.scrollback));
 
 	/* Reset the buffer, check values again */
 	b = buffer_init(BUFFER_T_SIZE);
@@ -46,7 +46,7 @@ test_buffer_init(void)
 	assert_equals(buffer_size(&b), 0);
 	assert_null(buffer_head(&b));
 	assert_null(buffer_tail(&b));
-	assert_null(buffer_sb(&b));
+	assert_null(buffer_line(&b, b.scrollback));
 }
 
 static void
@@ -58,7 +58,7 @@ test_buffer_head(void)
 
 	struct buffer b = buffer_init(BUFFER_OTHER);
 
-	assert_equals(buffer_size(&b), 0);
+	assert_null(buffer_head(&b));
 
 	for (i = 0; i < BUFFER_LINES_MAX + 1; i++)
 		_buffer_newline(&b, _fmt_int(i + 1));
@@ -76,7 +76,7 @@ test_buffer_tail(void)
 
 	struct buffer b = buffer_init(BUFFER_OTHER);
 
-	assert_equals(buffer_size(&b), 0);
+	assert_null(buffer_tail(&b));
 
 	for (i = 0; i < BUFFER_LINES_MAX; i++)
 		_buffer_newline(&b, _fmt_int(i + 1));
@@ -91,7 +91,93 @@ test_buffer_tail(void)
 }
 
 static void
-test_buffer_sb(void)
+test_buffer_line(void)
+{
+	/* Test that retrieving a buffer line fails when i != [tail, head) */
+
+	struct buffer b = buffer_init(BUFFER_OTHER);
+
+	/* Should retrieve null for an empty buffer */
+	assert_equals(buffer_size(&b), 0);
+	assert_null(buffer_line(&b, b.head));
+	assert_null(buffer_line(&b, b.tail));
+	assert_null(buffer_line(&b, b.scrollback));
+
+	/* For any buffer line retrieval, these conditions should always hold */
+	#define CHECK_BUFFER(B) \
+	    assert_fatal(buffer_line(&(B), (B).tail - 1)); \
+	    assert_fatal(buffer_line(&(B), (B).head));     \
+	    (void)buffer_line(&(B), (B).tail);             \
+	    (void)buffer_line(&(B), (B).tail + 1);         \
+	    (void)buffer_line(&(B), (B).head - 1);         \
+
+	/* Normal case:
+	 * |-----T-----H-----|
+	 *    a     b     c
+	 *
+	 * b    : valid
+	 * a, c : invalid */
+
+	b.tail = 1;
+	b.head = 1 + BUFFER_LINES_MAX;
+	CHECK_BUFFER(b);
+
+	/* Inverted case:
+	 * |-----H-----T-----|
+	 *    a     b     c
+	 *
+	 * b    : invalid
+	 * a, c : valid */
+
+	b.tail = UINT_MAX - 1;
+	b.head = UINT_MAX - 1 + BUFFER_LINES_MAX;
+	CHECK_BUFFER(b);
+
+	/* Edge case, head is 0
+	 * |H-----------T---|
+	 *        a       b
+	 * a : invalid
+	 * b : valid */
+
+	b.tail = 0 - BUFFER_LINES_MAX;
+	b.head = 0;
+	CHECK_BUFFER(b);
+
+	/* Edge case, head is UINT_MAX
+	 * |---------T-----H|
+	 *      a       b
+	 * a : invalid
+	 * b : valid */
+
+	b.tail = UINT_MAX - BUFFER_LINES_MAX;
+	b.head = UINT_MAX;
+	CHECK_BUFFER(b);
+
+	/* Edge case, tail is 0:
+	 * |T---H-----------|
+	 *    a       b
+	 * a : valid
+	 * b : invalid */
+
+	b.tail = 0;
+	b.head = 0 + BUFFER_LINES_MAX;
+	CHECK_BUFFER(b);
+
+	/* Edge case, tail is UINT_MAX
+	 * |---H-----------T|
+	 *   a      c      b
+	 * a, b : valid
+	 * c    : invalid */
+
+	b.tail = UINT_MAX;
+	b.head = UINT_MAX + BUFFER_LINES_MAX;
+	CHECK_BUFFER(b);
+
+	#undef CHECK_BUFFER
+}
+
+static void
+test_buffer_scrollback(void)
 {
 	/* Test features of the buffer scrollback:
 	 *   Empty buffer returns NULL for scrollback
@@ -103,58 +189,57 @@ test_buffer_sb(void)
 	struct buffer b = buffer_init(BUFFER_OTHER);
 
 	/* Empty buffer returns NULL */
-	assert_null(buffer_sb(&b));
+	assert_null(buffer_line(&b, b.scrollback));
 
 	/* Buffer scrollback stays locked to the buffer head when incrementing */
 	_buffer_newline(&b, "a");
-	assert_strcmp(buffer_sb(&b)->text, "a");
+	assert_strcmp(buffer_line(&b, b.scrollback)->text, "a");
 
 	_buffer_newline(&b, "b");
-	assert_strcmp(buffer_sb(&b)->text, "b");
+	assert_strcmp(buffer_line(&b, b.scrollback)->text, "b");
 
 	_buffer_newline(&b, "c");
-	assert_strcmp(buffer_sb(&b)->text, "c");
+	assert_strcmp(buffer_line(&b, b.scrollback)->text, "c");
 
 	/* Buffer scrollback stays between [tail, head) when scrolled back */
 	b.scrollback = b.tail + 1;
-	assert_strcmp(buffer_sb(&b)->text, "b");
+	assert_strcmp(buffer_line(&b, b.scrollback)->text, "b");
 
 	_buffer_newline(&b, "d");
-	assert_strcmp(buffer_sb(&b)->text, "b");
+	assert_strcmp(buffer_line(&b, b.scrollback)->text, "b");
 
 	/* Buffer scrollback stays locked to the buffer tail when incrementing */
 	b.head = b.tail + BUFFER_LINES_MAX;
 	assert_true(buffer_full(&b));
 
 	_buffer_newline(&b, "e");
-	assert_strcmp(buffer_sb(&b)->text, "b");
+	assert_strcmp(buffer_line(&b, b.scrollback)->text, "b");
 
 	_buffer_newline(&b, "f");
-	assert_strcmp(buffer_sb(&b)->text, "c");
-
-	/* TODO: ensure this is still true at overflow */
+	assert_strcmp(buffer_line(&b, b.scrollback)->text, "c");
 }
 
 static void
-test_buffer_sb_status(void)
+test_buffer_scrollback_status(void)
 {
 	/* Test retrieving buffer scrollback status */
 
 	struct buffer b = {
 		.head = (BUFFER_LINES_MAX / 2) - 1,
-		.tail = UINT_MAX - (BUFFER_LINES_MAX / 2)
+		.tail = UINT_MAX - (BUFFER_LINES_MAX / 2),
+		.scrollback = b.tail
 	};
 
 	assert_true(buffer_full(&b));
 
 	b.scrollback = b.tail;
-	assert_equals(buffer_sb_status(&b), 100);
+	assert_equals((int)(100 * buffer_scrollback_status(&b)), 100);
 
 	b.scrollback = b.tail + (BUFFER_LINES_MAX / 2);
-	assert_equals(buffer_sb_status(&b), 50);
+	assert_equals((int)(100 * buffer_scrollback_status(&b)), 50);
 
 	b.scrollback = b.head - 1;
-	assert_equals(buffer_sb_status(&b), 0);
+	assert_equals((int)(100 * buffer_scrollback_status(&b)), 0);
 }
 
 static void
@@ -164,7 +249,8 @@ test_buffer_index_overflow(void)
 
 	struct buffer b = {
 		.head = UINT_MAX,
-		.tail = UINT_MAX - 1
+		.tail = UINT_MAX - 1,
+		.scrollback = b.tail
 	};
 
 	assert_equals(buffer_size(&b), 1);

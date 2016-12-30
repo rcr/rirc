@@ -3,6 +3,7 @@
 
 /* FIXME: refactoring */
 #include "utils.h"
+#include "buffer.h"
 
 #define VERSION "0.1"
 
@@ -15,6 +16,7 @@
 #define MAX_INPUT 256
 #define RECONNECT_DELTA 15
 #define MODE_SIZE (26 * 2) + 1 /* Supports modes [az-AZ] */
+#define NICKSIZE 255
 
 /* When tab completing a nick at the beginning of the line, append the following char */
 #define TAB_COMPLETE_DELIMITER ':'
@@ -65,16 +67,6 @@
 		} \
 	} while (0)
 
-/* Buffer types */
-typedef enum
-{
-	BUFFER_OTHER,   /* Default/all other buffers */
-	BUFFER_CHANNEL, /* IRC channel buffer */
-	BUFFER_SERVER,  /* Server message buffer */
-	BUFFER_PRIVATE, /* Private chat buffer */
-	BUFFER_T_SIZE
-} buffer_t;
-
 /* Buffer bar activity types */
 typedef enum
 {
@@ -103,20 +95,6 @@ typedef struct input
 	struct input_line *line;
 	struct input_line *list_head;
 } input;
-
-/* TODO:
- * abstract away getting the first lines, last line, advancing a line
- * */
-
-/* Channel buffer */
-typedef struct buffer
-{
-	buffer_t type;
-	size_t nick_pad;
-	struct _buffer_line *scrollback;
-	struct _buffer_line *head;
-	struct _buffer_line lines[SCROLLBACK_BUFFER];
-} buffer;
 
 /* Channel */
 typedef struct channel
