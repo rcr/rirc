@@ -88,36 +88,31 @@ buffer_line(struct buffer *b, unsigned int i)
 	 *  a, c : valid
 	 *  b    : invalid
 	 *  */
-	if (((b->head > b->tail) && (i < b->tail || i >= b->head)) || (i < b->tail && i >= b->head))
+	if (((b->head > b->tail) && (i < b->tail || i >= b->head)) ||
+	    ((b->tail > b->head) && (i < b->tail && i >= b->head)))
 		fatal("invalid index");
 
 	return &b->buffer_lines[MASK(i)];
 }
 
 unsigned int
-buffer_line_rows(struct buffer_line *l, unsigned int w)
+buffer_line_rows(struct buffer_line *line, unsigned int w)
 {
 	/* Return the number of times a buffer line will wrap within w columns */
+
+	char *p;
 
 	if (w == 0)
 		fatal("width is zero");
 
-	if (l->w != w) {
-		unsigned int count = 0;
+	if (line->w != w) {
+		line->w = w;
 
-		char *ptr1 = l->text;
-		char *ptr2 = l->text + l->text_len;
-
-		do {
-			word_wrap(w, &ptr1, ptr2);
-			count++;
-		} while (*ptr1);
-
-		l->w = w;
-		l->rows = count;
+		for (p = line->text, line->rows = 0; *p; line->rows++)
+			word_wrap(w, &p, line->text + line->text_len);
 	}
 
-	return l->rows;
+	return line->rows;
 }
 
 void
@@ -238,11 +233,3 @@ buffer_init(enum buffer_t type)
 
 	return (struct buffer) { .type = type };
 }
-
-
-/* TODO
- * activity, draw bits
- *   set when newline is called on a channel
- *
- * reimplement draw functions to use these abstractions
- * */
