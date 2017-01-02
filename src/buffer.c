@@ -105,14 +105,18 @@ buffer_line_rows(struct buffer_line *line, unsigned int w)
 	if (w == 0)
 		fatal("width is zero");
 
-	if (line->w != w) {
-		line->w = w;
+	/* Empty lines occupy are considered to occupy a row */
+	if (!*line->text)
+		return line->_rows = 1;
 
-		for (p = line->text, line->rows = 0; *p; line->rows++)
+	if (line->_w != w) {
+		line->_w = w;
+
+		for (p = line->text, line->_rows = 0; *p; line->_rows++)
 			word_wrap(w, &p, line->text + line->text_len);
 	}
 
-	return line->rows;
+	return line->_rows;
 }
 
 void
@@ -151,8 +155,8 @@ buffer_newline(struct buffer *b, enum buffer_line_t type, const char *from, cons
 
 	l->time = time(NULL);
 	l->type = type;
-	l->rows = 0;
-	l->w = 0;
+	l->_rows = 0;
+	l->_w = 0;
 
 	if (from_len > b->pad)
 		b->pad = from_len;

@@ -349,6 +349,11 @@ test_buffer_line_rows(void)
 
 	/* Greater columns than length should always return one row */
 	assert_equals(buffer_line_rows(line, sizeof(text) + 1), 1);
+
+	/* Test empty line should return at least 1 row */
+	_buffer_newline(&b, "");
+
+	assert_equals(buffer_line_rows(buffer_head(&b), 1), 1);
 }
 
 static void

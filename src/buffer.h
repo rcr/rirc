@@ -35,8 +35,8 @@ struct buffer_line
 	size_t from_len;
 	size_t text_len;
 	time_t time;
-	unsigned int rows; /* Cached number of rows occupied when wrapping on w columns */
-	unsigned int w;    /* Cached width for rows */
+	unsigned int _rows; /* Cached number of rows occupied when wrapping on w columns */
+	unsigned int _w;    /* Cached width for rows */
 };
 
 struct buffer
