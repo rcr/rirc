@@ -1,5 +1,3 @@
-#include <math.h>
-
 #include "test.h"
 #include "../src/utils.c"
 
@@ -66,6 +64,10 @@ test_avl(void)
 
 	int ret, count = 0;
 
+	/* Hardcode caluculated maximum heigh of avl tree, avoid importing math libs */
+	double min_height; /* log_2(n + 1) */
+	double max_height; /* log_2(n + 2) * 1.618 - 0.328 */
+
 	/* Add all strings to the tree */
 	for (ptr = strings; *ptr; ptr++) {
 		if (!avl_add(&root, *ptr, NULL))
@@ -83,10 +85,16 @@ test_avl(void)
 		fail_test("_avl_is_binary() failed");
 
 	/* Check that the height of root stays within the mathematical bounds AVL trees allow */
-	//FIXME: hardcode this calculation, remove link to math libs
-	double max_height = 1.44 * log2(count + 2) - 0.328;
+	assert_equals(count, 78); /* Required for hardcoded log2 calculations */
+	min_height = 6.303;                /* log2(78 + 1) ~= 6.303 */
+	max_height = 6.321 * 1.44 - 0.328; /* log2(78 + 2) ~= 6.321 */
 
-	if ((ret = _avl_height(root)) >= max_height)
+	ret = _avl_height(root);
+
+	if (ret < min_height)
+		fail_testf("_avl_height() returned %d, expected greater than %f", ret, min_height);
+
+	if (ret >= max_height)
 		fail_testf("_avl_height() returned %d, expected strictly less than %f", ret, max_height);
 
 	/* Test adding a duplicate and case sensitive duplicate */
@@ -114,8 +122,18 @@ test_avl(void)
 	if (!_avl_is_binary(root))
 		fail_test("_avl_is_binary() failed");
 
-	/* Check that the height of root is still within the mathematical bounds AVL trees allow */
-	max_height = 1.44 * log2(count + 2) - 0.328;
+	/* Check that the height of root stays within the mathematical bounds AVL trees allow */
+	assert_equals(count, 39); /* Required for hardcoded log2 calculations */
+	min_height = 5.321;                /* log2(39 + 1) ~= 5.321 */
+	max_height = 5.357 * 1.44 - 0.328; /* log2(39 + 2) ~= 5.357 */
+
+	ret = _avl_height(root);
+
+	if (ret < min_height)
+		fail_testf("_avl_height() returned %d, expected greater than %f", ret, min_height);
+
+	if (ret >= max_height)
+		fail_testf("_avl_height() returned %d, expected strictly less than %f", ret, max_height);
 
 	if ((ret = _avl_height(root)) >= max_height)
 		fail_testf("_avl_height() returned %d, expected strictly less than %f", ret, max_height);
