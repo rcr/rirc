@@ -105,7 +105,6 @@ typedef struct channel
 	char chanmodes[MODE_SIZE];
 	int nick_count;
 	int parted;
-	int resized;
 	struct buffer buffer;
 	struct channel *next;
 	struct channel *prev;
