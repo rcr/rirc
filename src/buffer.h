@@ -8,7 +8,9 @@
 #define TEXT_LENGTH_MAX 510
 #define FROM_LENGTH_MAX 100
 
-#define BUFFER_LINES_MAX (1 << 10)
+#ifndef BUFFER_LINES_MAX
+	#define BUFFER_LINES_MAX (1 << 10)
+#endif
 
 enum buffer_line_t
 {
@@ -56,7 +58,7 @@ int buffer_page_forw(struct buffer*, unsigned int, unsigned int);
 
 unsigned int buffer_line_rows(struct buffer_line*, unsigned int);
 
-struct buffer buffer_init(enum buffer_t type);
+struct buffer buffer(enum buffer_t);
 
 struct buffer_line* buffer_head(struct buffer*);
 struct buffer_line* buffer_tail(struct buffer*);

@@ -109,7 +109,7 @@ new_channel(char *name, server *server, channel *chanlist, enum buffer_t type)
 	if ((c = calloc(1, sizeof(*c))) == NULL)
 		fatal("calloc");
 
-	c->buffer = buffer_init(type);
+	c->buffer = buffer(type);
 	c->input = new_input();
 	c->server = server;
 

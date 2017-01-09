@@ -25,11 +25,11 @@ _buffer_newline(struct buffer *b, const char *t)
 }
 
 static void
-test_buffer_init(void)
+test_buffer(void)
 {
 	/* Test retrieving values from an initialized buffer and resetting it */
 
-	struct buffer b = buffer_init(BUFFER_T_SIZE);
+	struct buffer b = buffer(BUFFER_T_SIZE);
 
 	assert_equals(b.type, BUFFER_T_SIZE);
 
@@ -39,7 +39,7 @@ test_buffer_init(void)
 	assert_null(buffer_line(&b, b.scrollback));
 
 	/* Reset the buffer, check values again */
-	b = buffer_init(BUFFER_T_SIZE);
+	b = buffer(BUFFER_T_SIZE);
 
 	assert_equals(b.type, BUFFER_T_SIZE);
 
@@ -56,7 +56,7 @@ test_buffer_head(void)
 
 	int i;
 
-	struct buffer b = buffer_init(BUFFER_OTHER);
+	struct buffer b = buffer(BUFFER_OTHER);
 
 	assert_null(buffer_head(&b));
 
@@ -74,7 +74,7 @@ test_buffer_tail(void)
 
 	int i;
 
-	struct buffer b = buffer_init(BUFFER_OTHER);
+	struct buffer b = buffer(BUFFER_OTHER);
 
 	assert_null(buffer_tail(&b));
 
@@ -95,7 +95,7 @@ test_buffer_line(void)
 {
 	/* Test that retrieving a buffer line fails when i != [tail, head) */
 
-	struct buffer b = buffer_init(BUFFER_OTHER);
+	struct buffer b = buffer(BUFFER_OTHER);
 
 	/* Should retrieve null for an empty buffer */
 	assert_equals(buffer_size(&b), 0);
@@ -186,7 +186,7 @@ test_buffer_scrollback(void)
 	 *   Buffer scrollback stays locked to the tail when incrementing
 	 * */
 
-	struct buffer b = buffer_init(BUFFER_OTHER);
+	struct buffer b = buffer(BUFFER_OTHER);
 
 	/* Empty buffer returns NULL */
 	assert_null(buffer_line(&b, b.scrollback));
@@ -272,7 +272,7 @@ test_buffer_line_overlength(void)
 {
 	/* Test that lines over the maximum length are recursively split and added separately */
 
-	struct buffer b = buffer_init(BUFFER_OTHER);
+	struct buffer b = buffer(BUFFER_OTHER);
 
 	/* Indices to first and last positions of lines, total length = 2.5 times the maximum */
 	unsigned int f1 = 0,
@@ -318,7 +318,7 @@ test_buffer_line_rows(void)
 {
 	/* Test calculating the number of rows a buffer line occupies */
 
-	struct buffer b = buffer_init(BUFFER_OTHER);
+	struct buffer b = buffer(BUFFER_OTHER);
 	struct buffer_line *line;
 
 	char *text = "aa bb cc";
@@ -374,7 +374,7 @@ int
 main(void)
 {
 	testcase tests[] = {
-		TESTCASE(test_buffer_init),
+		TESTCASE(test_buffer),
 		TESTCASE(test_buffer_head),
 		TESTCASE(test_buffer_tail),
 		TESTCASE(test_buffer_line),

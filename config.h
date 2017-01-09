@@ -11,6 +11,9 @@
 
 #define INPUT_FG_NEUTRAL 250
 
+/* Number of buffer lines to keep in history, must be power of 2 */
+#define BUFFER_LINES_MAX (1 << 10)
+
 static int nick_colours[] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14};
 
 /* Characters */

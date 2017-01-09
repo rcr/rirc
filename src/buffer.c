@@ -231,7 +231,7 @@ buffer_page_forw(struct buffer *b, unsigned int rows, unsigned int cols)
 }
 
 struct buffer
-buffer_init(enum buffer_t type)
+buffer(enum buffer_t type)
 {
 	/* Initialize a buffer */
 
