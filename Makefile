@@ -7,7 +7,7 @@ LDFLAGS      = -pthread
 #   > make -e CC=gcc debug
 ifeq ($(CC), gcc)
 	CFLAGS_DEBUG += -fsanitize=undefined,address
-	LDFLAGS_DEBUG = -pthread -lubsan -lasan
+	LDFLAGS_DEBUG = -pthread -lasan -lubsan
 endif
 
 SRCDIR = src/
