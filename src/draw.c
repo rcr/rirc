@@ -15,26 +15,28 @@
 /* FIXME: this has to be included after common.h for activity cols */
 #include "../config.h"
 
+#define ESC "\x1b"
+
 /* Set foreground/background colour */
-#define FG(X) "\x1b[38;5;"#X"m"
-#define BG(X) "\x1b[48;5;"#X"m"
+#define FG(X) ESC"[38;5;"#X"m"
+#define BG(X) ESC"[48;5;"#X"m"
 
 /* Reset foreground/background colour */
-#define FG_R "\x1b[39m"
-#define BG_R "\x1b[49m"
+#define FG_R ESC"[39m"
+#define BG_R ESC"[49m"
 
-#define CLEAR_ATTRIBUTES "\x1b[0m"
+#define CLEAR_ATTRIBUTES ESC"[0m"
 
-#define MOVE(X, Y) "\x1b["#X";"#Y"H"
+#define MOVE(X, Y) ESC"["#X";"#Y"H"
 
-#define CLEAR_FULL  "\x1b[2J"
-#define CLEAR_RIGHT "\x1b[0K"
-#define CLEAR_LEFT  "\x1b[1K"
-#define CLEAR_LINE  "\x1b[2K"
+#define CLEAR_FULL  ESC"[2J"
+#define CLEAR_RIGHT ESC"[0K"
+#define CLEAR_LEFT  ESC"[1K"
+#define CLEAR_LINE  ESC"[2K"
 
 /* Save and restore the cursor's location */
-#define CURSOR_SAVE    "\x1b[s"
-#define CURSOR_RESTORE "\x1b[u"
+#define CURSOR_SAVE    ESC"[s"
+#define CURSOR_RESTORE ESC"[u"
 
 #define SEPARATOR_FG_COL FG_R
 #define SEPARATOR_BG_COL BG_R
