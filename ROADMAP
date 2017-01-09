@@ -1,23 +1,4 @@
-WIP:
----------------------------
-Cleaner separation between the ui (draw.c) and everything else:
-	- ccur and navigation between channels are all function of the ui
-	- stateful ui related things are functions of the ui, eg:
-		- buffer scrollback
-		- input bar framing
-		- channel bar framing
-	- handle all draw routines from state altering functions, eg:
-	     input.c ___
-	                \
-	                 ---> state.c ---> draw.c
-	      mesg.c ___/
-
-	- Once the message handlers have a better interface to state altering functions
-	  the testcases will be much easier to implement
-	- Then replace strtok/strtok_r with getarg
-
-
-TODO (in no particular order):
+TODO
 ---------------------------
 
 Implement a mesg.c test framework before adding new message types, then:
@@ -31,6 +12,9 @@ Implement a mesg.c test framework before adding new message types, then:
 		^(Also print this implicitly when end of nicks numeric is received)
 		^(Also print server's ignore list for '/ignore' and '/unignore')
 
+	/IGNORE, /UNIGNORE,
+		print the ignore list
+
 	/CHANS
 		print currently open channels with status information, and numeric index
 
@@ -43,10 +27,6 @@ Implement a mesg.c test framework before adding new message types, then:
 
 	351 reply from server for /version
 		 on freenode it sends me 005...
-
-	402 no such server
-
-	403 :no such channel (Getting this from privmsg sometimes)
 
 	409 :No origin specified, (eg "/raw PING")
 
@@ -102,21 +82,18 @@ Tests for all the send_*, recv_* handlers
 	- ui.c and draw.c would be separate; draw.c is strictly responsible for drawing to stdout,
 	  while ui.c is responsible for all stateful user interactions
 
-Allow for multiple connections passed as cli args
-
 Reimplement the pasting stuff that was broken
 
 A way to unset current topic
 
 FIXME:
 ---------------------------
+when disconnected and reconnected, PING/PONG seems to be out of sync?
+	client continuously goes into timing out, though connection is still established
+
 I broke the activity colouring stuff:
 	join/part/quit sets activity (it shouldnt)
 	message and ping dont set activity (they should)
-
-cleared channels can still be scrolled back? Need a better mechanism for clearing a channel
-
-Scrollback is broken, some sort of fencepost error I think
 
 Some servers place single args in the trailing section, eg: JOIN :channel vs JOIN channel
 which forces the handlers to check p->params and p->trailing, however since p->params
@@ -137,14 +114,3 @@ use the alternate screen buffer to restore screen when rirc exits
 -- cannot send to '##linux - cannot send to channel'
 :::and on each message
 	ERR_ERRONEUSNICKNAME: nick is null
-
-
-MAYBE (Probably never):
----------------------------
-For input pastes that exceed some defined limit, offer a third option:
-	post to, for example, pastebin, and send the url to channel
-
-Client/daemon mode:
-	with -d, --daemon mode, rirc stays open in the background
-	when the user closes the client. draw()s are ignored, etc.
-	when a client connects to the daemon, send SIGWINCH, open pipes, etc

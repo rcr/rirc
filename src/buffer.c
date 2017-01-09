@@ -147,7 +147,7 @@ buffer_newline(struct buffer *b, enum buffer_line_t type, const char *from, cons
 	memcpy(l->from, from, from_len);
 	memcpy(l->text, text, text_len);
 
-	*(l->from + text_len) = '\0';
+	*(l->from + from_len) = '\0';
 	*(l->text + text_len) = '\0';
 
 	l->from_len = from_len;
@@ -231,7 +231,7 @@ buffer_page_forw(struct buffer *b, unsigned int rows, unsigned int cols)
 }
 
 struct buffer
-buffer_init(enum buffer_t type)
+buffer(enum buffer_t type)
 {
 	/* Initialize a buffer */
 

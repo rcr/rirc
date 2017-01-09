@@ -109,16 +109,10 @@ new_channel(char *name, server *server, channel *chanlist, enum buffer_t type)
 	if ((c = calloc(1, sizeof(*c))) == NULL)
 		fatal("calloc");
 
-	c->buffer = buffer_init(type);
+	c->buffer = buffer(type);
 	c->input = new_input();
+	c->name = strdup(name);
 	c->server = server;
-
-	/* TODO: if channel name length exceeds CHANSIZE we'll never appropriately
-	 * associate incomming messages with this channel anyways so it shouldn't be allowed
-	 *
-	 * also... this length never changes and is strlen'ed often when drawing the nav,
-	 * consider caching it as size_t */
-	strncpy(c->name, name, CHANSIZE);
 
 	/* Append the new channel to the list */
 	DLL_ADD(chanlist, c);
@@ -133,6 +127,7 @@ free_channel(channel *c)
 {
 	free_avl(c->nicklist);
 	free_input(c->input);
+	free(c->name);
 	free(c);
 }
 

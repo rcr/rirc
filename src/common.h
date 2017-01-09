@@ -9,14 +9,14 @@
 
 #define MAX_SERVERS 32
 
-#define SCROLLBACK_BUFFER 200
+//FIXME:
 #define SCROLLBACK_INPUT 15
-#define BUFFSIZE 512
-#define CHANSIZE 256
 #define MAX_INPUT 256
+#define NICKSIZE 255
+
+#define BUFFSIZE 512
 #define RECONNECT_DELTA 15
 #define MODE_SIZE (26 * 2) + 1 /* Supports modes [az-AZ] */
-#define NICKSIZE 255
 
 /* When tab completing a nick at the beginning of the line, append the following char */
 #define TAB_COMPLETE_DELIMITER ':'
@@ -100,12 +100,11 @@ typedef struct input
 typedef struct channel
 {
 	activity_t active;
-	char name[CHANSIZE];
+	char *name;
 	char type_flag;
 	char chanmodes[MODE_SIZE];
 	int nick_count;
 	int parted;
-	int resized;
 	struct buffer buffer;
 	struct channel *next;
 	struct channel *prev;
