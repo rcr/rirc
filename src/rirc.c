@@ -89,16 +89,12 @@ startup(int argc, char **argv)
 		{0, 0, 0, 0}
 	};
 
-	/* Silence buggy clang compiler warning */
-	#pragma clang diagnostic push
-	#pragma clang diagnostic ignored "-Wmissing-field-initializers"
 	struct auto_server {
 		char *host;
 		char *port;
 		char *join;
 		char *nicks;
-	} auto_servers[MAX_SERVERS] = {{0}};
-	#pragma clang diagnostic pop
+	} auto_servers[MAX_SERVERS] = {{0, 0, 0, 0}};
 
 	while ((c = getopt_long(argc, argv, "c:p:n:j:vh", long_opts, &opt_i))) {
 
