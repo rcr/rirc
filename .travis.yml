@@ -23,11 +23,11 @@ addons:
 matrix:
   include:
     - os: linux
-      compiler: gcc
+      compiler: gcc-4.8
     - os: linux
-      compiler: clang
+      compiler: clang-3.4
     - os: osx
-      compiler: clang
+      compiler: clang-3.4
 
 script:
   - test "${TRAVIS_BRANCH}" != "static_analysis" || exit 0
