@@ -11,17 +11,47 @@
 #include <strings.h>
 #include <stdarg.h>
 #include <stdio.h>
+#include <sys/ioctl.h>
 
 #include "common.h"
 #include "state.h"
+
+/* State of rirc */
+static struct
+{
+	channel *current_channel; /* the current channel being drawn */
+	channel *default_channel; /* the default rirc channel at startup */
+
+	server *server_list;
+
+	unsigned int term_cols;
+	unsigned int term_rows;
+} state;
 
 static int action_close_server(char);
 
 static void _newline(channel*, enum buffer_line_t, const char*, const char*, size_t);
 
-static struct state state;
+channel* current_channel(void) { return state.current_channel; }
+channel* default_channel(void) { return state.default_channel; }
 
-struct state const* get_state(void) { return &state; }
+unsigned int _term_cols(void) { return state.term_cols; }
+unsigned int _term_rows(void) { return state.term_rows; }
+
+void
+resize(void)
+{
+	/* Resize the terminal dimensions */
+
+	struct winsize w;
+
+	ioctl(0, TIOCGWINSZ, &w);
+
+	state.term_rows = (w.ws_row > 0) ? w.ws_row : 0;
+	state.term_cols = (w.ws_col > 0) ? w.ws_col : 0;
+
+	draw(D_FULL);
+}
 
 void
 init_state(void)
@@ -42,7 +72,7 @@ init_state(void)
 #endif
 
 	/* Initiate a full redraw */
-	draw(D_RESIZE);
+	resize();
 }
 
 void
@@ -166,6 +196,7 @@ action_close_server(char c)
 
 	if (c == 'y' || c == 'Y') {
 
+		//FIXME: logic here sucks
 		channel *c = ccur;
 
 		/* If closing the last server */

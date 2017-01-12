@@ -162,6 +162,7 @@ void redraw(channel*);
 #define D_CHANS  (1 << 2)
 #define D_INPUT  (1 << 3)
 #define D_STATUS (1 << 4)
+#define D_TEMP   (1 << 5)
 #define D_FULL ~((draw & 0) | D_RESIZE)
 extern unsigned int draw, term_cols, term_rows;
 
@@ -179,10 +180,5 @@ void recv_mesg(char*, int, server*);
 void send_mesg(char*, channel*);
 void send_paste(char*);
 extern avl_node* commands;
-
-/* state.c */
-/* FIXME: terrible, until i remove references to ccur/rirc */
-#define rirc (get_state()->default_channel)
-#define ccur (get_state()->current_channel)
 
 #endif

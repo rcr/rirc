@@ -5,20 +5,21 @@
  *
  * Interface for retrieving and altering global state of the program */
 
-/* Global state of rirc */
-struct state
-{
-	channel *current_channel; /* the current channel being drawn */
-	channel *default_channel; /* the default rirc channel at startup */
+/* state.c */
+/* FIXME: terrible, until i remove references to ccur/rirc */
+#define rirc (default_channel())
+#define ccur (current_channel())
+channel* current_channel(void);
+channel* default_channel(void);
 
-	server *server_list;
-};
+//TODO: rename
+unsigned int _term_cols(void);
+unsigned int _term_rows(void);
+
+void resize(void);
 
 void init_state(void);
 void free_state(void);
-
-/* Ensure state cannot be altered by functions beyond this interface */
-struct state const* get_state(void);
 
 /* Useful state retrieval abstractions */
 channel* channel_get(char*, server*);

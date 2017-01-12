@@ -4,11 +4,11 @@
  *
  * Assumes vt-100 compatible escape codes, as such YMMV */
 
+#include <alloca.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/ioctl.h>
 
 #include "common.h"
 #include "state.h"
@@ -37,9 +37,6 @@
 /* Save and restore the cursor's location */
 #define CURSOR_SAVE    ESC"[s"
 #define CURSOR_RESTORE ESC"[u"
-
-#define SEPARATOR_FG_COL FG_R
-#define SEPARATOR_BG_COL BG_R
 
 /* Minimum rows or columns to safely draw */
 #define COLS_MIN 5
@@ -74,11 +71,11 @@ struct coords
 
 static int _draw_fmt(char*, size_t*, size_t*, size_t*, int, const char*, ...);
 
-static void resize(void);
-static void draw_buffer(struct buffer*, struct coords);
 static void draw_buffer_line(struct buffer_line*, struct coords, unsigned int, unsigned int, unsigned int);
-static void draw_nav(struct state const*);
+static void draw_buffer(struct buffer*, struct coords);
 static void draw_input(channel*);
+static void draw_nav(channel*);
+static void draw_resize(void);
 static void draw_status(channel*);
 
 static inline unsigned int nick_col(char*);
@@ -100,18 +97,18 @@ redraw(channel *c)
 	if (!draw)
 		return;
 
-	if (draw & D_RESIZE)
-		resize();
+	term_cols = _term_cols();
+	term_rows = _term_rows();
 
 	if (term_cols < COLS_MIN || term_rows < ROWS_MIN) {
 		printf(CLEAR_FULL MOVE(1, 1) "rirc");
 		goto no_draw;
 	}
 
-	struct state const* st = get_state();
-
 	printf(CURSOR_SAVE);
 
+	//TODO: draw_static
+	if (draw & D_TEMP) draw_resize();
 	if (draw & D_BUFFER) draw_buffer(&c->buffer,
 		(struct coords) {
 			.c1 = 1,
@@ -119,7 +116,7 @@ redraw(channel *c)
 			.r1 = 3,
 			.rN = term_rows - 2
 		});
-	if (draw & D_CHANS)  draw_nav(st);
+	if (draw & D_CHANS)  draw_nav(c);
 	if (draw & D_INPUT)  draw_input(c);
 	if (draw & D_STATUS) draw_status(c);
 
@@ -134,31 +131,21 @@ no_draw:
 }
 
 static void
-resize(void)
+draw_resize(void)
 {
-	unsigned int i;
-	struct winsize w;
+	/* Terminal resize, clear and draw static components */
 
-	/* Get terminal dimensions */
-	ioctl(0, TIOCGWINSZ, &w);
+	unsigned int cols = _term_cols();
+	unsigned int rows = _term_rows();
 
-	term_rows = (w.ws_row > 0) ? w.ws_row : 0;
-	term_cols = (w.ws_col > 0) ? w.ws_col : 0;
+	printf(CLEAR_FULL);
+	printf(CLEAR_ATTRIBUTES);
 
-	/* Clear, move to top separator */
-	printf(CLEAR_FULL MOVE(2, 1));
+	printf(MOVE(2, 1));
+	printf("%.*s", cols, (char *)(memset(alloca(cols), *HORIZONTAL_SEPARATOR, cols)));
 
-	/* Draw upper separator */
-	printf(SEPARATOR_FG_COL SEPARATOR_BG_COL);
-	for (i = 0; i < term_cols; i++)
-		printf(HORIZONTAL_SEPARATOR);
-
-	/* Draw bottom bar, set colour back to default */
-	printf(FG_R BG_R);
-	printf(MOVE(%d, 1) " >>> ", term_rows);
-
-	/* Draw everything else */
-	draw(D_FULL);
+	printf(MOVE(%d, 1), rows);
+	printf("%.*s", cols, " >>> ");
 }
 
 static void
@@ -396,7 +383,7 @@ draw_buffer(struct buffer *b, struct coords coords)
  *           | #chan1 #chan2 #ch... |   Left printing
  * */
 static void
-draw_nav(struct state const* st)
+draw_nav(channel *c)
 {
 	/* Dynamically draw the nav such that:
 	 *
@@ -409,7 +396,7 @@ draw_nav(struct state const* st)
 
 	static channel *frame_prev, *frame_next;
 
-	channel *tmp, *c = st->current_channel;
+	channel *tmp, *current = c;
 
 	channel *c_first = channel_get_first();
 	channel *c_last = channel_get_last();
@@ -491,7 +478,7 @@ draw_nav(struct state const* st)
 	for (c = frame_prev; ; c = channel_get_next(c)) {
 
 		/* Set print colour and print name */
-		if (printf(FG(%d), (c == st->current_channel) ? 255 : actv_cols[c->active]) < 0)
+		if (printf(FG(%d), (c == current) ? 255 : actv_cols[c->active]) < 0)
 			break;
 
 		if (printf(" %s ", c->name) < 0)
@@ -501,7 +488,7 @@ draw_nav(struct state const* st)
 			break;
 	}
 
-	st->current_channel->active = ACTIVITY_DEFAULT;
+	current->active = ACTIVITY_DEFAULT;
 }
 
 /* TODO:
@@ -565,7 +552,7 @@ draw_status(channel *c)
 	if (term_cols < 3)
 		return;
 
-	printf(SEPARATOR_FG_COL SEPARATOR_BG_COL);
+	printf(CLEAR_ATTRIBUTES);
 
 	/* Print status to temporary buffer */
 	char status_buff[term_cols + 1];

@@ -248,10 +248,12 @@ main_loop(void)
 		check_servers();
 
 		/* Window has changed size */
-		if (flag_sigwinch)
-			flag_sigwinch = 0, draw(D_RESIZE);
+		if (flag_sigwinch) {
+			flag_sigwinch = 0;
+			resize();
+		}
 
 		/* Redraw the ui (skipped if nothing has changed) */
-		redraw(ccur);
+		redraw(current_channel());
 	}
 }
