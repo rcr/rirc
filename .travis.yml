@@ -23,11 +23,16 @@ addons:
 matrix:
   include:
     - os: linux
-      compiler: gcc-4.8
+      env: COMPILER=gcc-5
+      compiler: gcc
+
     - os: linux
-      compiler: clang-3.4
+      env: LLVM_VERSION=3.6.2
+      compiler: clang
+
     - os: osx
-      compiler: clang-3.4
+      env: LLVM_VERSION=3.6.2
+      compiler: clang
 
 script:
   - test "${TRAVIS_BRANCH}" != "static_analysis" || exit 0
