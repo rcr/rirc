@@ -50,7 +50,7 @@ resize(void)
 	state.term_rows = (w.ws_row > 0) ? w.ws_row : 0;
 	state.term_cols = (w.ws_col > 0) ? w.ws_col : 0;
 
-	draw(D_FULL);
+	draw_all();
 }
 
 void
@@ -126,9 +126,9 @@ _newline(channel *c, enum buffer_line_t type, const char *from, const char *mesg
 		c->active = ACTIVITY_ACTIVE;
 
 	if (c == ccur)
-		draw(D_BUFFER);
+		draw_buffer();
 	else
-		draw(D_CHANS);
+		draw_nav();
 }
 
 channel*
@@ -147,7 +147,7 @@ new_channel(char *name, server *server, channel *chanlist, enum buffer_t type)
 	/* Append the new channel to the list */
 	DLL_ADD(chanlist, c);
 
-	draw(D_FULL);
+	draw_all();
 
 	return c;
 }
@@ -205,7 +205,7 @@ action_close_server(char c)
 
 		server_disconnect(c->server, 0, 1, DEFAULT_QUIT_MESG);
 
-		draw(D_FULL);
+		draw_all();
 
 		return 1;
 	}
@@ -272,9 +272,9 @@ channel_close(channel *c)
 		/* If closing the current channel, update state to a new channel */
 		if (c == ccur) {
 			state.current_channel = !(c->next == c->server->channel) ? c->next : c->prev;
-			draw(D_FULL);
+			draw_all();
 		} else {
-			draw(D_CHANS);
+			draw_nav();
 		}
 
 		DLL_DEL(c->server->channel, c);
@@ -303,7 +303,7 @@ channel_switch(channel *c, int next)
 
 	ret->active = ACTIVITY_DEFAULT;
 
-	draw(D_FULL);
+	draw_all();
 
 	return ret;
 }
@@ -320,7 +320,7 @@ buffer_scrollback_back(channel *c)
 
 	UNUSED(c);
 
-	draw(D_BUFFER);
+	draw_buffer();
 }
 
 void
@@ -331,7 +331,7 @@ buffer_scrollback_forw(channel *c)
 	/* FIXME: new buffer scrollback */
 	UNUSED(c);
 
-	draw(D_BUFFER);
+	draw_buffer();
 }
 
 void
@@ -423,7 +423,7 @@ server_set_mode(server *s, const char *modes)
 	set_mode_str(s->usermodes, modes);
 
 	if (ccur->server == s)
-		draw(D_STATUS);
+		draw_status();
 }
 
 void
@@ -432,7 +432,7 @@ channel_set_mode(channel *c, const char *modes)
 	set_mode_str(c->chanmodes, modes);
 
 	if (ccur == c)
-		draw(D_STATUS);
+		draw_status();
 }
 
 /* Usefull server/channel structure abstractions for drawing */
@@ -482,7 +482,7 @@ channel_set_current(channel *c)
 
 	state.current_channel = c;
 
-	draw(D_FULL);
+	draw_all();
 }
 
 void
@@ -494,7 +494,7 @@ channel_move_prev(void)
 
 	if (c != state.current_channel) {
 		state.current_channel = c;
-		draw(D_FULL);
+		draw_all();
 	}
 }
 
@@ -507,6 +507,6 @@ channel_move_next(void)
 
 	if (c != state.current_channel) {
 		state.current_channel = c;
-		draw(D_FULL);
+		draw_all();
 	}
 }

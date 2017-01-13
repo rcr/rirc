@@ -503,7 +503,7 @@ check_latency(server *s, time_t t)
 	/* Server hasn't responded to PING, display latency in status */
 	if (delta > SERVER_LATENCY_S && current_channel()->server == s) {
 		s->latency_delta = delta;
-		draw(D_STATUS);
+		draw_status();
 	}
 
 	return 0;

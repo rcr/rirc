@@ -2,8 +2,9 @@
 #define COMMON_H
 
 /* FIXME: refactoring */
-#include "utils.h"
 #include "buffer.h"
+#include "draw.h"
+#include "utils.h"
 
 #define VERSION "0.1"
 
@@ -153,18 +154,6 @@ server* get_server_head(void);
 void check_servers(void);
 void server_connect(char*, char*, char*, char*);
 void server_disconnect(server*, int, int, char*);
-
-/* draw.c */
-void redraw(channel*);
-#define draw(X) draw |= X
-#define D_RESIZE (1 << 0)
-#define D_BUFFER (1 << 1)
-#define D_CHANS  (1 << 2)
-#define D_INPUT  (1 << 3)
-#define D_STATUS (1 << 4)
-#define D_TEMP   (1 << 5)
-#define D_FULL ~((draw & 0) | D_RESIZE)
-extern unsigned int draw, term_cols, term_rows;
 
 /* input.c */
 input* new_input(void);

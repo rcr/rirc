@@ -196,7 +196,7 @@ input_char(char c)
 
 	*ccur->input->head++ = c;
 
-	draw(D_INPUT);
+	draw_input();
 
 	return 1;
 }
@@ -229,7 +229,7 @@ input_cchar(char c)
 			ccur->input->head = ccur->input->line->text;
 			ccur->input->tail = ccur->input->line->text + MAX_INPUT;
 			ccur->input->window = ccur->input->line->text;
-			draw(D_INPUT);
+			draw_input();
 			break;
 
 		/* ^F */
@@ -449,7 +449,7 @@ input_action(char *input, ssize_t len)
 		action_message = NULL;
 		action_handler = NULL;
 
-		draw(D_INPUT);
+		draw_input();
 	}
 }
 
@@ -471,7 +471,7 @@ action(int (*a_handler)(char), const char *fmt, ...)
 	action_handler = a_handler;
 	action_message = action_buff;
 
-	draw(D_INPUT);
+	draw_input();
 }
 
 /*
@@ -486,7 +486,7 @@ cursor_left(input *in)
 	if (in->head > in->line->text)
 		*(--in->tail) = *(--in->head);
 
-	draw(D_INPUT);
+	draw_input();
 }
 
 static inline void
@@ -497,7 +497,7 @@ cursor_right(input *in)
 	if (in->tail < in->line->text + MAX_INPUT)
 		*(in->head++) = *(in->tail++);
 
-	draw(D_INPUT);
+	draw_input();
 }
 
 static inline void
@@ -508,7 +508,7 @@ delete_left(input *in)
 	if (in->head > in->line->text)
 		in->head--;
 
-	draw(D_INPUT);
+	draw_input();
 }
 
 static inline void
@@ -519,7 +519,7 @@ delete_right(input *in)
 	if (in->tail < in->line->text + MAX_INPUT)
 		in->tail++;
 
-	draw(D_INPUT);
+	draw_input();
 }
 
 static inline void
@@ -537,7 +537,7 @@ input_scroll_backwards(input *in)
 
 	reframe_line(in);
 
-	draw(D_INPUT);
+	draw_input();
 }
 
 static inline void
@@ -555,7 +555,7 @@ input_scroll_forwards(input *in)
 
 	reframe_line(in);
 
-	draw(D_INPUT);
+	draw_input();
 }
 
 /*
@@ -584,7 +584,7 @@ reframe_line(input *in)
 
 	in->head = in->line->end;
 	in->tail = in->line->text + MAX_INPUT;
-	in->window = in->head - (2 * term_cols / 3);
+	in->window = in->head - (2 * _term_cols() / 3);
 
 	if (in->window < in->line->text)
 		in->window = in->line->text;
@@ -633,7 +633,7 @@ action_find_channel(char c)
 		*(search_ptr = search_buff) = '\0';
 		channel_set_current(search_cptr);
 		search_cptr = NULL;
-		draw(D_FULL);
+		draw_all();
 		return 1;
 	}
 
@@ -831,7 +831,7 @@ send_input(void)
 		reframe_line(in);
 	}
 
-	draw(D_INPUT);
+	draw_input();
 
 	/* Send the message last; the channel might be closed as a result of the command */
 	send_mesg(sendbuff, ccur);

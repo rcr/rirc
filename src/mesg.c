@@ -843,7 +843,7 @@ recv_join(char *err, parsed_mesg *p, server *s)
 			c->parted = 0;
 			newlinef(c, 0, ">", "You have rejoined %s", chan);
 		}
-		draw(D_FULL);
+		draw_all();
 	} else {
 
 		if ((c = channel_get(chan, s)) == NULL)
@@ -857,7 +857,7 @@ recv_join(char *err, parsed_mesg *p, server *s)
 		if (c->nick_count < config.join_part_quit_threshold)
 			newlinef(c, 0, ">", "%s!%s has joined %s", p->from, p->hostinfo, chan);
 
-		draw(D_STATUS);
+		draw_status();
 	}
 
 	return 0;
@@ -912,7 +912,7 @@ recv_kick(char *err, parsed_mesg *p, server *s)
 			newlinef(c, 0, "--", "%s has kicked %s", p->from, user);
 	}
 
-	draw(D_STATUS);
+	draw_status();
 
 	return 0;
 }
@@ -1224,7 +1224,7 @@ num_200:
 				c->nick_count++;
 		}
 
-		draw(D_STATUS);
+		draw_status();
 		return 0;
 
 
@@ -1375,7 +1375,7 @@ recv_part(char *err, parsed_mesg *p, server *s)
 				newlinef(c, 0, "<", "you have left %s", targ);
 		}
 
-		draw(D_STATUS);
+		draw_status();
 
 		return 0;
 	}
@@ -1395,7 +1395,7 @@ recv_part(char *err, parsed_mesg *p, server *s)
 			newlinef(c, 0, "<", "%s!%s has left %s", p->from, p->hostinfo, targ);
 	}
 
-	draw(D_STATUS);
+	draw_status();
 
 	return 0;
 }
@@ -1498,7 +1498,7 @@ recv_quit(char *err, parsed_mesg *p, server *s)
 		c = c->next;
 	} while (c != s->channel);
 
-	draw(D_STATUS);
+	draw_status();
 
 	return 0;
 }

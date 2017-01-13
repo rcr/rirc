@@ -254,6 +254,6 @@ main_loop(void)
 		}
 
 		/* Redraw the ui (skipped if nothing has changed) */
-		redraw(current_channel());
+		draw();
 	}
 }

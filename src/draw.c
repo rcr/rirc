@@ -69,56 +69,67 @@ struct coords
 	unsigned int rN;
 };
 
+static union
+{
+	struct {
+		#define X(bit) unsigned int bit : 1;
+		DRAW_BITS
+		#undef X
+	};
+	unsigned int bits;
+} draw_bits;
+
+#define X(BIT) void draw_##BIT(void) { draw_bits.BIT = 1; }
+DRAW_BITS
+#undef X
+
 static int _draw_fmt(char*, size_t*, size_t*, size_t*, int, const char*, ...);
 
-static void draw_buffer_line(struct buffer_line*, struct coords, unsigned int, unsigned int, unsigned int);
-static void draw_buffer(struct buffer*, struct coords);
-static void draw_input(channel*);
-static void draw_nav(channel*);
-static void draw_resize(void);
-static void draw_status(channel*);
+static void _draw_buffer_line(struct buffer_line*, struct coords, unsigned int, unsigned int, unsigned int);
+static void _draw_buffer(struct buffer*, struct coords);
+static void _draw_input(channel*);
+static void _draw_nav(channel*);
+static void _draw_resize(void);
+static void _draw_status(channel*);
 
 static inline unsigned int nick_col(char*);
 static inline unsigned int header_cols(struct buffer*, struct buffer_line*, unsigned int);
 static inline void check_coords(struct coords);
 
+void
+draw_all(void)
+{
+	/* Set all bits to be redrawn */
 
-/* FIXME: input.c uses term_cols, doesn't need to, can be moved here and kept static */
-/* extern in common.h
- *
- * it can be made a function   frame_input(input*, w);   and called by the draw function
- * with coordinates prior to drawing
- * */
-unsigned int draw, term_rows, term_cols;
+	draw_bits.bits = -1;
+}
 
 void
-redraw(channel *c)
+draw(void)
 {
-	if (!draw)
+	if (!draw_bits.bits)
 		return;
 
-	term_cols = _term_cols();
-	term_rows = _term_rows();
+	channel *c = current_channel();
 
-	if (term_cols < COLS_MIN || term_rows < ROWS_MIN) {
+	if (_term_cols() < COLS_MIN || _term_rows() < ROWS_MIN) {
 		printf(CLEAR_FULL MOVE(1, 1) "rirc");
 		goto no_draw;
 	}
 
 	printf(CURSOR_SAVE);
 
-	//TODO: draw_static
-	if (draw & D_TEMP) draw_resize();
-	if (draw & D_BUFFER) draw_buffer(&c->buffer,
+	if (draw_bits.resize) _draw_resize();
+	if (draw_bits.buffer) _draw_buffer(&c->buffer,
 		(struct coords) {
 			.c1 = 1,
-			.cN = term_cols,
+			.cN = _term_cols(),
 			.r1 = 3,
-			.rN = term_rows - 2
+			.rN = _term_rows() - 2
 		});
-	if (draw & D_CHANS)  draw_nav(c);
-	if (draw & D_INPUT)  draw_input(c);
-	if (draw & D_STATUS) draw_status(c);
+	if (draw_bits.nav)    _draw_nav(c);
+	if (draw_bits.input)  _draw_input(c);
+	if (draw_bits.status) _draw_status(c);
 
 	printf(CLEAR_ATTRIBUTES);
 	printf(CURSOR_RESTORE);
@@ -127,11 +138,11 @@ no_draw:
 
 	fflush(stdout);
 
-	draw = 0;
+	draw_bits.bits = 0;
 }
 
 static void
-draw_resize(void)
+_draw_resize(void)
 {
 	/* Terminal resize, clear and draw static components */
 
@@ -149,7 +160,7 @@ draw_resize(void)
 }
 
 static void
-draw_buffer_line(
+_draw_buffer_line(
 		struct buffer_line *line,
 		struct coords coords,
 		unsigned int header_w,
@@ -256,7 +267,7 @@ print_header:
 }
 
 static void
-draw_buffer(struct buffer *b, struct coords coords)
+_draw_buffer(struct buffer *b, struct coords coords)
 {
 	/* Dynamically draw the current channel's buffer such that:
 	 *
@@ -334,7 +345,7 @@ draw_buffer(struct buffer *b, struct coords coords)
 
 		header_w = header_cols(b, line, col_total);
 
-		draw_buffer_line(
+		_draw_buffer_line(
 			line,
 			coords,
 			header_w,
@@ -355,7 +366,7 @@ draw_buffer(struct buffer *b, struct coords coords)
 
 		header_w = header_cols(b, line, col_total);
 
-		draw_buffer_line(
+		_draw_buffer_line(
 			line,
 			coords,
 			header_w,
@@ -383,7 +394,7 @@ draw_buffer(struct buffer *b, struct coords coords)
  *           | #chan1 #chan2 #ch... |   Left printing
  * */
 static void
-draw_nav(channel *c)
+_draw_nav(channel *c)
 {
 	/* Dynamically draw the nav such that:
 	 *
@@ -407,7 +418,7 @@ draw_nav(channel *c)
 	size_t len, total_len = 0;
 
 	/* Bump the channel frames, if applicable */
-	if ((total_len = (strlen(c->name) + 2)) >= term_cols)
+	if ((total_len = (strlen(c->name) + 2)) >= _term_cols())
 		return;
 	else if (c == frame_prev && frame_prev != c_first)
 		frame_prev = channel_get_prev(frame_prev);
@@ -426,7 +437,7 @@ draw_nav(channel *c)
 			tmp = channel_get_next(tmp_next);
 			len = strlen(tmp->name);
 
-			while ((total_len += (len + 2)) < term_cols && tmp != c_first) {
+			while ((total_len += (len + 2)) < _term_cols() && tmp != c_first) {
 
 				tmp_next = tmp;
 
@@ -444,7 +455,7 @@ draw_nav(channel *c)
 			tmp = channel_get_prev(tmp_prev);
 			len = strlen(tmp->name);
 
-			while ((total_len += (len + 2)) < term_cols && tmp != c_last) {
+			while ((total_len += (len + 2)) < _term_cols() && tmp != c_last) {
 
 				tmp_prev = tmp;
 
@@ -460,7 +471,7 @@ draw_nav(channel *c)
 		len = strlen(tmp->name);
 
 		/* Next channel doesn't fit */
-		if ((total_len += (len + 2)) >= term_cols)
+		if ((total_len += (len + 2)) >= _term_cols())
 			break;
 
 		if (nextward)
@@ -495,27 +506,27 @@ draw_nav(channel *c)
  *
  * Could use some cleaning up*/
 static void
-draw_input(channel *c)
+_draw_input(channel *c)
 {
 	/* Action messages override the input bar */
 	if (action_message) {
 		printf(MOVE(%d, 6) CLEAR_RIGHT FG(%d) "%s",
-				term_rows, INPUT_FG_NEUTRAL, action_message);
+				_term_rows(), INPUT_FG_NEUTRAL, action_message);
 		return;
 	}
 
-	unsigned int winsz = term_cols / 3;
+	unsigned int winsz = _term_cols() / 3;
 
 	input *in = c->input;
 
 	/* Reframe the input bar window */
-	if (in->head > (in->window + term_cols - 6))
+	if (in->head > (in->window + _term_cols() - 6))
 		in->window += winsz;
 	else if (in->head == in->window - 1)
 		in->window = (in->window - winsz > in->line->text)
 			? in->window - winsz : in->line->text;
 
-	printf(MOVE(%d, 6) CLEAR_RIGHT FG(%d), term_rows, INPUT_FG_NEUTRAL);
+	printf(MOVE(%d, 6) CLEAR_RIGHT FG(%d), _term_rows(), INPUT_FG_NEUTRAL);
 
 	char *p = in->window;
 	while (p < in->head)
@@ -523,19 +534,19 @@ draw_input(channel *c)
 
 	p = in->tail;
 
-	char *end = in->tail + term_cols - 5 - (in->head - in->window);
+	char *end = in->tail + _term_cols() - 5 - (in->head - in->window);
 
 	while (p < end && p < in->line->text + MAX_INPUT)
 		putchar(*p++);
 
 	int col = (in->head - in->window);
 
-	printf(MOVE(%d, %d), term_rows, col + 6);
+	printf(MOVE(%d, %d), _term_rows(), col + 6);
 	printf(CURSOR_SAVE);
 }
 
 static void
-draw_status(channel *c)
+_draw_status(channel *c)
 {
 	/* TODO: scrollback status */
 
@@ -546,42 +557,42 @@ draw_status(channel *c)
 	 * |-[usermodes]-[chancount chantype chanmodes]/[priv]-(latency)---...|
 	 * */
 
-	printf(MOVE(%d, 1) CLEAR_LINE, term_rows - 1);
+	printf(MOVE(%d, 1) CLEAR_LINE, _term_rows() - 1);
+
+	int ret;
+	unsigned int col = 0, cols = _term_cols();
 
 	/* Insufficient columns for meaningful status */
-	if (term_cols < 3)
+	if (cols < 3)
 		return;
 
 	printf(CLEAR_ATTRIBUTES);
 
 	/* Print status to temporary buffer */
-	char status_buff[term_cols + 1];
+	char status_buff[cols + 1];
 
-	int ret;
-	unsigned int col = 0;
-
-	memset(status_buff, 0, term_cols + 1);
+	memset(status_buff, 0, cols + 1);
 
 	/* -[usermodes] */
 	if (c->server && *c->server->usermodes) {
-		ret = snprintf(status_buff + col, term_cols - col + 1, "%s", HORIZONTAL_SEPARATOR "[+");
-		if (ret < 0 || (col += ret) >= term_cols)
+		ret = snprintf(status_buff + col, cols - col + 1, "%s", HORIZONTAL_SEPARATOR "[+");
+		if (ret < 0 || (col += ret) >= cols)
 			goto print_status;
 
-		ret = snprintf(status_buff + col, term_cols - col + 1, "%s", c->server->usermodes);
-		if (ret < 0 || (col += ret) >= term_cols)
+		ret = snprintf(status_buff + col, cols - col + 1, "%s", c->server->usermodes);
+		if (ret < 0 || (col += ret) >= cols)
 			goto print_status;
 
-		ret = snprintf(status_buff + col, term_cols - col + 1, "%s", "]");
-		if (ret < 0 || (col += ret) >= term_cols)
+		ret = snprintf(status_buff + col, cols - col + 1, "%s", "]");
+		if (ret < 0 || (col += ret) >= cols)
 			goto print_status;
 	}
 
 	/* If private chat buffer:
 	 * -[priv] */
 	if (c->buffer.type == BUFFER_PRIVATE) {
-		ret = snprintf(status_buff + col, term_cols - col + 1, "%s", HORIZONTAL_SEPARATOR "[priv]");
-		if (ret < 0 || (col += ret) >= term_cols)
+		ret = snprintf(status_buff + col, cols - col + 1, "%s", HORIZONTAL_SEPARATOR "[priv]");
+		if (ret < 0 || (col += ret) >= cols)
 			goto print_status;
 	}
 
@@ -589,33 +600,33 @@ draw_status(channel *c)
 	 * -[chancount chantype chanmodes] */
 	if (c->buffer.type == BUFFER_CHANNEL) {
 
-		ret = snprintf(status_buff + col, term_cols - col + 1,
+		ret = snprintf(status_buff + col, cols - col + 1,
 				HORIZONTAL_SEPARATOR "[%d", c->nick_count);
-		if (ret < 0 || (col += ret) >= term_cols)
+		if (ret < 0 || (col += ret) >= cols)
 			goto print_status;
 
 		if (c->type_flag) {
-			ret = snprintf(status_buff + col, term_cols - col + 1, " %c", c->type_flag);
-			if (ret < 0 || (col += ret) >= term_cols)
+			ret = snprintf(status_buff + col, cols - col + 1, " %c", c->type_flag);
+			if (ret < 0 || (col += ret) >= cols)
 				goto print_status;
 		}
 
 		if (*c->chanmodes) {
-			ret = snprintf(status_buff + col, term_cols - col + 1, " +%s", c->chanmodes);
-			if (ret < 0 || (col += ret) >= term_cols)
+			ret = snprintf(status_buff + col, cols - col + 1, " +%s", c->chanmodes);
+			if (ret < 0 || (col += ret) >= cols)
 				goto print_status;
 		}
 
-		ret = snprintf(status_buff + col, term_cols - col + 1, "%s", "]");
-		if (ret < 0 || (col += ret) >= term_cols)
+		ret = snprintf(status_buff + col, cols - col + 1, "%s", "]");
+		if (ret < 0 || (col += ret) >= cols)
 			goto print_status;
 	}
 
 	/* -(latency) */
 	if (c->server && c->server->latency_delta) {
-		ret = snprintf(status_buff + col, term_cols - col + 1,
+		ret = snprintf(status_buff + col, cols - col + 1,
 				HORIZONTAL_SEPARATOR "(%llds)", (long long) c->server->latency_delta);
-		if (ret < 0 || (col += ret) >= term_cols)
+		if (ret < 0 || (col += ret) >= cols)
 			goto print_status;
 	}
 
@@ -624,7 +635,7 @@ print_status:
 	printf("%s", status_buff);
 
 	/* Trailing separator */
-	while (col++ < term_cols)
+	while (col++ < cols)
 		printf(HORIZONTAL_SEPARATOR);
 }
 
