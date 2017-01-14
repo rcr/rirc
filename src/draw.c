@@ -75,11 +75,11 @@ static union
 		#define X(bit) unsigned int bit : 1;
 		DRAW_BITS
 		#undef X
-	};
-	unsigned int bits;
-} draw_bits;
+	} bits;
+	unsigned int all_bits;
+} _draw;
 
-#define X(BIT) void draw_##BIT(void) { draw_bits.BIT = 1; }
+#define X(BIT) void draw_##BIT(void) { _draw.bits.BIT = 1; }
 DRAW_BITS
 #undef X
 
@@ -101,13 +101,13 @@ draw_all(void)
 {
 	/* Set all bits to be redrawn */
 
-	draw_bits.bits = -1;
+	_draw.all_bits = -1;
 }
 
 void
 draw(void)
 {
-	if (!draw_bits.bits)
+	if (!_draw.all_bits)
 		return;
 
 	channel *c = current_channel();
@@ -119,17 +119,17 @@ draw(void)
 
 	printf(CURSOR_SAVE);
 
-	if (draw_bits.resize) _draw_resize();
-	if (draw_bits.buffer) _draw_buffer(&c->buffer,
+	if (_draw.bits.resize) _draw_resize();
+	if (_draw.bits.buffer) _draw_buffer(&c->buffer,
 		(struct coords) {
 			.c1 = 1,
 			.cN = _term_cols(),
 			.r1 = 3,
 			.rN = _term_rows() - 2
 		});
-	if (draw_bits.nav)    _draw_nav(c);
-	if (draw_bits.input)  _draw_input(c);
-	if (draw_bits.status) _draw_status(c);
+	if (_draw.bits.nav)    _draw_nav(c);
+	if (_draw.bits.input)  _draw_input(c);
+	if (_draw.bits.status) _draw_status(c);
 
 	printf(CLEAR_ATTRIBUTES);
 	printf(CURSOR_RESTORE);
@@ -138,7 +138,7 @@ no_draw:
 
 	fflush(stdout);
 
-	draw_bits.bits = 0;
+	_draw.all_bits = 0;
 }
 
 static void
@@ -559,6 +559,7 @@ _draw_status(channel *c)
 
 	printf(MOVE(%d, 1) CLEAR_LINE, _term_rows() - 1);
 
+	float sb;
 	int ret;
 	unsigned int col = 0, cols = _term_cols();
 
@@ -626,6 +627,14 @@ _draw_status(channel *c)
 	if (c->server && c->server->latency_delta) {
 		ret = snprintf(status_buff + col, cols - col + 1,
 				HORIZONTAL_SEPARATOR "(%llds)", (long long) c->server->latency_delta);
+		if (ret < 0 || (col += ret) >= cols)
+			goto print_status;
+	}
+
+	/* -(scrollback%) */
+	if ((sb = buffer_scrollback_status(&c->buffer))) {
+		ret = snprintf(status_buff + col, cols - col + 1,
+				HORIZONTAL_SEPARATOR "(%02d%%)", (int)(sb * 100));
 		if (ret < 0 || (col += ret) >= cols)
 			goto print_status;
 	}

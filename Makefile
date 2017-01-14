@@ -1,6 +1,6 @@
 CC = cc
-CFLAGS       = -std=c11 -Wall -Wextra -pedantic -O2
-CFLAGS_DEBUG = -std=c11 -Wall -Wextra -pedantic -O0 -g -DDEBUG
+CFLAGS       = -std=c99 -Wall -Wextra -pedantic -O2
+CFLAGS_DEBUG = -std=c99 -Wall -Wextra -pedantic -O0 -g -DDEBUG
 LDFLAGS      = -pthread
 
 # If using gcc for debug and sanitization, e.g.:
