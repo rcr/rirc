@@ -224,11 +224,11 @@ test_buffer_scrollback_status(void)
 {
 	/* Test retrieving buffer scrollback status */
 
-	struct buffer b = {
-		.head = (BUFFER_LINES_MAX / 2) - 1,
-		.tail = UINT_MAX - (BUFFER_LINES_MAX / 2),
-		.scrollback = b.tail
-	};
+	struct buffer b = buffer(BUFFER_OTHER);
+
+	b.head = (BUFFER_LINES_MAX / 2) - 1;
+	b.tail = UINT_MAX - (BUFFER_LINES_MAX / 2);
+	b.scrollback = b.tail;
 
 	assert_true(buffer_full(&b));
 
@@ -247,11 +247,11 @@ test_buffer_index_overflow(void)
 {
 	/* Test masked indexing after unsigned integer overflow */
 
-	struct buffer b = {
-		.head = UINT_MAX,
-		.tail = UINT_MAX - 1,
-		.scrollback = b.tail
-	};
+	struct buffer b = buffer(BUFFER_OTHER);
+
+	b.head = UINT_MAX;
+	b.tail = UINT_MAX - 1;
+	b.scrollback = b.tail;
 
 	assert_equals(buffer_size(&b), 1);
 	assert_equals(MASK(b.head), (BUFFER_LINES_MAX - 1));
@@ -319,13 +319,8 @@ test_buffer_line_rows(void)
 	/* Test calculating the number of rows a buffer line occupies */
 
 	struct buffer b = buffer(BUFFER_OTHER);
-	struct buffer_line *line;
 
-	char *text = "aa bb cc";
-
-	_buffer_newline(&b, text);
-
-	line = buffer_head(&b);
+	_buffer_newline(&b, "aa bb cc");
 
 	/* 1 column: 6 rows. word wrap skips whitespace prefix in line continuations:
 	 * a
@@ -335,7 +330,7 @@ test_buffer_line_rows(void)
 	 * c
 	 * c
 	 * */
-	assert_equals(buffer_line_rows(line, 1), 6);
+	assert_equals(buffer_line_rows(buffer_head(&b), 1), 6);
 
 	/* 4 columns: 3 rows:
 	 * 'aa b' -> wraps to
@@ -345,10 +340,10 @@ test_buffer_line_rows(void)
 	 *   'bb'
 	 *   'cc'
 	 * */
-	assert_equals(buffer_line_rows(line, 4), 3);
+	assert_equals(buffer_line_rows(buffer_head(&b), 4), 3);
 
 	/* Greater columns than length should always return one row */
-	assert_equals(buffer_line_rows(line, sizeof(text) + 1), 1);
+	assert_equals(buffer_line_rows(buffer_head(&b), buffer_head(&b)->text_len + 1), 1);
 
 	/* Test empty line should return at least 1 row */
 	_buffer_newline(&b, "");
