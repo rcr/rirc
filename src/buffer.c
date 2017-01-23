@@ -173,7 +173,7 @@ buffer_scrollback_status(struct buffer *b)
 	if (buffer_line(b, b->scrollback) == buffer_head(b))
 		return 0;
 
-	return (float)(b->head - b->scrollback) / (float)(BUFFER_LINES_MAX);
+	return (float)(b->head - b->scrollback) / (float)(buffer_size(b));
 }
 
 struct buffer
