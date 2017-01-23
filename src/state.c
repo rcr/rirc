@@ -313,13 +313,14 @@ buffer_scrollback_back(channel *c)
 {
 	/* Scroll a buffer back one page */
 
-	unsigned int count = 0,
+	struct buffer *b = &c->buffer;
+
+	unsigned int buffer_i = b->scrollback,
+	             count = 0,
 	             cols = _term_cols(),
 	             rows = _term_rows() - 4;
 
-	struct buffer *b = &c->buffer;
-
-	struct buffer_line *line = buffer_line(b, b->scrollback);
+	struct buffer_line *line = buffer_line(b, buffer_i);
 
 	/* Skip redraw */
 	if (line == buffer_tail(b))
@@ -329,14 +330,16 @@ buffer_scrollback_back(channel *c)
 	for (;;) {
 		count += buffer_line_rows(line, text_cols(b, line, cols));
 
-		if (line == buffer_tail(b))
-			break;
-
 		if (count >= rows)
 			break;
 
-		line = buffer_line(b, --b->scrollback);
+		if (line == buffer_tail(b))
+			return;
+
+		line = buffer_line(b, --buffer_i);
 	}
+
+	b->scrollback = buffer_i;
 
 	/* Top line is partial */
 	if (count == rows)
