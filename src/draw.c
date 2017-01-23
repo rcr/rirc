@@ -89,7 +89,6 @@ static void _draw_buffer_line(struct buffer_line*, struct coords, unsigned int, 
 static void _draw_buffer(struct buffer*, struct coords);
 static void _draw_input(channel*);
 static void _draw_nav(channel*);
-static void _draw_resize(void);
 static void _draw_status(channel*);
 
 static inline unsigned int nick_col(char*);
@@ -119,7 +118,6 @@ draw(void)
 
 	printf(CURSOR_SAVE);
 
-	if (_draw.bits.resize) _draw_resize();
 	if (_draw.bits.buffer) _draw_buffer(&c->buffer,
 		(struct coords) {
 			.c1 = 1,
@@ -139,24 +137,6 @@ no_draw:
 	fflush(stdout);
 
 	_draw.all_bits = 0;
-}
-
-static void
-_draw_resize(void)
-{
-	/* Terminal resize, clear and draw static components */
-
-	unsigned int cols = _term_cols();
-	unsigned int rows = _term_rows();
-
-	printf(CLEAR_FULL);
-	printf(CLEAR_ATTRIBUTES);
-
-	printf(MOVE(2, 1));
-	printf("%.*s", cols, (char *)(memset(alloca(cols), *HORIZONTAL_SEPARATOR, cols)));
-
-	printf(MOVE(%d, 1), rows);
-	printf("%.*s", cols, " >>> ");
 }
 
 static void
@@ -508,25 +488,31 @@ _draw_nav(channel *c)
 static void
 _draw_input(channel *c)
 {
+	unsigned int cols = _term_cols();
+	unsigned int rows = _term_rows();
+
+	printf(MOVE(%d, 1), rows);
+	printf("%.*s", cols, " >>> ");
+
 	/* Action messages override the input bar */
 	if (action_message) {
-		printf(MOVE(%d, 6) CLEAR_RIGHT FG(%d) "%s",
-				_term_rows(), INPUT_FG_NEUTRAL, action_message);
+		printf(CLEAR_RIGHT FG(%d) "%s",
+				INPUT_FG_NEUTRAL, action_message);
 		return;
 	}
 
-	unsigned int winsz = _term_cols() / 3;
+	unsigned int winsz = cols / 3;
 
 	input *in = c->input;
 
 	/* Reframe the input bar window */
-	if (in->head > (in->window + _term_cols() - 6))
+	if (in->head > (in->window + cols - 6))
 		in->window += winsz;
 	else if (in->head == in->window - 1)
 		in->window = (in->window - winsz > in->line->text)
 			? in->window - winsz : in->line->text;
 
-	printf(MOVE(%d, 6) CLEAR_RIGHT FG(%d), _term_rows(), INPUT_FG_NEUTRAL);
+	printf(CLEAR_RIGHT FG(%d), INPUT_FG_NEUTRAL);
 
 	char *p = in->window;
 	while (p < in->head)
@@ -534,7 +520,7 @@ _draw_input(channel *c)
 
 	p = in->tail;
 
-	char *end = in->tail + _term_cols() - 5 - (in->head - in->window);
+	char *end = in->tail + cols - 5 - (in->head - in->window);
 
 	while (p < end && p < in->line->text + MAX_INPUT)
 		putchar(*p++);
@@ -548,8 +534,6 @@ _draw_input(channel *c)
 static void
 _draw_status(channel *c)
 {
-	/* TODO: scrollback status */
-
 	/* server / private chat:
 	 * |-[usermodes]-(latency)---...|
 	 *
@@ -557,17 +541,22 @@ _draw_status(channel *c)
 	 * |-[usermodes]-[chancount chantype chanmodes]/[priv]-(latency)---...|
 	 * */
 
-	printf(MOVE(%d, 1) CLEAR_LINE, _term_rows() - 1);
-
 	float sb;
 	int ret;
-	unsigned int col = 0, cols = _term_cols();
+	unsigned int col = 0;
+	unsigned int cols = _term_cols();
+	unsigned int rows = _term_rows();
 
 	/* Insufficient columns for meaningful status */
 	if (cols < 3)
 		return;
 
 	printf(CLEAR_ATTRIBUTES);
+
+	printf(MOVE(2, 1));
+	printf("%.*s", cols, (char *)(memset(alloca(cols), *HORIZONTAL_SEPARATOR, cols)));
+
+	printf(MOVE(%d, 1) CLEAR_LINE, rows - 1);
 
 	/* Print status to temporary buffer */
 	char status_buff[cols + 1];

@@ -10,7 +10,6 @@ void draw(void);
 	X(buffer) \
 	X(input)  \
 	X(nav)    \
-	X(resize) \
 	X(status)
 
 /* Function prototypes for setting draw bits */
