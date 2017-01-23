@@ -122,7 +122,7 @@ buffer_line_rows(struct buffer_line *line, unsigned int w)
 void
 buffer_newline(struct buffer *b, enum buffer_line_t type, const char *from, const char *text)
 {
-	struct buffer_line *l = buffer_push(b);
+	struct buffer_line *line;
 
 	if (from == NULL)
 		fatal("from is NULL");
@@ -131,8 +131,10 @@ buffer_newline(struct buffer *b, enum buffer_line_t type, const char *from, cons
 		fatal("text is NULL");
 
 	size_t remainder_len = 0,
-	       text_len = strlen(text),
-	       from_len = strlen(from);
+	       from_len = strlen(from),
+	       text_len = strlen(text);
+
+	line = memset(buffer_push(b), 0, sizeof(*line));
 
 	/* Split overlength lines into continuations */
 	if (text_len > TEXT_LENGTH_MAX) {
@@ -144,19 +146,17 @@ buffer_newline(struct buffer *b, enum buffer_line_t type, const char *from, cons
 	if (from_len > FROM_LENGTH_MAX)
 		from_len = FROM_LENGTH_MAX;
 
-	memcpy(l->from, from, from_len);
-	memcpy(l->text, text, text_len);
+	memcpy(line->from, from, from_len);
+	memcpy(line->text, text, text_len);
 
-	*(l->from + from_len) = '\0';
-	*(l->text + text_len) = '\0';
+	*(line->from + from_len) = '\0';
+	*(line->text + text_len) = '\0';
 
-	l->from_len = from_len;
-	l->text_len = text_len;
+	line->from_len = from_len;
+	line->text_len = text_len;
 
-	l->time = time(NULL);
-	l->type = type;
-	l->_rows = 0;
-	l->_w = 0;
+	line->time = time(NULL);
+	line->type = type;
 
 	if (from_len > b->pad)
 		b->pad = from_len;
@@ -174,60 +174,6 @@ buffer_scrollback_status(struct buffer *b)
 		return 0;
 
 	return (float)(b->head - b->scrollback) / (float)(BUFFER_LINES_MAX);
-}
-
-int
-buffer_page_back(struct buffer *b, unsigned int rows, unsigned int cols)
-{
-	unsigned int r;
-
-	if (!rows)
-		fatal("rows are 0");
-
-	if (!cols)
-		fatal("cols are 0");
-
-	/* Should always go back at least one line */
-	while (buffer_line(b, b->scrollback) != buffer_tail(b)) {
-
-		b->scrollback--;
-
-		r = buffer_line_rows(&b->buffer_lines[MASK(b->scrollback)], cols);
-
-		if (r > rows)
-			return 1;
-
-		rows -= r;
-	}
-
-	return 0;
-}
-
-int
-buffer_page_forw(struct buffer *b, unsigned int rows, unsigned int cols)
-{
-	unsigned int r;
-
-	if (!rows)
-		fatal("rows are 0");
-
-	if (!cols)
-		fatal("cols are 0");
-
-	while (buffer_line(b, b->scrollback) != buffer_head(b)) {
-
-		b->scrollback++;
-
-		r = buffer_line_rows(&b->buffer_lines[MASK(b->scrollback)], cols);
-
-		if (r > rows)
-			return 1;
-
-		rows -= r;
-	}
-
-
-	return 0;
 }
 
 struct buffer

@@ -18,4 +18,6 @@ void draw(void);
 DRAW_BITS
 #undef X
 
+unsigned int text_cols(struct buffer*, struct buffer_line*, unsigned int);
+
 #endif

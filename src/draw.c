@@ -667,6 +667,12 @@ header_cols(struct buffer *b, struct buffer_line *line, unsigned int cols)
 	return header_w;
 }
 
+unsigned int
+text_cols(struct buffer *b, struct buffer_line *line, unsigned int cols)
+{
+	return cols - header_cols(b, line, cols);
+}
+
 static inline void
 check_coords(struct coords coords)
 {

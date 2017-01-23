@@ -351,20 +351,6 @@ test_buffer_line_rows(void)
 	assert_equals(buffer_line_rows(buffer_head(&b), 1), 1);
 }
 
-static void
-test_buffer_page_back(void)
-{
-	/* Test scrolling a buffer backwards */
-	; /* TODO */
-}
-
-static void
-test_buffer_page_forw(void)
-{
-	/* Test scrolling a buffer forward */
-	; /* TODO */
-}
-
 int
 main(void)
 {
@@ -378,8 +364,6 @@ main(void)
 		TESTCASE(test_buffer_index_overflow),
 		TESTCASE(test_buffer_line_overlength),
 		TESTCASE(test_buffer_line_rows),
-		TESTCASE(test_buffer_page_back),
-		TESTCASE(test_buffer_page_forw)
 	};
 
 	return run_tests(tests);

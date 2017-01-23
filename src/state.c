@@ -313,14 +313,37 @@ buffer_scrollback_back(channel *c)
 {
 	/* Scroll a buffer back one page */
 
-	/* FIXME: new buffer scrollback */
-	//buffer_page_back(struct buffer*, unsigned int, unsigned int);
-	//buffer_page_forw(struct buffer*, unsigned int, unsigned int);
+	unsigned int count = 0,
+	             cols = _term_cols(),
+	             rows = _term_rows() - 4;
 
+	struct buffer *b = &c->buffer;
 
-	UNUSED(c);
+	struct buffer_line *line = buffer_line(b, b->scrollback);
+
+	/* Skip redraw */
+	if (line == buffer_tail(b))
+		return;
+
+	/* Find top line */
+	for (;;) {
+		count += buffer_line_rows(line, text_cols(b, line, cols));
+
+		if (line == buffer_tail(b))
+			break;
+
+		if (count >= rows)
+			break;
+
+		line = buffer_line(b, --b->scrollback);
+	}
+
+	/* Top line is partial */
+	if (count == rows)
+		b->scrollback--;
 
 	draw_buffer();
+	draw_status();
 }
 
 void
@@ -328,10 +351,36 @@ buffer_scrollback_forw(channel *c)
 {
 	/* Scroll a buffer forward one page */
 
-	/* FIXME: new buffer scrollback */
-	UNUSED(c);
+	unsigned int count = 0,
+	             cols = _term_cols(),
+	             rows = _term_rows() - 4;
+
+	struct buffer *b = &c->buffer;
+
+	struct buffer_line *line = buffer_line(b, b->scrollback);
+
+	/* Skip redraw */
+	if (line == buffer_head(b))
+		return;
+
+	/* Find top line */
+	for (;;) {
+		count += buffer_line_rows(line, text_cols(b, line, cols));
+
+		if (line == buffer_head(b))
+			break;
+
+		if (count >= rows)
+			break;
+
+		line = buffer_line(b, ++b->scrollback);
+	}
+
+	if (count == rows)
+		b->scrollback++;
 
 	draw_buffer();
+	draw_status();
 }
 
 void
