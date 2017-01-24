@@ -317,6 +317,7 @@ buffer_scrollback_back(channel *c)
 
 	unsigned int buffer_i = b->scrollback,
 	             count = 0,
+				 text_w,
 	             cols = _term_cols(),
 	             rows = _term_rows() - 4;
 
@@ -328,7 +329,10 @@ buffer_scrollback_back(channel *c)
 
 	/* Find top line */
 	for (;;) {
-		count += buffer_line_rows(line, text_cols(b, line, cols));
+
+		split_buffer_cols(line, NULL, &text_w, cols, b->pad);
+
+		count += buffer_line_rows(line, text_w);
 
 		if (count >= rows)
 			break;
@@ -355,6 +359,7 @@ buffer_scrollback_forw(channel *c)
 	/* Scroll a buffer forward one page */
 
 	unsigned int count = 0,
+				 text_w,
 	             cols = _term_cols(),
 	             rows = _term_rows() - 4;
 
@@ -368,7 +373,10 @@ buffer_scrollback_forw(channel *c)
 
 	/* Find top line */
 	for (;;) {
-		count += buffer_line_rows(line, text_cols(b, line, cols));
+
+		split_buffer_cols(line, NULL, &text_w, cols, b->pad);
+
+		count += buffer_line_rows(line, text_w);
 
 		if (line == buffer_head(b))
 			break;

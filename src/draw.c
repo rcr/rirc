@@ -85,14 +85,13 @@ DRAW_BITS
 
 static int _draw_fmt(char*, size_t*, size_t*, size_t*, int, const char*, ...);
 
-static void _draw_buffer_line(struct buffer_line*, struct coords, unsigned int, unsigned int, unsigned int);
+static void _draw_buffer_line(struct buffer_line*, struct coords, unsigned int, unsigned int, unsigned int, unsigned int);
 static void _draw_buffer(struct buffer*, struct coords);
 static void _draw_input(channel*);
 static void _draw_nav(channel*);
 static void _draw_status(channel*);
 
 static inline unsigned int nick_col(char*);
-static inline unsigned int header_cols(struct buffer*, struct buffer_line*, unsigned int);
 static inline void check_coords(struct coords);
 
 void
@@ -139,14 +138,17 @@ no_draw:
 	_draw.all_bits = 0;
 }
 
+/* FIXME: works except when it doesn't.
+ *
+ * Fails when line headers are very long compared to text. tests/draw.c needed */
 static void
 _draw_buffer_line(
 		struct buffer_line *line,
 		struct coords coords,
-		unsigned int header_w,
+		unsigned int head_w,
+		unsigned int text_w,
 		unsigned int skip,
-		unsigned int pad
-)
+		unsigned int pad)
 {
 	check_coords(coords);
 
@@ -155,8 +157,6 @@ _draw_buffer_line(
 	     *p1 = line->text,
 	     *p2 = line->text + line->text_len;
 
-	unsigned int text_w = (coords.cN - coords.c1 + 1) - header_w;
-
 	if (skip == 0) {
 
 		/* Print the line header
@@ -164,45 +164,45 @@ _draw_buffer_line(
 		 * Since formatting codes don't occupy columns, enough space
 		 * should be allocated for all such sequences
 		 * */
-		char header[header_w + sizeof(FG(255) BG(255)) * 4 + 1];
+		char header[head_w + sizeof(FG(255) BG(255)) * 4 + 1];
 
 		struct tm *line_tm = localtime(&line->time);
 
 		size_t buff_n = sizeof(header) - 1,
 		       offset = 0,
-		       text_n = header_w - 1;
+		       head_n = head_w - 1;
 
-		if (!_draw_fmt(header, &offset, &buff_n, &text_n, 0,
+		if (!_draw_fmt(header, &offset, &buff_n, &head_n, 0,
 				FG(%d) BG_R, BUFFER_LINE_HEADER_FG_NEUTRAL))
 			goto print_header;
 
-		if (!_draw_fmt(header, &offset, &buff_n, &text_n, 1,
+		if (!_draw_fmt(header, &offset, &buff_n, &head_n, 1,
 				" %02d:%02d ", line_tm->tm_hour, line_tm->tm_min))
 			goto print_header;
 
-		if (!_draw_fmt(header, &offset, &buff_n, &text_n, 1,
-				"%.*s", (int)(pad - line->from_len), " "))
+		if (!_draw_fmt(header, &offset, &buff_n, &head_n, 1,
+				"%*s", pad, ""))
 			goto print_header;
 
-		if (!_draw_fmt(header, &offset, &buff_n, &text_n, 0,
+		if (!_draw_fmt(header, &offset, &buff_n, &head_n, 0,
 				FG_R BG_R))
 			goto print_header;
 
 		switch (line->type) {
 			case BUFFER_LINE_OTHER:
-				if (!_draw_fmt(header, &offset, &buff_n, &text_n, 0,
+				if (!_draw_fmt(header, &offset, &buff_n, &head_n, 0,
 						FG(%d), BUFFER_LINE_HEADER_FG_NEUTRAL))
 					goto print_header;
 				break;
 
 			case BUFFER_LINE_CHAT:
-				if (!_draw_fmt(header, &offset, &buff_n, &text_n, 0,
+				if (!_draw_fmt(header, &offset, &buff_n, &head_n, 0,
 						FG(%d), nick_col(line->from)))
 					goto print_header;
 				break;
 
 			case BUFFER_LINE_PINGED:
-				if (!_draw_fmt(header, &offset, &buff_n, &text_n, 0,
+				if (!_draw_fmt(header, &offset, &buff_n, &head_n, 0,
 						FG(%d) BG(%d), BUFFER_LINE_HEADER_FG_PINGED, BUFFER_LINE_HEADER_BG_PINGED))
 					goto print_header;
 				break;
@@ -211,16 +211,8 @@ _draw_buffer_line(
 				break;
 		}
 
-		if (!_draw_fmt(header, &offset, &buff_n, &text_n, 1,
+		if (!_draw_fmt(header, &offset, &buff_n, &head_n, 1,
 				"%s", line->from))
-			goto print_header;
-
-		if (!_draw_fmt(header, &offset, &buff_n, &text_n, 0,
-				FG(%d) BG_R, BUFFER_LINE_HEADER_FG_NEUTRAL))
-			goto print_header;
-
-		if (!_draw_fmt(header, &offset, &buff_n, &text_n, 1,
-				" " VERTICAL_SEPARATOR))
 			goto print_header;
 
 print_header:
@@ -228,22 +220,34 @@ print_header:
 		printf(MOVE(%d, 1) "%s " CLEAR_ATTRIBUTES, coords.r1, header);
 	}
 
-	printf(FG(%d) BG_R, line->text[0] == QUOTE_CHAR
-		? BUFFER_LINE_TEXT_FG_GREEN
-		: BUFFER_LINE_TEXT_FG_NEUTRAL);
-
 	while (skip--)
 		word_wrap(text_w, &p1, p2);
 
-	while (*p1 && coords.r1 <= coords.rN) {
+	do {
+		char *sep = " "VERTICAL_SEPARATOR" ";
 
-		printf(MOVE(%d, %d), coords.r1++, header_w);
+		if ((coords.cN - coords.c1) >= sizeof(*sep) + text_w) {
+			printf(MOVE(%d, %d), coords.r1, (int)(coords.cN - (sizeof(*sep) + text_w + 1)));
+			printf(FG(%d) BG_R, BUFFER_LINE_HEADER_FG_NEUTRAL);
+			puts(sep);
+		}
 
-		print_p1 = p1;
-		print_p2 = word_wrap(text_w, &p1, p2);
+		if (*p1) {
+			printf(MOVE(%d, %d), coords.r1, head_w);
 
-		printf("%.*s", (int)(print_p2 - print_p1), print_p1);
-	}
+			print_p1 = p1;
+			print_p2 = word_wrap(text_w, &p1, p2);
+
+			printf(FG(%d) BG_R, line->text[0] == QUOTE_CHAR
+				? BUFFER_LINE_TEXT_FG_GREEN
+				: BUFFER_LINE_TEXT_FG_NEUTRAL);
+
+			printf("%.*s", (int)(print_p2 - print_p1), print_p1);
+		}
+
+		coords.r1++;
+
+	} while (*p1 && coords.r1 <= coords.rN);
 }
 
 static void
@@ -293,7 +297,8 @@ _draw_buffer(struct buffer *b, struct coords coords)
 	unsigned int col_total = coords.cN - coords.c1 + 1;
 
 	unsigned int buffer_i = b->scrollback,
-	             header_w;
+	             head_w,
+	             text_w;
 
 	/* Clear the buffer area */
 	for (row = coords.r1; row <= coords.rN; row++)
@@ -309,7 +314,10 @@ _draw_buffer(struct buffer *b, struct coords coords)
 
 	/* Find top line */
 	for (;;) {
-		row_count += buffer_line_rows(line, col_total - header_cols(b, line, col_total));
+
+		split_buffer_cols(line, NULL, &text_w, col_total, b->pad);
+
+		row_count += buffer_line_rows(line, text_w);
 
 		if (line == tail)
 			break;
@@ -323,17 +331,18 @@ _draw_buffer(struct buffer *b, struct coords coords)
 	/* Handle impartial top line print */
 	if (row_count > row_total) {
 
-		header_w = header_cols(b, line, col_total);
+		split_buffer_cols(line, &head_w, &text_w, col_total, b->pad);
 
 		_draw_buffer_line(
 			line,
 			coords,
-			header_w,
+			head_w,
+			text_w,
 			row_count - row_total,
-			b->pad
+			BUFFER_PADDING ? (b->pad - line->from_len) : 0
 		);
 
-		coords.r1 += buffer_line_rows(line, col_total - header_w) - (row_count - row_total);
+		coords.r1 += buffer_line_rows(line, text_w) - (row_count - row_total);
 
 		if (line == head)
 			return;
@@ -344,17 +353,18 @@ _draw_buffer(struct buffer *b, struct coords coords)
 	/* Draw all remaining lines */
 	while (coords.r1 <= coords.rN) {
 
-		header_w = header_cols(b, line, col_total);
+		split_buffer_cols(line, &head_w, &text_w, col_total, b->pad);
 
 		_draw_buffer_line(
 			line,
 			coords,
-			header_w,
+			head_w,
+			text_w,
 			0,
-			b->pad
+			BUFFER_PADDING ? (b->pad - line->from_len) : 0
 		);
 
-		coords.r1 += buffer_line_rows(line, col_total - header_w);
+		coords.r1 += buffer_line_rows(line, text_w);
 
 		if (line == head)
 			return;
@@ -637,31 +647,6 @@ print_status:
 		printf(HORIZONTAL_SEPARATOR);
 }
 
-static inline unsigned int
-header_cols(struct buffer *b, struct buffer_line *line, unsigned int cols)
-{
-	/* Return the number of columns in cols to be occupied by buffer line text */
-
-	unsigned int header_w = sizeof(" HH:MM   ~ ");
-
-	if (BUFFER_PADDING)
-		header_w += b->pad;
-	else
-		header_w += line->from_len;
-
-	/* If header won't fit, split in half */
-	if (header_w >= cols)
-		return cols / 2;
-
-	return header_w;
-}
-
-unsigned int
-text_cols(struct buffer *b, struct buffer_line *line, unsigned int cols)
-{
-	return cols - header_cols(b, line, cols);
-}
-
 static inline void
 check_coords(struct coords coords)
 {
@@ -736,4 +721,32 @@ _draw_fmt(char *buff, size_t *offset, size_t *buff_n, size_t *text_n, int txt, c
 	*buff_n -= _ret;
 
 	return 1;
+}
+
+void
+split_buffer_cols(
+	struct buffer_line *line,
+	unsigned int *head_w,
+	unsigned int *text_w,
+	unsigned int cols,
+	unsigned int pad)
+{
+	unsigned int _head_w = sizeof(" HH:MM   "VERTICAL_SEPARATOR" ");
+
+	if (BUFFER_PADDING)
+		_head_w += pad;
+	else
+		_head_w += line->from_len;
+
+	/* If header won't fit, split in half */
+	if (_head_w >= cols)
+		_head_w = cols / 2;
+
+	//TODO: why?
+	_head_w -= 1;
+
+	if (head_w)
+		*head_w = _head_w;
+	if (text_w)
+		*text_w = cols - _head_w + 1;
 }

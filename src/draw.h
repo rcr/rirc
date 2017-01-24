@@ -17,6 +17,6 @@ void draw(void);
 DRAW_BITS
 #undef X
 
-unsigned int text_cols(struct buffer*, struct buffer_line*, unsigned int);
+void split_buffer_cols(struct buffer_line*, unsigned int*, unsigned int*, unsigned int, unsigned int);
 
 #endif
