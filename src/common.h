@@ -12,7 +12,6 @@
 #define NICKSIZE 255
 
 #define BUFFSIZE 512
-#define MODE_SIZE (26 * 2) + 1 /* Supports modes [az-AZ] */
 
 /* When tab completing a nick at the beginning of the line, append the following char */
 #define TAB_COMPLETE_DELIMITER ':'
@@ -29,13 +28,6 @@
 /* Message sent for PART and QUIT by default */
 #define DEFAULT_QUIT_MESG "rirc v" VERSION
 
-/* Translate defined values to strings at compile time */
-#define TO_STR(X) #X
-#define STR(X) TO_STR(X)
-
-/* Suppress 'unused parameter' warnings */
-#define UNUSED(X) ((void)(X))
-
 /* Buffer bar activity types */
 typedef enum
 {
@@ -45,63 +37,9 @@ typedef enum
 	ACTIVITY_T_SIZE
 } activity_t;
 
-/* Channel */
-typedef struct channel
-{
-	activity_t active;
-	char *name;
-	char type_flag;
-	char chanmodes[MODE_SIZE];
-	int nick_count;
-	int parted;
-	struct buffer buffer;
-	struct channel *next;
-	struct channel *prev;
-	struct avl_node *nicklist;
-	struct server *server;
-	struct input *input;
-} channel;
-
-/* Server */
-typedef struct server
-{
-	char *host;
-	char input[BUFFSIZE];
-	char *iptr;
-	char nick[NICKSIZE + 1];
-	char *nicks;
-	char *nptr;
-	char *port;
-	char *join;
-	char usermodes[MODE_SIZE];
-	int soc;
-	int pinging;
-	struct avl_node *ignore;
-	struct channel *channel;
-	struct server *next;
-	struct server *prev;
-	time_t latency_delta;
-	time_t latency_time;
-	time_t reconnect_delta;
-	time_t reconnect_time;
-	void *connecting;
-} server;
-
-/* rirc.c */
-extern struct config
-{
-	int join_part_quit_threshold;
-	char *username;
-	char *realname;
-	char *default_nick;
-} config;
-
-/* mesg.c */
-void init_mesg(void);
-void free_mesg(void);
-void recv_mesg(char*, int, server*);
-void send_mesg(char*, channel*);
-void send_paste(char*);
-extern avl_node* commands;
+#include "channel.h"
+#include "server.h"
+#include "mesg.h"
+#include "rirc.h"
 
 #endif
