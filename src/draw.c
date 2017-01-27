@@ -69,20 +69,6 @@ struct coords
 	unsigned int rN;
 };
 
-static union
-{
-	struct {
-		#define X(bit) unsigned int bit : 1;
-		DRAW_BITS
-		#undef X
-	} bits;
-	unsigned int all_bits;
-} _draw;
-
-#define X(BIT) void draw_##BIT(void) { _draw.bits.BIT = 1; }
-DRAW_BITS
-#undef X
-
 static int _draw_fmt(char*, size_t*, size_t*, size_t*, int, const char*, ...);
 
 static void _draw_buffer_line(struct buffer_line*, struct coords, unsigned int, unsigned int, unsigned int, unsigned int);
@@ -95,17 +81,9 @@ static inline unsigned int nick_col(char*);
 static inline void check_coords(struct coords);
 
 void
-draw_all(void)
+draw(union draw draw)
 {
-	/* Set all bits to be redrawn */
-
-	_draw.all_bits = -1;
-}
-
-void
-draw(void)
-{
-	if (!_draw.all_bits)
+	if (!draw.all_bits)
 		return;
 
 	channel *c = current_channel();
@@ -117,16 +95,16 @@ draw(void)
 
 	printf(CURSOR_SAVE);
 
-	if (_draw.bits.buffer) _draw_buffer(&c->buffer,
+	if (draw.bits.buffer) _draw_buffer(&c->buffer,
 		(struct coords) {
 			.c1 = 1,
 			.cN = _term_cols(),
 			.r1 = 3,
 			.rN = _term_rows() - 2
 		});
-	if (_draw.bits.nav)    _draw_nav(c);
-	if (_draw.bits.input)  _draw_input(c);
-	if (_draw.bits.status) _draw_status(c);
+	if (draw.bits.nav)    _draw_nav(c);
+	if (draw.bits.input)  _draw_input(c);
+	if (draw.bits.status) _draw_status(c);
 
 	printf(CLEAR_ATTRIBUTES);
 	printf(CURSOR_RESTORE);
@@ -134,8 +112,6 @@ draw(void)
 no_draw:
 
 	fflush(stdout);
-
-	_draw.all_bits = 0;
 }
 
 /* FIXME: works except when it doesn't.

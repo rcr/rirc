@@ -52,4 +52,13 @@ void part_channel(channel*);
 void reset_channel(channel*);
 void server_set_mode(server*, const char*);
 
+/* TODO: refactor, should be static in state */
+/* Function prototypes for setting draw bits */
+#define X(bit) void draw_##bit(void);
+DRAW_BITS
+#undef X
+void draw_all(void);
+
+void redraw(void);
+
 #endif

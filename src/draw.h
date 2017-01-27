@@ -1,10 +1,6 @@
 #ifndef DRAW_H
 #define DRAW_H
 
-/* Draw all components */
-void draw_all(void);
-void draw(void);
-
 /* Draw component, e.g. draw_buffer(); */
 #define DRAW_BITS \
 	X(buffer) \
@@ -12,11 +8,17 @@ void draw(void);
 	X(nav)    \
 	X(status)
 
-/* Function prototypes for setting draw bits */
-#define X(bit) void draw_##bit(void);
-DRAW_BITS
-#undef X
+union draw
+{
+	struct {
+		#define X(bit) unsigned int bit : 1;
+		DRAW_BITS
+		#undef X
+	} bits;
+	unsigned int all_bits;
+};
 
+void draw(union draw);
 void split_buffer_cols(struct buffer_line*, unsigned int*, unsigned int*, unsigned int, unsigned int);
 
 #endif

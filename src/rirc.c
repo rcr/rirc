@@ -253,7 +253,6 @@ main_loop(void)
 			resize();
 		}
 
-		/* Redraw the ui (skipped if nothing has changed) */
-		draw();
+		redraw();
 	}
 }
