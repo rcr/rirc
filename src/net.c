@@ -317,10 +317,6 @@ threaded_connect_cleanup(void *arg)
 		freeaddrinfo(servinfo);
 }
 
-//TODO:
-#define DISCONNECT_KILL  (1 << 0)
-#define DISCONNECT_ERROR (1 << 1)
-//server_disconnect(server *s, char *mesg, int flags)
 void
 server_disconnect(server *s, int err, int kill, char *mesg)
 {

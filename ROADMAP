@@ -1,7 +1,13 @@
 TODO
 ---------------------------
 
-Implement a mesg.c test framework before adding new message types, then:
+real todo
+
+Overarching roadmap, check gmail, figure this out, clear roadmap for the
+next major tasks:
+
+split common.h, split avl from utils
+
 ----------------------
 	/HELP [type]
 		show available commands.
@@ -53,11 +59,11 @@ Implement a mesg.c test framework before adding new message types, then:
 		 (e.g.: /raw MODE <not my nick> <flag>
 ----------------------
 
-show something other than the ping time when attempting to reconnect
+disconnected and ctrl-x channel segfaults, when closing disconnected channels
+
+show connect eta intead of ping when reconnecting
 
 show disconnected/parted in status bar for channels instead of 0 user count
-
-show scrollback % or x/y lines in the status bar
 
 Keep state of tab complete for successively getting the next nick lexicographically
 
@@ -69,22 +75,12 @@ Parsing 004/005 numeric for server specific configuration
 	-> parse PREFIX=(abc)xyz and use this to fix mode messages that are setting,
 	   for example, channel +o when the arg is a username in the channel
 
-buffer logging
-
-Nickserv stuff
-
-colorize output by linetype
-
-Tests for all the send_*, recv_* handlers
-	- split all the handlers out into mesg.c and move all net unrelated functions into
-	  ui.c so they can be mocked in test cases. Ideally the only interface to mesg.c
-	  would be send_mesg & recv_mesg
-	- ui.c and draw.c would be separate; draw.c is strictly responsible for drawing to stdout,
-	  while ui.c is responsible for all stateful user interactions
-
 Reimplement the pasting stuff that was broken
 
-A way to unset current topic
+Implement generic command arguments
+	/<cmd> -arg
+e.g.
+	/topic -unset
 
 FIXME:
 ---------------------------
@@ -94,6 +90,8 @@ when disconnected and reconnected, PING/PONG seems to be out of sync?
 I broke the activity colouring stuff:
 	join/part/quit sets activity (it shouldnt)
 	message and ping dont set activity (they should)
+
+Reimplement getting args as arg(&parsed_mesg)
 
 Some servers place single args in the trailing section, eg: JOIN :channel vs JOIN channel
 which forces the handlers to check p->params and p->trailing, however since p->params
