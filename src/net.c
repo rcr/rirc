@@ -22,8 +22,7 @@
 #include <netinet/in.h>
 #endif
 
-#include "common.h"
-#include "state.h"
+#include "net.h"
 
 #define SERVER_TIMEOUT_S 255 /* Latency time at which a server is considered to be timed out and a disconnect is issued */
 #define SERVER_LATENCY_S 125 /* Latency time at which to begin showing in the status bar */
@@ -317,10 +316,6 @@ threaded_connect_cleanup(void *arg)
 		freeaddrinfo(servinfo);
 }
 
-//TODO:
-#define DISCONNECT_KILL  (1 << 0)
-#define DISCONNECT_ERROR (1 << 1)
-//server_disconnect(server *s, char *mesg, int flags)
 void
 server_disconnect(server *s, int err, int kill, char *mesg)
 {

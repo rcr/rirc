@@ -13,8 +13,8 @@
 #include <stdio.h>
 #include <sys/ioctl.h>
 
-#include "common.h"
 #include "state.h"
+#include "draw.h"
 
 /* State of rirc */
 static struct
@@ -26,6 +26,8 @@ static struct
 
 	unsigned int term_cols;
 	unsigned int term_rows;
+
+	union draw draw;
 } state;
 
 static int action_close_server(char);
@@ -37,6 +39,22 @@ channel* default_channel(void) { return state.default_channel; }
 
 unsigned int _term_cols(void) { return state.term_cols; }
 unsigned int _term_rows(void) { return state.term_rows; }
+
+/* Set draw bits */
+#define X(BIT) void draw_##BIT(void) { state.draw.bits.BIT = 1; }
+DRAW_BITS
+#undef X
+
+/* Set all draw bits */
+void draw_all(void) { state.draw.all_bits = -1; }
+
+void
+redraw(void)
+{
+	draw(state.draw);
+
+	state.draw.all_bits = 0;
+}
 
 void
 resize(void)

@@ -18,7 +18,8 @@
 #include <string.h>
 #include <unistd.h>
 
-#include "common.h"
+//TODO:
+#include "input.h"
 #include "state.h"
 
 /* Max number of characters accepted in user pasted input */
@@ -30,7 +31,6 @@
 /* Max length of user action message */
 #define MAX_ACTION_MESG 256
 
-/* extern in common.h */
 char *action_message;
 
 /* Static buffer that accepts input from stdin */

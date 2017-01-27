@@ -12,7 +12,6 @@
 #include <stdlib.h>
 #include <termios.h>
 
-#include "common.h"
 #include "state.h"
 
 #define opt_error(MESG) \
@@ -253,7 +252,6 @@ main_loop(void)
 			resize();
 		}
 
-		/* Redraw the ui (skipped if nothing has changed) */
-		draw();
+		redraw();
 	}
 }
