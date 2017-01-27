@@ -1,12 +1,10 @@
 TODO
 ---------------------------
 
-real todo
-
-Overarching roadmap, check gmail, figure this out, clear roadmap for the
-next major tasks:
-
-split common.h, split avl from utils
+Continue refactoring:
+	- Move/split components (e.g. server, channel, input, etc):
+		src/components/*.{c,h}
+	- Untangle headers
 
 ----------------------
 	/HELP [type]
