@@ -1,7 +1,17 @@
 #ifndef INPUT_H
 #define INPUT_H
 
+#include "rirc.h"
 #include "utils.h"
+
+/* When tab completing a nick at the beginning of the line, append the following char */
+#define TAB_COMPLETE_DELIMITER ':'
+
+/* Compile time checks */
+#if BUFFSIZE < MAX_INPUT
+/* Required so input lines can be safely strcpy'ed into a send buffer */
+#error BUFFSIZE must be greater than MAX_INPUT
+#endif
 
 //FIXME:
 #define SCROLLBACK_INPUT 15

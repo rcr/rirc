@@ -1,6 +1,7 @@
 #ifndef SERVER_H
 #define SERVER_H
 
+#include "rirc.h"
 #include "channel.h"
 
 /* TODO: refactor -> server.c */
