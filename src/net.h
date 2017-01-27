@@ -1,7 +1,6 @@
 #ifndef NET_H
 #define NET_H
 
-#include "common.h"
 #include "state.h"
 
 #define RECONNECT_DELTA 15

@@ -1,7 +1,10 @@
 #ifndef STATE_H
 #define STATE_H
 
+#include "draw.h"
 #include "buffer.h"
+#include "server.h"
+#include "mesg.h"
 #include "input.h"
 #include "net.h"
 

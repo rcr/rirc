@@ -13,7 +13,6 @@
 #include <stdio.h>
 #include <sys/ioctl.h>
 
-#include "common.h"
 #include "state.h"
 #include "draw.h"
 

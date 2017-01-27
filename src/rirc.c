@@ -12,7 +12,6 @@
 #include <stdlib.h>
 #include <termios.h>
 
-#include "common.h"
 #include "state.h"
 
 #define opt_error(MESG) \

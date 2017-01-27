@@ -10,7 +10,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "common.h"
 #include "state.h"
 
 /* FIXME: this has to be included after common.h for activity cols */

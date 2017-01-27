@@ -19,7 +19,6 @@
 #include <unistd.h>
 
 //TODO:
-#include "common.h"
 #include "input.h"
 #include "state.h"
 
@@ -32,7 +31,6 @@
 /* Max length of user action message */
 #define MAX_ACTION_MESG 256
 
-/* extern in common.h */
 char *action_message;
 
 /* Static buffer that accepts input from stdin */
