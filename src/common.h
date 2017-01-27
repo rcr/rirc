@@ -10,9 +10,6 @@
 
 #define MAX_SERVERS 32
 
-//FIXME:
-#define SCROLLBACK_INPUT 15
-#define MAX_INPUT 256
 #define NICKSIZE 255
 
 #define BUFFSIZE 512
@@ -41,33 +38,6 @@
 /* Suppress 'unused parameter' warnings */
 #define UNUSED(X) ((void)(X))
 
-/* Doubly linked list macros */
-#define DLL_NEW(L, N) ((L) = (N)->next = (N)->prev = (N))
-
-#define DLL_ADD(L, N) \
-	do { \
-		if ((L) == NULL) \
-			DLL_NEW(L, N); \
-		else { \
-			((L)->next)->prev = (N); \
-			(N)->next = ((L)->next); \
-			(N)->prev = (L); \
-			(L)->next = (N); \
-		} \
-	} while (0)
-
-#define DLL_DEL(L, N) \
-	do { \
-		if (((N)->next) == (N)) \
-			(L) = NULL; \
-		else { \
-			if ((L) == N) \
-				(L) = ((N)->next); \
-			((N)->next)->prev = ((N)->prev); \
-			((N)->prev)->next = ((N)->next); \
-		} \
-	} while (0)
-
 /* Buffer bar activity types */
 typedef enum
 {
@@ -76,26 +46,6 @@ typedef enum
 	ACTIVITY_PINGED,
 	ACTIVITY_T_SIZE
 } activity_t;
-
-/* Channel input line */
-typedef struct input_line
-{
-	char *end;
-	char text[MAX_INPUT];
-	struct input_line *next;
-	struct input_line *prev;
-} input_line;
-
-/* Channel input */
-typedef struct input
-{
-	char *head;
-	char *tail;
-	char *window;
-	unsigned int count;
-	struct input_line *line;
-	struct input_line *list_head;
-} input;
 
 /* Channel */
 typedef struct channel
@@ -154,13 +104,6 @@ server* get_server_head(void);
 void check_servers(void);
 void server_connect(char*, char*, char*, char*);
 void server_disconnect(server*, int, int, char*);
-
-/* input.c */
-input* new_input(void);
-void action(int(*)(char), const char*, ...);
-void free_input(input*);
-void poll_input(void);
-extern char *action_message;
 
 /* mesg.c */
 void init_mesg(void);

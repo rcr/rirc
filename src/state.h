@@ -1,6 +1,8 @@
 #ifndef STATE_H
 #define STATE_H
 
+#include "input.h"
+
 /* state.h
  *
  * Interface for retrieving and altering global state of the program */

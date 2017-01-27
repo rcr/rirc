@@ -18,7 +18,9 @@
 #include <string.h>
 #include <unistd.h>
 
+//TODO:
 #include "common.h"
+#include "input.h"
 #include "state.h"
 
 /* Max number of characters accepted in user pasted input */
