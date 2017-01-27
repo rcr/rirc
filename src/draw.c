@@ -502,7 +502,10 @@ _draw_input(channel *c)
 	unsigned int rows = _term_rows();
 
 	printf(MOVE(%d, 1), rows);
+	printf(FG(%d) BG_R, BUFFER_LINE_HEADER_FG_NEUTRAL);
 	printf("%.*s", cols, " >>> ");
+
+	printf(CLEAR_ATTRIBUTES);
 
 	/* Action messages override the input bar */
 	if (action_message) {
