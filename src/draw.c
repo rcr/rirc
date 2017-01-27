@@ -12,6 +12,7 @@
 
 #include "common.h"
 #include "state.h"
+
 /* FIXME: this has to be included after common.h for activity cols */
 #include "../config.h"
 

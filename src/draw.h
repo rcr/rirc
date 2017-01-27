@@ -1,6 +1,8 @@
 #ifndef DRAW_H
 #define DRAW_H
 
+#include "buffer.h"
+
 /* Draw component, e.g. draw_buffer(); */
 #define DRAW_BITS \
 	X(buffer) \

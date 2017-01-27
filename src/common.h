@@ -2,7 +2,6 @@
 #define COMMON_H
 
 /* FIXME: refactoring */
-#include "buffer.h"
 #include "draw.h"
 #include "utils.h"
 
@@ -13,7 +12,6 @@
 #define NICKSIZE 255
 
 #define BUFFSIZE 512
-#define RECONNECT_DELTA 15
 #define MODE_SIZE (26 * 2) + 1 /* Supports modes [az-AZ] */
 
 /* When tab completing a nick at the beginning of the line, append the following char */
@@ -97,13 +95,6 @@ extern struct config
 	char *realname;
 	char *default_nick;
 } config;
-
-/* net.c */
-int sendf(char*, server*, const char*, ...);
-server* get_server_head(void);
-void check_servers(void);
-void server_connect(char*, char*, char*, char*);
-void server_disconnect(server*, int, int, char*);
 
 /* mesg.c */
 void init_mesg(void);

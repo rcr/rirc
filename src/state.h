@@ -1,7 +1,9 @@
 #ifndef STATE_H
 #define STATE_H
 
+#include "buffer.h"
 #include "input.h"
+#include "net.h"
 
 /* state.h
  *
