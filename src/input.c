@@ -698,7 +698,7 @@ tab_complete(input *inp)
 {
 	/* Case insensitive tab complete for commands and nicks */
 
-	const avl_node *n;
+	const struct avl_node *n;
 	const char *match, *str = inp->head;
 	size_t len = 0;
 

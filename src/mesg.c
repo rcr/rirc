@@ -95,7 +95,7 @@ HANDLED_SEND_CMDS
 #undef X
 
 /* extern in common.h */
-avl_node* commands;
+struct avl_node* commands;
 
 /* Handler for errors deemed fatal to a server's state */
 static void server_fatal(server*, char*, ...);
@@ -194,7 +194,7 @@ send_mesg(char *mesg, channel *chan)
 	 */
 
 	char *cmd_str, errbuff[MAX_ERROR];
-	const avl_node *cmd;
+	const struct avl_node *cmd;
 	int err = 0;
 
 	if (*mesg == '/') {

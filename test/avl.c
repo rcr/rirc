@@ -6,7 +6,7 @@
  * */
 
 static int
-_avl_count(avl_node *n)
+_avl_count(struct avl_node *n)
 {
 	/* Count the number of nodes in a tree */
 
@@ -17,7 +17,7 @@ _avl_count(avl_node *n)
 }
 
 static int
-_avl_is_binary(avl_node *n)
+_avl_is_binary(struct avl_node *n)
 {
 	if (n == NULL)
 		return 1;
@@ -32,7 +32,7 @@ _avl_is_binary(avl_node *n)
 }
 
 static int
-_avl_height(avl_node *n)
+_avl_height(struct avl_node *n)
 {
 	if (n == NULL)
 		return 0;
@@ -49,7 +49,7 @@ test_avl(void)
 {
 	/* Test AVL tree functions */
 
-	avl_node *root = NULL;
+	struct avl_node *root = NULL;
 
 	/* Insert strings a-z, zz-za, aa-az to hopefully excersize all combinations of rotations */
 	const char **ptr, *strings[] = {
