@@ -698,7 +698,6 @@ tab_complete(input *inp)
 {
 	/* Case insensitive tab complete for commands and nicks */
 
-	const struct avl_node *n;
 	const char *match, *str = inp->head;
 	size_t len = 0;
 
@@ -717,6 +716,7 @@ tab_complete(input *inp)
 	/* Check if tab completing a command at the beginning of the buffer */
 	if (*str == '/' && str == inp->line->text) {
 		/* Command tab completion */
+		const struct avl_node *n;
 
 		if ((n = avl_get(commands, ++str, --len))) {
 
@@ -733,23 +733,27 @@ tab_complete(input *inp)
 			/* For commands, append a space */
 			input_char(' ');
 		}
-	} else if ((n = avl_get(ccur->nicklist, str, len))) {
+	} else { 
 		/* Nick tab completion */
+		const struct nick *n;
 
-		match = n->key;
+		if ((n = nicklist_get(&(ccur->nicklist), str, len))) {
 
-		/* Since matching is case insensitive, delete the prefix */
-		while (len--)
-			delete_left(inp);
+			match = n->nick;
 
-		/* Then insert the matching string */
-		while (*match && input_char(*match++))
-			; /* do nothing */
+			/* Since matching is case insensitive, delete the prefix */
+			while (len--)
+				delete_left(inp);
 
-		/* Tab completing first word in input, append delimiter and space */
-		if (str == inp->line->text) {
-			input_char(TAB_COMPLETE_DELIMITER);
-			input_char(' ');
+			/* Then insert the matching string */
+			while (*match && input_char(*match++))
+				; /* do nothing */
+
+			/* Tab completing first word in input, append delimiter and space */
+			if (str == inp->line->text) {
+				input_char(TAB_COMPLETE_DELIMITER);
+				input_char(' ');
+			}
 		}
 	}
 }

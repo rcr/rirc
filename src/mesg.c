@@ -848,12 +848,10 @@ recv_join(char *err, parsed_mesg *p, server *s)
 		if ((c = channel_get(chan, s)) == NULL)
 			failf("JOIN: channel '%s' not found", chan);
 
-		if (!avl_add(&(c->nicklist), p->from, NULL))
+		if (!nicklist_add(&(c->nicklist), p->from))
 			failf("JOIN: nick '%s' already in '%s'", p->from, chan);
 
-		c->nick_count++;
-
-		if (c->nick_count < config.join_part_quit_threshold)
+		if (c->nicklist.count < config.join_part_quit_threshold)
 			newlinef(c, 0, ">", "%s!%s has joined %s", p->from, p->hostinfo, chan);
 
 		draw_status();
@@ -900,10 +898,8 @@ recv_kick(char *err, parsed_mesg *p, server *s)
 			newlinef(c, 0, "--", "You've been kicked by %s", p->from, user);
 	} else {
 
-		if (!avl_del(&c->nicklist, user))
+		if (!nicklist_del(&(c->nicklist), user))
 			failf("KICK: nick '%s' not found in '%s'", user, chan);
-
-		c->nick_count--;
 
 		if (p->trailing)
 			newlinef(c, 0, "--", "%s has kicked %s (%s)", p->from, user, p->trailing);
@@ -976,7 +972,7 @@ recv_mode(char *err, parsed_mesg *p, server *s)
 			c = s->channel;
 
 			do {
-				if (avl_get(c->nicklist, targ, strlen(targ)))
+				if (nicklist_get(&(c->nicklist), targ, 0))
 					/* [<user> set ]<target> mode: [<mode>][ <modeparams>] */
 					newlinef(c, 0, "--", "%s%s%s mode: [%s%s%s]",
 						(p->from ? p->from : ""),
@@ -1014,8 +1010,8 @@ recv_nick(char *err, parsed_mesg *p, server *s)
 
 	channel *c = s->channel;
 	do {
-		if (avl_del(&c->nicklist, p->from)) {
-			avl_add(&c->nicklist, nick, NULL);
+		if (nicklist_del(&(c->nicklist), p->from)) {
+			nicklist_add(&(c->nicklist), nick);
 			newlinef(c, 0, "--", "%s  >>  %s", p->from, nick);
 		}
 	} while ((c = c->next) != s->channel);
@@ -1219,8 +1215,8 @@ num_200:
 		while ((nick = getarg(&p->trailing, " "))) {
 			if (*nick == '@' || *nick == '+')
 				nick++;
-			if (avl_add(&c->nicklist, nick, NULL))
-				c->nick_count++;
+
+			nicklist_add(&(c->nicklist), nick);
 		}
 
 		draw_status();
@@ -1382,12 +1378,10 @@ recv_part(char *err, parsed_mesg *p, server *s)
 	if ((c = channel_get(targ, s)) == NULL)
 		failf("PART: channel '%s' not found", targ);
 
-	if (!avl_del(&c->nicklist, p->from))
+	if (!nicklist_del(&(c->nicklist), p->from))
 		failf("PART: nick '%s' not found in '%s'", p->from, targ);
 
-	c->nick_count--;
-
-	if (c->nick_count < config.join_part_quit_threshold) {
+	if (c->nicklist.count < config.join_part_quit_threshold) {
 		if (p->trailing)
 			newlinef(c, 0, "<", "%s!%s has left %s (%s)", p->from, p->hostinfo, targ, p->trailing);
 		else
@@ -1485,9 +1479,8 @@ recv_quit(char *err, parsed_mesg *p, server *s)
 
 	channel *c = s->channel;
 	do {
-		if (avl_del(&c->nicklist, p->from)) {
-			c->nick_count--;
-			if (c->nick_count < config.join_part_quit_threshold) {
+		if (nicklist_del(&(c->nicklist), p->from)) {
+			if (c->nicklist.count < config.join_part_quit_threshold) {
 				if (p->trailing)
 					newlinef(c, 0, "<", "%s!%s has quit (%s)", p->from, p->hostinfo, p->trailing);
 				else

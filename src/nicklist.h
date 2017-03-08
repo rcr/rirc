@@ -18,10 +18,10 @@ struct nick
 	char nick[];
 };
 
-int nicklist_add(struct nicklist*, char*);
-int nicklist_del(struct nicklist*, char*);
+int nicklist_add(struct nicklist*, const char*);
+int nicklist_del(struct nicklist*, const char*);
 
-struct nick* nicklist_get(struct nicklist*, char*, size_t);
+struct nick* nicklist_get(struct nicklist*, const char*, size_t);
 
 void nicklist_free(struct nicklist*);
 

@@ -20,10 +20,10 @@
 
 extern struct config
 {
-	int join_part_quit_threshold;
 	char *username;
 	char *realname;
 	char *default_nick;
+	unsigned int join_part_quit_threshold;
 } config;
 
 #endif

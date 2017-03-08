@@ -580,7 +580,7 @@ _draw_status(channel *c)
 	if (c->buffer.type == BUFFER_CHANNEL) {
 
 		ret = snprintf(status_buff + col, cols - col + 1,
-				HORIZONTAL_SEPARATOR "[%d", c->nick_count);
+				HORIZONTAL_SEPARATOR "[%d", c->nicklist.count);
 		if (ret < 0 || (col += ret) >= cols)
 			goto print_status;
 

@@ -3,8 +3,9 @@
 #define UNUSED(X) ((void)(X))
 
 int
-nicklist_add(struct nicklist *l, char *nick)
+nicklist_add(struct nicklist *l, const char *nick)
 {
+	/* TODO: increment nicklist.count if successful */
 	UNUSED(l);
 	UNUSED(nick);
 
@@ -12,8 +13,9 @@ nicklist_add(struct nicklist *l, char *nick)
 }
 
 int
-nicklist_del(struct nicklist *l, char *nick)
+nicklist_del(struct nicklist *l, const char *nick)
 {
+	/* TODO: decrement nicklist.count if successful */
 	UNUSED(l);
 	UNUSED(nick);
 
@@ -21,7 +23,7 @@ nicklist_del(struct nicklist *l, char *nick)
 }
 
 struct nick*
-nicklist_get(struct nicklist *l, char *nick, size_t len)
+nicklist_get(struct nicklist *l, const char *nick, size_t len)
 {
 	UNUSED(l);
 	UNUSED(nick);
