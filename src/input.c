@@ -34,7 +34,7 @@
 char *action_message;
 
 /* Static buffer that accepts input from stdin */
-static char input_buff[MAX_PASTE];
+static char input_buff[MAX_PASTE + 1];
 
 /* Buffer to hold paste message while waiting for confirmation, includes room for \r\n */
 static char paste_buff[MAX_INPUT + MAX_PASTE + (2 * MAX_PASTE_LINES)];
