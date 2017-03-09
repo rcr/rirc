@@ -478,7 +478,10 @@ _draw_input(channel *c)
 	unsigned int rows = _term_rows();
 
 	printf(MOVE(%d, 1), rows);
+	printf(FG(%d) BG_R, BUFFER_LINE_HEADER_FG_NEUTRAL);
 	printf("%.*s", cols, " >>> ");
+
+	printf(CLEAR_ATTRIBUTES);
 
 	/* Action messages override the input bar */
 	if (action_message) {
@@ -577,7 +580,7 @@ _draw_status(channel *c)
 	if (c->buffer.type == BUFFER_CHANNEL) {
 
 		ret = snprintf(status_buff + col, cols - col + 1,
-				HORIZONTAL_SEPARATOR "[%d", c->nick_count);
+				HORIZONTAL_SEPARATOR "[%d", c->nicklist.count);
 		if (ret < 0 || (col += ret) >= cols)
 			goto print_status;
 

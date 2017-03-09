@@ -34,7 +34,7 @@
 char *action_message;
 
 /* Static buffer that accepts input from stdin */
-static char input_buff[MAX_PASTE];
+static char input_buff[MAX_PASTE + 1];
 
 /* Buffer to hold paste message while waiting for confirmation, includes room for \r\n */
 static char paste_buff[MAX_INPUT + MAX_PASTE + (2 * MAX_PASTE_LINES)];
@@ -698,7 +698,6 @@ tab_complete(input *inp)
 {
 	/* Case insensitive tab complete for commands and nicks */
 
-	const avl_node *n;
 	const char *match, *str = inp->head;
 	size_t len = 0;
 
@@ -715,28 +714,21 @@ tab_complete(input *inp)
 		len++, str--;
 
 	/* Check if tab completing a command at the beginning of the buffer */
-	if (*str == '/' && str == inp->line->text) {
+	if (*str == '/' && str == inp->line->text && (match = avl_get(commands, ++str, --len)->key)) {
 		/* Command tab completion */
 
-		if ((n = avl_get(commands, ++str, --len))) {
+		/* Since matching is case insensitive, delete the prefix */
+		while (len--)
+			delete_left(inp);
 
-			match = n->key;
+		/* Then insert the matching string */
+		while (*match && input_char(*match++))
+			; /* do nothing */
 
-			/* Since matching is case insensitive, delete the prefix */
-			while (len--)
-				delete_left(inp);
-
-			/* Then insert the matching string */
-			while (*match && input_char(*match++))
-				; /* do nothing */
-
-			/* For commands, append a space */
-			input_char(' ');
-		}
-	} else if ((n = avl_get(ccur->nicklist, str, len))) {
+		/* For commands, append a space */
+		input_char(' ');
+	} else if ((match = nicklist_get(&(ccur->nicklist), str, len))) {
 		/* Nick tab completion */
-
-		match = n->key;
 
 		/* Since matching is case insensitive, delete the prefix */
 		while (len--)

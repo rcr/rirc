@@ -1,11 +1,28 @@
-/* TODO: first split AVL into a generic?
- *
- * extend avl to track a nicklist
- *
- * 'deep' copy a nicklist as a message type when printed by ignore/unignore/nicks
- * as a message type and associate a way to print that
- *
- * otherwise just implement add/remove/query
- *
- * add flags as char[128]
- * */
+#ifndef NICKLIST_H
+#define NICKLIST_H
+
+#include "avl.h"
+
+struct nicklist
+{
+	struct avl_node *root;
+
+	unsigned int count;
+};
+
+struct nick
+{
+	struct avl_node n;
+
+	size_t len;
+	char nick[];
+};
+
+int nicklist_add(struct nicklist*, const char*);
+int nicklist_del(struct nicklist*, const char*);
+
+const char* nicklist_get(struct nicklist*, const char*, size_t);
+
+void nicklist_free(struct nicklist*);
+
+#endif

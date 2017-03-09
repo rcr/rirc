@@ -42,7 +42,7 @@ typedef struct connection_thread {
 	int socket_tmp;
 	char *host;
 	char *port;
-	char error[MAX_ERROR];
+	char error[MAX_ERROR + 1];
 	char ipstr[INET6_ADDRSTRLEN];
 	pthread_t tid;
 } connection_thread;

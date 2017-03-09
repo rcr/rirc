@@ -173,7 +173,8 @@ new_channel(char *name, server *server, channel *chanlist, enum buffer_t type)
 void
 free_channel(channel *c)
 {
-	free_avl(c->nicklist);
+	nicklist_free(&(c->nicklist));
+
 	free_input(c->input);
 	free(c->name);
 	free(c);
@@ -242,10 +243,7 @@ reset_channel(channel *c)
 {
 	memset(c->chanmodes, 0, MODE_SIZE);
 
-	free_avl(c->nicklist);
-
-	c->nick_count = 0;
-	c->nicklist = NULL;
+	nicklist_free(&(c->nicklist));
 }
 
 void

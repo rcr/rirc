@@ -4,18 +4,18 @@
 #include <string.h>
 
 /* AVL tree node */
-typedef struct avl_node
+struct avl_node
 {
 	int height;
 	struct avl_node *l;
 	struct avl_node *r;
 	char *key;
 	void *val;
-} avl_node;
+};
 
-const avl_node* avl_get(avl_node*, const char*, size_t);
-int avl_add(avl_node**, const char*, void*);
-int avl_del(avl_node**, const char*);
-void free_avl(avl_node*);
+const struct avl_node* avl_get(struct avl_node*, const char*, size_t);
+int avl_add(struct avl_node**, const char*, void*);
+int avl_del(struct avl_node**, const char*);
+void free_avl(struct avl_node*);
 
 #endif

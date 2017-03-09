@@ -12,18 +12,18 @@
 //FIXME:
 static jmp_buf jmpbuf;
 
-static avl_node* _avl_add(avl_node*, const char*, void*);
-static avl_node* _avl_del(avl_node*, const char*);
-static avl_node* _avl_get(avl_node*, const char*, size_t);
-static avl_node* avl_new_node(const char*, void*);
-static void avl_free_node(avl_node*);
-static avl_node* avl_rotate_L(avl_node*);
-static avl_node* avl_rotate_R(avl_node*);
+static struct avl_node* _avl_add(struct avl_node*, const char*, void*);
+static struct avl_node* _avl_del(struct avl_node*, const char*);
+static struct avl_node* _avl_get(struct avl_node*, const char*, size_t);
+static struct avl_node* avl_new_node(const char*, void*);
+static void avl_free_node(struct avl_node*);
+static struct avl_node* avl_rotate_L(struct avl_node*);
+static struct avl_node* avl_rotate_R(struct avl_node*);
 
 /* AVL tree functions */
 
 void
-free_avl(avl_node *n)
+free_avl(struct avl_node *n)
 {
 	/* Recusrively free an AVL tree */
 
@@ -36,7 +36,7 @@ free_avl(avl_node *n)
 }
 
 int
-avl_add(avl_node **n, const char *key, void *val)
+avl_add(struct avl_node **n, const char *key, void *val)
 {
 	/* Entry point for adding a node to an AVL tree */
 
@@ -49,7 +49,7 @@ avl_add(avl_node **n, const char *key, void *val)
 }
 
 int
-avl_del(avl_node **n, const char *key)
+avl_del(struct avl_node **n, const char *key)
 {
 	/* Entry point for removing a node from an AVL tree */
 
@@ -61,8 +61,8 @@ avl_del(avl_node **n, const char *key)
 	return 1;
 }
 
-const avl_node*
-avl_get(avl_node *n, const char *key, size_t len)
+const struct avl_node*
+avl_get(struct avl_node *n, const char *key, size_t len)
 {
 	/* Entry point for fetching an avl node with prefix key */
 
@@ -72,10 +72,10 @@ avl_get(avl_node *n, const char *key, size_t len)
 	return _avl_get(n, key, len);
 }
 
-static avl_node*
+static struct avl_node*
 avl_new_node(const char *key, void *val)
 {
-	avl_node *n;
+	struct avl_node *n;
 
 	if ((n = calloc(1, sizeof(*n))) == NULL)
 		fatal("calloc");
@@ -88,15 +88,15 @@ avl_new_node(const char *key, void *val)
 }
 
 static void
-avl_free_node(avl_node *n)
+avl_free_node(struct avl_node *n)
 {
 	free(n->key);
 	free(n->val);
 	free(n);
 }
 
-static avl_node*
-avl_rotate_R(avl_node *r)
+static struct avl_node*
+avl_rotate_R(struct avl_node *r)
 {
 	/* Rotate right for root r and pivot p
 	 *
@@ -108,8 +108,8 @@ avl_rotate_R(avl_node *r)
 	 *
 	 */
 
-	avl_node *p = r->l;
-	avl_node *b = p->r;
+	struct avl_node *p = r->l;
+	struct avl_node *b = p->r;
 
 	p->r = r;
 	r->l = b;
@@ -120,8 +120,8 @@ avl_rotate_R(avl_node *r)
 	return p;
 }
 
-static avl_node*
-avl_rotate_L(avl_node *r)
+static struct avl_node*
+avl_rotate_L(struct avl_node *r)
 {
 	/* Rotate left for root r and pivot p
 	 *
@@ -133,8 +133,8 @@ avl_rotate_L(avl_node *r)
 	 *
 	 */
 
-	avl_node *p = r->r;
-	avl_node *b = p->l;
+	struct avl_node *p = r->r;
+	struct avl_node *b = p->l;
 
 	p->l = r;
 	r->r = b;
@@ -145,8 +145,8 @@ avl_rotate_L(avl_node *r)
 	return p;
 }
 
-static avl_node*
-_avl_add(avl_node *n, const char *key, void *val)
+static struct avl_node*
+_avl_add(struct avl_node *n, const char *key, void *val)
 {
 	/* Recursively add key to an AVL tree.
 	 *
@@ -196,8 +196,8 @@ _avl_add(avl_node *n, const char *key, void *val)
 	return n;
 }
 
-static avl_node*
-_avl_del(avl_node *n, const char *key)
+static struct avl_node*
+_avl_del(struct avl_node *n, const char *key)
 {
 	/* Recursive function for deleting nodes from an AVL tree
 	 *
@@ -216,13 +216,13 @@ _avl_del(avl_node *n, const char *key)
 			/* Recursively delete nodes with both children to ensure balance */
 
 			/* Find the next largest value in the tree (the leftmost node in the right subtree) */
-			avl_node *next = n->r;
+			struct avl_node *next = n->r;
 
 			while (next->l)
 				next = next->l;
 
 			/* Swap it's value with the node being deleted */
-			avl_node t = *n;
+			struct avl_node t = *n;
 
 			n->key = next->key;
 			n->val = next->val;
@@ -234,7 +234,7 @@ _avl_del(avl_node *n, const char *key)
 
 		} else {
 			/* If n has a child, return it */
-			avl_node *tmp = (n->l) ? n->l : n->r;
+			struct avl_node *tmp = (n->l) ? n->l : n->r;
 
 			avl_free_node(n);
 
@@ -277,8 +277,8 @@ _avl_del(avl_node *n, const char *key)
 	return n;
 }
 
-static avl_node*
-_avl_get(avl_node *n, const char *key, size_t len)
+static struct avl_node*
+_avl_get(struct avl_node *n, const char *key, size_t len)
 {
 	/* Case insensitive search for a node whose value is prefixed by key */
 
