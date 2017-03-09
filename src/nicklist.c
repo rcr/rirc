@@ -1,13 +1,17 @@
 #include "nicklist.h"
 
-#define UNUSED(X) ((void)(X))
+/* TODO:
+ * redesigning how avl trees are used, testing with nicklist
+ * abstractions
+ * */
 
 int
 nicklist_add(struct nicklist *l, const char *nick)
 {
-	/* TODO: increment nicklist.count if successful */
-	UNUSED(l);
-	UNUSED(nick);
+	if (avl_add(&(l->root), nick, NULL)) {
+		l->count++;
+		return 1;
+	}
 
 	return 0;
 }
@@ -15,25 +19,25 @@ nicklist_add(struct nicklist *l, const char *nick)
 int
 nicklist_del(struct nicklist *l, const char *nick)
 {
-	/* TODO: decrement nicklist.count if successful */
-	UNUSED(l);
-	UNUSED(nick);
+	if (avl_del(&(l->root), nick)) {
+		l->count--;
+		return 1;
+	}
 
 	return 0;
 }
 
-struct nick*
+//TODO: return struct nick*
+const char*
 nicklist_get(struct nicklist *l, const char *nick, size_t len)
 {
-	UNUSED(l);
-	UNUSED(nick);
-	UNUSED(len);
-
-	return NULL;
+	return avl_get(l->root, nick, len)->key;
 }
 
 void
 nicklist_free(struct nicklist *l)
 {
-	UNUSED(l);
+	free_avl(l->root);
+	l->root = NULL;
+	l->count = 0;
 }

@@ -714,46 +714,34 @@ tab_complete(input *inp)
 		len++, str--;
 
 	/* Check if tab completing a command at the beginning of the buffer */
-	if (*str == '/' && str == inp->line->text) {
+	if (*str == '/' && str == inp->line->text && (match = avl_get(commands, ++str, --len)->key)) {
 		/* Command tab completion */
-		const struct avl_node *n;
 
-		if ((n = avl_get(commands, ++str, --len))) {
+		/* Since matching is case insensitive, delete the prefix */
+		while (len--)
+			delete_left(inp);
 
-			match = n->key;
+		/* Then insert the matching string */
+		while (*match && input_char(*match++))
+			; /* do nothing */
 
-			/* Since matching is case insensitive, delete the prefix */
-			while (len--)
-				delete_left(inp);
-
-			/* Then insert the matching string */
-			while (*match && input_char(*match++))
-				; /* do nothing */
-
-			/* For commands, append a space */
-			input_char(' ');
-		}
-	} else { 
+		/* For commands, append a space */
+		input_char(' ');
+	} else if ((match = nicklist_get(&(ccur->nicklist), str, len))) {
 		/* Nick tab completion */
-		const struct nick *n;
 
-		if ((n = nicklist_get(&(ccur->nicklist), str, len))) {
+		/* Since matching is case insensitive, delete the prefix */
+		while (len--)
+			delete_left(inp);
 
-			match = n->nick;
+		/* Then insert the matching string */
+		while (*match && input_char(*match++))
+			; /* do nothing */
 
-			/* Since matching is case insensitive, delete the prefix */
-			while (len--)
-				delete_left(inp);
-
-			/* Then insert the matching string */
-			while (*match && input_char(*match++))
-				; /* do nothing */
-
-			/* Tab completing first word in input, append delimiter and space */
-			if (str == inp->line->text) {
-				input_char(TAB_COMPLETE_DELIMITER);
-				input_char(' ');
-			}
+		/* Tab completing first word in input, append delimiter and space */
+		if (str == inp->line->text) {
+			input_char(TAB_COMPLETE_DELIMITER);
+			input_char(' ');
 		}
 	}
 }
