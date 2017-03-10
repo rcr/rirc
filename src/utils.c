@@ -96,6 +96,10 @@ irc_isnickchar(const char c)
 	return (c == '-' || (c >= 0x30 && c <= 0x39) || (c >= 0x41 && c <= 0x7D));
 }
 
+/* TODO:
+ * - char *[] for args, remove getarg from message handling
+ * - don't set \0s until message format is determined to be valid, for error reporting
+ * - analogous function for parsing ctcp messages */
 parsed_mesg*
 parse(parsed_mesg *p, char *mesg)
 {
