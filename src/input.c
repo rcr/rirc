@@ -33,9 +33,6 @@
 
 char *action_message;
 
-/* Static buffer that accepts input from stdin */
-static char input_buff[MAX_PASTE + 1];
-
 /* Buffer to hold paste message while waiting for confirmation, includes room for \r\n */
 static char paste_buff[MAX_INPUT + MAX_PASTE + (2 * MAX_PASTE_LINES)];
 static size_t paste_len;
@@ -144,6 +141,8 @@ poll_input(void)
 	int ret;
 	int timeout_ms = 200;
 
+	char input_buff[MAX_PASTE + 1];
+
 	struct pollfd stdin_fd[] = {{ .fd = STDIN_FILENO, .events = POLLIN }};
 
 	if ((ret = poll(stdin_fd, 1, timeout_ms)) < 0 && errno != EINTR)
@@ -158,6 +157,8 @@ poll_input(void)
 
 		if (count == 0)
 			fatal("stdin closed");
+
+		*(input_buff + count) = '\0';
 
 		/* Waiting for user action, ignore everything else */
 		 if (action_message)
