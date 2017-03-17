@@ -33,9 +33,6 @@
 
 char *action_message;
 
-/* Static buffer that accepts input from stdin */
-static char input_buff[MAX_PASTE + 1];
-
 /* Buffer to hold paste message while waiting for confirmation, includes room for \r\n */
 static char paste_buff[MAX_INPUT + MAX_PASTE + (2 * MAX_PASTE_LINES)];
 static size_t paste_len;
@@ -144,6 +141,8 @@ poll_input(void)
 	int ret;
 	int timeout_ms = 200;
 
+	char input_buff[MAX_PASTE + 1];
+
 	struct pollfd stdin_fd[] = {{ .fd = STDIN_FILENO, .events = POLLIN }};
 
 	if ((ret = poll(stdin_fd, 1, timeout_ms)) < 0 && errno != EINTR)
@@ -153,11 +152,14 @@ poll_input(void)
 
 		ssize_t count;
 
-		if ((count = read(STDIN_FILENO, input_buff, MAX_PASTE)) < 0 && errno != EINTR)
-			fatal("read");
+		while ((count = read(STDIN_FILENO, input_buff, MAX_PASTE)) < 0)
+			if (errno != EINTR)
+				fatal("read");
 
 		if (count == 0)
 			fatal("stdin closed");
+
+		*(input_buff + count) = '\0';
 
 		/* Waiting for user action, ignore everything else */
 		 if (action_message)
@@ -701,6 +703,8 @@ tab_complete(input *inp)
 	const char *match, *str = inp->head;
 	size_t len = 0;
 
+	struct avl_node *n;
+
 	/* Don't tab complete at beginning of line or if previous character is space */
 	if (inp->head == inp->line->text || *(inp->head - 1) == ' ')
 		return;
@@ -714,8 +718,10 @@ tab_complete(input *inp)
 		len++, str--;
 
 	/* Check if tab completing a command at the beginning of the buffer */
-	if (*str == '/' && str == inp->line->text && (match = avl_get(commands, ++str, --len)->key)) {
+	if (*str == '/' && str == inp->line->text && (n = avl_get(commands, ++str, --len))) {
 		/* Command tab completion */
+
+		match = n->key;
 
 		/* Since matching is case insensitive, delete the prefix */
 		while (len--)
