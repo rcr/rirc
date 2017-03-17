@@ -152,8 +152,9 @@ poll_input(void)
 
 		ssize_t count;
 
-		if ((count = read(STDIN_FILENO, input_buff, MAX_PASTE)) < 0 && errno != EINTR)
-			fatal("read");
+		while ((count = read(STDIN_FILENO, input_buff, MAX_PASTE)) < 0)
+			if (errno != EINTR)
+				fatal("read");
 
 		if (count == 0)
 			fatal("stdin closed");
