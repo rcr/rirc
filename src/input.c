@@ -703,7 +703,7 @@ tab_complete(input *inp)
 	const char *match, *str = inp->head;
 	size_t len = 0;
 
-	struct avl_node *n;
+	const struct avl_node *n;
 
 	/* Don't tab complete at beginning of line or if previous character is space */
 	if (inp->head == inp->line->text || *(inp->head - 1) == ' ')
