@@ -12,7 +12,9 @@
 #include <stdlib.h>
 #include <termios.h>
 
+#include "input.h"
 #include "state.h"
+#include "utils.h"
 
 #define opt_error(MESG) \
 	do { puts((MESG)); exit(EXIT_FAILURE); } while (0);

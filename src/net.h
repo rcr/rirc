@@ -1,7 +1,7 @@
 #ifndef NET_H
 #define NET_H
 
-#include "state.h"
+#include "server.h"
 
 #define RECONNECT_DELTA 15
 

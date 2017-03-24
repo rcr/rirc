@@ -2,6 +2,7 @@
 #include <ctype.h>
 #include <stdlib.h>
 #include <stdarg.h>
+#include <string.h>
 #include <strings.h>
 
 #include "utils.h"

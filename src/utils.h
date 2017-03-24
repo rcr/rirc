@@ -2,7 +2,6 @@
 #define UTILS_H
 
 #include <errno.h>
-#include "avl.h"
 
 /* Parsed IRC message */
 typedef struct parsed_mesg

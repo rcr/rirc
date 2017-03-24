@@ -31,7 +31,7 @@ nicklist_del(struct nicklist *l, const char *nick)
 const char*
 nicklist_get(struct nicklist *l, const char *nick, size_t len)
 {
-	struct avl_node *n;
+	const struct avl_node *n;
 
 	if ((n = avl_get(l->root, nick, len)))
 		return n->key;

@@ -6,8 +6,8 @@
 #include "avl.h"
 #include "utils.h"
 
-#define H(N) (N == NULL ? 0 : N->height)
-#define MAX(A, B) (A > B ? A : B)
+#define H(N) ((N) == NULL ? 0 : (N)->height)
+#define MAX(A, B) ((A) > (B) ? (A) : (B))
 
 //FIXME:
 static jmp_buf jmpbuf;

@@ -6,6 +6,7 @@
 #include <sys/time.h>
 
 #include "state.h"
+#include "utils.h"
 
 /* Numeric Reply Codes */
 #define RPL_WELCOME            1

@@ -10,7 +10,9 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "input.h"
 #include "state.h"
+#include "utils.h"
 
 /* FIXME: this has to be included after common.h for activity cols */
 #include "../config.h"

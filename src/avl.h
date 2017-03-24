@@ -1,7 +1,7 @@
 #ifndef AVL_H
 #define AVL_H
 
-#include <string.h>
+#include <stddef.h>
 
 /* AVL tree node */
 struct avl_node

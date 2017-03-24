@@ -13,8 +13,10 @@
 #include <stdio.h>
 #include <sys/ioctl.h>
 
-#include "state.h"
 #include "draw.h"
+#include "input.h"
+#include "state.h"
+#include "utils.h"
 
 /* State of rirc */
 static struct

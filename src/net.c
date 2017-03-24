@@ -17,23 +17,26 @@
 #include <unistd.h>
 
 #ifdef __FreeBSD__
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
+	#include <sys/types.h>
+	#include <sys/socket.h>
+	#include <netinet/in.h>
 #endif
 
+#include "buffer.h"
 #include "net.h"
+#include "state.h"
+#include "utils.h"
 
 #define SERVER_TIMEOUT_S 255 /* Latency time at which a server is considered to be timed out and a disconnect is issued */
 #define SERVER_LATENCY_S 125 /* Latency time at which to begin showing in the status bar */
 #define SERVER_LATENCY_PING_S (SERVER_LATENCY_S - 10) /* Latency time at which to issue a PING before displaying latency */
 
 #if SERVER_TIMEOUT_S <= SERVER_LATENCY_S
-#error Server timeout must be greater than latency counting time
+	#error Server timeout must be greater than latency counting time
 #endif
 
 #if SERVER_LATENCY_PING_S <= 0
-#error Server latency display time too low
+	#error Server latency display time too low
 #endif
 
 /* Connection thread info */

@@ -5,7 +5,6 @@
 #include "buffer.h"
 #include "server.h"
 #include "mesg.h"
-#include "input.h"
 #include "net.h"
 
 /* state.h
