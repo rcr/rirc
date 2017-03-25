@@ -8,38 +8,6 @@
 #include "state.h"
 #include "utils.h"
 
-//TODO: enum these, switch in recv_numeric,
-//remove the shortcuts
-/* Numeric Reply Codes */
-#define RPL_WELCOME            1
-#define RPL_YOURHOST           2
-#define RPL_CREATED            3
-#define RPL_MYINFO             4
-#define RPL_ISUPPORT           5
-#define RPL_STATSCONN        250
-#define RPL_LUSERCLIENT      251
-#define RPL_LUSEROP          252
-#define RPL_LUSERUNKNOWN     253
-#define RPL_LUSERCHANNELS    254
-#define RPL_LUSERME          255
-#define RPL_LOCALUSERS       265
-#define RPL_GLOBALUSERS      266
-#define RPL_CHANNEL_URL      328
-#define RPL_NOTOPIC          331
-#define RPL_TOPIC            332
-#define RPL_TOPICWHOTIME     333
-#define RPL_NAMREPLY         353
-#define RPL_ENDOFNAMES       366
-#define RPL_MOTD             372
-#define RPL_MOTDSTART        375
-#define RPL_ENDOFMOTD        376
-#define ERR_NOSUCHNICK       401
-#define ERR_NOSUCHSERVER     402
-#define ERR_NOSUCHCHANNEL    403
-#define ERR_CANNOTSENDTOCHAN 404
-#define ERR_ERRONEUSNICKNAME 432
-#define ERR_NICKNAMEINUSE    433
-
 /* Fail macros used in message sending/receiving handlers */
 #define fail(M) \
 	do { if (err) { strncpy(err, M, MAX_ERROR); } return 1; } while (0)
@@ -110,7 +78,10 @@ static int send_default(char*, char*, channel*);
 static int send_unhandled(char*, char*, char*, channel*);
 
 /* Encapsulate a function pointer in a struct so AVL tree cleanup can free it */
-struct command { int (*fptr)(char*, char*, channel*); };
+struct command
+{
+	int (*fptr)(char*, char*, channel*)
+};
 static struct command* new_command(int (*fptr)(char*, char*, channel*));
 
 /* Message receiving handlers */
@@ -130,6 +101,38 @@ static int recv_privmesg (char*, struct parsed_mesg*, server*);
 static int recv_quit     (char*, struct parsed_mesg*, server*);
 static int recv_topic    (char*, struct parsed_mesg*, server*);
 
+/* Numeric Reply Codes */
+enum numeric {
+	RPL_WELCOME          =   1,
+	RPL_YOURHOST         =   2,
+	RPL_CREATED          =   3,
+	RPL_MYINFO           =   4,
+	RPL_ISUPPORT         =   5,
+	RPL_STATSCONN        = 250,
+	RPL_LUSERCLIENT      = 251,
+	RPL_LUSEROP          = 252,
+	RPL_LUSERUNKNOWN     = 253,
+	RPL_LUSERCHANNELS    = 254,
+	RPL_LUSERME          = 255,
+	RPL_LOCALUSERS       = 265,
+	RPL_GLOBALUSERS      = 266,
+	RPL_CHANNEL_URL      = 328,
+	RPL_NOTOPIC          = 331,
+	RPL_TOPIC            = 332,
+	RPL_TOPICWHOTIME     = 333,
+	RPL_NAMREPLY         = 353,
+	RPL_ENDOFNAMES       = 366,
+	RPL_MOTD             = 372,
+	RPL_MOTDSTART        = 375,
+	RPL_ENDOFMOTD        = 376,
+	ERR_NOSUCHNICK       = 401,
+	ERR_NOSUCHSERVER     = 402,
+	ERR_NOSUCHCHANNEL    = 403,
+	ERR_CANNOTSENDTOCHAN = 404,
+	ERR_ERRONEUSNICKNAME = 432,
+	ERR_NICKNAMEINUSE    = 433
+};
+
 static void
 server_fatal(server *s, char *fmt, ...)
 {
@@ -144,6 +147,7 @@ server_fatal(server *s, char *fmt, ...)
 	server_disconnect(s, 1, 0, errbuff);
 }
 
+//TODO: singleton, register atexit
 void
 init_mesg(void)
 {
@@ -1059,7 +1063,9 @@ recv_numeric(char *err, struct parsed_mesg *p, server *s)
 
 	channel *c;
 	char *targ, *nick, *chan, *time, *type, *num;
-	int code, ret;
+	int ret;
+
+	enum numeric code = 0;
 
 	/* Extract numeric code */
 	for (code = 0; isdigit(*p->command); p->command++) {
@@ -1082,13 +1088,6 @@ recv_numeric(char *err, struct parsed_mesg *p, server *s)
 		return 1;
 	}
 
-	/* Shortcuts */
-	if (!code)
-		fail("NUMERIC: code is null");
-	else if (code > 400) goto num_400;
-	else if (code > 200) goto num_200;
-
-	/* Numeric types (000, 200) */
 	switch (code) {
 
 	/* 001 :<Welcome message> */
@@ -1121,33 +1120,22 @@ recv_numeric(char *err, struct parsed_mesg *p, server *s)
 			newline(s->channel, 0, "--", p->trailing);
 
 		newlinef(s->channel, 0, "--", "You are known as %s", s->nick);
-		return 0;
+		break;
 
 
 	case RPL_YOURHOST:  /* 002 :<Host info, server version, etc> */
 	case RPL_CREATED:   /* 003 :<Server creation date message> */
 
 		newline(s->channel, 0, "--", p->trailing);
-		return 0;
+		break;
 
 
 	case RPL_MYINFO:    /* 004 <params> :Are supported by this server */
 	case RPL_ISUPPORT:  /* 005 <params> :Are supported by this server */
 
 		newlinef(s->channel, 0, "--", "%s ~ supported by this server", p->params);
-		return 0;
+		break;
 
-
-	default:
-
-		newlinef(s->channel, 0, "UNHANDLED", "%d %s :%s", code, p->params, p->trailing);
-		return 0;
-	}
-
-num_200:
-
-	/* Numeric types (200, 400) */
-	switch (code) {
 
 	/* 328 <channel> :<url> */
 	case RPL_CHANNEL_URL:
@@ -1159,7 +1147,7 @@ num_200:
 			failf("RPL_CHANNEL_URL: channel '%s' not found", chan);
 
 		newlinef(c, 0, "--", "URL for %s is: \"%s\"", chan, p->trailing);
-		return 0;
+		break;
 
 
 	/* 332 <channel> :<topic> */
@@ -1172,7 +1160,7 @@ num_200:
 			failf("RPL_TOPIC: channel '%s' not found", chan);
 
 		newlinef(c, 0, "--", "Topic for %s is \"%s\"", chan, p->trailing);
-		return 0;
+		break;
 
 
 	/* 333 <channel> <nick> <time> */
@@ -1194,7 +1182,7 @@ num_200:
 		time = ctime(&raw_time);
 
 		newlinef(c, 0, "--", "Topic set by %s, %s", nick, time);
-		return 0;
+		break;
 
 
 	/* 353 ("="/"*"/"@") <channel> :*([ "@" / "+" ]<nick>) */
@@ -1220,14 +1208,14 @@ num_200:
 		}
 
 		draw_status();
-		return 0;
+		break;
 
 
 	case RPL_STATSCONN:    /* 250 :<Message> */
 	case RPL_LUSERCLIENT:  /* 251 :<Message> */
 
 		newline(s->channel, 0, "--", p->trailing);
-		return 0;
+		break;
 
 
 	case RPL_LUSEROP:        /* 252 <int> :IRC Operators online */
@@ -1238,7 +1226,7 @@ num_200:
 			num = "NULL";
 
 		newlinef(s->channel, 0, "--", "%s %s", num, p->trailing);
-		return 0;
+		break;
 
 
 	case RPL_LUSERME:      /* 255 :I have <int> clients and <int> servers */
@@ -1248,26 +1236,15 @@ num_200:
 	case RPL_MOTDSTART:    /* 375 :- <server> Message of the day - */
 
 		newline(s->channel, 0, "--", p->trailing);
-		return 0;
+		break;
 
 
 	/* Not printing these */
 	case RPL_NOTOPIC:     /* 331 <chan> :<Message> */
 	case RPL_ENDOFNAMES:  /* 366 <chan> :<Message> */
 	case RPL_ENDOFMOTD:   /* 376 :End of MOTD command */
-		return 0;
+		break;
 
-
-	default:
-
-		newlinef(s->channel, 0, "UNHANDLED", "%d %s :%s", code, p->params, p->trailing);
-		return 0;
-	}
-
-num_400:
-
-	/* Numeric types (400, 600) */
-	switch (code) {
 
 	case ERR_NOSUCHNICK:    /* <nick> :<reason> */
 	case ERR_NOSUCHSERVER:  /* <server> :<reason> */
@@ -1290,7 +1267,7 @@ num_400:
 			newlinef(c, 0, "--", "Cannot send to '%s': %s", targ, p->trailing);
 		else
 			newlinef(c, 0, "--", "Cannot send to '%s'", targ);
-		return 0;
+		break;
 
 
 	case ERR_CANNOTSENDTOCHAN:  /* <channel> :<reason> */
@@ -1306,7 +1283,7 @@ num_400:
 			newlinef(c, 0, "--", "Cannot send to '%s': %s", chan, p->trailing);
 		else
 			newlinef(c, 0, "--", "Cannot send to '%s'", chan);
-		return 0;
+		break;
 
 
 	case ERR_ERRONEUSNICKNAME:  /* 432 <nick> :<reason> */
@@ -1315,7 +1292,8 @@ num_400:
 			fail("ERR_ERRONEUSNICKNAME: nick is null");
 
 		newlinef(s->channel, 0, "-!!-", "'%s' - %s", nick, p->trailing);
-		return 0;
+		break;
+
 
 	case ERR_NICKNAMEINUSE:  /* 433 <nick> :Nickname is already in use */
 
@@ -1331,13 +1309,13 @@ num_400:
 
 			return sendf(err, s, "NICK %s", s->nick);
 		}
-		return 0;
+		break;
 
 
 	default:
 
 		newlinef(s->channel, 0, "UNHANDLED", "%d %s :%s", code, p->params, p->trailing);
-		return 0;
+		break;
 	}
 
 	return 0;
