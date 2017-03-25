@@ -80,7 +80,7 @@ static int send_unhandled(char*, char*, char*, channel*);
 /* Encapsulate a function pointer in a struct so AVL tree cleanup can free it */
 struct command
 {
-	int (*fptr)(char*, char*, channel*)
+	int (*fptr)(char*, char*, channel*);
 };
 static struct command* new_command(int (*fptr)(char*, char*, channel*));
 
@@ -130,7 +130,9 @@ enum numeric {
 	ERR_NOSUCHCHANNEL    = 403,
 	ERR_CANNOTSENDTOCHAN = 404,
 	ERR_ERRONEUSNICKNAME = 432,
-	ERR_NICKNAMEINUSE    = 433
+	ERR_NICKNAMEINUSE    = 433,
+	ERR_INVITEONLYCHAN   = 473,
+	ERR_NOCHANMODES      = 477
 };
 
 static void
@@ -1309,6 +1311,16 @@ recv_numeric(char *err, struct parsed_mesg *p, server *s)
 
 			return sendf(err, s, "NICK %s", s->nick);
 		}
+		break;
+
+
+	case ERR_INVITEONLYCHAN:
+	case ERR_NOCHANMODES:
+
+		if (p->trailing)
+			newlinef(s->channel, 0, "--", "%s: %s", p->params, p->trailing);
+		else
+			newlinef(s->channel, 0, "--", "%s", p->params);
 		break;
 
 
