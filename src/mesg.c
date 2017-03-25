@@ -8,6 +8,8 @@
 #include "state.h"
 #include "utils.h"
 
+//TODO: enum these, switch in recv_numeric,
+//remove the shortcuts
 /* Numeric Reply Codes */
 #define RPL_WELCOME            1
 #define RPL_YOURHOST           2
@@ -111,23 +113,22 @@ static int send_unhandled(char*, char*, char*, channel*);
 struct command { int (*fptr)(char*, char*, channel*); };
 static struct command* new_command(int (*fptr)(char*, char*, channel*));
 
-//TODO: mimic the send handler macros and build/free a tree of handlers
 /* Message receiving handlers */
-static int recv_ctcp_req(char*, parsed_mesg*, server*);
-static int recv_ctcp_rpl(char*, parsed_mesg*);
-static int recv_error(char*, parsed_mesg*, server*);
-static int recv_join(char*, parsed_mesg*, server*);
-static int recv_kick(char*, parsed_mesg*, server*);
-static int recv_mode(char*, parsed_mesg*, server*);
-static int recv_nick(char*, parsed_mesg*, server*);
-static int recv_notice(char*, parsed_mesg*, server*);
-static int recv_numeric(char*, parsed_mesg*, server*);
-static int recv_part(char*, parsed_mesg*, server*);
-static int recv_ping(char*, parsed_mesg*, server*);
-static int recv_pong(char*, parsed_mesg*, server*);
-static int recv_priv(char*, parsed_mesg*, server*);
-static int recv_quit(char*, parsed_mesg*, server*);
-static int recv_topic(char*, parsed_mesg*, server*);
+static int recv_ctcp_req (char*, struct parsed_mesg*, server*);
+static int recv_ctcp_rpl (char*, struct parsed_mesg*); /* FIXME */
+static int recv_error    (char*, struct parsed_mesg*, server*);
+static int recv_join     (char*, struct parsed_mesg*, server*);
+static int recv_kick     (char*, struct parsed_mesg*, server*);
+static int recv_mode     (char*, struct parsed_mesg*, server*);
+static int recv_nick     (char*, struct parsed_mesg*, server*);
+static int recv_notice   (char*, struct parsed_mesg*, server*);
+static int recv_numeric  (char*, struct parsed_mesg*, server*);
+static int recv_part     (char*, struct parsed_mesg*, server*);
+static int recv_ping     (char*, struct parsed_mesg*, server*);
+static int recv_pong     (char*, struct parsed_mesg*, server*);
+static int recv_privmesg (char*, struct parsed_mesg*, server*);
+static int recv_quit     (char*, struct parsed_mesg*, server*);
+static int recv_topic    (char*, struct parsed_mesg*, server*);
 
 static void
 server_fatal(server *s, char *fmt, ...)
@@ -600,8 +601,10 @@ send_version(char *err, char *mesg, channel *c)
  * Message receiving handlers
  * */
 
-/* FIXME: lots of incorrect instances of ccur below */
-
+/* FIXME: lots of incorrect instances of ccur below
+ * in general these will be incorrect, message is being received by server *s,
+ * ccur might point to a channel on a different server
+ * */
 void
 recv_mesg(char *inp, int count, server *s)
 {
@@ -612,7 +615,7 @@ recv_mesg(char *inp, int count, server *s)
 
 	int err = 0;
 
-	parsed_mesg p;
+	struct parsed_mesg p;
 
 	while (count--) {
 		if (*inp == '\r') {
@@ -620,15 +623,15 @@ recv_mesg(char *inp, int count, server *s)
 			*ptr = '\0';
 
 #ifdef DEBUG
-			newline(s->channel, 0, "", "");
 			newline(s->channel, 0, "DEBUG <<", s->input);
 #endif
-			if (!(parse(&p, s->input)))
-				newline(s->channel, 0, "-!!-", "Failed to parse message");
+
+			if (!(parse_mesg(&p, s->input)))
+				newlinef(s->channel, 0, "-!!-", "Failed to parse: %s", s->input);
 			else if (isdigit(*p.command))
 				err = recv_numeric(errbuff, &p, s);
 			else if (!strcmp(p.command, "PRIVMSG"))
-				err = recv_priv(errbuff, &p, s);
+				err = recv_privmesg(errbuff, &p, s);
 			else if (!strcmp(p.command, "JOIN"))
 				err = recv_join(errbuff, &p, s);
 			else if (!strcmp(p.command, "PART"))
@@ -670,7 +673,7 @@ recv_mesg(char *inp, int count, server *s)
 }
 
 static int
-recv_ctcp_req(char *err, parsed_mesg *p, server *s)
+recv_ctcp_req(char *err, struct parsed_mesg *p, server *s)
 {
 	/* CTCP Requests:
 	 * PRIVMSG <target> :0x01<command> <arguments>0x01
@@ -683,6 +686,7 @@ recv_ctcp_req(char *err, parsed_mesg *p, server *s)
 	if (!p->from)
 		fail("CTCP: sender's nick is null");
 
+	//FIXME: why are we checking ccur?
 	/* CTCP request from ignored user, do nothing */
 	if (avl_get(ccur->server->ignore, p->from, strlen(p->from)))
 		return 0;
@@ -784,7 +788,7 @@ recv_ctcp_req(char *err, parsed_mesg *p, server *s)
 }
 
 static int
-recv_ctcp_rpl(char *err, parsed_mesg *p)
+recv_ctcp_rpl(char *err, struct parsed_mesg *p)
 {
 	/* CTCP replies:
 	 * NOTICE <target> :0x01<command> <arguments>0x01 */
@@ -795,6 +799,7 @@ recv_ctcp_rpl(char *err, parsed_mesg *p)
 		fail("CTCP: sender's nick is null");
 
 	/* CTCP reply from ignored user, do nothing */
+	//FIXME: this should be passed the server*.... it checks ccur->server->ignore, this is wrong
 	if (avl_get(ccur->server->ignore, p->from, strlen(p->from)))
 		return 0;
 
@@ -811,7 +816,7 @@ recv_ctcp_rpl(char *err, parsed_mesg *p)
 }
 
 static int
-recv_error(char *err, parsed_mesg *p, server *s)
+recv_error(char *err, struct parsed_mesg *p, server *s)
 {
 	/* ERROR :<message> */
 
@@ -823,7 +828,7 @@ recv_error(char *err, parsed_mesg *p, server *s)
 }
 
 static int
-recv_join(char *err, parsed_mesg *p, server *s)
+recv_join(char *err, struct parsed_mesg *p, server *s)
 {
 	/* :nick!user@hostname.domain JOIN [:]<channel> */
 
@@ -853,7 +858,7 @@ recv_join(char *err, parsed_mesg *p, server *s)
 			failf("JOIN: nick '%s' already in '%s'", p->from, chan);
 
 		if (c->nicklist.count < config.join_part_quit_threshold)
-			newlinef(c, 0, ">", "%s!%s has joined %s", p->from, p->hostinfo, chan);
+			newlinef(c, 0, ">", "%s!%s has joined %s", p->from, p->host, chan);
 
 		draw_status();
 	}
@@ -862,7 +867,7 @@ recv_join(char *err, parsed_mesg *p, server *s)
 }
 
 static int
-recv_kick(char *err, parsed_mesg *p, server *s)
+recv_kick(char *err, struct parsed_mesg *p, server *s)
 {
 	/* :nick!user@hostname.domain KICK <channel> <user> :comment */
 
@@ -914,7 +919,7 @@ recv_kick(char *err, parsed_mesg *p, server *s)
 }
 
 static int
-recv_mode(char *err, parsed_mesg *p, server *s)
+recv_mode(char *err, struct parsed_mesg *p, server *s)
 {
 	/* :nick!user@hostname.domain MODE <targ> *( ( "-" / "+" ) *<modes> *<modeparams> ) */
 
@@ -991,7 +996,7 @@ recv_mode(char *err, parsed_mesg *p, server *s)
 }
 
 static int
-recv_nick(char *err, parsed_mesg *p, server *s)
+recv_nick(char *err, struct parsed_mesg *p, server *s)
 {
 	/* :nick!user@hostname.domain NICK [:]<new nick> */
 
@@ -1021,7 +1026,7 @@ recv_nick(char *err, parsed_mesg *p, server *s)
 }
 
 static int
-recv_notice(char *err, parsed_mesg *p, server *s)
+recv_notice(char *err, struct parsed_mesg *p, server *s)
 {
 	/* :nick.hostname.domain NOTICE <target> :<message> */
 
@@ -1054,7 +1059,7 @@ recv_notice(char *err, parsed_mesg *p, server *s)
 }
 
 static int
-recv_numeric(char *err, parsed_mesg *p, server *s)
+recv_numeric(char *err, struct parsed_mesg *p, server *s)
 {
 	/* :server <code> <target> [args] */
 
@@ -1345,7 +1350,7 @@ num_400:
 }
 
 static int
-recv_part(char *err, parsed_mesg *p, server *s)
+recv_part(char *err, struct parsed_mesg *p, server *s)
 {
 	/* :nick!user@hostname.domain PART <channel> [:message] */
 
@@ -1384,9 +1389,9 @@ recv_part(char *err, parsed_mesg *p, server *s)
 
 	if (c->nicklist.count < config.join_part_quit_threshold) {
 		if (p->trailing)
-			newlinef(c, 0, "<", "%s!%s has left %s (%s)", p->from, p->hostinfo, targ, p->trailing);
+			newlinef(c, 0, "<", "%s!%s has left %s (%s)", p->from, p->host, targ, p->trailing);
 		else
-			newlinef(c, 0, "<", "%s!%s has left %s", p->from, p->hostinfo, targ);
+			newlinef(c, 0, "<", "%s!%s has left %s", p->from, p->host, targ);
 	}
 
 	draw_status();
@@ -1395,7 +1400,7 @@ recv_part(char *err, parsed_mesg *p, server *s)
 }
 
 static int
-recv_ping(char *err, parsed_mesg *p, server *s)
+recv_ping(char *err, struct parsed_mesg *p, server *s)
 {
 	/* PING :<server> */
 
@@ -1406,7 +1411,7 @@ recv_ping(char *err, parsed_mesg *p, server *s)
 }
 
 static int
-recv_pong(char *err, parsed_mesg *p, server *s)
+recv_pong(char *err, struct parsed_mesg *p, server *s)
 {
 	/*  PONG <server> [<server2>] */
 
@@ -1422,7 +1427,7 @@ recv_pong(char *err, parsed_mesg *p, server *s)
 }
 
 static int
-recv_priv(char *err, parsed_mesg *p, server *s)
+recv_privmesg(char *err, struct parsed_mesg *p, server *s)
 {
 	/* :nick!user@hostname.domain PRIVMSG <target> :<message> */
 
@@ -1471,7 +1476,7 @@ recv_priv(char *err, parsed_mesg *p, server *s)
 }
 
 static int
-recv_quit(char *err, parsed_mesg *p, server *s)
+recv_quit(char *err, struct parsed_mesg *p, server *s)
 {
 	/* :nick!user@hostname.domain QUIT [:message] */
 
@@ -1483,9 +1488,9 @@ recv_quit(char *err, parsed_mesg *p, server *s)
 		if (nicklist_del(&(c->nicklist), p->from)) {
 			if (c->nicklist.count < config.join_part_quit_threshold) {
 				if (p->trailing)
-					newlinef(c, 0, "<", "%s!%s has quit (%s)", p->from, p->hostinfo, p->trailing);
+					newlinef(c, 0, "<", "%s!%s has quit (%s)", p->from, p->host, p->trailing);
 				else
-					newlinef(c, 0, "<", "%s!%s has quit", p->from, p->hostinfo);
+					newlinef(c, 0, "<", "%s!%s has quit", p->from, p->host);
 			}
 		}
 		c = c->next;
@@ -1497,7 +1502,7 @@ recv_quit(char *err, parsed_mesg *p, server *s)
 }
 
 static int
-recv_topic(char *err, parsed_mesg *p, server *s)
+recv_topic(char *err, struct parsed_mesg *p, server *s)
 {
 	/* :nick!user@hostname.domain TOPIC <channel> :[topic] */
 

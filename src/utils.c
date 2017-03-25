@@ -99,12 +99,14 @@ irc_isnickchar(const char c)
 
 /* TODO:
  * - char *[] for args, remove getarg from message handling
- * - don't set \0s until message format is determined to be valid, for error reporting
  * - analogous function for parsing ctcp messages */
-parsed_mesg*
-parse(parsed_mesg *p, char *mesg)
+int
+parse_mesg(struct parsed_mesg *pm, char *mesg)
 {
-	/* RFC 2812, section 2.3.1
+	/* Parse a string into components. Null terminators are only inserted
+	 * once the message is determined to be valid
+	 *
+	 * RFC 2812, section 2.3.1
 	 *
 	 * message    =   [ ":" prefix SPACE ] command [ params ] crlf
 	 * prefix     =   servername / ( nickname [ [ "!" user ] "@" host ] )
@@ -121,32 +123,49 @@ parse(parsed_mesg *p, char *mesg)
 	 * crlf       =   %x0D %x0A   ; "carriage return" "linefeed"
 	 */
 
-	memset(p, 0, sizeof(parsed_mesg));
+	char *end_from = NULL,
+	     *end_host = NULL;
 
-	/* Skip leading whitespace */
-	while (*mesg && *mesg == ' ')
-		mesg++;
+	memset(pm, 0, sizeof(*pm));
 
-	/* Check for prefix and parse if detected */
-	if (*mesg == ':') {
+	if (*mesg == ':' && *(++mesg) != ' ') {
 
-		p->from = ++mesg;
+		/* Prefix:
+		 *  =  servername
+		 *  =/ nickname
+		 *  =/ nickname@host
+		 *  =/ nickname!user@host
+		 *
+		 * So:
+		 *  pm->from = servername / nickname
+		 *  pm->host = host / user@host
+		 */
 
-		while (*mesg) {
-			if (*mesg == '!' || (*mesg == '@' && !p->hostinfo)) {
-				*mesg++ = '\0';
-				p->hostinfo = mesg;
-			} else if (*mesg == ' ') {
-				*mesg++ = '\0';
-				break;
-			}
+		pm->from = mesg;
+
+		while (*mesg && *mesg != ' '  && *mesg != '!' && *mesg != '@')
 			mesg++;
+
+		if (*mesg == '!' || *mesg == '@') {
+			end_from = mesg++;
+			pm->host = mesg;
+
+			while (*mesg && *mesg != ' ')
+				mesg++;
 		}
+
+		end_host = mesg;
 	}
 
 	/* The command is minimally required for a valid message */
-	if (!(p->command = getarg(&mesg, " ")))
-		return NULL;
+	if (!(pm->command = getarg(&mesg, " ")))
+		return 0;
+
+	if (end_from)
+		*end_from = '\0';
+
+	if (end_host)
+		*end_host = '\0';
 
 	/* Keep track of the last arg so it can be terminated */
 	char *param_end = NULL;
@@ -164,18 +183,18 @@ parse(parsed_mesg *p, char *mesg)
 
 			/* Maximum number of parameters found */
 			if (param_count == 14) {
-				p->trailing = mesg;
+				pm->trailing = mesg;
 				break;
 			}
 
 			/* Trailing section found */
 			if (*mesg == ':') {
-				p->trailing = (mesg + 1);
+				pm->trailing = (mesg + 1);
 				break;
 			}
 
-			if (!p->params)
-				p->params = mesg;
+			if (!pm->params)
+				pm->params = mesg;
 		}
 
 		while (*mesg && *mesg != ' ')
@@ -189,7 +208,7 @@ parse(parsed_mesg *p, char *mesg)
 	if (param_end)
 		*param_end = '\0';
 
-	return p;
+	return 1;
 }
 
 int
