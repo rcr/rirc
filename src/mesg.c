@@ -115,7 +115,7 @@ static struct command* new_command(int (*fptr)(char*, char*, channel*));
 
 /* Message receiving handlers */
 static int recv_ctcp_req (char*, struct parsed_mesg*, server*);
-static int recv_ctcp_rpl (char*, struct parsed_mesg*); /* FIXME */
+static int recv_ctcp_rpl (char*, struct parsed_mesg*, server*);
 static int recv_error    (char*, struct parsed_mesg*, server*);
 static int recv_join     (char*, struct parsed_mesg*, server*);
 static int recv_kick     (char*, struct parsed_mesg*, server*);
@@ -601,10 +601,6 @@ send_version(char *err, char *mesg, channel *c)
  * Message receiving handlers
  * */
 
-/* FIXME: lots of incorrect instances of ccur below
- * in general these will be incorrect, message is being received by server *s,
- * ccur might point to a channel on a different server
- * */
 void
 recv_mesg(char *inp, int count, server *s)
 {
@@ -686,9 +682,8 @@ recv_ctcp_req(char *err, struct parsed_mesg *p, server *s)
 	if (!p->from)
 		fail("CTCP: sender's nick is null");
 
-	//FIXME: why are we checking ccur?
 	/* CTCP request from ignored user, do nothing */
-	if (avl_get(ccur->server->ignore, p->from, strlen(p->from)))
+	if (avl_get(s->ignore, p->from, strlen(p->from)))
 		return 0;
 
 	if (!(targ = getarg(&p->params, " ")))
@@ -788,7 +783,7 @@ recv_ctcp_req(char *err, struct parsed_mesg *p, server *s)
 }
 
 static int
-recv_ctcp_rpl(char *err, struct parsed_mesg *p)
+recv_ctcp_rpl(char *err, struct parsed_mesg *p, server *s)
 {
 	/* CTCP replies:
 	 * NOTICE <target> :0x01<command> <arguments>0x01 */
@@ -799,8 +794,7 @@ recv_ctcp_rpl(char *err, struct parsed_mesg *p)
 		fail("CTCP: sender's nick is null");
 
 	/* CTCP reply from ignored user, do nothing */
-	//FIXME: this should be passed the server*.... it checks ccur->server->ignore, this is wrong
-	if (avl_get(ccur->server->ignore, p->from, strlen(p->from)))
+	if (avl_get(s->ignore, p->from, strlen(p->from)))
 		return 0;
 
 	if (!(mesg = getarg(&p->trailing, "\x01")))
@@ -810,7 +804,7 @@ recv_ctcp_rpl(char *err, struct parsed_mesg *p)
 	if (!(cmd = getarg(&mesg, " ")))
 		fail("CTCP: command is null");
 
-	newlinef(ccur, 0, p->from, "CTCP %s reply: %s", cmd, mesg);
+	newlinef(s->channel, 0, p->from, "CTCP %s reply: %s", cmd, mesg);
 
 	return 0;
 }
@@ -1038,13 +1032,13 @@ recv_notice(char *err, struct parsed_mesg *p, server *s)
 
 	/* CTCP reply */
 	if (*p->trailing == 0x01)
-		return recv_ctcp_rpl(err, p);
+		return recv_ctcp_rpl(err, p, s);
 
 	if (!p->from)
 		fail("NOTICE: sender's nick is null");
 
 	/* Notice from ignored user, do nothing */
-	if (avl_get(ccur->server->ignore, p->from, strlen(p->from)))
+	if (avl_get(s->ignore, p->from, strlen(p->from)))
 		return 0;
 
 	if (!(targ = getarg(&p->params, " ")))
@@ -1419,7 +1413,7 @@ recv_pong(char *err, struct parsed_mesg *p, server *s)
 
 	/*  PING sent explicitly by the user */
 	if (!s->pinging)
-		newlinef(ccur, 0, "!!", "PONG %s", p->params);
+		newlinef(s->channel, 0, "!!", "PONG %s", p->params);
 
 	s->pinging = 0;
 
@@ -1445,7 +1439,7 @@ recv_privmesg(char *err, struct parsed_mesg *p, server *s)
 		fail("PRIVMSG: sender's nick is null");
 
 	/* Privmesg from ignored user, do nothing */
-	if (avl_get(ccur->server->ignore, p->from, strlen(p->from)))
+	if (avl_get(s->ignore, p->from, strlen(p->from)))
 		return 0;
 
 	if (!(targ = getarg(&p->params, " ")))

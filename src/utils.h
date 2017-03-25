@@ -9,7 +9,7 @@ struct parsed_mesg
 	char *from;
 	char *host;
 	char *command;
-	char *params;
+	char *params; /* TODO: char*[15] */
 	char *trailing;
 };
 
