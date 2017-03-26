@@ -718,7 +718,7 @@ tab_complete(input *inp)
 		len++, str--;
 
 	/* Check if tab completing a command at the beginning of the buffer */
-	if (*str == '/' && str == inp->line->text && (n = avl_get(commands, ++str, --len))) {
+	if (*str == '/' && str == inp->line->text && (n = commands_get(++str, --len))) {
 		/* Command tab completion */
 
 		match = n->key;

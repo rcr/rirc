@@ -65,8 +65,16 @@
 HANDLED_SEND_CMDS
 #undef X
 
-/* extern in common.h */
-struct avl_node* commands;
+/* Encapsulate a function pointer in a struct so AVL tree cleanup can free it */
+struct command
+{
+	int (*fptr)(char*, char*, channel*);
+};
+
+static struct avl_node* commands;
+
+static void commands_add(char*, int (*)(char*, char*, channel*));
+static void commands_free(void);
 
 /* Handler for errors deemed fatal to a server's state */
 static void server_fatal(server*, char*, ...);
@@ -76,13 +84,6 @@ static int send_default(char*, char*, channel*);
 
 /* Default case handler for sending commands */
 static int send_unhandled(char*, char*, char*, channel*);
-
-/* Encapsulate a function pointer in a struct so AVL tree cleanup can free it */
-struct command
-{
-	int (*fptr)(char*, char*, channel*);
-};
-static struct command* new_command(int (*fptr)(char*, char*, channel*));
 
 /* Message receiving handlers */
 static int recv_ctcp_req (char*, struct parsed_mesg*, server*);
@@ -149,42 +150,46 @@ server_fatal(server *s, char *fmt, ...)
 	server_disconnect(s, 1, 0, errbuff);
 }
 
-//TODO: singleton, register atexit
-void
-init_mesg(void)
+static void
+commands_add(char *key, int (*val)(char*, char*, channel*))
 {
-	/* Build and AVL tree of commands and function pointers to handlers */
-
-	/* Add the unhandled commands with no explicit handler */
-	#define X(cmd) avl_add(&commands, #cmd, NULL);
-	UNHANDLED_SEND_CMDS
-	#undef X
-
-	/* Add the handled commands with explicit handlers */
-	#define X(cmd) avl_add(&commands, #cmd, new_command(send_##cmd));
-	HANDLED_SEND_CMDS
-	#undef X
-}
-
-void
-free_mesg(void)
-{
-	free_avl(commands);
-}
-
-static struct command*
-new_command(int (*fptr)(char*, char*, channel *c))
-{
-	/* Allocate a command handler */
-
 	struct command *c;
 
 	if ((c = malloc(sizeof(struct command))) == NULL)
 		fatal("malloc");
 
-	c->fptr = fptr;
+	c->fptr = val;
 
-	return c;
+	avl_add(&commands, key, c);
+}
+
+static void
+commands_free(void)
+{
+	free_avl(commands);
+}
+
+const struct avl_node*
+commands_get(const char *key, size_t len)
+{
+	if (commands == NULL) {
+
+		/* Add the unhandled commands with no explicit handler */
+		#define X(cmd) commands_add(#cmd, NULL);
+		UNHANDLED_SEND_CMDS
+		#undef X
+
+		#define X(cmd) commands_add(#cmd, send_##cmd);
+		HANDLED_SEND_CMDS
+		#undef X
+
+		errno = 0; /* atexit doesn't set errno */
+
+		if (atexit(commands_free) != 0)
+			fatal("atexit");
+	}
+
+	return avl_get(commands, key, len);
 }
 
 /*
@@ -215,7 +220,7 @@ send_mesg(char *mesg, channel *chan)
 		else if (!(cmd_str = getarg(&mesg, " ")))
 			newline(chan, 0, "-!!-", "Messages beginning with '/' require a command");
 
-		else if (!(cmd = avl_get(commands, cmd_str, strlen(cmd_str))))
+		else if (!(cmd = commands_get(cmd_str, strlen(cmd_str))))
 			newlinef(chan, 0, "-!!-", "Unknown command: '%s'", cmd_str);
 
 		else {
