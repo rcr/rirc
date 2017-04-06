@@ -6,10 +6,10 @@
 #define RECONNECT_DELTA 15
 
 /* TODO: refactoring */
-int sendf(char*, server*, const char*, ...);
-server* get_server_head(void);
+int sendf(char*, struct server*, const char*, ...);
+struct server* get_server_head(void);
 void check_servers(void);
 void server_connect(char*, char*, char*, char*);
-void server_disconnect(server*, int, int, char*);
+void server_disconnect(struct server*, int, int, char*);
 
 #endif

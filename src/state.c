@@ -24,7 +24,8 @@ static struct
 	channel *current_channel; /* the current channel being drawn */
 	channel *default_channel; /* the default rirc channel at startup */
 
-	server *server_list;
+	//TODO: not used???
+	struct server *server_list;
 
 	unsigned int term_cols;
 	unsigned int term_rows;
@@ -152,7 +153,7 @@ _newline(channel *c, enum buffer_line_t type, const char *from, const char *mesg
 }
 
 channel*
-new_channel(char *name, server *server, channel *chanlist, enum buffer_t type)
+new_channel(char *name, struct server *s, channel *chanlist, enum buffer_t type)
 {
 	channel *c;
 
@@ -162,7 +163,7 @@ new_channel(char *name, server *server, channel *chanlist, enum buffer_t type)
 	c->buffer = buffer(type);
 	c->input = new_input();
 	c->name = strdup(name);
-	c->server = server;
+	c->server = s;
 
 	/* Append the new channel to the list */
 	DLL_ADD(chanlist, c);
@@ -183,7 +184,7 @@ free_channel(channel *c)
 }
 
 channel*
-channel_get(char *chan, server *s)
+channel_get(char *chan, struct server *s)
 {
 	if (!s)
 		return NULL;
@@ -496,7 +497,7 @@ set_mode_str(char mode_str[MODE_SIZE], const char *modes)
 }
 
 void
-server_set_mode(server *s, const char *modes)
+server_set_mode(struct server *s, const char *modes)
 {
 	set_mode_str(s->usermodes, modes);
 
@@ -518,7 +519,7 @@ channel_set_mode(channel *c, const char *modes)
 channel*
 channel_get_first(void)
 {
-	server *s = get_server_head();
+	struct server *s = get_server_head();
 
 	/* First channel of the first server */
 	return !s ? state.default_channel : s->channel;
@@ -527,7 +528,7 @@ channel_get_first(void)
 channel*
 channel_get_last(void)
 {
-	server *s = get_server_head();
+	struct server *s = get_server_head();
 
 	/* Last channel of the last server */
 	return !s ? state.default_channel : s->prev->channel->prev;

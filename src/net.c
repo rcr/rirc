@@ -51,33 +51,33 @@ typedef struct connection_thread {
 } connection_thread;
 
 /* DLL of current servers */
-static server *server_head;
+static struct server *server_head;
 
-static server* new_server(char*, char*, char*, char*);
-static void free_server(server*);
+static struct server* new_server(char*, char*, char*, char*);
+static void free_server(struct server*);
 
-static int check_connect(server*);
-static int check_latency(server*, time_t);
-static int check_reconnect(server*, time_t);
-static int check_socket(server*, time_t);
+static int check_connect(struct server*);
+static int check_latency(struct server*, time_t);
+static int check_reconnect(struct server*, time_t);
+static int check_socket(struct server*, time_t);
 
-static void connected(server*);
+static void connected(struct server*);
 
 static void* threaded_connect(void*);
 static void threaded_connect_cleanup(void*);
 
 /* FIXME: reorganize, this is a temporary fix in order to retrieve
  * the first/last channels for drawing purposes. */
-server*
+struct server*
 get_server_head(void)
 {
 	return server_head;
 }
 
-static server*
+static struct server*
 new_server(char *host, char *port, char *join, char *nicks)
 {
-	server *s;
+	struct server *s;
 
 	if ((s = calloc(1, sizeof(*s))) == NULL)
 		fatal("calloc");
@@ -108,7 +108,7 @@ new_server(char *host, char *port, char *join, char *nicks)
 }
 
 static void
-free_server(server *s)
+free_server(struct server *s)
 {
 	channel *t, *c = s->channel;
 
@@ -126,7 +126,7 @@ free_server(server *s)
 }
 
 int
-sendf(char *err, server *s, const char *fmt, ...)
+sendf(char *err, struct server *s, const char *fmt, ...)
 {
 	/* Send a formatted message to a server.
 	 *
@@ -177,7 +177,7 @@ void
 server_connect(char *host, char *port, char *nicks, char *join)
 {
 	connection_thread *ct;
-	server *tmp, *s = NULL;
+	struct server *tmp, *s = NULL;
 
 	/* Check if server matching host:port already exists */
 	if ((tmp = server_head) != NULL) {
@@ -218,7 +218,7 @@ server_connect(char *host, char *port, char *nicks, char *join)
 }
 
 static void
-connected(server *s)
+connected(struct server *s)
 {
 	/* Server successfully connected, send IRC init messages */
 
@@ -320,7 +320,7 @@ threaded_connect_cleanup(void *arg)
 }
 
 void
-server_disconnect(server *s, int err, int kill, char *mesg)
+server_disconnect(struct server *s, int err, int kill, char *mesg)
 {
 	/* When err flag is set:
 	 *   Disconnect initiated by remote host
@@ -415,7 +415,7 @@ check_servers(void)
 
 	/* TODO: there's probably a better order to check these */
 
-	server *s;
+	struct server *s;
 
 	if ((s = server_head) == NULL)
 		return;
@@ -438,7 +438,7 @@ check_servers(void)
 }
 
 static int
-check_connect(server *s)
+check_connect(struct server *s)
 {
 	/* Check the server's connection thread status for success or failure */
 
@@ -475,7 +475,7 @@ check_connect(server *s)
 }
 
 static int
-check_latency(server *s, time_t t)
+check_latency(struct server *s, time_t t)
 {
 	/* Check time since last message */
 
@@ -508,7 +508,7 @@ check_latency(server *s, time_t t)
 }
 
 static int
-check_reconnect(server *s, time_t t)
+check_reconnect(struct server *s, time_t t)
 {
 	/* Check if the server is in auto-reconnect mode, and issue a reconnect if needed */
 
@@ -521,7 +521,7 @@ check_reconnect(server *s, time_t t)
 }
 
 static int
-check_socket(server *s, time_t t)
+check_socket(struct server *s, time_t t)
 {
 	/* Check the status of the server's socket */
 
