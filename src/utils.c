@@ -7,7 +7,7 @@
 
 #include "utils.h"
 
-static int irc_isnickchar(const char);
+static inline int irc_isnickchar(const char);
 
 void
 error(int errnum, const char *fmt, ...)
@@ -73,17 +73,16 @@ getarg(char **str, const char *sep)
 char*
 strdup(const char *str)
 {
-	char *ret;
+	size_t len = strlen(str) + 1;
+	void *ret;
 
-	if ((ret = malloc(strlen(str) + 1)) == NULL)
+	if ((ret = malloc(len)) == NULL)
 		fatal("malloc");
 
-	strcpy(ret, str);
-
-	return ret;
+	return (char *) memcpy(ret, str, len);
 }
 
-static int
+static inline int
 irc_isnickchar(const char c)
 {
 	/* RFC 2812, section 2.3.1
@@ -94,7 +93,7 @@ irc_isnickchar(const char c)
 	 * special    =  %x5B-60 / %x7B-7D       ; "[", "]", "\", "`", "_", "^", "{", "|", "}"
 	 */
 
-	return (c == '-' || (c >= 0x30 && c <= 0x39) || (c >= 0x41 && c <= 0x7D));
+	return ((c >= 0x41 && c <= 0x7D) || (c >= 0x30 && c <= 0x39) || c == '-');
 }
 
 /* TODO:
@@ -223,6 +222,7 @@ check_pinged(const char *mesg, const char *nick)
 		while (!(*mesg >= 0x41 && *mesg <= 0x7D))
 			mesg++;
 
+		//FIXME: use irc_strncmp
 		/* nick prefixes the word, following character is space or symbol */
 		if (!strncasecmp(mesg, nick, len) && !irc_isnickchar(*(mesg + len))) {
 			putchar('\a');
