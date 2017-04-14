@@ -74,6 +74,18 @@ static void _print_testcase_name_(const char*);
 			fail_testf(#X " expected '%s', got '%s'", (Y) == NULL ? "NULL" : (Y), (X) == NULL ? "NULL" : (X)); \
 	} while (0)
 
+#define assert_lt(X, Y) \
+	do { \
+		if (!((X) < (Y))) \
+			fail_testf(#X " expected '%d' to be less than '%d'", (X), (Y)); \
+	} while (0)
+
+#define assert_gt(X, Y) \
+	do { \
+		if (!((X) > (Y))) \
+			fail_testf(#X " expected '%d' to be greater than '%d'", (X), (Y)); \
+	} while (0)
+
 #define assert_equals(X, Y) \
 	do { \
 		if ((X) != (Y)) \

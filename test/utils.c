@@ -59,6 +59,28 @@ test_getarg(void)
 }
 
 void
+test_irc_strcmp(void)
+{
+	/* Test case insensitive */
+	assert_equals(irc_strcmp("abc123[]\\~`_", "ABC123{}|^`_"), 0);
+
+	/* Test lexicographic order
+	 *
+	 * The character '`' is permitted along with '{', but are disjoint
+	 * in ascii, with lowercase letters between them. Ensure that in
+	 * lexicographic order, irc_strmp ranks:
+	 *  numeric > alpha > special
+	 */
+	assert_gt(irc_strcmp("0", "a"), 0);
+	assert_gt(irc_strcmp("a", "`"), 0);
+	assert_gt(irc_strcmp("a", "{"), 0);
+	assert_gt(irc_strcmp("z", "{"), 0);
+	assert_gt(irc_strcmp("Z", "`"), 0);
+	assert_gt(irc_strcmp("a", "Z"), 0);
+	assert_gt(irc_strcmp("A", "z"), 0);
+}
+
+void
 test_irc_toupper(void)
 {
 	/* Test rfc 2812 2.2 */
@@ -337,6 +359,7 @@ main(void)
 	testcase tests[] = {
 		TESTCASE(test_check_pinged),
 		TESTCASE(test_getarg),
+		TESTCASE(test_irc_strcmp),
 		TESTCASE(test_irc_toupper),
 		TESTCASE(test_parse_mesg),
 		TESTCASE(test_word_wrap)

@@ -122,6 +122,30 @@ irc_isnickchar(const char c)
 	return ((c >= 0x41 && c <= 0x7D) || (c >= 0x30 && c <= 0x39) || c == '-');
 }
 
+int
+irc_strcmp(const char *s1, const char *s2)
+{
+	/* Case insensitive comparison of strings s1, s2 in accordance
+	 * with RFC 2812, section 2.2
+	 */
+
+	int c1, c2;
+
+	for (;;) {
+
+		c1 = irc_toupper(*s1++);
+		c2 = irc_toupper(*s2++);
+
+		if ((c1 -= c2))
+			return -c1;
+
+		if (c2 == 0)
+			break;
+	}
+
+	return 0;
+}
+
 /* TODO:
  * - char *[] for args, remove getarg from message handling
  * - analogous function for parsing ctcp messages */

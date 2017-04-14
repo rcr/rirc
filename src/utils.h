@@ -13,6 +13,9 @@ struct parsed_mesg
 	char *trailing;
 };
 
+//TODO: replace comps to channel / nicks
+int irc_strcmp(const char*, const char*);
+
 char* getarg(char**, const char*);
 char* strdup(const char*);
 char* word_wrap(int, char**, char*);
