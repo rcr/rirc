@@ -8,6 +8,7 @@
 #include "utils.h"
 
 static inline int irc_isnickchar(const char);
+static inline int irc_tolower(int);
 
 void
 error(int errnum, const char *fmt, ...)
@@ -80,6 +81,31 @@ strdup(const char *str)
 		fatal("malloc");
 
 	return (char *) memcpy(ret, str, len);
+}
+
+static inline int
+irc_tolower(const int c)
+{
+	/* RFC 2812, section 2.2
+	 *
+	 * Because of IRC's Scandinavian origin, the characters {}|^ are
+	 * considered to be the lower case equivalents of the characters []\~,
+	 * respectively. This is a critical issue when determining the
+	 * equivalence of two nicknames or channel names.
+	 */
+
+	switch(c) {
+		case '[':
+			return '{';
+		case ']':
+			return '}';
+		case '\\':
+			return '|';
+		case '~':
+			return '^';
+		default:
+			return (c >= 'A' && c <= 'Z') ? (c + 'A' - 'a')  : c;
+	}
 }
 
 static inline int
