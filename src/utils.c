@@ -8,7 +8,7 @@
 #include "utils.h"
 
 static inline int irc_isnickchar(const char);
-static inline int irc_tolower(int);
+static inline int irc_toupper(int);
 
 void
 error(int errnum, const char *fmt, ...)
@@ -84,7 +84,7 @@ strdup(const char *str)
 }
 
 static inline int
-irc_tolower(const int c)
+irc_toupper(const int c)
 {
 	/* RFC 2812, section 2.2
 	 *
@@ -95,16 +95,16 @@ irc_tolower(const int c)
 	 */
 
 	switch(c) {
-		case '[':
-			return '{';
-		case ']':
-			return '}';
-		case '\\':
-			return '|';
-		case '~':
-			return '^';
+		case '{':
+			return '[';
+		case '}':
+			return ']';
+		case '|':
+			return '\\';
+		case '^':
+			return '~';
 		default:
-			return (c >= 'A' && c <= 'Z') ? (c + 'A' - 'a')  : c;
+			return (c >= 'a' && c <= 'z') ? (c + 'A' - 'a') : c;
 	}
 }
 

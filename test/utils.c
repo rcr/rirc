@@ -59,6 +59,19 @@ test_getarg(void)
 }
 
 void
+test_irc_toupper(void)
+{
+	/* Test rfc 2812 2.2 */
+
+	char *p, str[] = "*az{}|^[]\\~*";
+
+	for (p = str; *p; p++)
+		*p = irc_toupper(*p);
+
+	assert_strcmp(str, "*AZ[]\\~[]\\~*");
+}
+
+void
 test_parse_mesg(void)
 {
 	/* Test the IRC message parsing function */
@@ -322,9 +335,10 @@ int
 main(void)
 {
 	testcase tests[] = {
-		TESTCASE(test_parse_mesg),
-		TESTCASE(test_getarg),
 		TESTCASE(test_check_pinged),
+		TESTCASE(test_getarg),
+		TESTCASE(test_irc_toupper),
+		TESTCASE(test_parse_mesg),
 		TESTCASE(test_word_wrap)
 	};
 
