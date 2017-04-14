@@ -86,7 +86,7 @@ static void _print_testcase_name_(const char*);
 			fail_testf(#X " expected '%d' to be greater than '%d'", (X), (Y)); \
 	} while (0)
 
-#define assert_equals(X, Y) \
+#define assert_eq(X, Y) \
 	do { \
 		if ((X) != (Y)) \
 			fail_testf(#X " expected '%d', got '%d'", (Y), (X)); \

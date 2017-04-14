@@ -62,7 +62,7 @@ void
 test_irc_strcmp(void)
 {
 	/* Test case insensitive */
-	assert_equals(irc_strcmp("abc123[]\\~`_", "ABC123{}|^`_"), 0);
+	assert_eq(irc_strcmp("abc123[]\\~`_", "ABC123{}|^`_"), 0);
 
 	/* Test lexicographic order
 	 *
@@ -78,6 +78,32 @@ test_irc_strcmp(void)
 	assert_gt(irc_strcmp("Z", "`"), 0);
 	assert_gt(irc_strcmp("a", "Z"), 0);
 	assert_gt(irc_strcmp("A", "z"), 0);
+}
+
+void
+test_irc_strncmp(void)
+{
+	/* Test case insensitive */
+	assert_eq(irc_strncmp("abc123[]\\~`_", "ABC123{}|^`_", 100), 0);
+
+	/* Test lexicographic order
+	 *
+	 * The character '`' is permitted along with '{', but are disjoint
+	 * in ascii, with lowercase letters between them. Ensure that in
+	 * lexicographic order, irc_strmp ranks:
+	 *  numeric > alpha > special
+	 */
+	assert_gt(irc_strncmp("0", "a", 1), 0);
+	assert_gt(irc_strncmp("a", "`", 1), 0);
+	assert_gt(irc_strncmp("a", "{", 1), 0);
+	assert_gt(irc_strncmp("z", "{", 1), 0);
+	assert_gt(irc_strncmp("Z", "`", 1), 0);
+	assert_gt(irc_strncmp("a", "Z", 1), 0);
+	assert_gt(irc_strncmp("A", "z", 1), 0);
+
+	/* Test n */
+	assert_eq(irc_strncmp("abcA", "abcZ", 3), 0);
+	assert_gt(irc_strncmp("abcA", "abcZ", 4), 0);
 }
 
 void
@@ -202,31 +228,31 @@ test_check_pinged(void)
 
 	/* Test message contains username */
 	char *mesg1 = "testing testnick testing";
-	assert_equals(check_pinged(mesg1, nick), 1);
+	assert_eq(check_pinged(mesg1, nick), 1);
 
 	/* Test common way of addressing messages to users */
 	char *mesg2 = "testnick: testing";
-	assert_equals(check_pinged(mesg2, nick), 1);
+	assert_eq(check_pinged(mesg2, nick), 1);
 
 	/* Test non-nick char prefix */
 	char *mesg3 = "testing !@#testnick testing";
-	assert_equals(check_pinged(mesg3, nick), 1);
+	assert_eq(check_pinged(mesg3, nick), 1);
 
 	/* Test non-nick char suffix */
 	char *mesg4 = "testing testnick!@#$ testing";
-	assert_equals(check_pinged(mesg4, nick), 1);
+	assert_eq(check_pinged(mesg4, nick), 1);
 
 	/* Test non-nick char prefix and suffix */
 	char *mesg5 = "testing !testnick! testing";
-	assert_equals(check_pinged(mesg5, nick), 1);
+	assert_eq(check_pinged(mesg5, nick), 1);
 
 	/* Error: message doesn't contain username */
 	char *mesg6 = "testing testing";
-	assert_equals(check_pinged(mesg6, nick), 0);
+	assert_eq(check_pinged(mesg6, nick), 0);
 
 	/* Error: message contains username prefix */
 	char *mesg7 = "testing testnickshouldfail testing";
-	assert_equals(check_pinged(mesg7, nick), 0);
+	assert_eq(check_pinged(mesg7, nick), 0);
 }
 
 void
@@ -360,6 +386,7 @@ main(void)
 		TESTCASE(test_check_pinged),
 		TESTCASE(test_getarg),
 		TESTCASE(test_irc_strcmp),
+		TESTCASE(test_irc_strncmp),
 		TESTCASE(test_irc_toupper),
 		TESTCASE(test_parse_mesg),
 		TESTCASE(test_word_wrap)

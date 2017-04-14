@@ -85,7 +85,7 @@ test_avl(void)
 		fail_test("_avl_is_binary() failed");
 
 	/* Check that the height of root stays within the mathematical bounds AVL trees allow */
-	assert_equals(count, 78); /* Required for hardcoded log2 calculations */
+	assert_eq(count, 78); /* Required for hardcoded log2 calculations */
 	min_height = 6.303;                /* log2(78 + 1) ~= 6.303 */
 	max_height = 6.321 * 1.44 - 0.328; /* log2(78 + 2) ~= 6.321 */
 
@@ -123,7 +123,7 @@ test_avl(void)
 		fail_test("_avl_is_binary() failed");
 
 	/* Check that the height of root stays within the mathematical bounds AVL trees allow */
-	assert_equals(count, 39); /* Required for hardcoded log2 calculations */
+	assert_eq(count, 39); /* Required for hardcoded log2 calculations */
 	min_height = 5.321;                /* log2(39 + 1) ~= 5.321 */
 	max_height = 5.357 * 1.44 - 0.328; /* log2(39 + 2) ~= 5.357 */
 

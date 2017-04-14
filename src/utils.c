@@ -146,6 +146,32 @@ irc_strcmp(const char *s1, const char *s2)
 	return 0;
 }
 
+int
+irc_strncmp(const char *s1, const char *s2, size_t n)
+{
+	/* Case insensitive comparison of strings s1, s2 in accordance
+	 * with RFC 2812, section 2.2, up to n characters
+	 */
+
+	int c1, c2;
+
+	while (n > 0) {
+
+		c1 = irc_toupper(*s1++);
+		c2 = irc_toupper(*s2++);
+
+		if ((c1 -= c2))
+			return -c1;
+
+		if (c2 == 0)
+			break;
+
+		n--;
+	}
+
+	return 0;
+}
+
 /* TODO:
  * - char *[] for args, remove getarg from message handling
  * - analogous function for parsing ctcp messages */
