@@ -192,7 +192,7 @@ channel_get(char *chan, struct server *s)
 	channel *c = s->channel;
 
 	do {
-		if (!strcasecmp(c->name, chan))
+		if (!irc_strcmp(c->name, chan))
 			return c;
 
 	} while ((c = c->next) != s->channel);

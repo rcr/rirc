@@ -1,4 +1,5 @@
 #include "nicklist.h"
+#include "utils.h"
 
 /* TODO:
  * redesigning how avl trees are used, testing with nicklist
@@ -8,7 +9,7 @@
 int
 nicklist_add(struct nicklist *l, const char *nick)
 {
-	if (avl_add(&(l->root), nick, NULL)) {
+	if (avl_add(&(l->root), nick, irc_strcmp, NULL)) {
 		l->count++;
 		return 1;
 	}
@@ -19,7 +20,7 @@ nicklist_add(struct nicklist *l, const char *nick)
 int
 nicklist_del(struct nicklist *l, const char *nick)
 {
-	if (avl_del(&(l->root), nick)) {
+	if (avl_del(&(l->root), nick, irc_strcmp)) {
 		l->count--;
 		return 1;
 	}
@@ -33,7 +34,7 @@ nicklist_get(struct nicklist *l, const char *nick, size_t len)
 {
 	const struct avl_node *n;
 
-	if ((n = avl_get(l->root, nick, len)))
+	if ((n = avl_get(l->root, nick, irc_strncmp, len)))
 		return n->key;
 	else
 		return NULL;
