@@ -1,4 +1,5 @@
 #include "test.h"
+#include "strings.h"
 #include "../src/avl.c"
 
 /*
