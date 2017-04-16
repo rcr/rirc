@@ -6,6 +6,8 @@ Continue refactoring:
 		src/components/*.{c,h}
 	- Untangle headers
 
+src/README.md
+
 ----------------------
 	/HELP [type]
 		show available commands.

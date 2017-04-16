@@ -6,6 +6,8 @@
 #define MAX_SERVERS 32
 
 #define BUFFSIZE 512
+
+//TODO: just malloc the current nick
 #define NICKSIZE 255
 
 /* Error message length */

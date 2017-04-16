@@ -31,9 +31,9 @@ test_buffer(void)
 
 	struct buffer b = buffer(BUFFER_T_SIZE);
 
-	assert_equals(b.type, BUFFER_T_SIZE);
+	assert_eq(b.type, BUFFER_T_SIZE);
 
-	assert_equals(buffer_size(&b), 0);
+	assert_eq(buffer_size(&b), 0);
 	assert_null(buffer_head(&b));
 	assert_null(buffer_tail(&b));
 	assert_null(buffer_line(&b, b.scrollback));
@@ -41,9 +41,9 @@ test_buffer(void)
 	/* Reset the buffer, check values again */
 	b = buffer(BUFFER_T_SIZE);
 
-	assert_equals(b.type, BUFFER_T_SIZE);
+	assert_eq(b.type, BUFFER_T_SIZE);
 
-	assert_equals(buffer_size(&b), 0);
+	assert_eq(buffer_size(&b), 0);
 	assert_null(buffer_head(&b));
 	assert_null(buffer_tail(&b));
 	assert_null(buffer_line(&b, b.scrollback));
@@ -64,7 +64,7 @@ test_buffer_head(void)
 		_buffer_newline(&b, _fmt_int(i + 1));
 
 	assert_strcmp(buffer_head(&b)->text, _fmt_int(BUFFER_LINES_MAX + 1));
-	assert_equals(buffer_size(&b), BUFFER_LINES_MAX);
+	assert_eq(buffer_size(&b), BUFFER_LINES_MAX);
 }
 
 static void
@@ -82,12 +82,12 @@ test_buffer_tail(void)
 		_buffer_newline(&b, _fmt_int(i + 1));
 
 	assert_strcmp(buffer_tail(&b)->text, _fmt_int(1));
-	assert_equals(buffer_size(&b), BUFFER_LINES_MAX);
+	assert_eq(buffer_size(&b), BUFFER_LINES_MAX);
 
 	_buffer_newline(&b, _fmt_int(i + 1));
 
 	assert_strcmp(buffer_tail(&b)->text, _fmt_int(2));
-	assert_equals(buffer_size(&b), BUFFER_LINES_MAX);
+	assert_eq(buffer_size(&b), BUFFER_LINES_MAX);
 }
 
 static void
@@ -98,7 +98,7 @@ test_buffer_line(void)
 	struct buffer b = buffer(BUFFER_OTHER);
 
 	/* Should retrieve null for an empty buffer */
-	assert_equals(buffer_size(&b), 0);
+	assert_eq(buffer_size(&b), 0);
 	assert_null(buffer_line(&b, b.head));
 	assert_null(buffer_line(&b, b.tail));
 	assert_null(buffer_line(&b, b.scrollback));
@@ -233,13 +233,13 @@ test_buffer_scrollback_status(void)
 	assert_true(buffer_full(&b));
 
 	b.scrollback = b.tail;
-	assert_equals((int)(100 * buffer_scrollback_status(&b)), 100);
+	assert_eq((int)(100 * buffer_scrollback_status(&b)), 100);
 
 	b.scrollback = b.tail + (BUFFER_LINES_MAX / 2);
-	assert_equals((int)(100 * buffer_scrollback_status(&b)), 50);
+	assert_eq((int)(100 * buffer_scrollback_status(&b)), 50);
 
 	b.scrollback = b.head - 1;
-	assert_equals((int)(100 * buffer_scrollback_status(&b)), 0);
+	assert_eq((int)(100 * buffer_scrollback_status(&b)), 0);
 }
 
 static void
@@ -253,17 +253,17 @@ test_buffer_index_overflow(void)
 	b.tail = UINT_MAX - 1;
 	b.scrollback = b.tail;
 
-	assert_equals(buffer_size(&b), 1);
-	assert_equals(MASK(b.head), (BUFFER_LINES_MAX - 1));
+	assert_eq(buffer_size(&b), 1);
+	assert_eq(MASK(b.head), (BUFFER_LINES_MAX - 1));
 
 	_buffer_newline(&b, _fmt_int(0));
 
-	assert_equals(buffer_size(&b), 2);
-	assert_equals(MASK(b.head), 0);
+	assert_eq(buffer_size(&b), 2);
+	assert_eq(MASK(b.head), 0);
 
 	_buffer_newline(&b, _fmt_int(-1));
 
-	assert_equals(buffer_size(&b), 3);
+	assert_eq(buffer_size(&b), 3);
 	assert_strcmp(b.buffer_lines[0].text, _fmt_int(-1));
 }
 
@@ -298,19 +298,19 @@ test_buffer_line_overlength(void)
 
 	_buffer_newline(&b, text);
 
-	assert_equals((int)b.buffer_lines[0].text_len, TEXT_LENGTH_MAX);
-	assert_equals((int)b.buffer_lines[2].text_len, TEXT_LENGTH_MAX / 2);
+	assert_eq((int)b.buffer_lines[0].text_len, TEXT_LENGTH_MAX);
+	assert_eq((int)b.buffer_lines[2].text_len, TEXT_LENGTH_MAX / 2);
 
-	assert_equals(buffer_size(&b), 3);
+	assert_eq(buffer_size(&b), 3);
 
-	assert_equals(b.buffer_lines[0].text[0], 'a');
-	assert_equals(b.buffer_lines[0].text[TEXT_LENGTH_MAX - 1], 'A');
+	assert_eq(b.buffer_lines[0].text[0], 'a');
+	assert_eq(b.buffer_lines[0].text[TEXT_LENGTH_MAX - 1], 'A');
 
-	assert_equals(b.buffer_lines[1].text[0], 'b');
-	assert_equals(b.buffer_lines[1].text[TEXT_LENGTH_MAX - 1], 'B');
+	assert_eq(b.buffer_lines[1].text[0], 'b');
+	assert_eq(b.buffer_lines[1].text[TEXT_LENGTH_MAX - 1], 'B');
 
-	assert_equals(b.buffer_lines[2].text[0], 'c');
-	assert_equals(b.buffer_lines[2].text[TEXT_LENGTH_MAX / 2 - 1], 'C');
+	assert_eq(b.buffer_lines[2].text[0], 'c');
+	assert_eq(b.buffer_lines[2].text[TEXT_LENGTH_MAX / 2 - 1], 'C');
 }
 
 static void
@@ -330,7 +330,7 @@ test_buffer_line_rows(void)
 	 * c
 	 * c
 	 * */
-	assert_equals(buffer_line_rows(buffer_head(&b), 1), 6);
+	assert_eq(buffer_line_rows(buffer_head(&b), 1), 6);
 
 	/* 4 columns: 3 rows:
 	 * 'aa b' -> wraps to
@@ -340,15 +340,15 @@ test_buffer_line_rows(void)
 	 *   'bb'
 	 *   'cc'
 	 * */
-	assert_equals(buffer_line_rows(buffer_head(&b), 4), 3);
+	assert_eq(buffer_line_rows(buffer_head(&b), 4), 3);
 
 	/* Greater columns than length should always return one row */
-	assert_equals(buffer_line_rows(buffer_head(&b), buffer_head(&b)->text_len + 1), 1);
+	assert_eq(buffer_line_rows(buffer_head(&b), buffer_head(&b)->text_len + 1), 1);
 
 	/* Test empty line should return at least 1 row */
 	_buffer_newline(&b, "");
 
-	assert_equals(buffer_line_rows(buffer_head(&b), 1), 1);
+	assert_eq(buffer_line_rows(buffer_head(&b), 1), 1);
 }
 
 int

@@ -2,24 +2,27 @@
 #define UTILS_H
 
 #include <errno.h>
-#include "avl.h"
 
 /* Parsed IRC message */
-typedef struct parsed_mesg
+struct parsed_mesg
 {
 	char *from;
-	char *hostinfo;
+	char *host;
 	char *command;
-	char *params;
+	char *params; /* TODO: char*[15] */
 	char *trailing;
-} parsed_mesg;
+};
+
+//TODO: replace comps to channel / nicks
+int irc_strcmp(const char*, const char*);
+int irc_strncmp(const char*, const char*, size_t);
 
 char* getarg(char**, const char*);
 char* strdup(const char*);
 char* word_wrap(int, char**, char*);
 
 int check_pinged(const char*, const char*);
-parsed_mesg* parse(parsed_mesg*, char*);
+int parse_mesg(struct parsed_mesg*, char*);
 void error(int status, const char*, ...);
 
 /* Irrecoverable error

@@ -1,4 +1,5 @@
 CC = cc
+PP = cc -E
 CFLAGS       = -std=c99 -Wall -Wextra -pedantic -O2
 CFLAGS_DEBUG = -std=c99 -Wall -Wextra -pedantic -O0 -g -DDEBUG
 LDFLAGS      = -pthread
@@ -10,39 +11,41 @@ ifeq ($(CC), gcc)
 	LDFLAGS_DEBUG = -pthread -lasan -lubsan
 endif
 
-SRCDIR = src/
-BLDDIR = src/bld/
+SDIR = src
+BDIR = src/bld
 
-SRCDIR_T = test/
-BLDDIR_T = test/bld/
+SDIR_T = test
+BDIR_T = test/bld
 
 # Source and build files
-SRC = $(wildcard $(SRCDIR)*.c)
-OBJ = $(patsubst $(SRCDIR)%.c, $(BLDDIR)%.o, $(SRC))
+SRC = $(shell find $(SDIR) -iname '*.c')
+BLD = $(shell echo '$(SRC:.c=.o)' | sed 's|$(SDIR)/|,|g; s|/|.|g; s|,|$(BDIR)/|g')
 
 # Test source and build files
-SRC_T = $(wildcard $(SRCDIR_T)*.c)
-OBJ_T = $(patsubst $(SRCDIR_T)%.c, $(BLDDIR_T)%.t, $(SRC_T))
+SRC_T = $(shell find $(SDIR_T) -iname '*.c')
+BLD_T = $(shell echo '$(SRC_T:.c=.t)' | sed 's|$(SDIR_T)/|,|g; s|/|.|g; s|,|$(BDIR_T)/|g')
 
-rirc: $(OBJ)
-	@echo $@
+rirc: $(BLD)
+	@echo cc $@
 	@$(CC) $(LDFLAGS) -o $@ $^
 
-$(BLDDIR)%.o: $(SRCDIR)%.c
-	@echo $@
-	@$(CPP) $(CFLAGS) -MM -MP -MT $@ $< -MF $(@:.o=.d)
-	@$(CC) $(CFLAGS) -c -o $@ $<
+$(BDIR)%.o:
+	$(eval _SRC = $(SDIR)/$(shell echo '$(@F)' | sed 's|\.o$$||; s|\.|/|; s|$$|.c|'))
+	@echo cc $(_SRC)
+	@$(PP) $(CFLAGS) -MM -MP -MT $@ $(_SRC) -MF $(@:.o=.d)
+	@$(CC) $(CFLAGS) -c -o $@ $(_SRC)
 
-$(BLDDIR_T)%.t: $(SRCDIR_T)%.c
-	@$(CPP) $(CFLAGS) -MM -MP -MT $@ $< -MF $(@:.t=.d)
-	@$(CC) $(CFLAGS_DEBUG) $(LDFLAGS_DEBUG) -o $@ $<
+$(BDIR_T)%.t:
+	$(eval _SRC = $(SDIR_T)/$(shell echo '$(@F)' | sed 's|\.t$$||; s|\.|/|; s|$$|.c|'))
+	@$(PP) $(CFLAGS) -MM -MP -MT $@ $(_SRC) -MF $(@:.t=.d)
+	@$(CC) $(CFLAGS_DEBUG) $(LDFLAGS_DEBUG) -o $@ $(_SRC)
 	-@./$@ || rm $@
 
--include $(BLDDIR)*.d $(BLDDIR_T)*.d
+-include $(wildcard $(BDIR)/*.d) $(wildcard $(BLDDIR_T)*.d)
 
 clean:
 	@echo cleaning
-	@rm -f rirc $(BLDDIR)*.{o,d} $(BLDDIR_T)*.{t,d}
+	@rm -f rirc $(BDIR)/*{o,d} $(BDIR_T)/*.{t,d}
 
 debug: CFLAGS   = $(CFLAGS_DEBUG)
 debug: LDFLAGS += $(LDFLAGS_DEBUG)
@@ -50,6 +53,6 @@ debug: rirc
 
 default: rirc
 
-test: $(OBJ_T)
+test: $(BLD_T)
 
 .PHONY: clean debug default test

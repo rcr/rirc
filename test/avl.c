@@ -70,7 +70,7 @@ test_avl(void)
 
 	/* Add all strings to the tree */
 	for (ptr = strings; *ptr; ptr++) {
-		if (!avl_add(&root, *ptr, NULL))
+		if (!avl_add(&root, *ptr, strcmp, NULL))
 			fail_testf("avl_add() failed to add %s", *ptr);
 		else
 			count++;
@@ -85,7 +85,7 @@ test_avl(void)
 		fail_test("_avl_is_binary() failed");
 
 	/* Check that the height of root stays within the mathematical bounds AVL trees allow */
-	assert_equals(count, 78); /* Required for hardcoded log2 calculations */
+	assert_eq(count, 78); /* Required for hardcoded log2 calculations */
 	min_height = 6.303;                /* log2(78 + 1) ~= 6.303 */
 	max_height = 6.321 * 1.44 - 0.328; /* log2(78 + 2) ~= 6.321 */
 
@@ -98,17 +98,17 @@ test_avl(void)
 		fail_testf("_avl_height() returned %d, expected strictly less than %f", ret, max_height);
 
 	/* Test adding a duplicate and case sensitive duplicate */
-	if (avl_add(&root, "aa", NULL) && count++)
+	if (avl_add(&root, "aa", strcmp, NULL) && count++)
 		fail_test("avl_add() failed to detect duplicate 'aa'");
 
-	if (avl_add(&root, "aA", NULL) && count++)
+	if (avl_add(&root, "aA", strcasecmp, NULL) && count++)
 		fail_test("avl_add() failed to detect case sensitive duplicate 'aA'");
 
 	/* Delete about half of the strings */
 	int num_delete = count / 2;
 
 	for (ptr = strings; *ptr && num_delete > 0; ptr++, num_delete--) {
-		if (!avl_del(&root, *ptr))
+		if (!avl_del(&root, *ptr, strcmp))
 			fail_testf("avl_del() failed to delete %s", *ptr);
 		else
 			count--;
@@ -123,7 +123,7 @@ test_avl(void)
 		fail_test("_avl_is_binary() failed");
 
 	/* Check that the height of root stays within the mathematical bounds AVL trees allow */
-	assert_equals(count, 39); /* Required for hardcoded log2 calculations */
+	assert_eq(count, 39); /* Required for hardcoded log2 calculations */
 	min_height = 5.321;                /* log2(39 + 1) ~= 5.321 */
 	max_height = 5.357 * 1.44 - 0.328; /* log2(39 + 2) ~= 5.357 */
 
@@ -139,7 +139,7 @@ test_avl(void)
 		fail_testf("_avl_height() returned %d, expected strictly less than %f", ret, max_height);
 
 	/* Test deleting string that was previously deleted */
-	if (avl_del(&root, *strings))
+	if (avl_del(&root, *strings, strcmp))
 		fail_testf("_avl_del() should have failed to delete %s", *strings);
 }
 

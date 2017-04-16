@@ -5,7 +5,6 @@
 #include "buffer.h"
 #include "server.h"
 #include "mesg.h"
-#include "input.h"
 #include "net.h"
 
 /* state.h
@@ -29,14 +28,14 @@ void init_state(void);
 void free_state(void);
 
 /* Useful state retrieval abstractions */
-channel* channel_get(char*, server*);
+channel* channel_get(char*, struct server*);
 channel* channel_get_first(void);
 channel* channel_get_last(void);
 channel* channel_get_next(channel*);
 channel* channel_get_prev(channel*);
 
 /* State altering interface */
-channel* new_channel(char*, server*, channel*, enum buffer_t);
+channel* new_channel(char*, struct server*, channel*, enum buffer_t);
 void auto_nick(char**, char*);
 
 /* FIXME: */
@@ -55,7 +54,7 @@ void newlinef(channel*, enum buffer_line_t, const char*, const char*, ...);
 void nicklist_print(channel*);
 void part_channel(channel*);
 void reset_channel(channel*);
-void server_set_mode(server*, const char*);
+void server_set_mode(struct server*, const char*);
 
 /* TODO: refactor, should be static in state */
 /* Function prototypes for setting draw bits */

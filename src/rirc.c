@@ -12,7 +12,9 @@
 #include <stdlib.h>
 #include <termios.h>
 
+#include "input.h"
 #include "state.h"
+#include "utils.h"
 
 #define opt_error(MESG) \
 	do { puts((MESG)); exit(EXIT_FAILURE); } while (0);
@@ -186,12 +188,11 @@ startup(int argc, char **argv)
 	if (sigaction(SIGWINCH, &sa_sigwinch, NULL) == -1)
 		fatal("sigaction - SIGWINCH");
 
-	errno = 0; /* doesn't set errno */
+	errno = 0; /* atexit doesn't set errno */
+
 	if (atexit(cleanup) != 0)
 		fatal("atexit");
 
-	/* Initialize submodules */
-	init_mesg();
 	init_state();
 
 	config.default_nick = getenv("USER");
@@ -213,8 +214,6 @@ cleanup(void)
 	if (tcsetattr(0, TCSADRAIN, &oterm) < 0)
 		fatal("tcsetattr");
 
-	/* Free submodules */
-	free_mesg();
 	free_state();
 
 	/* Reset terminal colours */

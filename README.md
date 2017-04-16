@@ -1,4 +1,4 @@
-#rirc
+# rirc
 [![Coverity Scan Build](https://scan.coverity.com/projects/4940/badge.svg)](https://scan.coverity.com/projects/4940)
 
 A minimalistic irc client written in C.
@@ -7,7 +7,7 @@ While still under development, it currently supports
 many features which you would expect from a basic
 irc client.
 
-##Building:
+## Building:
 
 Default build:
 ```
@@ -19,7 +19,7 @@ Debug build
 make clean debug
 ```
 
-##Usage:
+## Usage:
 ```
   rirc [-c server [OPTIONS]]*
 
@@ -51,8 +51,8 @@ Hotkeys:
   ^D : scroll buffer down
 ```
 
-##More info:
+## More info:
 [rcr.io/rirc.html](http://rcr.io/rirc.html)
 
-##Screenshots:
+## Screenshots:
 ![image](https://raw.github.com/robbinsr/rirc/master/rirc.png?raw=true)

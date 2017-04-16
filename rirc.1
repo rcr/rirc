@@ -1,0 +1,126 @@
+.Dd mar 7, 2017
+.Dt RIRC 1
+.Os
+.
+.Sh NAME
+.
+.Nm rirc
+.Nd a minimalistic irc client written in C
+.
+.Sh SYNOPSIS
+.
+.Nm
+.Op Fl vh
+.Op Fl p Ar port
+.Op Fl j Ar channels
+.Op Fl n Ar nicks
+.Fl c Ar server
+.
+.Sh DESCRIPTION
+.
+.Ss Help
+.
+.Bl -tag -width indent -compact
+.It Fl h , Fl -help
+Print a help message
+.El
+.
+.Ss Options
+.
+.Bl -tag -width indent
+.It Fl c , Fl -connect Ns Cm = Ns Ar server
+Connect to server
+.
+.It Fl p , Fl -port= Ns Ar port
+Connect using
+.Ar port
+.
+.It Fl j , Fl -join= Ns Ar channels
+Comma separated list of channels to join
+.
+.It Fl n , Fl -nicks= Ns Ar nicks
+Comma and/or space separated list of nicks to use
+.
+.It Fl v , Fl -version
+Print rirc version and exit
+.El
+.
+.Ss Keybindings
+.
+.Bl -tag -width indent -compact
+.It Ic ^N
+go to next channel
+.
+.It Ic ^P
+go to previous channel
+.
+.It Ic ^L
+clear channel
+.
+.It Ic ^X
+close channel
+.
+.It Ic ^F
+find channel
+.
+.It Ic ^C
+cancel input/action
+.
+.It Ic ^U
+scroll buffer up
+.
+.It Ic ^D
+scroll buffer down
+.El
+.
+.Ss Commands
+.
+.Bl -column CommandXXXX Arguments
+.It Ic /connect Ta Op Ar host | Ar host:port | Ar host port
+.
+.It Ic /close Ta
+.
+.It Ic /disconnect Ta Op Ar "quit message"
+.
+.It Ic /me Ta Ar message
+.
+.It Ic /join Ta Op Ar target Op Ar targets...
+.
+.It Ic /nick Ta Op Ar nick
+.
+.It Ic /part Ta Oo Ar target Oo Ar targets... Oc Oc Op Ar "part message"
+.
+.It Ic /priv Ta Ar target message
+.
+.It Ic /raw Ta Ar "raw message"
+.
+.It Ic /quit Ta Op Ar "quit message"
+.
+.It Ic /version Ta
+.
+.It Ic /ignore Ta Op Ar nick
+.
+.It Ic /unignore Ta Op Ar nick
+.El
+.
+.Sh EXAMPLES
+.
+.Bd -literal
+rirc -c server -j '#chan'
+rirc -c server -j '#chan' -c server2 -j '#chan2'
+rirc -c server -p 1234 -j '#chan1,#chan2' -n 'nick, nick_, nick__'
+.Ed
+.
+.Sh SEE ALSO
+.
+.Lk http://rcr.io/rirc.html rcr.io/rirc.html
+.
+.Sh AUTHORS
+.
+.An Richard So rcr Sc Robbins Aq Mt mail@rcr.io
+.
+.Sh BUGS
+.
+See the
+.Pa ROADMAP
+file in the source directory for current known issues.

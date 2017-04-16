@@ -1,21 +1,18 @@
 #ifndef INPUT_H
 #define INPUT_H
 
-#include "rirc.h"
-#include "utils.h"
+#define SCROLLBACK_INPUT 15
+#define BUFFSIZE 512
+#define MAX_INPUT 256
 
 /* When tab completing a nick at the beginning of the line, append the following char */
 #define TAB_COMPLETE_DELIMITER ':'
 
 /* Compile time checks */
 #if BUFFSIZE < MAX_INPUT
-/* Required so input lines can be safely strcpy'ed into a send buffer */
-#error BUFFSIZE must be greater than MAX_INPUT
+	/* Required so input lines can be safely strcpy'ed into a send buffer */
+	#error BUFFSIZE must be greater than MAX_INPUT
 #endif
-
-//FIXME:
-#define SCROLLBACK_INPUT 15
-#define MAX_INPUT 256
 
 /* Channel input line */
 typedef struct input_line

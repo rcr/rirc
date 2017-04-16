@@ -4,13 +4,17 @@
  *
  * Assumes vt-100 compatible escape codes, as such YMMV */
 
+//FIXME: fixed, settable colour for messages by the user
+
 #include <alloca.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
+#include "input.h"
 #include "state.h"
+#include "utils.h"
 
 /* FIXME: this has to be included after common.h for activity cols */
 #include "../config.h"
