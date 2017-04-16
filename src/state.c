@@ -13,8 +13,10 @@
 #include <stdio.h>
 #include <sys/ioctl.h>
 
-#include "common.h"
+#include "draw.h"
+#include "input.h"
 #include "state.h"
+#include "utils.h"
 
 /* State of rirc */
 static struct
@@ -22,10 +24,13 @@ static struct
 	channel *current_channel; /* the current channel being drawn */
 	channel *default_channel; /* the default rirc channel at startup */
 
-	server *server_list;
+	//TODO: not used???
+	struct server *server_list;
 
 	unsigned int term_cols;
 	unsigned int term_rows;
+
+	union draw draw;
 } state;
 
 static int action_close_server(char);
@@ -37,6 +42,22 @@ channel* default_channel(void) { return state.default_channel; }
 
 unsigned int _term_cols(void) { return state.term_cols; }
 unsigned int _term_rows(void) { return state.term_rows; }
+
+/* Set draw bits */
+#define X(BIT) void draw_##BIT(void) { state.draw.bits.BIT = 1; }
+DRAW_BITS
+#undef X
+
+/* Set all draw bits */
+void draw_all(void) { state.draw.all_bits = -1; }
+
+void
+redraw(void)
+{
+	draw(state.draw);
+
+	state.draw.all_bits = 0;
+}
 
 void
 resize(void)
@@ -132,7 +153,7 @@ _newline(channel *c, enum buffer_line_t type, const char *from, const char *mesg
 }
 
 channel*
-new_channel(char *name, server *server, channel *chanlist, enum buffer_t type)
+new_channel(char *name, struct server *s, channel *chanlist, enum buffer_t type)
 {
 	channel *c;
 
@@ -142,7 +163,7 @@ new_channel(char *name, server *server, channel *chanlist, enum buffer_t type)
 	c->buffer = buffer(type);
 	c->input = new_input();
 	c->name = strdup(name);
-	c->server = server;
+	c->server = s;
 
 	/* Append the new channel to the list */
 	DLL_ADD(chanlist, c);
@@ -155,14 +176,15 @@ new_channel(char *name, server *server, channel *chanlist, enum buffer_t type)
 void
 free_channel(channel *c)
 {
-	free_avl(c->nicklist);
+	nicklist_free(&(c->nicklist));
+
 	free_input(c->input);
 	free(c->name);
 	free(c);
 }
 
 channel*
-channel_get(char *chan, server *s)
+channel_get(char *chan, struct server *s)
 {
 	if (!s)
 		return NULL;
@@ -170,7 +192,7 @@ channel_get(char *chan, server *s)
 	channel *c = s->channel;
 
 	do {
-		if (!strcasecmp(c->name, chan))
+		if (!irc_strcmp(c->name, chan))
 			return c;
 
 	} while ((c = c->next) != s->channel);
@@ -224,10 +246,7 @@ reset_channel(channel *c)
 {
 	memset(c->chanmodes, 0, MODE_SIZE);
 
-	free_avl(c->nicklist);
-
-	c->nick_count = 0;
-	c->nicklist = NULL;
+	nicklist_free(&(c->nicklist));
 }
 
 void
@@ -478,7 +497,7 @@ set_mode_str(char mode_str[MODE_SIZE], const char *modes)
 }
 
 void
-server_set_mode(server *s, const char *modes)
+server_set_mode(struct server *s, const char *modes)
 {
 	set_mode_str(s->usermodes, modes);
 
@@ -500,7 +519,7 @@ channel_set_mode(channel *c, const char *modes)
 channel*
 channel_get_first(void)
 {
-	server *s = get_server_head();
+	struct server *s = get_server_head();
 
 	/* First channel of the first server */
 	return !s ? state.default_channel : s->channel;
@@ -509,7 +528,7 @@ channel_get_first(void)
 channel*
 channel_get_last(void)
 {
-	server *s = get_server_head();
+	struct server *s = get_server_head();
 
 	/* Last channel of the last server */
 	return !s ? state.default_channel : s->prev->channel->prev;

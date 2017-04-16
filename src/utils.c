@@ -1,28 +1,14 @@
 #include <stdio.h>
 #include <ctype.h>
 #include <stdlib.h>
-#include <setjmp.h>
 #include <stdarg.h>
 #include <string.h>
 #include <strings.h>
 
 #include "utils.h"
 
-#define H(N) (N == NULL ? 0 : N->height)
-#define MAX(A, B) (A > B ? A : B)
-
-static int irc_isnickchar(const char);
-
-/* AVL tree function */
-static avl_node* _avl_add(avl_node*, const char*, void*);
-static avl_node* _avl_del(avl_node*, const char*);
-static avl_node* _avl_get(avl_node*, const char*, size_t);
-static avl_node* avl_new_node(const char*, void*);
-static void avl_free_node(avl_node*);
-static avl_node* avl_rotate_L(avl_node*);
-static avl_node* avl_rotate_R(avl_node*);
-
-static jmp_buf jmpbuf;
+static inline int irc_isnickchar(const char);
+static inline int irc_toupper(int);
 
 void
 error(int errnum, const char *fmt, ...)
@@ -88,17 +74,41 @@ getarg(char **str, const char *sep)
 char*
 strdup(const char *str)
 {
-	char *ret;
+	size_t len = strlen(str) + 1;
+	void *ret;
 
-	if ((ret = malloc(strlen(str) + 1)) == NULL)
+	if ((ret = malloc(len)) == NULL)
 		fatal("malloc");
 
-	strcpy(ret, str);
-
-	return ret;
+	return (char *) memcpy(ret, str, len);
 }
 
-static int
+static inline int
+irc_toupper(const int c)
+{
+	/* RFC 2812, section 2.2
+	 *
+	 * Because of IRC's Scandinavian origin, the characters {}|^ are
+	 * considered to be the lower case equivalents of the characters []\~,
+	 * respectively. This is a critical issue when determining the
+	 * equivalence of two nicknames or channel names.
+	 */
+
+	switch(c) {
+		case '{':
+			return '[';
+		case '}':
+			return ']';
+		case '|':
+			return '\\';
+		case '^':
+			return '~';
+		default:
+			return (c >= 'a' && c <= 'z') ? (c + 'A' - 'a') : c;
+	}
+}
+
+static inline int
 irc_isnickchar(const char c)
 {
 	/* RFC 2812, section 2.3.1
@@ -109,13 +119,69 @@ irc_isnickchar(const char c)
 	 * special    =  %x5B-60 / %x7B-7D       ; "[", "]", "\", "`", "_", "^", "{", "|", "}"
 	 */
 
-	return (c == '-' || (c >= 0x30 && c <= 0x39) || (c >= 0x41 && c <= 0x7D));
+	return ((c >= 0x41 && c <= 0x7D) || (c >= 0x30 && c <= 0x39) || c == '-');
 }
 
-parsed_mesg*
-parse(parsed_mesg *p, char *mesg)
+int
+irc_strcmp(const char *s1, const char *s2)
 {
-	/* RFC 2812, section 2.3.1
+	/* Case insensitive comparison of strings s1, s2 in accordance
+	 * with RFC 2812, section 2.2
+	 */
+
+	int c1, c2;
+
+	for (;;) {
+
+		c1 = irc_toupper(*s1++);
+		c2 = irc_toupper(*s2++);
+
+		if ((c1 -= c2))
+			return -c1;
+
+		if (c2 == 0)
+			break;
+	}
+
+	return 0;
+}
+
+int
+irc_strncmp(const char *s1, const char *s2, size_t n)
+{
+	/* Case insensitive comparison of strings s1, s2 in accordance
+	 * with RFC 2812, section 2.2, up to n characters
+	 */
+
+	int c1, c2;
+
+	while (n > 0) {
+
+		c1 = irc_toupper(*s1++);
+		c2 = irc_toupper(*s2++);
+
+		if ((c1 -= c2))
+			return -c1;
+
+		if (c2 == 0)
+			break;
+
+		n--;
+	}
+
+	return 0;
+}
+
+/* TODO:
+ * - char *[] for args, remove getarg from message handling
+ * - analogous function for parsing ctcp messages */
+int
+parse_mesg(struct parsed_mesg *pm, char *mesg)
+{
+	/* Parse a string into components. Null terminators are only inserted
+	 * once the message is determined to be valid
+	 *
+	 * RFC 2812, section 2.3.1
 	 *
 	 * message    =   [ ":" prefix SPACE ] command [ params ] crlf
 	 * prefix     =   servername / ( nickname [ [ "!" user ] "@" host ] )
@@ -132,32 +198,49 @@ parse(parsed_mesg *p, char *mesg)
 	 * crlf       =   %x0D %x0A   ; "carriage return" "linefeed"
 	 */
 
-	memset(p, 0, sizeof(parsed_mesg));
+	char *end_from = NULL,
+	     *end_host = NULL;
 
-	/* Skip leading whitespace */
-	while (*mesg && *mesg == ' ')
-		mesg++;
+	memset(pm, 0, sizeof(*pm));
 
-	/* Check for prefix and parse if detected */
-	if (*mesg == ':') {
+	if (*mesg == ':' && *(++mesg) != ' ') {
 
-		p->from = ++mesg;
+		/* Prefix:
+		 *  =  servername
+		 *  =/ nickname
+		 *  =/ nickname@host
+		 *  =/ nickname!user@host
+		 *
+		 * So:
+		 *  pm->from = servername / nickname
+		 *  pm->host = host / user@host
+		 */
 
-		while (*mesg) {
-			if (*mesg == '!' || (*mesg == '@' && !p->hostinfo)) {
-				*mesg++ = '\0';
-				p->hostinfo = mesg;
-			} else if (*mesg == ' ') {
-				*mesg++ = '\0';
-				break;
-			}
+		pm->from = mesg;
+
+		while (*mesg && *mesg != ' '  && *mesg != '!' && *mesg != '@')
 			mesg++;
+
+		if (*mesg == '!' || *mesg == '@') {
+			end_from = mesg++;
+			pm->host = mesg;
+
+			while (*mesg && *mesg != ' ')
+				mesg++;
 		}
+
+		end_host = mesg;
 	}
 
 	/* The command is minimally required for a valid message */
-	if (!(p->command = getarg(&mesg, " ")))
-		return NULL;
+	if (!(pm->command = getarg(&mesg, " ")))
+		return 0;
+
+	if (end_from)
+		*end_from = '\0';
+
+	if (end_host)
+		*end_host = '\0';
 
 	/* Keep track of the last arg so it can be terminated */
 	char *param_end = NULL;
@@ -175,18 +258,18 @@ parse(parsed_mesg *p, char *mesg)
 
 			/* Maximum number of parameters found */
 			if (param_count == 14) {
-				p->trailing = mesg;
+				pm->trailing = mesg;
 				break;
 			}
 
 			/* Trailing section found */
 			if (*mesg == ':') {
-				p->trailing = (mesg + 1);
+				pm->trailing = (mesg + 1);
 				break;
 			}
 
-			if (!p->params)
-				p->params = mesg;
+			if (!pm->params)
+				pm->params = mesg;
 		}
 
 		while (*mesg && *mesg != ' ')
@@ -200,7 +283,7 @@ parse(parsed_mesg *p, char *mesg)
 	if (param_end)
 		*param_end = '\0';
 
-	return p;
+	return 1;
 }
 
 int
@@ -215,6 +298,7 @@ check_pinged(const char *mesg, const char *nick)
 		while (!(*mesg >= 0x41 && *mesg <= 0x7D))
 			mesg++;
 
+		//FIXME: use irc_strncmp
 		/* nick prefixes the word, following character is space or symbol */
 		if (!strncasecmp(mesg, nick, len) && !irc_isnickchar(*(mesg + len))) {
 			putchar('\a');
@@ -289,280 +373,3 @@ word_wrap(int n, char **str, char *end)
 	return ret;
 }
 
-/* AVL tree functions */
-
-void
-free_avl(avl_node *n)
-{
-	/* Recusrively free an AVL tree */
-
-	if (n == NULL)
-		return;
-
-	free_avl(n->l);
-	free_avl(n->r);
-	avl_free_node(n);
-}
-
-int
-avl_add(avl_node **n, const char *key, void *val)
-{
-	/* Entry point for adding a node to an AVL tree */
-
-	if (setjmp(jmpbuf))
-		return 0;
-
-	*n = _avl_add(*n, key, val);
-
-	return 1;
-}
-
-int
-avl_del(avl_node **n, const char *key)
-{
-	/* Entry point for removing a node from an AVL tree */
-
-	if (setjmp(jmpbuf))
-		return 0;
-
-	*n = _avl_del(*n, key);
-
-	return 1;
-}
-
-const avl_node*
-avl_get(avl_node *n, const char *key, size_t len)
-{
-	/* Entry point for fetching an avl node with prefix key */
-
-	if (setjmp(jmpbuf))
-		return NULL;
-
-	return _avl_get(n, key, len);
-}
-
-static avl_node*
-avl_new_node(const char *key, void *val)
-{
-	avl_node *n;
-
-	if ((n = calloc(1, sizeof(*n))) == NULL)
-		fatal("calloc");
-
-	n->height = 1;
-	n->key = strdup(key);
-	n->val = val;
-
-	return n;
-}
-
-static void
-avl_free_node(avl_node *n)
-{
-	free(n->key);
-	free(n->val);
-	free(n);
-}
-
-static avl_node*
-avl_rotate_R(avl_node *r)
-{
-	/* Rotate right for root r and pivot p
-	 *
-	 *     r          p
-	 *    / \   ->   / \
-	 *   p   c      a   r
-	 *  / \            / \
-	 * a   b          b   c
-	 *
-	 */
-
-	avl_node *p = r->l;
-	avl_node *b = p->r;
-
-	p->r = r;
-	r->l = b;
-
-	r->height = MAX(H(r->l), H(r->r)) + 1;
-	p->height = MAX(H(p->l), H(p->r)) + 1;
-
-	return p;
-}
-
-static avl_node*
-avl_rotate_L(avl_node *r)
-{
-	/* Rotate left for root r and pivot p
-	 *
-	 *   r            p
-	 *  / \    ->    / \
-	 * a   p        r   c
-	 *    / \      / \
-	 *   b   c    a   b
-	 *
-	 */
-
-	avl_node *p = r->r;
-	avl_node *b = p->l;
-
-	p->l = r;
-	r->r = b;
-
-	r->height = MAX(H(r->l), H(r->r)) + 1;
-	p->height = MAX(H(p->l), H(p->r)) + 1;
-
-	return p;
-}
-
-static avl_node*
-_avl_add(avl_node *n, const char *key, void *val)
-{
-	/* Recursively add key to an AVL tree.
-	 *
-	 * If a duplicate is found (case insensitive) longjmp is called to indicate failure */
-
-	if (n == NULL)
-		return avl_new_node(key, val);
-
-	int ret = strcasecmp(key, n->key);
-
-	if (ret == 0)
-		/* Duplicate found */
-		longjmp(jmpbuf, 1);
-
-	else if (ret > 0)
-		n->r = _avl_add(n->r, key, val);
-
-	else if (ret < 0)
-		n->l = _avl_add(n->l, key, val);
-
-	/* Node was successfully added, recaculate height and rebalance */
-
-	n->height = MAX(H(n->l), H(n->r)) + 1;
-
-	int balance = H(n->l) - H(n->r);
-
-	/* right rotation */
-	if (balance > 1) {
-
-		/* left-right rotation */
-		if (strcasecmp(key, n->l->key) > 0)
-			n->l = avl_rotate_L(n->l);
-
-		return avl_rotate_R(n);
-	}
-
-	/* left rotation */
-	if (balance < -1) {
-
-		/* right-left rotation */
-		if (strcasecmp(n->r->key, key) > 0)
-			n->r = avl_rotate_R(n->r);
-
-		return avl_rotate_L(n);
-	}
-
-	return n;
-}
-
-static avl_node*
-_avl_del(avl_node *n, const char *key)
-{
-	/* Recursive function for deleting nodes from an AVL tree
-	 *
-	 * If the node isn't found (case insensitive) longjmp is called to indicate failure */
-
-	if (n == NULL)
-		/* Node not found */
-		longjmp(jmpbuf, 1);
-
-	int ret = strcasecmp(key, n->key);
-
-	if (ret == 0) {
-		/* Node found */
-
-		if (n->l && n->r) {
-			/* Recursively delete nodes with both children to ensure balance */
-
-			/* Find the next largest value in the tree (the leftmost node in the right subtree) */
-			avl_node *next = n->r;
-
-			while (next->l)
-				next = next->l;
-
-			/* Swap it's value with the node being deleted */
-			avl_node t = *n;
-
-			n->key = next->key;
-			n->val = next->val;
-			next->key = t.key;
-			next->val = t.val;
-
-			/* Recusively delete in the right subtree */
-			n->r = _avl_del(n->r, t.key);
-
-		} else {
-			/* If n has a child, return it */
-			avl_node *tmp = (n->l) ? n->l : n->r;
-
-			avl_free_node(n);
-
-			return tmp;
-		}
-	}
-
-	else if (ret > 0)
-		n->r = _avl_del(n->r, key);
-
-	else if (ret < 0)
-		n->l = _avl_del(n->l, key);
-
-	/* Node was successfully deleted, recalculate height and rebalance */
-
-	n->height = MAX(H(n->l), H(n->r)) + 1;
-
-	int balance = H(n->l) - H(n->r);
-
-	/* right rotation */
-	if (balance > 1) {
-
-		/* left-right rotation */
-		if (H(n->l->l) - H(n->l->r) < 0)
-			n->l =  avl_rotate_L(n->l);
-
-		return avl_rotate_R(n);
-	}
-
-	/* left rotation */
-	if (balance < -1) {
-
-		/* right-left rotation */
-		if (H(n->r->l) - H(n->r->r) > 0)
-			n->r = avl_rotate_R(n->r);
-
-		return avl_rotate_L(n);
-	}
-
-	return n;
-}
-
-static avl_node*
-_avl_get(avl_node *n, const char *key, size_t len)
-{
-	/* Case insensitive search for a node whose value is prefixed by key */
-
-	/* Failed to find node */
-	if (n == NULL)
-		longjmp(jmpbuf, 1);
-
-	int ret = strncasecmp(key, n->key, len);
-
-	if (ret > 0)
-		return _avl_get(n->r, key, len);
-
-	if (ret < 0)
-		return _avl_get(n->l, key, len);
-
-	/* Match found */
-	return n;
-}
