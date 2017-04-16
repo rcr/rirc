@@ -1,7 +1,5 @@
 #include <setjmp.h>
 #include <stdlib.h>
-#include <string.h>
-#include <strings.h>
 
 #include "avl.h"
 #include "utils.h"
@@ -179,7 +177,7 @@ _avl_add(struct avl_node *n, const char *key, int (*cmp)(const char*, const char
 	if (balance > 1) {
 
 		/* left-right rotation */
-		if (strcasecmp(key, n->l->key) > 0)
+		if (cmp(key, n->l->key) > 0)
 			n->l = avl_rotate_L(n->l);
 
 		return avl_rotate_R(n);
@@ -189,7 +187,7 @@ _avl_add(struct avl_node *n, const char *key, int (*cmp)(const char*, const char
 	if (balance < -1) {
 
 		/* right-left rotation */
-		if (strcasecmp(n->r->key, key) > 0)
+		if (cmp(n->r->key, key) > 0)
 			n->r = avl_rotate_R(n->r);
 
 		return avl_rotate_L(n);
@@ -209,7 +207,6 @@ _avl_del(struct avl_node *n, const char *key, int (*cmp)(const char*, const char
 		/* Node not found */
 		longjmp(jmpbuf, 1);
 
-	//int ret = strcasecmp(key, n->key);
 	int ret = cmp(key, n->key);
 
 	if (ret == 0) {
