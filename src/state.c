@@ -77,6 +77,11 @@ resize(void)
 void
 init_state(void)
 {
+	errno = 0; /* atexit doesn't set errno */
+
+	if (atexit(free_state) != 0)
+		fatal("atexit");
+
 	state.default_channel = state.current_channel = new_channel("rirc", NULL, NULL, BUFFER_OTHER);
 
 	/* Splashscreen */
@@ -99,6 +104,8 @@ init_state(void)
 void
 free_state(void)
 {
+	/* Exit handler; must return normally */
+
 	free_channel(state.default_channel);
 }
 

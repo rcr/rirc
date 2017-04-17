@@ -166,6 +166,8 @@ commands_add(char *key, int (*val)(char*, char*, channel*))
 static void
 commands_free(void)
 {
+	/* Exit handler; must return normally */
+
 	free_avl(commands);
 }
 

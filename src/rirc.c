@@ -25,7 +25,7 @@ static void main_loop(void);
 static void usage(void);
 static void signal_sigwinch(int);
 
-static struct termios oterm, nterm;
+static struct termios oterm;
 static struct sigaction sa_sigwinch;
 static volatile sig_atomic_t flag_sigwinch;
 
@@ -173,7 +173,8 @@ startup(int argc, char **argv)
 	if (tcgetattr(0, &oterm) < 0)
 		fatal("tcgetattr");
 
-	nterm = oterm;
+	struct termios nterm = oterm;
+
 	nterm.c_lflag &= ~(ECHO | ICANON | ISIG);
 	nterm.c_cc[VMIN] = 1;
 	nterm.c_cc[VTIME] = 0;
@@ -210,11 +211,7 @@ startup(int argc, char **argv)
 static void
 cleanup(void)
 {
-	/* Reset terminal modes */
-	if (tcsetattr(0, TCSADRAIN, &oterm) < 0)
-		fatal("tcsetattr");
-
-	free_state();
+	/* Exit handler; must return normally */
 
 	/* Reset terminal colours */
 	printf("\x1b[38;0;m");
@@ -224,6 +221,9 @@ cleanup(void)
 	/* Clear screen */
 	printf("\x1b[H\x1b[J");
 #endif
+
+	/* Reset terminal modes */
+	tcsetattr(0, TCSADRAIN, &oterm);
 }
 
 static void

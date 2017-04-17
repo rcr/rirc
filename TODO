@@ -1,6 +1,12 @@
 TODO
 ---------------------------
 
+this iteration:
+	- fix paste
+	- fix draw chans colouring
+	- proper mode support
+	- list.h, in prep for channel/server list abstraction
+
 Continue refactoring:
 	- Move/split components (e.g. server, channel, input, etc):
 		src/components/*.{c,h}
