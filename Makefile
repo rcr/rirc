@@ -41,7 +41,7 @@ $(BDIR_T)%.t:
 	@$(CC) $(CFLAGS_DEBUG) $(LDFLAGS_DEBUG) -o $@ $(_SRC)
 	-@./$@ || rm $@
 
--include $(wildcard $(BDIR)/*.d) $(wildcard $(BLDDIR_T)*.d)
+-include $(wildcard $(BDIR)/*.d) $(wildcard $(BDIR_T)/*.d)
 
 clean:
 	@echo cleaning
