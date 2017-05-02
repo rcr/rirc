@@ -15,10 +15,6 @@ Continue refactoring:
 src/README.md
 
 ----------------------
-	/HELP [type]
-		show available commands.
-		if [type] is given, show more specific help
-
 	/NICKS
 		print the current nicks to the channel
 		^(Also print this implicitly when end of nicks numeric is received)
@@ -26,12 +22,6 @@ src/README.md
 
 	/IGNORE, /UNIGNORE,
 		print the ignore list
-
-	/CHANS
-		print currently open channels with status information, and numeric index
-
-	/<#>
-		go to channel <#>
 
 	Numerics:
 	221 +<flags> :(null)
@@ -64,9 +54,6 @@ src/README.md
 	502 :Can't set/get mode for other users
 		 (e.g.: /raw MODE <not my nick> <flag>
 ----------------------
-
-disconnected and ctrl-x channel segfaults, when closing disconnected channels
-
 show connect eta intead of ping when reconnecting
 
 show disconnected/parted in status bar for channels instead of 0 user count

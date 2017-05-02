@@ -134,28 +134,26 @@ sendf(char *err, struct server *s, const char *fmt, ...)
 	 * to by err.
 	 */
 
+#define SENDF_ERR(str) \
+	do { if (err) { snprintf(err, MAX_ERROR, "Error: %s", str); }  return 1; } while (0)
+
 	char sendbuff[BUFFSIZE];
 	int soc, len;
 	va_list ap;
 
-	if (s == NULL || (soc = s->soc) < 0) {
-		strncpy(err, "Error: Not connected to server", MAX_ERROR);
-		return 1;
-	}
+	if (s == NULL || (soc = s->soc) < 0)
+		SENDF_ERR("Not connected to server");
+
 
 	va_start(ap, fmt);
 	len = vsnprintf(sendbuff, BUFFSIZE-2, fmt, ap);
 	va_end(ap);
 
-	if (len < 0) {
-		strncpy(err, "Error: Invalid message format", MAX_ERROR);
-		return 1;
-	}
+	if (len < 0)
+		SENDF_ERR("Invalid message format");
 
-	if (len >= BUFFSIZE-2) {
-		strncpy(err, "Error: Message exceeds maximum length of " STR(BUFFSIZE) " bytes", MAX_ERROR);
-		return 1;
-	}
+	if (len >= BUFFSIZE-2)
+		SENDF_ERR("Message exceeds maximum length of " STR(BUFFSIZE) " bytes");
 
 #ifdef DEBUG
 	newline(s->channel, 0, "DEBUG >>", sendbuff);
@@ -164,10 +162,8 @@ sendf(char *err, struct server *s, const char *fmt, ...)
 	sendbuff[len++] = '\r';
 	sendbuff[len++] = '\n';
 
-	if (send(soc, sendbuff, len, 0) < 0) {
-		snprintf(err, MAX_ERROR, "Error: %s", strerror(errno));
-		return 1;
-	}
+	if (send(soc, sendbuff, len, 0) < 0)
+		SENDF_ERR(strerror(errno));
 
 	return 0;
 }
