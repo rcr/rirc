@@ -3,7 +3,7 @@
 
 #include <stddef.h>
 
-#include "avl.h"
+#include "tree.h"
 #include "channel.h"
 #include "server.h"
 

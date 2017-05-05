@@ -1,7 +1,7 @@
 #ifndef NICKLIST_H
 #define NICKLIST_H
 
-#include "avl.h"
+#include "tree.h"
 
 struct nicklist
 {

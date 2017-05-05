@@ -1,6 +1,6 @@
 #include "test.h"
 #include "strings.h"
-#include "../src/avl.c"
+#include "../src/tree.c"
 
 /*
  * Util functions for testing AVL properties

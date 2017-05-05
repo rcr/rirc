@@ -1,7 +1,7 @@
 #include <setjmp.h>
 #include <stdlib.h>
 
-#include "avl.h"
+#include "tree.h"
 #include "utils.h"
 
 #define H(N) ((N) == NULL ? 0 : (N)->height)

@@ -2,8 +2,7 @@
 #define CHANNEL_H
 
 #include "nicklist.h"
-
-/* TODO: refactor -> channel.c */
+#include "buffer.h"
 
 #define MODE_SIZE (26 * 2) + 1 /* Supports modes [az-AZ] */
 
