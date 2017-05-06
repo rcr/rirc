@@ -25,11 +25,13 @@ void free_avl(struct avl_node*);
 #define SPLAY_ROOT(head)        (head)->splay_root
 #define SPLAY_EMPTY(head)       (SPLAY_ROOT(head) == NULL)
 
-#define SPLAY_INSERT(name, x, y) name##_SPLAY_INSERT(x, y)
-#define SPLAY_REMOVE(name, x, y) name##_SPLAY_REMOVE(x, y)
-#define SPLAY_FIND(name, x, y)   name##_SPLAY_FIND(x, y)
-#define SPLAY_NEXT(name, x, y)   name##_SPLAY_NEXT(x, y)
-#define SPLAY_PREV(name, x, y)   name##_SPLAY_PREV(x, y)
+#define SPLAY_ADD(name, x, y)  name##_SPLAY_ADD(x, y)
+#define SPLAY_DEL(name, x, y)  name##_SPLAY_DEL(x, y)
+#define SPLAY_GET(name, x, y)  name##_SPLAY_GET(x, y)
+#define SPLAY_NEXT(name, x, y) name##_SPLAY_NEXT(x, y)
+#define SPLAY_PREV(name, x, y) name##_SPLAY_PREV(x, y)
+#define SPLAY_MIN(name, x)     (SPLAY_EMPTY(x) ? NULL: name##_SPLAY_MIN(x))
+#define SPLAY_MAX(name, x)     (SPLAY_EMPTY(x) ? NULL: name##_SPLAY_MAX(x))
 
 
 #define SPLAY_HEAD(type) \
@@ -84,52 +86,87 @@ void free_avl(struct avl_node*);
     } while (0)
 
 
+#define SPLAY_FOREACH(x, name, head)      \
+    for ((x) = SPLAY_MIN(name, head);     \
+         (x) != NULL;                     \
+         (x) = SPLAY_NEXT(name, head, x))
+
+
 #define SPLAY_GENERATE(name, type, field, cmp)                                \
-    struct type *name##_SPLAY_INSERT(struct name *, struct type *);           \
-    struct type *name##_SPLAY_REMOVE(struct name *, struct type *);           \
-    void name##_SPLAY(struct name *, struct type *);                          \
+    struct type* name##_SPLAY_ADD(struct name*, struct type*);                \
+    struct type* name##_SPLAY_DEL(struct name*, struct type*);                \
+    void name##_SPLAY(struct name*, struct type*);                            \
                                                                               \
-static inline struct type *                                                   \
-name##_SPLAY_FIND(struct name *head, struct type *elm)                        \
+static inline struct type*                                                    \
+name##_SPLAY_MIN(struct name *head)                                           \
+{                                                                             \
+    struct type *x = SPLAY_ROOT(head);                                        \
+                                                                              \
+    while (SPLAY_LEFT(x, field) != NULL)                                      \
+        x = SPLAY_LEFT(x, field);                                             \
+                                                                              \
+    return x;                                                                 \
+}                                                                             \
+                                                                              \
+static inline struct type*                                                    \
+name##_SPLAY_MAX(struct name *head)                                           \
+{                                                                             \
+    struct type *x = SPLAY_ROOT(head);                                        \
+                                                                              \
+    while (SPLAY_RIGHT(x, field) != NULL)                                     \
+        x = SPLAY_RIGHT(x, field);                                            \
+                                                                              \
+    return x;                                                                 \
+}                                                                             \
+                                                                              \
+static inline struct type*                                                    \
+name##_SPLAY_NEXT(struct name *head, struct type *elm)                        \
+{                                                                             \
+    name##_SPLAY(head, elm);                                                  \
+                                                                              \
+    if (SPLAY_RIGHT(elm, field) == NULL)                                      \
+        return NULL;                                                          \
+                                                                              \
+    elm = SPLAY_RIGHT(elm, field);                                            \
+                                                                              \
+    while (SPLAY_LEFT(elm, field) != NULL)                                    \
+        elm = SPLAY_LEFT(elm, field);                                         \
+                                                                              \
+    return elm;                                                               \
+}                                                                             \
+                                                                              \
+static inline struct type*                                                    \
+name##_SPLAY_PREV(struct name *head, struct type *elm)                        \
+{                                                                             \
+    name##_SPLAY(head, elm);                                                  \
+                                                                              \
+    if (SPLAY_LEFT(elm, field) == NULL)                                       \
+        return NULL;                                                          \
+                                                                              \
+    elm = SPLAY_LEFT(elm, field);                                             \
+                                                                              \
+    while (SPLAY_RIGHT(elm, field) != NULL)                                   \
+        elm = SPLAY_RIGHT(elm, field);                                        \
+                                                                              \
+    return elm;                                                               \
+}                                                                             \
+                                                                              \
+static inline struct type*                                                    \
+name##_SPLAY_GET(struct name *head, struct type *elm)                         \
 {                                                                             \
     if (SPLAY_EMPTY(head))                                                    \
-        return(NULL);                                                         \
+        return NULL;                                                          \
                                                                               \
     name##_SPLAY(head, elm);                                                  \
                                                                               \
     if ((cmp)(elm, (head)->splay_root) == 0)                                  \
         return (head->splay_root);                                            \
                                                                               \
-    return (NULL);                                                            \
-}                                                                             \
-                                                                              \
-static inline struct type *                                                   \
-name##_SPLAY_NEXT(struct name *head, struct type *elm)                        \
-{                                                                             \
-    name##_SPLAY(head, elm);                                                  \
-                                                                              \
-    if (SPLAY_RIGHT(elm, field) != NULL) {                                    \
-        elm = SPLAY_RIGHT(elm, field);                                        \
-        while (SPLAY_LEFT(elm, field) != NULL) {                              \
-            elm = SPLAY_LEFT(elm, field);                                     \
-        }                                                                     \
-    } else                                                                    \
-        elm = NULL;                                                           \
-                                                                              \
-    return (elm);                                                             \
-}                                                                             \
-                                                                              \
-static inline struct type *                                                   \
-name##_SPLAY_PREV(struct name *head, struct type *elm)                        \
-{                                                                             \
-    /* TODO */                                                                \
-    (void)((head));                                                           \
-    (void)((elm));                                                            \
     return NULL;                                                              \
 }                                                                             \
                                                                               \
-struct type *                                                                 \
-name##_SPLAY_INSERT(struct name *head, struct type *elm)                      \
+struct type*                                                                  \
+name##_SPLAY_ADD(struct name *head, struct type *elm)                         \
 {                                                                             \
     if (SPLAY_EMPTY(head)) {                                                  \
         SPLAY_LEFT(elm, field) = SPLAY_RIGHT(elm, field) = NULL;              \
@@ -137,7 +174,7 @@ name##_SPLAY_INSERT(struct name *head, struct type *elm)                      \
         int comp;                                                             \
         name##_SPLAY(head, elm);                                              \
         comp = (cmp)(elm, (head)->splay_root);                                \
-        if(comp < 0) {                                                        \
+        if (comp < 0) {                                                       \
             SPLAY_LEFT(elm, field) = SPLAY_LEFT((head)->splay_root, field);   \
             SPLAY_RIGHT(elm, field) = (head)->splay_root;                     \
             SPLAY_LEFT((head)->splay_root, field) = NULL;                     \
@@ -149,15 +186,15 @@ name##_SPLAY_INSERT(struct name *head, struct type *elm)                      \
             return ((head)->splay_root);                                      \
     }                                                                         \
     (head)->splay_root = (elm);                                               \
-    return (NULL);                                                            \
+    return NULL;                                                              \
 }                                                                             \
                                                                               \
-struct type *                                                                 \
-name##_SPLAY_REMOVE(struct name *head, struct type *elm)                      \
+struct type*                                                                  \
+name##_SPLAY_DEL(struct name *head, struct type *elm)                         \
 {                                                                             \
     struct type *tmp;                                                         \
     if (SPLAY_EMPTY(head))                                                    \
-        return (NULL);                                                        \
+        return NULL;                                                          \
     name##_SPLAY(head, elm);                                                  \
     if ((cmp)(elm, (head)->splay_root) == 0) {                                \
         if (SPLAY_LEFT((head)->splay_root, field) == NULL) {                  \
@@ -170,7 +207,7 @@ name##_SPLAY_REMOVE(struct name *head, struct type *elm)                      \
         }                                                                     \
         return (elm);                                                         \
     }                                                                         \
-    return (NULL);                                                            \
+    return NULL;                                                              \
 }                                                                             \
                                                                               \
 void                                                                          \
