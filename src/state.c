@@ -175,6 +175,8 @@ new_channel(char *name, struct server *s, struct channel *chanlist, enum buffer_
 	/* Append the new channel to the list */
 	DLL_ADD(chanlist, c);
 
+	channel_list_add(&s->clist, c);
+
 	draw_all();
 
 	return c;
@@ -304,6 +306,9 @@ channel_close(struct channel *c)
 		}
 
 		DLL_DEL(c->server->channel, c);
+
+		channel_list_del(&c->server->clist, c);
+
 		free_channel(c);
 	}
 }
