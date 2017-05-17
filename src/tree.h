@@ -20,18 +20,18 @@ void free_avl(struct avl_node*);
 
 /* Splay Tree */
 
+#define SPLAY_EMPTY(head)       (SPLAY_ROOT(head) == NULL)
 #define SPLAY_LEFT(elm, field)  (elm)->field.splay_left
 #define SPLAY_RIGHT(elm, field) (elm)->field.splay_right
 #define SPLAY_ROOT(head)        (head)->splay_root
-#define SPLAY_EMPTY(head)       (SPLAY_ROOT(head) == NULL)
 
 #define SPLAY_ADD(name, x, y)  name##_SPLAY_ADD(x, y)
 #define SPLAY_DEL(name, x, y)  name##_SPLAY_DEL(x, y)
 #define SPLAY_GET(name, x, y)  name##_SPLAY_GET(x, y)
+#define SPLAY_MAX(name, x)     (SPLAY_EMPTY(x) ? NULL : name##_SPLAY_MAX(x))
+#define SPLAY_MIN(name, x)     (SPLAY_EMPTY(x) ? NULL : name##_SPLAY_MIN(x))
 #define SPLAY_NEXT(name, x, y) name##_SPLAY_NEXT(x, y)
 #define SPLAY_PREV(name, x, y) name##_SPLAY_PREV(x, y)
-#define SPLAY_MIN(name, x)     (SPLAY_EMPTY(x) ? NULL: name##_SPLAY_MIN(x))
-#define SPLAY_MAX(name, x)     (SPLAY_EMPTY(x) ? NULL: name##_SPLAY_MAX(x))
 
 
 #define SPLAY_HEAD(type) \

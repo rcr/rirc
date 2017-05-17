@@ -16,7 +16,7 @@ typedef enum
 } activity_t;
 
 /* Channel */
-typedef struct channel
+struct channel
 {
 	activity_t active;
 	char *name;
@@ -29,6 +29,16 @@ typedef struct channel
 	struct input *input;
 	struct nicklist nicklist;
 	struct server *server;
-} channel;
+	SPLAY_NODE(channel) node;
+};
+
+struct channel_list
+{
+	SPLAY_HEAD(channel);
+};
+
+struct channel* channel_list_add(struct channel_list*, struct channel*);
+struct channel* channel_list_del(struct channel_list*, char*);
+struct channel* channel_list_get(struct channel_list*, char*);
 
 #endif

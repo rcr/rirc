@@ -77,9 +77,9 @@ static int _draw_fmt(char*, size_t*, size_t*, size_t*, int, const char*, ...);
 
 static void _draw_buffer_line(struct buffer_line*, struct coords, unsigned int, unsigned int, unsigned int, unsigned int);
 static void _draw_buffer(struct buffer*, struct coords);
-static void _draw_input(channel*);
-static void _draw_nav(channel*);
-static void _draw_status(channel*);
+static void _draw_input(struct channel*);
+static void _draw_nav(struct channel*);
+static void _draw_status(struct channel*);
 
 static inline unsigned int nick_col(char*);
 static inline void check_coords(struct coords);
@@ -90,7 +90,7 @@ draw(union draw draw)
 	if (!draw.all_bits)
 		return;
 
-	channel *c = current_channel();
+	struct channel *c = current_channel();
 
 	if (_term_cols() < COLS_MIN || _term_rows() < ROWS_MIN) {
 		printf(CLEAR_FULL MOVE(1, 1) "rirc");
@@ -364,7 +364,7 @@ _draw_buffer(struct buffer *b, struct coords coords)
  *           | #chan1 #chan2 #ch... |   Left printing
  * */
 static void
-_draw_nav(channel *c)
+_draw_nav(struct channel *c)
 {
 	/* Dynamically draw the nav such that:
 	 *
@@ -375,12 +375,12 @@ _draw_nav(channel *c)
 
 	printf(MOVE(1, 1) CLEAR_LINE);
 
-	static channel *frame_prev, *frame_next;
+	static struct channel *frame_prev, *frame_next;
 
-	channel *tmp, *current = c;
+	struct channel *tmp, *current = c;
 
-	channel *c_first = channel_get_first();
-	channel *c_last = channel_get_last();
+	struct channel *c_first = channel_get_first();
+	struct channel *c_last = channel_get_last();
 
 	/* By default assume drawing starts towards the next channel */
 	unsigned int nextward = 1;
@@ -396,7 +396,7 @@ _draw_nav(channel *c)
 		frame_next = channel_get_next(frame_next);
 
 	/* Calculate the new frames */
-	channel *tmp_prev = c, *tmp_next = c;
+	struct channel *tmp_prev = c, *tmp_next = c;
 
 	for (;;) {
 
@@ -476,7 +476,7 @@ _draw_nav(channel *c)
  *
  * Could use some cleaning up*/
 static void
-_draw_input(channel *c)
+_draw_input(struct channel *c)
 {
 	unsigned int cols = _term_cols();
 	unsigned int rows = _term_rows();
@@ -525,7 +525,7 @@ _draw_input(channel *c)
 }
 
 static void
-_draw_status(channel *c)
+_draw_status(struct channel *c)
 {
 	/* server / private chat:
 	 * |-[usermodes]-(latency)---...|

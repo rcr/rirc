@@ -110,7 +110,7 @@ new_server(char *host, char *port, char *join, char *nicks)
 static void
 free_server(struct server *s)
 {
-	channel *t, *c = s->channel;
+	struct channel *t, *c = s->channel;
 
 	do {
 		t = c;
@@ -371,7 +371,7 @@ server_disconnect(struct server *s, int err, int kill, char *mesg)
 		auto_nick(&(s->nptr), s->nick);
 
 		/* Print message to all open channels and reset their attributes */
-		channel *c = s->channel;
+		struct channel *c = s->channel;
 		do {
 			newline(c, 0, "-!!-", "(disconnected)");
 

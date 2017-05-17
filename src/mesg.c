@@ -61,29 +61,29 @@
 	X(version)
 
 /* Function prototypes for explicitly handled commands */
-#define X(cmd) static int send_##cmd(char*, char*, channel*);
+#define X(cmd) static int send_##cmd(char*, char*, struct channel*);
 HANDLED_SEND_CMDS
 #undef X
 
 /* Encapsulate a function pointer in a struct so AVL tree cleanup can free it */
 struct command
 {
-	int (*fptr)(char*, char*, channel*);
+	int (*fptr)(char*, char*, struct channel*);
 };
 
 static struct avl_node* commands;
 
-static void commands_add(char*, int (*)(char*, char*, channel*));
+static void commands_add(char*, int (*)(char*, char*, struct channel*));
 static void commands_free(void);
 
 /* Handler for errors deemed fatal to a server's state */
 static void server_fatal(struct server*, char*, ...);
 
 /* Special case handler for sending non-command input */
-static int send_default(char*, char*, channel*);
+static int send_default(char*, char*, struct channel*);
 
 /* Default case handler for sending commands */
-static int send_unhandled(char*, char*, char*, channel*);
+static int send_unhandled(char*, char*, char*, struct channel*);
 
 /* Message receiving handlers */
 static int recv_ctcp_req (char*, struct parsed_mesg*, struct server*);
@@ -151,7 +151,7 @@ server_fatal(struct server *s, char *fmt, ...)
 }
 
 static void
-commands_add(char *key, int (*val)(char*, char*, channel*))
+commands_add(char *key, int (*val)(char*, char*, struct channel*))
 {
 	struct command *c;
 
@@ -199,7 +199,7 @@ commands_get(const char *key, size_t len)
  * */
 
 void
-send_mesg(char *mesg, channel *chan)
+send_mesg(char *mesg, struct channel *chan)
 {
 	/* Handle the input to a channel, ie:
 	 *	- a default message to the channel
@@ -251,7 +251,7 @@ send_paste(char *paste)
 }
 
 static int
-send_unhandled(char *err, char *cmd, char *args, channel *c)
+send_unhandled(char *err, char *cmd, char *args, struct channel *c)
 {
 	/* All commands defined in the UNHANDLED_CMDS */
 
@@ -265,12 +265,12 @@ send_unhandled(char *err, char *cmd, char *args, channel *c)
 }
 
 static int
-send_clear(char *err, char *mesg, channel *c)
+send_clear(char *err, char *mesg, struct channel *c)
 {
 	/* /clear [channel] */
 
 	char *targ;
-	channel *cc;
+	struct channel *cc;
 
 	if (!(targ = getarg(&mesg, " ")))
 		channel_clear(c);
@@ -283,12 +283,12 @@ send_clear(char *err, char *mesg, channel *c)
 }
 
 static int
-send_close(char *err, char *mesg, channel *c)
+send_close(char *err, char *mesg, struct channel *c)
 {
 	/* /close [channel] */
 
 	char *targ;
-	channel *cc;
+	struct channel *cc;
 
 	if (!(targ = getarg(&mesg, " ")))
 		channel_close(c);
@@ -301,7 +301,7 @@ send_close(char *err, char *mesg, channel *c)
 }
 
 static int
-send_connect(char *err, char *mesg, channel *c)
+send_connect(char *err, char *mesg, struct channel *c)
 {
 	/* /connect [(host) | (host:port) | (host port)] */
 
@@ -330,7 +330,7 @@ send_connect(char *err, char *mesg, channel *c)
 }
 
 static int
-send_ctcp(char *err, char *mesg, channel *c)
+send_ctcp(char *err, char *mesg, struct channel *c)
 {
 	/* /ctcp <target> <message> */
 
@@ -354,7 +354,7 @@ send_ctcp(char *err, char *mesg, channel *c)
 }
 
 static int
-send_default(char *err, char *mesg, channel *c)
+send_default(char *err, char *mesg, struct channel *c)
 {
 	/* All messages not beginning with '/'  */
 
@@ -372,7 +372,7 @@ send_default(char *err, char *mesg, channel *c)
 }
 
 static int
-send_disconnect(char *err, char *mesg, channel *c)
+send_disconnect(char *err, char *mesg, struct channel *c)
 {
 	/* /disconnect [quit message] */
 
@@ -388,7 +388,7 @@ send_disconnect(char *err, char *mesg, channel *c)
 }
 
 static int
-send_me(char *err, char *mesg, channel *c)
+send_me(char *err, char *mesg, struct channel *c)
 {
 	/* /me <message> */
 
@@ -406,7 +406,7 @@ send_me(char *err, char *mesg, channel *c)
 }
 
 static int
-send_ignore(char *err, char *mesg, channel *c)
+send_ignore(char *err, char *mesg, struct channel *c)
 {
 	/* /ignore [nick] */
 
@@ -428,7 +428,7 @@ send_ignore(char *err, char *mesg, channel *c)
 }
 
 static int
-send_join(char *err, char *mesg, channel *c)
+send_join(char *err, char *mesg, struct channel *c)
 {
 	/* /join [target[,targets]*] */
 
@@ -450,7 +450,7 @@ send_join(char *err, char *mesg, channel *c)
 }
 
 static int
-send_msg(char *err, char *mesg, channel *c)
+send_msg(char *err, char *mesg, struct channel *c)
 {
 	/* Alias for /priv */
 
@@ -458,7 +458,7 @@ send_msg(char *err, char *mesg, channel *c)
 }
 
 static int
-send_nick(char *err, char *mesg, channel *c)
+send_nick(char *err, char *mesg, struct channel *c)
 {
 	/* /nick [nick] */
 
@@ -476,7 +476,7 @@ send_nick(char *err, char *mesg, channel *c)
 }
 
 static int
-send_part(char *err, char *mesg, channel *c)
+send_part(char *err, char *mesg, struct channel *c)
 {
 	/* /part [[target[,targets]*] part message]*/
 
@@ -498,12 +498,12 @@ send_part(char *err, char *mesg, channel *c)
 }
 
 static int
-send_privmsg(char *err, char *mesg, channel *c)
+send_privmsg(char *err, char *mesg, struct channel *c)
 {
 	/* /(priv | msg) <target> <message> */
 
 	char *targ;
-	channel *cc;
+	struct channel *cc;
 
 	if (!(targ = getarg(&mesg, " ")))
 		fail("Error: Private messages require a target");
@@ -522,7 +522,7 @@ send_privmsg(char *err, char *mesg, channel *c)
 }
 
 static int
-send_raw(char *err, char *mesg, channel *c)
+send_raw(char *err, char *mesg, struct channel *c)
 {
 	/* /raw <raw message> */
 
@@ -534,7 +534,7 @@ send_raw(char *err, char *mesg, channel *c)
 }
 
 static int
-send_topic(char *err, char *mesg, channel *c)
+send_topic(char *err, char *mesg, struct channel *c)
 {
 	/* /topic [topic] */
 
@@ -549,7 +549,7 @@ send_topic(char *err, char *mesg, channel *c)
 }
 
 static int
-send_unignore(char *err, char *mesg, channel *c)
+send_unignore(char *err, char *mesg, struct channel *c)
 {
 	/* /unignore [nick] */
 
@@ -571,7 +571,7 @@ send_unignore(char *err, char *mesg, channel *c)
 }
 
 static int
-send_quit(char *err, char *mesg, channel *c)
+send_quit(char *err, char *mesg, struct channel *c)
 {
 	/* /quit [quit message] */
 
@@ -591,7 +591,7 @@ send_quit(char *err, char *mesg, channel *c)
 }
 
 static int
-send_version(char *err, char *mesg, channel *c)
+send_version(char *err, char *mesg, struct channel *c)
 {
 	/* /version [target] */
 
@@ -714,7 +714,7 @@ recv_ctcp_req(char *err, struct parsed_mesg *p, struct server *s)
 	if (!strcmp(cmd, "ACTION")) {
 		/* ACTION <message> */
 
-		channel *c;
+		struct channel *c;
 
 		if (IS_ME(targ)) {
 			/* Sending emote to private channel */
@@ -840,7 +840,7 @@ recv_join(char *err, struct parsed_mesg *p, struct server *s)
 	/* :nick!user@hostname.domain JOIN [:]<channel> */
 
 	char *chan;
-	channel *c;
+	struct channel *c;
 
 	if (!p->from)
 		fail("JOIN: sender's nick is null");
@@ -879,7 +879,7 @@ recv_kick(char *err, struct parsed_mesg *p, struct server *s)
 	/* :nick!user@hostname.domain KICK <channel> <user> :comment */
 
 	char *chan, *user;
-	channel *c;
+	struct channel *c;
 
 	if (!p->from)
 		fail("KICK: sender's nick is null");
@@ -930,8 +930,8 @@ recv_mode(char *err, struct parsed_mesg *p, struct server *s)
 {
 	/* :nick!user@hostname.domain MODE <targ> *( ( "-" / "+" ) *<modes> *<modeparams> ) */
 
-	channel *c;
 	char *targ;
+	struct channel *c;
 
 	if (!(targ = getarg(&p->params, " ")))
 		fail("MODE: target is null");
@@ -1021,7 +1021,7 @@ recv_nick(char *err, struct parsed_mesg *p, struct server *s)
 		newlinef(s->channel, 0, "--", "You are now known as %s", nick);
 	}
 
-	channel *c = s->channel;
+	struct channel *c = s->channel;
 	do {
 		if (nicklist_del(&(c->nicklist), p->from)) {
 			nicklist_add(&(c->nicklist), nick);
@@ -1038,7 +1038,7 @@ recv_notice(char *err, struct parsed_mesg *p, struct server *s)
 	/* :nick.hostname.domain NOTICE <target> :<message> */
 
 	char *targ;
-	channel *c;
+	struct channel *c;
 
 	if (!p->trailing)
 		fail("NOTICE: message is null");
@@ -1070,9 +1070,9 @@ recv_numeric(char *err, struct parsed_mesg *p, struct server *s)
 {
 	/* :server <code> <target> [args] */
 
-	channel *c;
 	char *targ, *nick, *chan, *time, *type, *num;
 	int ret;
+	struct channel *c;
 
 	enum numeric code = 0;
 
@@ -1346,7 +1346,7 @@ recv_part(char *err, struct parsed_mesg *p, struct server *s)
 	/* :nick!user@hostname.domain PART <channel> [:message] */
 
 	char *targ;
-	channel *c;
+	struct channel *c;
 
 	if (!p->from)
 		fail("PART: sender's nick is null");
@@ -1423,7 +1423,7 @@ recv_privmesg(char *err, struct parsed_mesg *p, struct server *s)
 	/* :nick!user@hostname.domain PRIVMSG <target> :<message> */
 
 	char *targ;
-	channel *c;
+	struct channel *c;
 
 	if (!p->trailing)
 		fail("PRIVMSG: message is null");
@@ -1474,7 +1474,7 @@ recv_quit(char *err, struct parsed_mesg *p, struct server *s)
 	if (!p->from)
 		fail("QUIT: sender's nick is null");
 
-	channel *c = s->channel;
+	struct channel *c = s->channel;
 	do {
 		if (nicklist_del(&(c->nicklist), p->from)) {
 			if (c->nicklist.count < config.join_part_quit_threshold) {
@@ -1497,8 +1497,8 @@ recv_topic(char *err, struct parsed_mesg *p, struct server *s)
 {
 	/* :nick!user@hostname.domain TOPIC <channel> :[topic] */
 
-	channel *c;
 	char *targ;
+	struct channel *c;
 
 	if (!p->from)
 		fail("TOPIC: sender's nick is null");
