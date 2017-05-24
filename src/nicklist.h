@@ -3,6 +3,8 @@
 
 #include "tree.h"
 
+//TODO: user/userlist -> channel users, server ignore users
+
 struct nicklist
 {
 	struct avl_node *root;

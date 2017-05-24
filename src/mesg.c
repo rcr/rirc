@@ -60,6 +60,8 @@
 	X(unignore) \
 	X(version)
 
+//TODO: recv/send handlers should take a struct ctx with err, server, channel
+
 /* Function prototypes for explicitly handled commands */
 #define X(cmd) static int send_##cmd(char*, char*, struct server*, struct channel*);
 HANDLED_SEND_CMDS
@@ -274,7 +276,7 @@ send_clear(char *err, char *mesg, struct server *s, struct channel *c)
 
 	if (!(targ = getarg(&mesg, " ")))
 		channel_clear(c);
-	else if ((cc = channel_get(targ, s)))
+	else if ((cc = channel_list_get(&s->clist, targ)))
 		channel_clear(cc);
 	else
 		failf("Error: Channel '%s' not found", targ);
@@ -292,7 +294,7 @@ send_close(char *err, char *mesg, struct server *s, struct channel *c)
 
 	if (!(targ = getarg(&mesg, " ")))
 		channel_close(c);
-	else if ((cc = channel_get(targ, s)))
+	else if ((cc = channel_list_get(&s->clist, targ)))
 		channel_close(cc);
 	else
 		failf("Error: Channel '%s' not found", targ);
@@ -517,7 +519,7 @@ send_privmsg(char *err, char *mesg, struct server *s, struct channel *c)
 
 	fail_if(sendf(err, s, "PRIVMSG %s :%s", targ, mesg));
 
-	if ((cc = channel_get(targ, s)) == NULL)
+	if ((cc = channel_list_get(&s->clist, targ)) == NULL)
 		cc = new_channel(targ, s, c, BUFFER_PRIVATE);
 
 	newline(cc, BUFFER_LINE_CHAT, s->nick, mesg);
@@ -724,13 +726,13 @@ recv_ctcp_req(char *err, struct parsed_mesg *p, struct server *s)
 		if (IS_ME(targ)) {
 			/* Sending emote to private channel */
 
-			if ((c = channel_get(p->from, s)) == NULL)
+			if ((c = channel_list_get(&s->clist, p->from)) == NULL)
 				c = new_channel(p->from, s, s->channel, BUFFER_PRIVATE);
 
 			if (c != ccur)
 				c->active = ACTIVITY_PINGED;
 
-		} else if ((c = channel_get(targ, s)) == NULL)
+		} else if ((c = channel_list_get(&s->clist, targ)) == NULL)
 			failf("CTCP ACTION: channel '%s' not found", targ);
 
 		newlinef(c, 0, "*", "%s %s", p->from, mesg);
@@ -844,6 +846,7 @@ recv_join(char *err, struct parsed_mesg *p, struct server *s)
 {
 	/* :nick!user@hostname.domain JOIN [:]<channel> */
 
+	//FIXME: chan / targ
 	char *chan;
 	struct channel *c;
 
@@ -854,7 +857,7 @@ recv_join(char *err, struct parsed_mesg *p, struct server *s)
 		fail("JOIN: channel is null");
 
 	if (IS_ME(p->from)) {
-		if ((c = channel_get(chan, s)) == NULL)
+		if ((c = channel_list_get(&s->clist, chan)) == NULL)
 			channel_set_current(new_channel(chan, s, ccur, BUFFER_CHANNEL));
 		else {
 			c->parted = 0;
@@ -863,7 +866,7 @@ recv_join(char *err, struct parsed_mesg *p, struct server *s)
 		draw_all();
 	} else {
 
-		if ((c = channel_get(chan, s)) == NULL)
+		if ((c = channel_list_get(&s->clist, chan)) == NULL)
 			failf("JOIN: channel '%s' not found", chan);
 
 		if (!nicklist_add(&(c->nicklist), p->from))
@@ -895,7 +898,7 @@ recv_kick(char *err, struct parsed_mesg *p, struct server *s)
 	if (!(user = getarg(&p->params, " ")))
 		fail("KICK: user is null");
 
-	if ((c = channel_get(chan, s)) == NULL)
+	if ((c = channel_list_get(&s->clist, chan)) == NULL)
 		failf("KICK: channel '%s' not found", chan);
 
 	/* RFC 2812, 3.2.8:
@@ -945,7 +948,7 @@ recv_mode(char *err, struct parsed_mesg *p, struct server *s)
 	if (IS_ME(targ))
 		c = s->channel;
 	else
-		c = channel_get(targ, s);
+		c = channel_list_get(&s->clist, targ);
 
 	char *modes, *modeparams, *modetmp = NULL;
 
@@ -989,6 +992,7 @@ recv_mode(char *err, struct parsed_mesg *p, struct server *s)
 			 * and print where found */
 			c = s->channel;
 
+			//TODO: channel_list_foreach
 			do {
 				if (nicklist_get(&(c->nicklist), targ, 0))
 					/* [<user> set ]<target> mode: [<mode>][ <modeparams>] */
@@ -1027,6 +1031,7 @@ recv_nick(char *err, struct parsed_mesg *p, struct server *s)
 	}
 
 	struct channel *c = s->channel;
+	//TODO: channel_list_foreach
 	do {
 		if (nicklist_del(&(c->nicklist), p->from)) {
 			nicklist_add(&(c->nicklist), nick);
@@ -1062,7 +1067,7 @@ recv_notice(char *err, struct parsed_mesg *p, struct server *s)
 	if (!(targ = getarg(&p->params, " ")))
 		fail("NOTICE: target is null");
 
-	if ((c = channel_get(targ, s)))
+	if ((c = channel_list_get(&s->clist, targ)))
 		newline(c, 0, p->from, p->trailing);
 	else
 		newline(s->channel, 0, p->from, p->trailing);
@@ -1123,6 +1128,7 @@ recv_numeric(char *err, struct parsed_mesg *p, struct server *s)
 		} else {
 			/* If reconnecting to server, join any non-parted channels */
 			c = s->channel;
+			//TODO: channel_list_foreach
 			do {
 				if (c->buffer.type == BUFFER_CHANNEL && !c->parted)
 					fail_if(sendf(err, s, "JOIN %s", c->name));
@@ -1157,7 +1163,7 @@ recv_numeric(char *err, struct parsed_mesg *p, struct server *s)
 		if (!(chan = getarg(&p->params, " ")))
 			fail("RPL_CHANNEL_URL: channel is null");
 
-		if ((c = channel_get(chan, s)) == NULL)
+		if ((c = channel_list_get(&s->clist, chan)) == NULL)
 			failf("RPL_CHANNEL_URL: channel '%s' not found", chan);
 
 		newlinef(c, 0, "--", "URL for %s is: \"%s\"", chan, p->trailing);
@@ -1170,7 +1176,7 @@ recv_numeric(char *err, struct parsed_mesg *p, struct server *s)
 		if (!(chan = getarg(&p->params, " ")))
 			fail("RPL_TOPIC: channel is null");
 
-		if ((c = channel_get(chan, s)) == NULL)
+		if ((c = channel_list_get(&s->clist, chan)) == NULL)
 			failf("RPL_TOPIC: channel '%s' not found", chan);
 
 		newlinef(c, 0, "--", "Topic for %s is \"%s\"", chan, p->trailing);
@@ -1189,7 +1195,7 @@ recv_numeric(char *err, struct parsed_mesg *p, struct server *s)
 		if (!(time = getarg(&p->params, " ")))
 			fail("RPL_TOPICWHOTIME: time is null");
 
-		if ((c = channel_get(chan, s)) == NULL)
+		if ((c = channel_list_get(&s->clist, chan)) == NULL)
 			failf("RPL_TOPICWHOTIME: channel '%s' not found", chan);
 
 		time_t raw_time = atoi(time);
@@ -1209,7 +1215,7 @@ recv_numeric(char *err, struct parsed_mesg *p, struct server *s)
 		if (!(chan = getarg(&p->params, " ")))
 			fail("RPL_NAMEREPLY: channel is null");
 
-		if ((c = channel_get(chan, s)) == NULL)
+		if ((c = channel_list_get(&s->clist, chan)) == NULL)
 			failf("RPL_NAMEREPLY: channel '%s' not found", chan);
 
 		c->type_flag = *type;
@@ -1274,7 +1280,7 @@ recv_numeric(char *err, struct parsed_mesg *p, struct server *s)
 		}
 
 		/* Private buffer might not exist */
-		if ((c = channel_get(targ, s)) == NULL)
+		if ((c = channel_list_get(&s->clist, targ)) == NULL)
 			c = s->channel;
 
 		if (p->trailing)
@@ -1290,7 +1296,7 @@ recv_numeric(char *err, struct parsed_mesg *p, struct server *s)
 			fail("ERR_CANNOTSENDTOCHAN: channel is null");
 
 		/* Channel buffer might not exist */
-		if ((c = channel_get(chan, s)) == NULL)
+		if ((c = channel_list_get(&s->clist, chan)) == NULL)
 			c = s->channel;
 
 		if (p->trailing)
@@ -1362,7 +1368,7 @@ recv_part(char *err, struct parsed_mesg *p, struct server *s)
 	if (IS_ME(p->from)) {
 
 		/* If receving a PART message from myself channel isn't found, assume it was closed */
-		if ((c = channel_get(targ, s)) != NULL) {
+		if ((c = channel_list_get(&s->clist, targ)) == NULL) {
 
 			part_channel(c);
 
@@ -1377,7 +1383,7 @@ recv_part(char *err, struct parsed_mesg *p, struct server *s)
 		return 0;
 	}
 
-	if ((c = channel_get(targ, s)) == NULL)
+	if ((c = channel_list_get(&s->clist, targ)) == NULL)
 		failf("PART: channel '%s' not found", targ);
 
 	if (!nicklist_del(&(c->nicklist), p->from))
@@ -1450,13 +1456,13 @@ recv_privmesg(char *err, struct parsed_mesg *p, struct server *s)
 	/* Find the target channel */
 	if (IS_ME(targ)) {
 
-		if ((c = channel_get(p->from, s)) == NULL)
+		if ((c = channel_list_get(&s->clist, p->from)) == NULL)
 			c = new_channel(p->from, s, s->channel, BUFFER_PRIVATE);
 
 		if (c != ccur)
 			c->active = ACTIVITY_PINGED;
 
-	} else if ((c = channel_get(targ, s)) == NULL)
+	} else if ((c = channel_list_get(&s->clist, targ)) == NULL)
 		failf("PRIVMSG: channel '%s' not found", targ);
 
 	if (check_pinged(p->trailing, s->nick)) {
@@ -1480,6 +1486,7 @@ recv_quit(char *err, struct parsed_mesg *p, struct server *s)
 		fail("QUIT: sender's nick is null");
 
 	struct channel *c = s->channel;
+	//TODO: channel_list_foreach
 	do {
 		if (nicklist_del(&(c->nicklist), p->from)) {
 			if (c->nicklist.count < config.join_part_quit_threshold) {
@@ -1514,7 +1521,7 @@ recv_topic(char *err, struct parsed_mesg *p, struct server *s)
 	if (!p->trailing)
 		fail("TOPIC: topic is null");
 
-	if ((c = channel_get(targ, s)) == NULL)
+	if ((c = channel_list_get(&s->clist, targ)) == NULL)
 		failf("TOPIC: channel '%s' not found", targ);
 
 	if (*p->trailing) {

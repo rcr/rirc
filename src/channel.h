@@ -1,8 +1,9 @@
 #ifndef CHANNEL_H
 #define CHANNEL_H
 
-#include "nicklist.h"
 #include "buffer.h"
+#include "nicklist.h"
+#include "tree.h"
 
 #define MODE_SIZE (26 * 2) + 1 /* Supports modes [az-AZ] */
 
@@ -24,12 +25,14 @@ struct channel
 	char chanmodes[MODE_SIZE];
 	int parted;
 	struct buffer buffer;
-	struct channel *next;
-	struct channel *prev;
 	struct input *input;
 	struct nicklist nicklist;
 	struct server *server;
-	SPLAY_NODE(channel) node;
+
+	SPLAY_NODE(channel) node; /* Fast unordered retrieval */
+	struct channel *next;
+	struct channel *prev;
+	//TODO: DLL_NODE here since channels will be added to both
 };
 
 struct channel_list
@@ -40,5 +43,10 @@ struct channel_list
 struct channel* channel_list_add(struct channel_list*, struct channel*);
 struct channel* channel_list_del(struct channel_list*, struct channel*);
 struct channel* channel_list_get(struct channel_list*, char*);
+
+//TODO: define macro, use the DLL, not the SPLAY stuff
+//  channel_list_foreach(channel_list, channel*)   {
+//
+//  }
 
 #endif

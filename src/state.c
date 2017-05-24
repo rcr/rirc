@@ -175,7 +175,9 @@ new_channel(char *name, struct server *s, struct channel *chanlist, enum buffer_
 	/* Append the new channel to the list */
 	DLL_ADD(chanlist, c);
 
-	channel_list_add(&s->clist, c);
+	if (s) {
+		channel_list_add(&s->clist, c);
+	}
 
 	draw_all();
 
@@ -190,23 +192,6 @@ free_channel(struct channel *c)
 	free_input(c->input);
 	free(c->name);
 	free(c);
-}
-
-struct channel*
-channel_get(char *chan, struct server *s)
-{
-	if (!s)
-		return NULL;
-
-	struct channel *c = s->channel;
-
-	do {
-		if (!irc_strcmp(c->name, chan))
-			return c;
-
-	} while ((c = c->next) != s->channel);
-
-	return NULL;
 }
 
 /* FIXME: functions that operate on a buffer should just take the buffer as an argument */
