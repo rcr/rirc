@@ -15,8 +15,8 @@
 /* FIXME: terrible, until i remove references to ccur/rirc */
 #define rirc (default_channel())
 #define ccur (current_channel())
-channel* current_channel(void);
-channel* default_channel(void);
+struct channel* current_channel(void);
+struct channel* default_channel(void);
 
 //TODO: rename
 unsigned int _term_cols(void);
@@ -27,33 +27,34 @@ void resize(void);
 void init_state(void);
 void free_state(void);
 
+//TODO: move to channel.c
 /* Useful state retrieval abstractions */
-channel* channel_get(char*, struct server*);
-channel* channel_get_first(void);
-channel* channel_get_last(void);
-channel* channel_get_next(channel*);
-channel* channel_get_prev(channel*);
+struct channel* channel_get(char*, struct server*);
+struct channel* channel_get_first(void);
+struct channel* channel_get_last(void);
+struct channel* channel_get_next(struct channel*);
+struct channel* channel_get_prev(struct channel*);
 
 /* State altering interface */
-channel* new_channel(char*, struct server*, channel*, enum buffer_t);
+struct channel* new_channel(char*, struct server*, struct channel*, enum buffer_t);
 void auto_nick(char**, char*);
 
 /* FIXME: */
-void buffer_scrollback_back(channel*);
-void buffer_scrollback_forw(channel*);
-void channel_clear(channel*);
+void buffer_scrollback_back(struct channel*);
+void buffer_scrollback_forw(struct channel*);
+void channel_clear(struct channel*);
 
-void channel_close(channel*);
+void channel_close(struct channel*);
 void channel_move_prev(void);
 void channel_move_next(void);
-void channel_set_current(channel*);
-void channel_set_mode(channel*, const char*);
-void free_channel(channel*);
-void newline(channel*, enum buffer_line_t, const char*, const char*);
-void newlinef(channel*, enum buffer_line_t, const char*, const char*, ...);
-void nicklist_print(channel*);
-void part_channel(channel*);
-void reset_channel(channel*);
+void channel_set_current(struct channel*);
+void channel_set_mode(struct channel*, const char*);
+void free_channel(struct channel*);
+void newline(struct channel*, enum buffer_line_t, const char*, const char*);
+void newlinef(struct channel*, enum buffer_line_t, const char*, const char*, ...);
+void nicklist_print(struct channel*);
+void part_channel(struct channel*);
+void reset_channel(struct channel*);
 void server_set_mode(struct server*, const char*);
 
 /* TODO: refactor, should be static in state */

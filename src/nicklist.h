@@ -1,7 +1,9 @@
 #ifndef NICKLIST_H
 #define NICKLIST_H
 
-#include "avl.h"
+#include "tree.h"
+
+//TODO: user/userlist -> channel users, server ignore users
 
 struct nicklist
 {

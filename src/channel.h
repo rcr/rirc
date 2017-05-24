@@ -1,9 +1,9 @@
 #ifndef CHANNEL_H
 #define CHANNEL_H
 
+#include "buffer.h"
 #include "nicklist.h"
-
-/* TODO: refactor -> channel.c */
+#include "tree.h"
 
 #define MODE_SIZE (26 * 2) + 1 /* Supports modes [az-AZ] */
 
@@ -17,7 +17,7 @@ typedef enum
 } activity_t;
 
 /* Channel */
-typedef struct channel
+struct channel
 {
 	activity_t active;
 	char *name;
@@ -25,11 +25,28 @@ typedef struct channel
 	char chanmodes[MODE_SIZE];
 	int parted;
 	struct buffer buffer;
-	struct channel *next;
-	struct channel *prev;
 	struct input *input;
 	struct nicklist nicklist;
 	struct server *server;
-} channel;
+
+	SPLAY_NODE(channel) node; /* Fast unordered retrieval */
+	struct channel *next;
+	struct channel *prev;
+	//TODO: DLL_NODE here since channels will be added to both
+};
+
+struct channel_list
+{
+	SPLAY_HEAD(channel);
+};
+
+struct channel* channel_list_add(struct channel_list*, struct channel*);
+struct channel* channel_list_del(struct channel_list*, struct channel*);
+struct channel* channel_list_get(struct channel_list*, char*);
+
+//TODO: define macro, use the DLL, not the SPLAY stuff
+//  channel_list_foreach(channel_list, channel*)   {
+//
+//  }
 
 #endif
