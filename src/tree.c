@@ -1,7 +1,7 @@
 #include <setjmp.h>
 #include <stdlib.h>
 
-#include "avl.h"
+#include "tree.h"
 #include "utils.h"
 
 #define H(N) ((N) == NULL ? 0 : (N)->height)
@@ -9,12 +9,9 @@
 
 //TODO: generalize avl tree functions as macros
 
-//FIXME:
-static jmp_buf jmpbuf;
-
-static struct avl_node* _avl_add(struct avl_node*, const char*, int (*)(const char*, const char*), void*);
-static struct avl_node* _avl_del(struct avl_node*, const char*, int (*)(const char*, const char*));
-static struct avl_node* _avl_get(struct avl_node*, const char*, int (*)(const char*, const char*, size_t), size_t);
+static struct avl_node* _avl_add(jmp_buf*, struct avl_node*, const char*, int (*)(const char*, const char*), void*);
+static struct avl_node* _avl_del(jmp_buf*, struct avl_node*, const char*, int (*)(const char*, const char*));
+static struct avl_node* _avl_get(jmp_buf*, struct avl_node*, const char*, int (*)(const char*, const char*, size_t), size_t);
 static struct avl_node* avl_new_node(const char*, void*);
 static void avl_free_node(struct avl_node*);
 static struct avl_node* avl_rotate_L(struct avl_node*);
@@ -40,10 +37,12 @@ avl_add(struct avl_node **n, const char *key, int (*cmp)(const char*, const char
 {
 	/* Entry point for adding a node to an AVL tree */
 
-	if (setjmp(jmpbuf))
+	jmp_buf err;
+
+	if (setjmp(err))
 		return 0;
 
-	*n = _avl_add(*n, key, cmp, val);
+	*n = _avl_add(&err, *n, key, cmp, val);
 
 	return 1;
 }
@@ -53,10 +52,12 @@ avl_del(struct avl_node **n, const char *key, int (*cmp)(const char*, const char
 {
 	/* Entry point for removing a node from an AVL tree */
 
-	if (setjmp(jmpbuf))
+	jmp_buf err;
+
+	if (setjmp(err))
 		return 0;
 
-	*n = _avl_del(*n, key, cmp);
+	*n = _avl_del(&err, *n, key, cmp);
 
 	return 1;
 }
@@ -66,10 +67,12 @@ avl_get(struct avl_node *n, const char *key, int (*cmp)(const char*, const char*
 {
 	/* Entry point for fetching an avl node with prefix key */
 
-	if (setjmp(jmpbuf))
+	jmp_buf err;
+
+	if (setjmp(err))
 		return NULL;
 
-	return _avl_get(n, key, cmp, len);
+	return _avl_get(&err, n, key, cmp, len);
 }
 
 static struct avl_node*
@@ -146,7 +149,7 @@ avl_rotate_L(struct avl_node *r)
 }
 
 static struct avl_node*
-_avl_add(struct avl_node *n, const char *key, int (*cmp)(const char*, const char*), void *val)
+_avl_add(jmp_buf *err, struct avl_node *n, const char *key, int (*cmp)(const char*, const char*), void *val)
 {
 	/* Recursively add key to an AVL tree.
 	 *
@@ -159,13 +162,13 @@ _avl_add(struct avl_node *n, const char *key, int (*cmp)(const char*, const char
 
 	if (ret == 0)
 		/* Duplicate found */
-		longjmp(jmpbuf, 1);
+		longjmp(*err, 1);
 
 	else if (ret > 0)
-		n->r = _avl_add(n->r, key, cmp, val);
+		n->r = _avl_add(err, n->r, key, cmp, val);
 
 	else if (ret < 0)
-		n->l = _avl_add(n->l, key, cmp, val);
+		n->l = _avl_add(err, n->l, key, cmp, val);
 
 	/* Node was successfully added, recaculate height and rebalance */
 
@@ -197,7 +200,7 @@ _avl_add(struct avl_node *n, const char *key, int (*cmp)(const char*, const char
 }
 
 static struct avl_node*
-_avl_del(struct avl_node *n, const char *key, int (*cmp)(const char*, const char*))
+_avl_del(jmp_buf *err, struct avl_node *n, const char *key, int (*cmp)(const char*, const char*))
 {
 	/* Recursive function for deleting nodes from an AVL tree
 	 *
@@ -205,7 +208,7 @@ _avl_del(struct avl_node *n, const char *key, int (*cmp)(const char*, const char
 
 	if (n == NULL)
 		/* Node not found */
-		longjmp(jmpbuf, 1);
+		longjmp(*err, 1);
 
 	int ret = cmp(key, n->key);
 
@@ -230,7 +233,7 @@ _avl_del(struct avl_node *n, const char *key, int (*cmp)(const char*, const char
 			next->val = t.val;
 
 			/* Recusively delete in the right subtree */
-			n->r = _avl_del(n->r, t.key, cmp);
+			n->r = _avl_del(err, n->r, t.key, cmp);
 
 		} else {
 			/* If n has a child, return it */
@@ -243,10 +246,10 @@ _avl_del(struct avl_node *n, const char *key, int (*cmp)(const char*, const char
 	}
 
 	else if (ret > 0)
-		n->r = _avl_del(n->r, key, cmp);
+		n->r = _avl_del(err, n->r, key, cmp);
 
 	else if (ret < 0)
-		n->l = _avl_del(n->l, key, cmp);
+		n->l = _avl_del(err, n->l, key, cmp);
 
 	/* Node was successfully deleted, recalculate height and rebalance */
 
@@ -278,21 +281,21 @@ _avl_del(struct avl_node *n, const char *key, int (*cmp)(const char*, const char
 }
 
 static struct avl_node*
-_avl_get(struct avl_node *n, const char *key, int (*cmp)(const char*, const char*, size_t), size_t len)
+_avl_get(jmp_buf *err, struct avl_node *n, const char *key, int (*cmp)(const char*, const char*, size_t), size_t len)
 {
 	/* Case insensitive search for a node whose value is prefixed by key */
 
 	/* Failed to find node */
 	if (n == NULL)
-		longjmp(jmpbuf, 1);
+		longjmp(*err, 1);
 
 	int ret = cmp(key, n->key, len);
 
 	if (ret > 0)
-		return _avl_get(n->r, key, cmp, len);
+		return _avl_get(err, n->r, key, cmp, len);
 
 	if (ret < 0)
-		return _avl_get(n->l, key, cmp, len);
+		return _avl_get(err, n->l, key, cmp, len);
 
 	/* Match found */
 	return n;

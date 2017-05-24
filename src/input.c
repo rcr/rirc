@@ -596,19 +596,19 @@ reframe_line(input *in)
  *
  * It can be cleaned up, and input.c is probably not the most ideal place for this */
 #define MAX_SEARCH 128
-channel *search_cptr; /* Used for iterative searching, before setting ccur */
+struct channel *search_cptr; /* Used for iterative searching, before setting ccur */
 static char search_buff[MAX_SEARCH];
 static char *search_ptr = search_buff;
 
-static channel* search_channels(channel*, char*);
-static channel*
-search_channels(channel *start, char *search)
+static struct channel* search_channels(struct channel*, char*);
+static struct channel*
+search_channels(struct channel *start, char *search)
 {
 	if (start == NULL || *search == '\0')
 		return NULL;
 
 	/* Start the search one past the input */
-	channel *c = channel_get_next(start);
+	struct channel *c = channel_get_next(start);
 
 	while (c != start) {
 

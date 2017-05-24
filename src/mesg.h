@@ -3,7 +3,7 @@
 
 #include <stddef.h>
 
-#include "avl.h"
+#include "tree.h"
 #include "channel.h"
 #include "server.h"
 
@@ -13,7 +13,7 @@
 const struct avl_node* commands_get(const char*, size_t);
 
 void recv_mesg(char*, int, struct server*);
-void send_mesg(char*, channel*);
+void send_mesg(char*, struct channel*);
 void send_paste(char*);
 
 #endif

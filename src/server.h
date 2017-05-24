@@ -43,6 +43,8 @@ struct server
 	time_t reconnect_delta;
 	time_t reconnect_time;
 	void *connecting;
+	//TODO: WIP
+	struct channel_list clist;
 };
 
 //TODO:

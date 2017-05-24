@@ -21,8 +21,8 @@
 /* State of rirc */
 static struct
 {
-	channel *current_channel; /* the current channel being drawn */
-	channel *default_channel; /* the default rirc channel at startup */
+	struct channel *current_channel; /* the current channel being drawn */
+	struct channel *default_channel; /* the default rirc channel at startup */
 
 	//TODO: not used???
 	struct server *server_list;
@@ -35,10 +35,10 @@ static struct
 
 static int action_close_server(char);
 
-static void _newline(channel*, enum buffer_line_t, const char*, const char*, size_t);
+static void _newline(struct channel*, enum buffer_line_t, const char*, const char*, size_t);
 
-channel* current_channel(void) { return state.current_channel; }
-channel* default_channel(void) { return state.default_channel; }
+struct channel* current_channel(void) { return state.current_channel; }
+struct channel* default_channel(void) { return state.default_channel; }
 
 unsigned int _term_cols(void) { return state.term_cols; }
 unsigned int _term_rows(void) { return state.term_rows; }
@@ -77,6 +77,11 @@ resize(void)
 void
 init_state(void)
 {
+	errno = 0; /* atexit doesn't set errno */
+
+	if (atexit(free_state) != 0)
+		fatal("atexit");
+
 	state.default_channel = state.current_channel = new_channel("rirc", NULL, NULL, BUFFER_OTHER);
 
 	/* Splashscreen */
@@ -99,11 +104,13 @@ init_state(void)
 void
 free_state(void)
 {
+	/* Exit handler; must return normally */
+
 	free_channel(state.default_channel);
 }
 
 void
-newline(channel *c, enum buffer_line_t type, const char *from, const char *mesg)
+newline(struct channel *c, enum buffer_line_t type, const char *from, const char *mesg)
 {
 	/* Default wrapper for _newline because length of message won't be known */
 
@@ -111,7 +118,7 @@ newline(channel *c, enum buffer_line_t type, const char *from, const char *mesg)
 }
 
 void
-newlinef(channel *c, enum buffer_line_t type, const char *from, const char *fmt, ...)
+newlinef(struct channel *c, enum buffer_line_t type, const char *from, const char *fmt, ...)
 {
 	/* Formating wrapper for _newline */
 
@@ -127,7 +134,7 @@ newlinef(channel *c, enum buffer_line_t type, const char *from, const char *fmt,
 }
 
 static void
-_newline(channel *c, enum buffer_line_t type, const char *from, const char *mesg, size_t len)
+_newline(struct channel *c, enum buffer_line_t type, const char *from, const char *mesg, size_t len)
 {
 	/* Static function for handling inserting new lines into buffers */
 
@@ -152,10 +159,10 @@ _newline(channel *c, enum buffer_line_t type, const char *from, const char *mesg
 		draw_nav();
 }
 
-channel*
-new_channel(char *name, struct server *s, channel *chanlist, enum buffer_t type)
+struct channel*
+new_channel(char *name, struct server *s, struct channel *chanlist, enum buffer_t type)
 {
-	channel *c;
+	struct channel *c;
 
 	if ((c = calloc(1, sizeof(*c))) == NULL)
 		fatal("calloc");
@@ -168,13 +175,17 @@ new_channel(char *name, struct server *s, channel *chanlist, enum buffer_t type)
 	/* Append the new channel to the list */
 	DLL_ADD(chanlist, c);
 
+	if (s) {
+		channel_list_add(&s->clist, c);
+	}
+
 	draw_all();
 
 	return c;
 }
 
 void
-free_channel(channel *c)
+free_channel(struct channel *c)
 {
 	nicklist_free(&(c->nicklist));
 
@@ -183,26 +194,9 @@ free_channel(channel *c)
 	free(c);
 }
 
-channel*
-channel_get(char *chan, struct server *s)
-{
-	if (!s)
-		return NULL;
-
-	channel *c = s->channel;
-
-	do {
-		if (!irc_strcmp(c->name, chan))
-			return c;
-
-	} while ((c = c->next) != s->channel);
-
-	return NULL;
-}
-
 /* FIXME: functions that operate on a buffer should just take the buffer as an argument */
 void
-channel_clear(channel *c)
+channel_clear(struct channel *c)
 {
 	UNUSED(c);
 	/* FIXME: c->buffer = buffer_init(c->buffer.type) */
@@ -219,7 +213,7 @@ action_close_server(char c)
 	if (c == 'y' || c == 'Y') {
 
 		//FIXME: logic here sucks
-		channel *c = ccur;
+		struct channel *c = ccur;
 
 		/* If closing the last server */
 		if ((state.current_channel = c->server->next->channel) == c->server->channel)
@@ -236,13 +230,13 @@ action_close_server(char c)
 }
 
 void
-nicklist_print(channel *c)
+nicklist_print(struct channel *c)
 {
 	newline(c, 0, "TODO", "Print ignore list to channel");
 }
 
 void
-reset_channel(channel *c)
+reset_channel(struct channel *c)
 {
 	memset(c->chanmodes, 0, MODE_SIZE);
 
@@ -250,7 +244,7 @@ reset_channel(channel *c)
 }
 
 void
-part_channel(channel *c)
+part_channel(struct channel *c)
 {
 	/* Set the state of a parted channel */
 	reset_channel(c);
@@ -259,7 +253,7 @@ part_channel(channel *c)
 }
 
 void
-channel_close(channel *c)
+channel_close(struct channel *c)
 {
 	/* Close a channel. If the current channel is being
 	 * closed, update state appropriately */
@@ -297,15 +291,18 @@ channel_close(channel *c)
 		}
 
 		DLL_DEL(c->server->channel, c);
+
+		channel_list_del(&c->server->clist, c);
+
 		free_channel(c);
 	}
 }
 
 /* Get a channel's next/previous, taking into account server wraparound */
-channel*
-channel_switch(channel *c, int next)
+struct channel*
+channel_switch(struct channel *c, int next)
 {
-	channel *ret;
+	struct channel *ret;
 
 	/* c in this case is the main buffer */
 	if (c->server == NULL)
@@ -328,7 +325,7 @@ channel_switch(channel *c, int next)
 }
 
 void
-buffer_scrollback_back(channel *c)
+buffer_scrollback_back(struct channel *c)
 {
 	/* Scroll a buffer back one page */
 
@@ -373,7 +370,7 @@ buffer_scrollback_back(channel *c)
 }
 
 void
-buffer_scrollback_forw(channel *c)
+buffer_scrollback_forw(struct channel *c)
 {
 	/* Scroll a buffer forward one page */
 
@@ -506,7 +503,7 @@ server_set_mode(struct server *s, const char *modes)
 }
 
 void
-channel_set_mode(channel *c, const char *modes)
+channel_set_mode(struct channel *c, const char *modes)
 {
 	set_mode_str(c->chanmodes, modes);
 
@@ -516,7 +513,7 @@ channel_set_mode(channel *c, const char *modes)
 
 /* Usefull server/channel structure abstractions for drawing */
 
-channel*
+struct channel*
 channel_get_first(void)
 {
 	struct server *s = get_server_head();
@@ -525,7 +522,7 @@ channel_get_first(void)
 	return !s ? state.default_channel : s->channel;
 }
 
-channel*
+struct channel*
 channel_get_last(void)
 {
 	struct server *s = get_server_head();
@@ -534,8 +531,8 @@ channel_get_last(void)
 	return !s ? state.default_channel : s->prev->channel->prev;
 }
 
-channel*
-channel_get_next(channel *c)
+struct channel*
+channel_get_next(struct channel *c)
 {
 	if (c == state.default_channel)
 		return c;
@@ -544,8 +541,8 @@ channel_get_next(channel *c)
 		return !(c->next == c->server->channel) ?  c->next : c->server->next->channel;
 }
 
-channel*
-channel_get_prev(channel *c)
+struct channel*
+channel_get_prev(struct channel *c)
 {
 	if (c == state.default_channel)
 		return c;
@@ -555,7 +552,7 @@ channel_get_prev(channel *c)
 }
 
 void
-channel_set_current(channel *c)
+channel_set_current(struct channel *c)
 {
 	/* Set the state to an arbitrary channel */
 
@@ -569,7 +566,7 @@ channel_move_prev(void)
 {
 	/* Set the current channel to the previous channel */
 
-	channel *c = channel_get_prev(state.current_channel);
+	struct channel *c = channel_get_prev(state.current_channel);
 
 	if (c != state.current_channel) {
 		state.current_channel = c;
@@ -582,7 +579,7 @@ channel_move_next(void)
 {
 	/* Set the current channel to the next channel */
 
-	channel *c = channel_get_next(state.current_channel);
+	struct channel *c = channel_get_next(state.current_channel);
 
 	if (c != state.current_channel) {
 		state.current_channel = c;
