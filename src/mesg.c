@@ -1368,7 +1368,7 @@ recv_part(char *err, struct parsed_mesg *p, struct server *s)
 	if (IS_ME(p->from)) {
 
 		/* If receving a PART message from myself channel isn't found, assume it was closed */
-		if ((c = channel_list_get(&s->clist, targ)) == NULL) {
+		if ((c = channel_list_get(&s->clist, targ)) != NULL) {
 
 			part_channel(c);
 
