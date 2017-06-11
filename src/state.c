@@ -324,6 +324,8 @@ channel_switch(struct channel *c, int next)
 	return ret;
 }
 
+//TODO:
+//improvement: don't set the scrollback if the buffer tail is in view
 void
 buffer_scrollback_back(struct channel *c)
 {
@@ -361,8 +363,8 @@ buffer_scrollback_back(struct channel *c)
 
 	b->scrollback = buffer_i;
 
-	/* Top line is partial */
-	if (count == rows)
+	/* Top line in view draws in full; scroll back one additional line */
+	if (count == rows && line != buffer_tail(b))
 		b->scrollback--;
 
 	draw_buffer();
@@ -403,7 +405,8 @@ buffer_scrollback_forw(struct channel *c)
 		line = buffer_line(b, ++b->scrollback);
 	}
 
-	if (count == rows)
+	/* Bottom line in view draws in full; scroll forward one additional line */
+	if (count == rows && line != buffer_head(b))
 		b->scrollback++;
 
 	draw_buffer();

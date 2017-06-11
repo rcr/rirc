@@ -25,6 +25,9 @@ int check_pinged(const char*, const char*);
 int parse_mesg(struct parsed_mesg*, char*);
 void error(int status, const char*, ...);
 
+//FIXME: pass errno to the macro or 0 when errno won't be set
+//e.g:
+//rirc: ERROR in buffer_line: invalid index (errno: Interrupted system call)
 /* Irrecoverable error
  *   this define is precluded in test.h to aggregate fatal errors in testcases */
 #ifndef fatal
