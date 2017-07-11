@@ -55,29 +55,30 @@ static int action_send_paste(char);
 static int action_find_channel(char);
 
 /* Case insensitive tab complete for commands and nicks */
-static void tab_complete(input*);
+static void tab_complete(struct input*);
 
 /* Send the current input to be parsed and handled */
 static void send_input(void);
 
 /* Input line manipulation functions */
-static inline void cursor_left(input*);
-static inline void cursor_right(input*);
-static inline void delete_left(input*);
-static inline void delete_right(input*);
-static inline void input_scroll_backwards(input*);
-static inline void input_scroll_forwards(input*);
+static inline void cursor_left(struct input*);
+static inline void cursor_right(struct input*);
+static inline void delete_left(struct input*);
+static inline void delete_right(struct input*);
+static inline void input_scroll_backwards(struct input*);
+static inline void input_scroll_forwards(struct input*);
 
 /* Input line util functions */
-static inline void reset_line(input*);
-static inline void reframe_line(input*);
+static inline void reset_line(struct input*);
+static inline void reframe_line(struct input*);
 
-static void new_list_head(input*);
+static void new_list_head(struct input*);
 
-input*
+//TODO: struct input input(struct input*)
+struct input*
 new_input(void)
 {
-	input *i;
+	struct input *i;
 
 	if ((i = calloc(1, sizeof(*i))) == NULL)
 		fatal("calloc");
@@ -88,11 +89,11 @@ new_input(void)
 }
 
 void
-free_input(input *i)
+free_input(struct input *i)
 {
 	/* Free an input and all of it's lines */
 
-	input_line *t, *l = i->list_head;
+	struct input_line *t, *l = i->list_head;
 
 	do {
 		t = l;
@@ -104,11 +105,11 @@ free_input(input *i)
 }
 
 static void
-new_list_head(input *i)
+new_list_head(struct input *i)
 {
 	/* Append a new line as the list_head */
 
-	input_line *l;
+	struct input_line *l;
 
 	if ((l = calloc(1, sizeof(*l))) == NULL)
 		fatal("calloc");
@@ -481,7 +482,7 @@ action(int (*a_handler)(char), const char *fmt, ...)
  * */
 
 static inline void
-cursor_left(input *in)
+cursor_left(struct input *in)
 {
 	/* Move the cursor left */
 
@@ -492,7 +493,7 @@ cursor_left(input *in)
 }
 
 static inline void
-cursor_right(input *in)
+cursor_right(struct input *in)
 {
 	/* Move the cursor right */
 
@@ -503,7 +504,7 @@ cursor_right(input *in)
 }
 
 static inline void
-delete_left(input *in)
+delete_left(struct input *in)
 {
 	/* Delete the character left of the cursor */
 
@@ -514,7 +515,7 @@ delete_left(input *in)
 }
 
 static inline void
-delete_right(input *in)
+delete_right(struct input *in)
 {
 	/* Delete the character right of the cursor */
 
@@ -525,7 +526,7 @@ delete_right(input *in)
 }
 
 static inline void
-input_scroll_backwards(input *in)
+input_scroll_backwards(struct input *in)
 {
 	/* Scroll backwards through the input history */
 
@@ -543,7 +544,7 @@ input_scroll_backwards(input *in)
 }
 
 static inline void
-input_scroll_forwards(input *in)
+input_scroll_forwards(struct input *in)
 {
 	/* Scroll forwards through the input history */
 
@@ -565,7 +566,7 @@ input_scroll_forwards(input *in)
  * */
 
 static inline void
-reset_line(input *in)
+reset_line(struct input *in)
 {
 	/* Reset a line's gap buffer pointers such that new chars are inserted at the gap head */
 
@@ -580,7 +581,7 @@ reset_line(input *in)
 }
 
 static inline void
-reframe_line(input *in)
+reframe_line(struct input *in)
 {
 	/* Reframe a line's draw window */
 
@@ -696,7 +697,7 @@ action_find_channel(char c)
 }
 
 void
-tab_complete(input *inp)
+tab_complete(struct input *inp)
 {
 	/* Case insensitive tab complete for commands and nicks */
 
@@ -779,7 +780,7 @@ send_input(void)
 {
 	char sendbuff[BUFFSIZE];
 
-	input *in = ccur->input;
+	struct input *in = ccur->input;
 
 	/* Before sending, copy the tail of the gap buffer back to the head */
 	reset_line(in);
@@ -803,7 +804,7 @@ send_input(void)
 
 		if (in->count == SCROLLBACK_INPUT) {
 			/* Reached maximum input scrollback lines, delete the tail */
-			input_line *t = in->list_head->next;
+			struct input_line *t = in->list_head->next;
 
 			DLL_DEL(in->list_head, t);
 			free(t);

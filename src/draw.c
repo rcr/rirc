@@ -496,7 +496,7 @@ _draw_input(struct channel *c)
 
 	unsigned int winsz = cols / 3;
 
-	input *in = c->input;
+	struct input *in = c->input;
 
 	/* Reframe the input bar window */
 	if (in->head > (in->window + cols - 6))
