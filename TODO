@@ -2,7 +2,8 @@ TODO
 ---------------------------
 
 this iteration:
-	- fix paste
+	- Fix drawing input when pasting longer than terminal width
+	- Fix segfault on free_input when input contains a max length line
 	- fix draw chans colouring
 	- proper mode support
 	- list.h, in prep for channel/server list abstraction

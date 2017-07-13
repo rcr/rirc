@@ -436,7 +436,6 @@ _draw_nav(struct channel *c)
 			break;
 		}
 
-
 		tmp = nextward ? channel_get_next(tmp_next) : channel_get_prev(tmp_prev);
 		len = strlen(tmp->name);
 

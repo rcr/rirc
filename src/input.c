@@ -22,34 +22,19 @@
 #include "state.h"
 #include "utils.h"
 
-/* Max number of characters accepted in user pasted input */
-#define MAX_PASTE 2048
-
-/* Max number of lines that can result from a paste */
-#define MAX_PASTE_LINES 128
-
 /* Max length of user action message */
 #define MAX_ACTION_MESG 256
 
 char *action_message;
 
-/* Buffer to hold paste message while waiting for confirmation, includes room for \r\n */
-static char paste_buff[MAX_INPUT + MAX_PASTE + (2 * MAX_PASTE_LINES)];
-static size_t paste_len;
-
 /* User input handlers */
 static int input_char(char);
-static void input_cchar(char);
-static void input_cseq(char*, ssize_t);
-static void input_paste(char*, ssize_t);
+static void input_cchar(char*);
 static void input_action(char*, ssize_t);
 
 /* Action handling */
 static int (*action_handler)(char);
 static char action_buff[MAX_ACTION_MESG];
-
-/* Confirmation handler when multi-line pastes are encountered */
-static int action_send_paste(char);
 
 /* Incremental channel search */
 static int action_find_channel(char);
@@ -128,21 +113,14 @@ new_list_head(struct input *i)
 void
 poll_input(void)
 {
-	/* Poll stdin for user input. 4 cases:
-	 *
-	 * 1. A single printable character
-	 * 2. A single byte control character
-	 * 3. A multibyte control sequence
-	 * 4. Pasted input (up to MAX_PASTE characters)
-	 *
-	 * Pastes should be sanitized of unprintable characters and split into
-	 * lines by \n characters or by MAX_INPUT. The user is warned about
-	 * pastes exceeding a single line before sending. */
+	/* Poll stdin for user input, checking for control character
+	 * or escape sequence. Otherwise copy all characters to the
+	 * input struct of the current context
+	 */
 
-	int ret;
-	int timeout_ms = 200;
+	int ret, timeout_ms = 200;
 
-	char input_buff[MAX_PASTE + 1];
+	char *inp_ptr, inp_buff[MAX_INPUT + 1];
 
 	struct pollfd stdin_fd[] = {{ .fd = STDIN_FILENO, .events = POLLIN }};
 
@@ -153,34 +131,23 @@ poll_input(void)
 
 		ssize_t count;
 
-		while ((count = read(STDIN_FILENO, input_buff, MAX_PASTE)) < 0)
+		while ((count = read(STDIN_FILENO, inp_buff, MAX_INPUT)) < 0)
 			if (errno != EINTR)
 				fatal("read");
 
 		if (count == 0)
 			fatal("stdin closed");
 
-		*(input_buff + count) = '\0';
+		*(inp_buff + count) = '\0';
 
-		/* Waiting for user action, ignore everything else */
-		 if (action_message)
-			input_action(input_buff, count);
+		if (action_message)
+			input_action(inp_buff, count);
 
-		/* Case 1 */
-		else if (count == 1 && isprint(*input_buff))
-			input_char(*input_buff);
+		else if (iscntrl(*inp_buff))
+			input_cchar(inp_buff);
 
-		/* Case 2 */
-		else if (count == 1 && iscntrl(*input_buff))
-			input_cchar(*input_buff);
-
-		/* Case 3 */
-		else if (*input_buff == 0x1b)
-			input_cseq(input_buff, count);
-
-		/* Case 4 */
-		else if (count > 1)
-			input_paste(input_buff, count);
+		else for (inp_ptr = inp_buff; *inp_ptr && input_char(*inp_ptr); inp_ptr++)
+			;
 	}
 }
 
@@ -205,11 +172,45 @@ input_char(char c)
 }
 
 static void
-input_cchar(char c)
+input_cchar(char *c)
 {
-	/* Input a single byte control character */
+	/* Input a control character or escape sequence */
 
-	switch (c) {
+	/* ESC begins a key sequence */
+	if (*c == 0x1b) {
+
+		if (++c == 0)
+			return;
+
+		/* arrow up */
+		else if (!strcmp(c, "[A"))
+			input_scroll_backwards(ccur->input);
+
+		/* arrow down */
+		else if (!strcmp(c, "[B"))
+			input_scroll_forwards(ccur->input);
+
+		/* arrow right */
+		else if (!strcmp(c, "[C"))
+			cursor_right(ccur->input);
+
+		/* arrow left */
+		else if (!strcmp(c, "[D"))
+			cursor_left(ccur->input);
+
+		/* delete */
+		else if (!strcmp(c, "[3~"))
+			delete_right(ccur->input);
+
+		/* page up */
+		else if (!strcmp(c, "[5~"))
+			buffer_scrollback_back(ccur);
+
+		/* page down */
+		else if (!strcmp(c, "[6~"))
+			buffer_scrollback_forw(ccur);
+
+	} else switch (*c) {
 
 		/* Backspace */
 		case 0x7F:
@@ -278,167 +279,6 @@ input_cchar(char c)
 			buffer_scrollback_forw(ccur);
 			break;
 	}
-}
-
-static void
-input_cseq(char *input, ssize_t len)
-{
-	/* Input a multibyte control sequence */
-
-	/* Skip comparing the escape character */
-	input++;
-	if (--len == 0)
-		return;
-
-	/* arrow up */
-	else if (!strncmp(input, "[A", len))
-		input_scroll_backwards(ccur->input);
-
-	/* arrow down */
-	else if (!strncmp(input, "[B", len))
-		input_scroll_forwards(ccur->input);
-
-	/* arrow right */
-	else if (!strncmp(input, "[C", len))
-		cursor_right(ccur->input);
-
-	/* arrow left */
-	else if (!strncmp(input, "[D", len))
-		cursor_left(ccur->input);
-
-	/* delete */
-	else if (!strncmp(input, "[3~", len))
-		delete_right(ccur->input);
-
-	/* page up */
-	else if (!strncmp(input, "[5~", len))
-		buffer_scrollback_back(ccur);
-
-	/* page down */
-	else if (!strncmp(input, "[6~", len))
-		buffer_scrollback_forw(ccur);
-}
-
-//TODO: third option Y, N, [S]trip newlines
-//       - skip repeated newlines, but replace single ones with ' ' and input it
-/* TODO:
- *
- * Rather than render with \r\n, separate messages with \0. The handler for this will
- * will iterate over it and call sendf & _newline */
-static void
-input_paste(char *paste, ssize_t len)
-{
-	/* Input pasted text and render a buffer of messages that will be sent if confirmed */
-
-	/* If first character is /, assume a command is being entered:
-	 *  - don't input more than a single input line will accept
-	 *  - don't automatically send anything
-	 */
-	if (*ccur->input->line->text == '/') {
-
-		while (len && input_char(*paste))
-			len--, paste++;
-
-		return;
-	}
-
-	/* Determine how many lines would be required for the paste, confirm with user
-	 *
-	 * Where each message will be:
-	 *   `PRIVMESG <target> :<mesg>\r\n`
-	 */
-
-	/* Max number of characters per message that can be sent to this target */
-	size_t max_len = BUFFSIZE - strlen("PRIVMESG  :\r\n") - strlen(ccur->name);
-
-	/* Get the number of characters currently on the input line's gap buffer */
-	size_t input_len = (ccur->input->head - ccur->input->line->text)
-		+ (MAX_INPUT - (ccur->input->tail - ccur->input->line->text));
-
-	/* If there are no \n characters in the paste and (head + paste + tail) fits in one
-	 * input line, insert the paste and skip the rest of the processing */
-	if ((input_len + len) <= max_len && !strchr(paste, '\n')) {
-
-		while (len && input_char(*paste))
-			len--, paste++;
-
-		return;
-	}
-
-	/* Else render the paste buffer, count lines, confirm with user
-	 *
-	 * Since paste might be inserted into the middle of the line, copy the input
-	 * head, then scan and copy the paste, then copy the tail
-	 *
-	 * The paste body should be scanned for \n, the head and tail can be assumed to contain none
-	 */
-	char *input_ptr, *paste_ptr = paste_buff;
-
-	int line_count = 1;
-
-	/* Copy the input head to the paste buffer */
-	for (input_ptr = ccur->input->line->text; input_ptr < ccur->input->head; input_ptr++)
-		*paste_ptr++ = *input_ptr;
-
-	/* Initial length is the input head's count */
-	size_t line_len = ccur->input->head - ccur->input->line->text;
-
-	/* Scan the paste for \n characters and count the length, if \n is encountered
-	 * or the max number of characters is encountered, insert message terminator */
-	for (input_ptr = paste; input_ptr < &paste[len]; input_ptr++) {
-
-		if (*input_ptr == '\n' || line_len == max_len) {
-
-			/* Dedupe \n characters to avoid sending empty lines */
-			if (*paste_ptr == '\n')
-				continue;
-
-			line_count++;
-
-			*paste_ptr++ = '\r';
-			*paste_ptr++ = '\n';
-
-			line_len = 0;
-
-			if (line_count == MAX_PASTE_LINES) {
-				newlinef(ccur, 0, "-!!-",
-						"MAX_PASTE_LINES (%d) encountered, discarding excess", MAX_PASTE_LINES);
-
-				/* Goto send_paste to avoid adding the tail to the paste */
-				goto send_paste;
-			}
-		} else {
-			*paste_ptr++ = *input_ptr;
-		}
-	}
-
-	/* Copy the input tail to the paste buffer
-	 *
-	 * Since line_count is at least < MAX_PASTE_LINES there will always  be enough
-	 * for the tail, though it may be be split at least once more
-	 */
-	for (input_ptr = ccur->input->tail; input_ptr < ccur->input->head; input_ptr++) {
-
-		if (line_len == max_len) {
-			line_count++;
-
-			*paste_ptr++ = '\r';
-			*paste_ptr++ = '\n';
-
-			line_len = 0;
-		}
-
-		*paste_ptr++ = *input_ptr;
-		line_len++;
-	}
-
-send_paste:
-
-	/* Store the paste length */
-	paste_len = paste_ptr - paste_buff;
-
-	/* Confirm sending the paste */
-	action(action_send_paste, "Confirm sending %d lines? [y/n]", line_count);
 }
 
 static void
@@ -756,23 +596,6 @@ tab_complete(struct input *inp)
 /*
  * Input sending functions
  * */
-
-static int
-action_send_paste(char c)
-{
-	/* Confirmed send */
-	if (toupper(c) == 'Y') {
-		send_paste(paste_buff);
-		return 1;
-	}
-
-	/* Confirmed don't send */
-	if (toupper(c) == 'N')
-		return 1;
-
-	/* Do nothing */
-	return 0;
-}
 
 /* TODO: pass channel into this function too */
 static void
