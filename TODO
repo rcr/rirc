@@ -2,7 +2,6 @@ TODO
 ---------------------------
 
 this iteration:
-	- fix channel clear
 	- fix `len` passed to newline/buffer_newline, known at _newline
 
 next iteration:

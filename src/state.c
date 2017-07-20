@@ -189,13 +189,12 @@ free_channel(struct channel *c)
 	free(c);
 }
 
-/* FIXME: functions that operate on a buffer should just take the buffer as an argument */
 void
 channel_clear(struct channel *c)
 {
-	UNUSED(c);
-	/* FIXME: c->buffer = buffer_init(c->buffer.type) */
-	;
+	c->buffer = buffer(c->buffer.type);
+
+	draw_buffer();
 }
 
 /* Confirm closing a server */
