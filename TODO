@@ -2,8 +2,6 @@ TODO
 ---------------------------
 
 this iteration:
-	- Fix drawing input when pasting longer than terminal width
-	- Fix segfault on free_input when input contains a max length line
 	- fix draw chans colouring
 	- proper mode support
 	- list.h, in prep for channel/server list abstraction
@@ -12,6 +10,8 @@ Continue refactoring:
 	- Move/split components (e.g. server, channel, input, etc):
 		src/components/*.{c,h}
 	- Untangle headers
+	- Rewrite input DLL as circular buffer of gap buffers, with copy on repeat,
+		use abstractions in _draw_input
 
 src/README.md
 
@@ -69,8 +69,6 @@ Parsing 004/005 numeric for server specific configuration
 	-> parse PREFIX=(abc)xyz and use this to fix mode messages that are setting,
 	   for example, channel +o when the arg is a username in the channel
 
-Reimplement the pasting stuff that was broken
-
 Implement generic command arguments
 	/<cmd> -arg
 e.g.
@@ -84,8 +82,6 @@ when disconnected and reconnected, PING/PONG seems to be out of sync?
 I broke the activity colouring stuff:
 	join/part/quit sets activity (it shouldnt)
 	message and ping dont set activity (they should)
-
-Reimplement getting args as arg(&parsed_mesg)
 
 Some servers place single args in the trailing section, eg: JOIN :channel vs JOIN channel
 which forces the handlers to check p->params and p->trailing, however since p->params

@@ -1,6 +1,8 @@
 /* Rirc configuration header */
 
-/* Colors, 0..255 */
+/* Colours can be set [0, 255],
+ * Any other value will set the default terminal foreground/background */
+
 #define BUFFER_LINE_HEADER_FG_NEUTRAL 239
 
 #define BUFFER_LINE_HEADER_FG_PINGED  250
@@ -20,6 +22,15 @@ static int nick_colours[] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14};
 #define QUOTE_CHAR '>'
 #define HORIZONTAL_SEPARATOR "-"
 #define VERTICAL_SEPARATOR "~"
+
+/* Prefix string for the input line and colours */
+#define INPUT_PREFIX " >>> "
+#define INPUT_PREFIX_FG 239
+#define INPUT_PREFIX_BG -1
+
+/* Input line text colours */
+#define INPUT_FG 250
+#define INPUT_BG -1
 
 /* BUFFER_PAD:
  * How the buffer line headers will be padded, options are 0, 1

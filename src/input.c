@@ -10,6 +10,10 @@
  * Escape sequences are assumed to be ANSI. As such, you mileage may vary
  * */
 
+//TODO: complete rewrite,
+// line->end is not properly set in a lot of cases,
+// should be rewritten with a better thought out design
+
 #include <ctype.h>
 #include <poll.h>
 #include <stdarg.h>

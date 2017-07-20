@@ -21,15 +21,11 @@
 
 #define ESC "\x1b"
 
-/* Set foreground/background colour */
+#define RESET_ATTRIBUTES ESC"[0m"
+
+//FIXME: remove in favour of _colour
 #define FG(X) ESC"[38;5;"#X"m"
 #define BG(X) ESC"[48;5;"#X"m"
-
-/* Reset foreground/background colour */
-#define FG_R ESC"[39m"
-#define BG_R ESC"[49m"
-
-#define CLEAR_ATTRIBUTES ESC"[0m"
 
 #define MOVE(X, Y) ESC"["#X";"#Y"H"
 
@@ -45,6 +41,9 @@
 /* Minimum rows or columns to safely draw */
 #define COLS_MIN 5
 #define ROWS_MIN 5
+
+/* Size of a full colour string for purposes of pre-formating text to print */
+#define COLOUR_SIZE sizeof(RESET_ATTRIBUTES FG(255) BG(255))
 
 #ifndef BUFFER_PADDING
 	#define BUFFER_PADDING 1
@@ -73,16 +72,18 @@ struct coords
 	unsigned int rN;
 };
 
-static int _draw_fmt(char*, size_t*, size_t*, size_t*, int, const char*, ...);
+static int _draw_fmt(char**, size_t*, size_t*, int, const char*, ...);
 
 static void _draw_buffer_line(struct buffer_line*, struct coords, unsigned int, unsigned int, unsigned int, unsigned int);
 static void _draw_buffer(struct buffer*, struct coords);
-static void _draw_input(struct channel*);
+static void _draw_input(struct input*, struct coords);
 static void _draw_nav(struct channel*);
 static void _draw_status(struct channel*);
 
 static inline unsigned int nick_col(char*);
 static inline void check_coords(struct coords);
+
+static char* _colour(int, int);
 
 void
 draw(union draw draw)
@@ -106,11 +107,20 @@ draw(union draw draw)
 			.r1 = 3,
 			.rN = _term_rows() - 2
 		});
+
 	if (draw.bits.nav)    _draw_nav(c);
-	if (draw.bits.input)  _draw_input(c);
+
+	if (draw.bits.input)  _draw_input(c->input,
+		(struct coords) {
+			.c1 = 1,
+			.cN = _term_cols(),
+			.r1 = _term_rows(),
+			.rN = _term_rows()
+		});
+
 	if (draw.bits.status) _draw_status(c);
 
-	printf(CLEAR_ATTRIBUTES);
+	printf(RESET_ATTRIBUTES);
 	printf(CURSOR_RESTORE);
 
 no_draw:
@@ -145,44 +155,43 @@ _draw_buffer_line(
 		 * should be allocated for all such sequences
 		 * */
 		char header[head_w + sizeof(FG(255) BG(255)) * 4 + 1];
+		char *header_ptr = header;
+
+		size_t buff_n = sizeof(header) - 1, /*  */
+		       text_n = head_w - 1;
 
 		struct tm *line_tm = localtime(&line->time);
 
-		size_t buff_n = sizeof(header) - 1,
-		       offset = 0,
-		       head_n = head_w - 1;
-
-		if (!_draw_fmt(header, &offset, &buff_n, &head_n, 0,
-				FG(%d) BG_R, BUFFER_LINE_HEADER_FG_NEUTRAL))
+		if (!_draw_fmt(&header_ptr, &buff_n, &text_n, 0,
+				RESET_ATTRIBUTES FG(%d), BUFFER_LINE_HEADER_FG_NEUTRAL))
 			goto print_header;
 
-		if (!_draw_fmt(header, &offset, &buff_n, &head_n, 1,
+		if (!_draw_fmt(&header_ptr, &buff_n, &text_n, 1,
 				" %02d:%02d ", line_tm->tm_hour, line_tm->tm_min))
 			goto print_header;
 
-		if (!_draw_fmt(header, &offset, &buff_n, &head_n, 1,
+		if (!_draw_fmt(&header_ptr, &buff_n, &text_n, 1,
 				"%*s", pad, ""))
 			goto print_header;
 
-		if (!_draw_fmt(header, &offset, &buff_n, &head_n, 0,
-				FG_R BG_R))
+		if (!_draw_fmt(&header_ptr, &buff_n, &text_n, 0, RESET_ATTRIBUTES))
 			goto print_header;
 
 		switch (line->type) {
 			case BUFFER_LINE_OTHER:
-				if (!_draw_fmt(header, &offset, &buff_n, &head_n, 0,
+				if (!_draw_fmt(&header_ptr, &buff_n, &text_n, 0,
 						FG(%d), BUFFER_LINE_HEADER_FG_NEUTRAL))
 					goto print_header;
 				break;
 
 			case BUFFER_LINE_CHAT:
-				if (!_draw_fmt(header, &offset, &buff_n, &head_n, 0,
+				if (!_draw_fmt(&header_ptr, &buff_n, &text_n, 0,
 						FG(%d), nick_col(line->from)))
 					goto print_header;
 				break;
 
 			case BUFFER_LINE_PINGED:
-				if (!_draw_fmt(header, &offset, &buff_n, &head_n, 0,
+				if (!_draw_fmt(&header_ptr, &buff_n, &text_n, 0,
 						FG(%d) BG(%d), BUFFER_LINE_HEADER_FG_PINGED, BUFFER_LINE_HEADER_BG_PINGED))
 					goto print_header;
 				break;
@@ -191,13 +200,13 @@ _draw_buffer_line(
 				break;
 		}
 
-		if (!_draw_fmt(header, &offset, &buff_n, &head_n, 1,
+		if (!_draw_fmt(&header_ptr, &buff_n, &text_n, 1,
 				"%s", line->from))
 			goto print_header;
 
 print_header:
 		/* Print the line header */
-		printf(MOVE(%d, 1) "%s " CLEAR_ATTRIBUTES, coords.r1, header);
+		printf(MOVE(%d, 1) "%s " RESET_ATTRIBUTES, coords.r1, header);
 	}
 
 	while (skip--)
@@ -208,7 +217,7 @@ print_header:
 
 		if ((coords.cN - coords.c1) >= sizeof(*sep) + text_w) {
 			printf(MOVE(%d, %d), coords.r1, (int)(coords.cN - (sizeof(*sep) + text_w + 1)));
-			printf(FG(%d) BG_R, BUFFER_LINE_HEADER_FG_NEUTRAL);
+			printf(RESET_ATTRIBUTES FG(%d), BUFFER_LINE_HEADER_FG_NEUTRAL);
 			puts(sep);
 		}
 
@@ -218,7 +227,7 @@ print_header:
 			print_p1 = p1;
 			print_p2 = word_wrap(text_w, &p1, p2);
 
-			printf(FG(%d) BG_R, line->text[0] == QUOTE_CHAR
+			printf(RESET_ATTRIBUTES FG(%d), line->text[0] == QUOTE_CHAR
 				? BUFFER_LINE_TEXT_FG_GREEN
 				: BUFFER_LINE_TEXT_FG_NEUTRAL);
 
@@ -471,55 +480,117 @@ _draw_nav(struct channel *c)
 	current->active = ACTIVITY_DEFAULT;
 }
 
-/* TODO:
- *
- * Could use some cleaning up*/
 static void
-_draw_input(struct channel *c)
+_draw_input(struct input *in, struct coords coords)
 {
-	unsigned int cols = _term_cols();
-	unsigned int rows = _term_rows();
+	/* Draw the input line, or the current action message */
 
-	printf(MOVE(%d, 1), rows);
-	printf(FG(%d) BG_R, BUFFER_LINE_HEADER_FG_NEUTRAL);
-	printf("%.*s", cols, " >>> ");
+	check_coords(coords);
 
-	printf(CLEAR_ATTRIBUTES);
+	unsigned int cols_t = coords.cN - coords.c1 + 1,
+	             cursor = coords.c1;
 
-	/* Action messages override the input bar */
-	if (action_message) {
-		printf(CLEAR_RIGHT FG(%d) "%s",
-				INPUT_FG_NEUTRAL, action_message);
+	printf(RESET_ATTRIBUTES);
+	printf(MOVE(%d, 1) CLEAR_LINE, coords.rN);
+	printf(CURSOR_SAVE);
+
+	/* Insufficient columns for meaningful input drawing */
+	if (cols_t < 3)
 		return;
+
+	char input[cols_t + COLOUR_SIZE * 2 + 1];
+	char *input_ptr = input;
+
+	size_t buff_n = sizeof(input) - 1,
+	       text_n = cols_t;
+
+	if (sizeof(INPUT_PREFIX)) {
+
+		if (!_draw_fmt(&input_ptr, &buff_n, &text_n, 0,
+				"%s", _colour(INPUT_PREFIX_FG, INPUT_PREFIX_BG)))
+			goto print_input;
+
+		cursor = coords.c1 + sizeof(INPUT_PREFIX) - 1;
+
+		if (!_draw_fmt(&input_ptr, &buff_n, &text_n, 1,
+				INPUT_PREFIX))
+			goto print_input;
 	}
 
-	unsigned int winsz = cols / 3;
+	if (!_draw_fmt(&input_ptr, &buff_n, &text_n, 0,
+			"%s", _colour(INPUT_FG, INPUT_BG)))
+		goto print_input;
 
-	struct input *in = c->input;
+	if (action_message) {
 
-	/* Reframe the input bar window */
-	if (in->head > (in->window + cols - 6))
-		in->window += winsz;
-	else if (in->head == in->window - 1)
-		in->window = (in->window - winsz > in->line->text)
-			? in->window - winsz : in->line->text;
+		cursor = coords.cN;
 
-	printf(CLEAR_RIGHT FG(%d), INPUT_FG_NEUTRAL);
+		if (!_draw_fmt(&input_ptr, &buff_n, &text_n, 1,
+				"%s", action_message))
+			goto print_input;
 
-	char *p = in->window;
-	while (p < in->head)
-		putchar(*p++);
+		cursor = cols_t - text_n + 1;
 
-	p = in->tail;
+	} else {
 
-	char *end = in->tail + cols - 5 - (in->head - in->window);
+		/*  Keep the input head in view, reframing if the cursor would be
+		 *  drawn outside [A, B] as a function of input window and head
+		 *
+		 * |  <prefix>     <text area>  |
+		 * |............|---------------|
+		 * |             A             B|
+		 * |                            | : cols_t
+		 *              |               | : text_n
+		 *
+		 * The cursor should track the input head, where the next
+		 * character would be entered
+		 *
+		 * In the <= A case: deletions occurred; the head is less than
+		 * or equal to the window
+		 *
+		 * In the >= B case: insertions occurred; the distance from window
+		 * to head is greater than the distance from [A, B]
+		 *
+		 * Set the window 2/3 of the text area width backwards from the head */
 
-	while (p < end && p < in->line->text + MAX_INPUT)
-		putchar(*p++);
+		size_t frame = text_n * 2 / 3;
 
-	int col = (in->head - in->window);
+		char *w1, *w2, *ptr;
 
-	printf(MOVE(%d, %d), _term_rows(), col + 6);
+		if (in->window >= in->head || (in->window + text_n) <= in->head) {
+
+			w1 = in->line->text,
+			w2 = in->line->text + frame;
+
+			in->window = (w2 >= in->head) ? w1 : in->head - frame;
+		}
+
+		cursor = (cols_t - text_n) + (in->head - in->window + 1);
+
+		for (ptr = in->window; text_n; text_n--) {
+
+			/* Copy characters, x, from the gap buffer, i.e.:
+			 *
+			 *  window   head    tail
+			 *       v      v       v
+			 * |.....xxxxxxx|------|xxxxxxx| */
+
+			if (ptr == in->head)
+				ptr = in->tail;
+
+			if (ptr == in->line->text + MAX_INPUT)
+				break;
+
+			*input_ptr++ = *ptr++;
+		}
+
+		*input_ptr = '\0';
+	}
+
+print_input:
+
+	printf(input);
+	printf(MOVE(%d, %d), coords.rN, (cursor >= coords.c1 && cursor <= coords.cN) ? cursor : coords.cN);
 	printf(CURSOR_SAVE);
 }
 
@@ -543,7 +614,7 @@ _draw_status(struct channel *c)
 	if (cols < 3)
 		return;
 
-	printf(CLEAR_ATTRIBUTES);
+	printf(RESET_ATTRIBUTES);
 
 	printf(MOVE(2, 1));
 	printf("%.*s", cols, (char *)(memset(alloca(cols), *HORIZONTAL_SEPARATOR, cols)));
@@ -652,55 +723,81 @@ nick_col(char *nick)
 	return nick_colours[colour % sizeof(nick_colours) / sizeof(nick_colours[0])];
 }
 
+static char*
+_colour(int fg, int bg)
+{
+	/* Set terminal foreground and background colours to a value [0, 255],
+	 * or reset colour if given anything else
+	 *
+	 * Foreground(F): ESC"[38;5;Fm"
+	 * Background(B): ESC"[48;5;Bm"
+	 * */
+
+	static char col_buff[COLOUR_SIZE + 1] = RESET_ATTRIBUTES;
+
+	int ret = 0;
+
+	char *col_buff_ptr = col_buff + sizeof(RESET_ATTRIBUTES) - 1;
+
+	/* Assume any colour sequence begins by resetting all attributes */
+	*(col_buff_ptr = col_buff + sizeof(RESET_ATTRIBUTES) - 1) = '\0';
+
+	/* Set valid foreground colour */
+	if (fg >= 0 && fg <= 255 && ((ret = sprintf(col_buff_ptr, ESC"[38;5;%dm", fg)) < 0))
+		return strcpy(col_buff, RESET_ATTRIBUTES);
+
+	col_buff_ptr += ret;
+
+	/* Set valid background colour */
+	if (bg >= 0 && bg <= 255 && ((ret = sprintf(col_buff_ptr, ESC"[48;5;%dm", bg)) < 0))
+		return strcpy(col_buff, RESET_ATTRIBUTES);
+
+	return col_buff;
+}
+
 static int
-_draw_fmt(char *buff, size_t *offset, size_t *buff_n, size_t *text_n, int txt, const char *fmt, ...)
+_draw_fmt(char **ptr, size_t *buff_n, size_t *text_n, int txt, const char *fmt, ...)
 {
 	/* Write formatted text to a buffer for purposes of preparing an object to be drawn
 	 * to the terminal.
 	 *
 	 * Calls to this function should distinguish between formatting and printed text
 	 * with the txt flag.
-	 * */
+	 *
+	 *  - ptr    : pointer to location in buffer being printed to
+	 *  - buff_n : remaining bytes available in buff
+	 *  - text_n : remaining columns available for text
+	 *  - txt    : flag set true if bytes being written are printable text
+	 *
+	 *  returns 0 on error, or if no more prints to this buffer can occur
+	 */
 
 	int ret;
-	size_t _ret;
 	va_list ap;
 
-	/* Man vsnprintf: "... the number of characters (excluding the terminating null byte) which
-	 * would have been writting to the final string if enough space had been avilable. Thus,
-	 * a return value of `size` or more means that the output was truncated" */
 	va_start(ap, fmt);
-	ret = vsnprintf(buff + *offset, *buff_n, fmt, ap);
+	ret = vsnprintf(*ptr, *buff_n, fmt, ap);
 	va_end(ap);
 
-	/* In any case of failure, truncate the buffer where printing would have began */
 	if (ret < 0)
-		return (*buff = 0);
+		return (**ptr = 0);
 
-	_ret = (size_t)ret;
+	size_t _ret = (size_t) ret;
 
-	/* If printing formatting escape sequences and insufficient room, truncate any partial
-	 * sequence that would be printed */
 	if (!txt && _ret >= *buff_n)
-		return (*buff = 0);
+		return (**ptr = 0);
 
 	if (txt) {
-
-		/* If printing text and insufficient text columns available, truncate after any printable
-		 * characters */
-		if (_ret >= *text_n)
-			return (*(buff + *text_n) = 0);
-
-		/* Either calls to this function were erroneously flagged or insufficient room was
-		 * allocated for all the formatting */
-		if (_ret >= *buff_n)
-			fatal("text columns available but buffer is full");
-
-		*text_n -= _ret;
+		if (*text_n > _ret)
+			*text_n -= _ret;
+		else {
+			*ptr += *text_n;
+			**ptr = 0;
+			return (*text_n = 0);
+		}
 	}
 
-	*offset += _ret;
-	*buff_n -= _ret;
+	*ptr += _ret;
 
 	return 1;
 }

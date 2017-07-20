@@ -25,6 +25,9 @@ int check_pinged(const char*, const char*);
 int parse_mesg(struct parsed_mesg*, char*);
 void error(int status, const char*, ...);
 
+#define MAX(A, B) ((A) > (B) ? (A) : (B))
+#define MIN(A, B) ((A) > (B) ? (B) : (A))
+
 //FIXME: pass errno to the macro or 0 when errno won't be set
 //e.g:
 //rirc: ERROR in buffer_line: invalid index (errno: Interrupted system call)

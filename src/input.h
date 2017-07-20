@@ -18,7 +18,7 @@
 struct input_line
 {
 	char *end;
-	char text[MAX_INPUT];
+	char text[MAX_INPUT + 1];
 	struct input_line *next;
 	struct input_line *prev;
 };
