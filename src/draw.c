@@ -384,15 +384,17 @@ _draw_nav(struct channel *c)
 
 	printf(MOVE(1, 1) CLEAR_LINE);
 
-	static struct channel *frame_prev, *frame_next;
+	static struct channel *frame_prev,
+	                      *frame_next;
 
-	struct channel *tmp, *current = c;
+	struct channel *c_first = channel_get_first(),
+	               *c_last = channel_get_last(),
+	               *tmp;
 
-	struct channel *c_first = channel_get_first();
-	struct channel *c_last = channel_get_last();
+	c->activity = ACTIVITY_DEFAULT;
 
 	/* By default assume drawing starts towards the next channel */
-	unsigned int nextward = 1;
+	int colour, nextward = 1;
 
 	size_t len, total_len = 0;
 
@@ -464,20 +466,19 @@ _draw_nav(struct channel *c)
 	frame_next = tmp_next;
 
 	/* Draw coloured channel names, from frame to frame */
-	for (c = frame_prev; ; c = channel_get_next(c)) {
+	for (tmp = frame_prev; ; tmp = channel_get_next(tmp)) {
 
-		/* Set print colour and print name */
-		if (printf(FG(%d), (c == current) ? 255 : actv_cols[c->active]) < 0)
+		colour = (tmp == c) ? NAV_CURRENT_CHAN : nav_actv_cols[tmp->activity];
+
+		if (printf(_colour(colour, -1)) < 0)
 			break;
 
-		if (printf(" %s ", c->name) < 0)
+		if (printf(" %s ", tmp->name) < 0)
 			break;
 
-		if (c == frame_next)
+		if (tmp == frame_next)
 			break;
 	}
-
-	current->active = ACTIVITY_DEFAULT;
 }
 
 static void

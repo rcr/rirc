@@ -2,9 +2,13 @@ TODO
 ---------------------------
 
 this iteration:
-	- fix draw chans colouring
-	- proper mode support
-	- list.h, in prep for channel/server list abstraction
+	- fix channel clear
+	- fix `len` passed to newline/buffer_newline, known at _newline
+
+next iteration:
+	- 004/005 parsing, server defaults and configuration handling
+	- CHANMODES, PREFIX=(abc)xyz
+	- Proper mode support (struct cmode/umode)
 
 Continue refactoring:
 	- Move/split components (e.g. server, channel, input, etc):
@@ -12,6 +16,9 @@ Continue refactoring:
 	- Untangle headers
 	- Rewrite input DLL as circular buffer of gap buffers, with copy on repeat,
 		use abstractions in _draw_input
+
+RFC compliance:
+	- List all message types and error numerics from RFC, mark handled/unhandled
 
 src/README.md
 
@@ -64,10 +71,6 @@ Keep state of tab complete for successively getting the next nick lexicographica
 Make sure all the thread related code is using thread-safe functions,
 and that proper cancellation points are used. Make sure no resources
 can be left hanging (eg: sockets left open when a thread is canceled?)
-
-Parsing 004/005 numeric for server specific configuration
-	-> parse PREFIX=(abc)xyz and use this to fix mode messages that are setting,
-	   for example, channel +o when the arg is a username in the channel
 
 Implement generic command arguments
 	/<cmd> -arg

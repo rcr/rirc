@@ -1,3 +1,14 @@
+/* TODO: reduce overall size of buffer, implement growable text area with
+ * ring of buffer_lines pointing to strings, instantiated with initial size
+ *
+ * i.e.            line(n).text            line(n+1).text
+ *                           v                         v
+ * text buffer: [...\0user1\0some line of text\0user2\0some other line\0...]
+ *                    ^                         ^
+ *          line(n).user             line(n+1).user
+ *
+ * will allow removal of text/from truncation */
+
 #include <string.h>
 
 #include "buffer.h"
@@ -10,21 +21,21 @@
 
 #define MASK(X) ((X) & (BUFFER_LINES_MAX - 1))
 
-static unsigned int buffer_size(struct buffer*);
 static unsigned int buffer_full(struct buffer*);
+static unsigned int buffer_size(struct buffer*);
 
 static struct buffer_line* buffer_push(struct buffer*);
-
-static unsigned int
-buffer_size(struct buffer *b)
-{
-	return b->head - b->tail;
-}
 
 static unsigned int
 buffer_full(struct buffer *b)
 {
 	return buffer_size(b) == BUFFER_LINES_MAX;
+}
+
+static unsigned int
+buffer_size(struct buffer *b)
+{
+	return b->head - b->tail;
 }
 
 static struct buffer_line*

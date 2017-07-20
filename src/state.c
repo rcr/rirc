@@ -139,10 +139,6 @@ _newline(struct channel *c, enum buffer_line_t type, const char *from, const cha
 	/* Static function for handling inserting new lines into buffers */
 
 	/* FIXME: pass len still? */
-	UNUSED(c);
-	UNUSED(type);
-	UNUSED(from);
-	UNUSED(mesg);
 	UNUSED(len);
 
 	if (c == NULL)
@@ -150,8 +146,7 @@ _newline(struct channel *c, enum buffer_line_t type, const char *from, const cha
 
 	buffer_newline(&c->buffer, type, from, mesg);
 
-	if (c->active < ACTIVITY_ACTIVE)
-		c->active = ACTIVITY_ACTIVE;
+	c->activity = MAX(c->activity, ACTIVITY_ACTIVE);
 
 	if (c == ccur)
 		draw_buffer();
@@ -316,8 +311,6 @@ channel_switch(struct channel *c, int next)
 		/* If wrapping around backwards, get previous server's last channel */
 		ret = !(c == c->server->channel) ?
 			c->prev : c->server->prev->channel->prev;
-
-	ret->active = ACTIVITY_DEFAULT;
 
 	draw_all();
 

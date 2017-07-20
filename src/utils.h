@@ -3,6 +3,10 @@
 
 #include <errno.h>
 
+//TODO: struct string { len, text[] } for
+// fields often strlen'ed, e.g. usernames, channel names, server names
+// strcmp comparing len == len && strlen
+
 /* Parsed IRC message */
 struct parsed_mesg
 {

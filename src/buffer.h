@@ -10,6 +10,7 @@
 	#define BUFFER_LINES_MAX (1 << 10)
 #endif
 
+/* Buffer line types, in order of precedence */
 enum buffer_line_t
 {
 	BUFFER_LINE_OTHER,  /* Default/all other lines */

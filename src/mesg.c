@@ -729,8 +729,10 @@ recv_ctcp_req(char *err, struct parsed_mesg *p, struct server *s)
 			if ((c = channel_list_get(&s->clist, p->from)) == NULL)
 				c = new_channel(p->from, s, s->channel, BUFFER_PRIVATE);
 
-			if (c != ccur)
-				c->active = ACTIVITY_PINGED;
+			if (c != ccur) {
+				c->activity = ACTIVITY_PINGED;
+				draw_nav();
+			}
 
 		} else if ((c = channel_list_get(&s->clist, targ)) == NULL)
 			failf("CTCP ACTION: channel '%s' not found", targ);
@@ -1459,16 +1461,20 @@ recv_privmesg(char *err, struct parsed_mesg *p, struct server *s)
 		if ((c = channel_list_get(&s->clist, p->from)) == NULL)
 			c = new_channel(p->from, s, s->channel, BUFFER_PRIVATE);
 
-		if (c != ccur)
-			c->active = ACTIVITY_PINGED;
+		if (c != ccur) {
+			c->activity = ACTIVITY_PINGED;
+			draw_nav();
+		}
 
 	} else if ((c = channel_list_get(&s->clist, targ)) == NULL)
 		failf("PRIVMSG: channel '%s' not found", targ);
 
 	if (check_pinged(p->trailing, s->nick)) {
 
-		if (c != ccur)
-			c->active = ACTIVITY_PINGED;
+		if (c != ccur) {
+			c->activity = ACTIVITY_PINGED;
+			draw_nav();
+		}
 
 		newline(c, BUFFER_LINE_PINGED, p->from, p->trailing);
 	} else
