@@ -3,6 +3,10 @@
 
 #include <errno.h>
 
+//TODO: struct string { len, text[] } for
+// fields often strlen'ed, e.g. usernames, channel names, server names
+// strcmp comparing len == len && strlen
+
 /* Parsed IRC message */
 struct parsed_mesg
 {
@@ -25,6 +29,12 @@ int check_pinged(const char*, const char*);
 int parse_mesg(struct parsed_mesg*, char*);
 void error(int status, const char*, ...);
 
+#define MAX(A, B) ((A) > (B) ? (A) : (B))
+#define MIN(A, B) ((A) > (B) ? (B) : (A))
+
+//FIXME: pass errno to the macro or 0 when errno won't be set
+//e.g:
+//rirc: ERROR in buffer_line: invalid index (errno: Interrupted system call)
 /* Irrecoverable error
  *   this define is precluded in test.h to aggregate fatal errors in testcases */
 #ifndef fatal

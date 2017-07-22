@@ -1,6 +1,6 @@
 #include "test.h"
 
-#include "../src/utils.c" /* FIXME: word_wrap */
+#include "../src/utils.c"
 #include "../src/buffer.c"
 
 #include <limits.h>
@@ -21,7 +21,7 @@ _buffer_newline(struct buffer *b, const char *t)
 {
 	/* Abstract newline with default values */
 
-	buffer_newline(b, BUFFER_LINE_OTHER, "", t);
+	buffer_newline(b, BUFFER_LINE_OTHER, "", t, 0, 0);
 }
 
 static void

@@ -1,3 +1,14 @@
+/* TODO: reduce overall size of buffer, implement growable text area with
+ * ring of buffer_lines pointing to strings, instantiated with initial size
+ *
+ * i.e.            line(n).text            line(n+1).text
+ *                           v                         v
+ * text buffer: [...\0user1\0some line of text\0user2\0some other line\0...]
+ *                    ^                         ^
+ *          line(n).user             line(n+1).user
+ *
+ * will allow removal of text/from truncation */
+
 #include <string.h>
 
 #include "buffer.h"
@@ -10,21 +21,21 @@
 
 #define MASK(X) ((X) & (BUFFER_LINES_MAX - 1))
 
-static unsigned int buffer_size(struct buffer*);
 static unsigned int buffer_full(struct buffer*);
+static unsigned int buffer_size(struct buffer*);
 
 static struct buffer_line* buffer_push(struct buffer*);
-
-static unsigned int
-buffer_size(struct buffer *b)
-{
-	return b->head - b->tail;
-}
 
 static unsigned int
 buffer_full(struct buffer *b)
 {
 	return buffer_size(b) == BUFFER_LINES_MAX;
+}
+
+static unsigned int
+buffer_size(struct buffer *b)
+{
+	return b->head - b->tail;
 }
 
 static struct buffer_line*
@@ -121,7 +132,13 @@ buffer_line_rows(struct buffer_line *line, unsigned int w)
 }
 
 void
-buffer_newline(struct buffer *b, enum buffer_line_t type, const char *from, const char *text)
+buffer_newline(
+		struct buffer *b,
+		enum buffer_line_t type,
+		const char *from,
+		const char *text,
+		size_t from_len,
+		size_t text_len)
 {
 	struct buffer_line *line;
 
@@ -131,9 +148,13 @@ buffer_newline(struct buffer *b, enum buffer_line_t type, const char *from, cons
 	if (text == NULL)
 		fatal("text is NULL");
 
-	size_t remainder_len = 0,
-	       from_len = strlen(from),
-	       text_len = strlen(text);
+	size_t remainder_len = 0;
+
+	if (!from_len)
+		from_len = strlen(from);
+
+	if (!text_len)
+		text_len = strlen(text);
 
 	line = memset(buffer_push(b), 0, sizeof(*line));
 
@@ -163,7 +184,7 @@ buffer_newline(struct buffer *b, enum buffer_line_t type, const char *from, cons
 		b->pad = from_len;
 
 	if (remainder_len)
-		buffer_newline(b, type, from, text + TEXT_LENGTH_MAX);
+		buffer_newline(b, type, from, text + TEXT_LENGTH_MAX, from_len, remainder_len);
 }
 
 float

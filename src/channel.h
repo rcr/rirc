@@ -7,32 +7,30 @@
 
 #define MODE_SIZE (26 * 2) + 1 /* Supports modes [az-AZ] */
 
-/* nav activity types */
-typedef enum
+/* Channel activity types, in order of precedence */
+enum activity_t
 {
-	ACTIVITY_DEFAULT,
-	ACTIVITY_ACTIVE,
-	ACTIVITY_PINGED,
+	ACTIVITY_DEFAULT, /* Default activity */
+	ACTIVITY_JPQ,     /* Join/Part/Quit activity */
+	ACTIVITY_ACTIVE,  /* Chat activity */
+	ACTIVITY_PINGED,  /* Ping activity */
 	ACTIVITY_T_SIZE
-} activity_t;
+};
 
-/* Channel */
 struct channel
 {
-	activity_t active;
+	char chanmodes[MODE_SIZE];
 	char *name;
 	char type_flag;
-	char chanmodes[MODE_SIZE];
+	enum activity_t activity;
 	int parted;
+	SPLAY_NODE(channel) node; /* Fast unordered retrieval */
 	struct buffer buffer;
+	struct channel *next;
+	struct channel *prev;
 	struct input *input;
 	struct nicklist nicklist;
 	struct server *server;
-
-	SPLAY_NODE(channel) node; /* Fast unordered retrieval */
-	struct channel *next;
-	struct channel *prev;
-	//TODO: DLL_NODE here since channels will be added to both
 };
 
 struct channel_list
@@ -43,10 +41,5 @@ struct channel_list
 struct channel* channel_list_add(struct channel_list*, struct channel*);
 struct channel* channel_list_del(struct channel_list*, struct channel*);
 struct channel* channel_list_get(struct channel_list*, char*);
-
-//TODO: define macro, use the DLL, not the SPLAY stuff
-//  channel_list_foreach(channel_list, channel*)   {
-//
-//  }
 
 #endif

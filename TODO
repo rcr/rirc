@@ -2,15 +2,19 @@ TODO
 ---------------------------
 
 this iteration:
-	- fix paste
-	- fix draw chans colouring
-	- proper mode support
-	- list.h, in prep for channel/server list abstraction
+	- 004/005 parsing, server defaults and configuration handling
+	- CHANMODES, PREFIX=(abc)xyz
+	- Proper mode support (struct cmode/umode)
 
 Continue refactoring:
 	- Move/split components (e.g. server, channel, input, etc):
 		src/components/*.{c,h}
 	- Untangle headers
+	- Rewrite input DLL as circular buffer of gap buffers, with copy on repeat,
+		use abstractions in _draw_input
+
+RFC compliance:
+	- List all message types and error numerics from RFC, mark handled/unhandled
 
 src/README.md
 
@@ -64,12 +68,6 @@ Make sure all the thread related code is using thread-safe functions,
 and that proper cancellation points are used. Make sure no resources
 can be left hanging (eg: sockets left open when a thread is canceled?)
 
-Parsing 004/005 numeric for server specific configuration
-	-> parse PREFIX=(abc)xyz and use this to fix mode messages that are setting,
-	   for example, channel +o when the arg is a username in the channel
-
-Reimplement the pasting stuff that was broken
-
 Implement generic command arguments
 	/<cmd> -arg
 e.g.
@@ -83,8 +81,6 @@ when disconnected and reconnected, PING/PONG seems to be out of sync?
 I broke the activity colouring stuff:
 	join/part/quit sets activity (it shouldnt)
 	message and ping dont set activity (they should)
-
-Reimplement getting args as arg(&parsed_mesg)
 
 Some servers place single args in the trailing section, eg: JOIN :channel vs JOIN channel
 which forces the handlers to check p->params and p->trailing, however since p->params

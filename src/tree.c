@@ -5,7 +5,6 @@
 #include "utils.h"
 
 #define H(N) ((N) == NULL ? 0 : (N)->height)
-#define MAX(A, B) ((A) > (B) ? (A) : (B))
 
 //TODO: generalize avl tree functions as macros
 
