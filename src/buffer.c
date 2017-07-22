@@ -132,7 +132,13 @@ buffer_line_rows(struct buffer_line *line, unsigned int w)
 }
 
 void
-buffer_newline(struct buffer *b, enum buffer_line_t type, const char *from, const char *text)
+buffer_newline(
+		struct buffer *b,
+		enum buffer_line_t type,
+		const char *from,
+		const char *text,
+		size_t from_len,
+		size_t text_len)
 {
 	struct buffer_line *line;
 
@@ -142,9 +148,13 @@ buffer_newline(struct buffer *b, enum buffer_line_t type, const char *from, cons
 	if (text == NULL)
 		fatal("text is NULL");
 
-	size_t remainder_len = 0,
-	       from_len = strlen(from),
-	       text_len = strlen(text);
+	size_t remainder_len = 0;
+
+	if (!from_len)
+		from_len = strlen(from);
+
+	if (!text_len)
+		text_len = strlen(text);
 
 	line = memset(buffer_push(b), 0, sizeof(*line));
 
@@ -174,7 +184,7 @@ buffer_newline(struct buffer *b, enum buffer_line_t type, const char *from, cons
 		b->pad = from_len;
 
 	if (remainder_len)
-		buffer_newline(b, type, from, text + TEXT_LENGTH_MAX);
+		buffer_newline(b, type, from, text + TEXT_LENGTH_MAX, from_len, remainder_len);
 }
 
 float

@@ -2,9 +2,6 @@ TODO
 ---------------------------
 
 this iteration:
-	- fix `len` passed to newline/buffer_newline, known at _newline
-
-next iteration:
 	- 004/005 parsing, server defaults and configuration handling
 	- CHANMODES, PREFIX=(abc)xyz
 	- Proper mode support (struct cmode/umode)

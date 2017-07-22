@@ -48,8 +48,11 @@ unsigned int _term_rows(void) { return state.term_rows; }
 DRAW_BITS
 #undef X
 
-/* Set all draw bits */
-void draw_all(void) { state.draw.all_bits = -1; }
+void
+draw_all(void)
+{
+	state.draw.all_bits = -1;
+}
 
 void
 redraw(void)
@@ -114,7 +117,7 @@ newline(struct channel *c, enum buffer_line_t type, const char *from, const char
 {
 	/* Default wrapper for _newline because length of message won't be known */
 
-	_newline(c, type, from, mesg, strlen(mesg)); /* FIXME: sizeof for static strings? */
+	_newline(c, type, from, mesg, strlen(mesg));
 }
 
 void
@@ -122,7 +125,7 @@ newlinef(struct channel *c, enum buffer_line_t type, const char *from, const cha
 {
 	/* Formating wrapper for _newline */
 
-	char buff[BUFFSIZE];
+	char buff[BUFFSIZE]; char errmesg[] = "newlinef error: vsprintf failure";
 	int len;
 	va_list ap;
 
@@ -130,21 +133,21 @@ newlinef(struct channel *c, enum buffer_line_t type, const char *from, const cha
 	len = vsnprintf(buff, BUFFSIZE, fmt, ap);
 	va_end(ap);
 
-	_newline(c, type, from, buff, len);
+	if (len < 0)
+		_newline(c, 0, "-!!-", errmesg, sizeof(errmesg));
+	else
+		_newline(c, type, from, buff, len);
 }
 
 static void
-_newline(struct channel *c, enum buffer_line_t type, const char *from, const char *mesg, size_t len)
+_newline(struct channel *c, enum buffer_line_t type, const char *from, const char *mesg, size_t mesg_len)
 {
 	/* Static function for handling inserting new lines into buffers */
-
-	/* FIXME: pass len still? */
-	UNUSED(len);
 
 	if (c == NULL)
 		fatal("channel is null");
 
-	buffer_newline(&c->buffer, type, from, mesg);
+	buffer_newline(&c->buffer, type, from, mesg, strlen(from), mesg_len);
 
 	c->activity = MAX(c->activity, ACTIVITY_ACTIVE);
 
