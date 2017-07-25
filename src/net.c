@@ -301,6 +301,7 @@ threaded_connect(void *arg)
 
 	ct->socket = ct->socket_tmp;
 
+	/* coverity[leaked_storage] No leak here */
 	pthread_cleanup_pop(1);
 
 	return NULL;

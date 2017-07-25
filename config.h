@@ -55,3 +55,6 @@ static int nav_actv_cols[ACTIVITY_T_SIZE] = {
  *   12:34 charlie ~ just nod if you can hear me
  * */
 #define BUFFER_PADDING 1
+
+/* Raise terminal bell when pinged in chat */
+#define BELL_ON_PINGED 1
