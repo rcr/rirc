@@ -80,7 +80,7 @@ new_server(char *host, char *port, char *join, char *nicks)
 	struct server *s;
 
 	if ((s = calloc(1, sizeof(*s))) == NULL)
-		fatal("calloc");
+		fatal("calloc", errno);
 
 	/* Set non-zero default fields */
 	s->soc = -1;
@@ -198,7 +198,7 @@ server_connect(char *host, char *port, char *nicks, char *join)
 	channel_set_current(s->channel);
 
 	if ((ct = calloc(1, sizeof(*ct))) == NULL)
-		fatal("calloc");
+		fatal("calloc", errno);
 
 	ct->socket = -1;
 	ct->socket_tmp = -1;
@@ -209,8 +209,8 @@ server_connect(char *host, char *port, char *nicks, char *join)
 
 	newlinef(s->channel, 0, "--", "Connecting to '%s' port %s", host, port);
 
-	if ((pthread_create(&ct->tid, NULL, threaded_connect, ct)))
-		fatal("pthread_create");
+	if ((errno = pthread_create(&ct->tid, NULL, threaded_connect, ct)))
+		fatal("pthread_create", errno);
 }
 
 static void
@@ -220,8 +220,8 @@ connected(struct server *s)
 
 	connection_thread *ct = s->connecting;
 
-	if ((pthread_join(ct->tid, NULL)))
-		fatal("pthread_join");
+	if ((errno = pthread_join(ct->tid, NULL)))
+		fatal("pthread_join", errno);
 
 	if (*ct->ipstr)
 		newlinef(s->channel, 0, "--", "Connected to [%s]", ct->ipstr);
@@ -303,6 +303,7 @@ threaded_connect(void *arg)
 
 	pthread_cleanup_pop(1);
 
+	/* coverity[leaked_storage] No leak here */
 	return NULL;
 }
 
@@ -330,8 +331,8 @@ server_disconnect(struct server *s, int err, int kill, char *mesg)
 
 		connection_thread *ct = s->connecting;
 
-		if ((pthread_cancel(ct->tid)))
-			fatal("pthread_cancel");
+		if ((errno = pthread_cancel(ct->tid)))
+			fatal("pthread_cancel", errno);
 
 		/* There's a chance the thread is canceled with an open socket */
 		if (ct->socket_tmp)

@@ -5,6 +5,7 @@
 #include <string.h>
 #include <sys/time.h>
 
+#include "draw.h"
 #include "state.h"
 #include "utils.h"
 
@@ -158,7 +159,7 @@ commands_add(char *key, int (*val)(char*, char*, struct server*, struct channel*
 	struct command *c;
 
 	if ((c = malloc(sizeof(struct command))) == NULL)
-		fatal("malloc");
+		fatal("malloc", errno);
 
 	c->fptr = val;
 
@@ -187,10 +188,9 @@ commands_get(const char *key, size_t len)
 		HANDLED_SEND_CMDS
 		#undef X
 
-		errno = 0; /* atexit doesn't set errno */
-
+		/* atexit doesn't set errno */
 		if (atexit(commands_free) != 0)
-			fatal("atexit");
+			fatal("atexit", 0);
 	}
 
 	return avl_get(commands, key, strncmp, len);
@@ -729,8 +729,10 @@ recv_ctcp_req(char *err, struct parsed_mesg *p, struct server *s)
 			if ((c = channel_list_get(&s->clist, p->from)) == NULL)
 				c = new_channel(p->from, s, s->channel, BUFFER_PRIVATE);
 
-			if (c != ccur)
-				c->active = ACTIVITY_PINGED;
+			if (c != ccur) {
+				c->activity = ACTIVITY_PINGED;
+				draw_nav();
+			}
 
 		} else if ((c = channel_list_get(&s->clist, targ)) == NULL)
 			failf("CTCP ACTION: channel '%s' not found", targ);
@@ -1081,19 +1083,20 @@ recv_numeric(char *err, struct parsed_mesg *p, struct server *s)
 	/* :server <code> <target> [args] */
 
 	char *targ, *nick, *chan, *time, *type, *num;
-	int ret;
+	int ret, _code;
+
 	struct channel *c;
 
-	enum numeric code = 0;
-
 	/* Extract numeric code */
-	for (code = 0; isdigit(*p->command); p->command++) {
+	for (_code = 0; isdigit(*p->command); p->command++) {
 
-		code = code * 10 + (*p->command - '0');
+		_code = _code * 10 + (*p->command - '0');
 
-		if (code > 999)
+		if (_code > 999)
 			fail("NUMERIC: greater than 999");
 	}
+
+	enum numeric code = _code;
 
 	/* Message target is only used to establish s->nick when registering with a server */
 	if (!(targ = getarg(&p->params, " "))) {
@@ -1459,16 +1462,22 @@ recv_privmesg(char *err, struct parsed_mesg *p, struct server *s)
 		if ((c = channel_list_get(&s->clist, p->from)) == NULL)
 			c = new_channel(p->from, s, s->channel, BUFFER_PRIVATE);
 
-		if (c != ccur)
-			c->active = ACTIVITY_PINGED;
+		if (c != ccur) {
+			c->activity = ACTIVITY_PINGED;
+			draw_nav();
+		}
 
 	} else if ((c = channel_list_get(&s->clist, targ)) == NULL)
 		failf("PRIVMSG: channel '%s' not found", targ);
 
 	if (check_pinged(p->trailing, s->nick)) {
 
-		if (c != ccur)
-			c->active = ACTIVITY_PINGED;
+		bell();
+
+		if (c != ccur) {
+			c->activity = ACTIVITY_PINGED;
+			draw_nav();
+		}
 
 		newline(c, BUFFER_LINE_PINGED, p->from, p->trailing);
 	} else

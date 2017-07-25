@@ -3,6 +3,10 @@
 
 #include <errno.h>
 
+//TODO: struct string { len, text[] } for
+// fields often strlen'ed, e.g. usernames, channel names, server names
+// strcmp comparing len == len && strlen
+
 /* Parsed IRC message */
 struct parsed_mesg
 {
@@ -23,13 +27,19 @@ char* word_wrap(int, char**, char*);
 
 int check_pinged(const char*, const char*);
 int parse_mesg(struct parsed_mesg*, char*);
-void error(int status, const char*, ...);
+
+void handle_error(int, const char*, ...);
+
+extern int fatal_exit;
+
+#define MAX(A, B) ((A) > (B) ? (A) : (B))
+#define MIN(A, B) ((A) > (B) ? (B) : (A))
 
 /* Irrecoverable error
  *   this define is precluded in test.h to aggregate fatal errors in testcases */
 #ifndef fatal
-#define fatal(mesg) \
-	do { error(errno, "ERROR in %s: %s", __func__, mesg); } while (0)
+#define fatal(M, E) \
+	do { handle_error(E, "ERROR in %s: %s", __func__, M); } while (0)
 #endif
 
 //TODO: refactor

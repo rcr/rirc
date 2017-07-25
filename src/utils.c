@@ -1,7 +1,7 @@
-#include <stdio.h>
 #include <ctype.h>
-#include <stdlib.h>
 #include <stdarg.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <strings.h>
 
@@ -10,8 +10,10 @@
 static inline int irc_isnickchar(const char);
 static inline int irc_toupper(int);
 
+int fatal_exit;
+
 void
-error(int errnum, const char *fmt, ...)
+handle_error(int errnum, const char *fmt, ...)
 {
 	/* Report an error and exit the program */
 
@@ -19,7 +21,7 @@ error(int errnum, const char *fmt, ...)
 
 	fflush(stdout);
 
-	fputs("rirc: ", stderr);
+	fputs("\n\nrirc: ", stderr);
 
 	va_start(ap, fmt);
 	vfprintf(stderr, fmt, ap);
@@ -29,6 +31,8 @@ error(int errnum, const char *fmt, ...)
 		fprintf(stderr, " (errno: %s)\n", strerror(errnum));
 	else
 		fprintf(stderr, "\n");
+
+	fatal_exit = 1;
 
 	exit(EXIT_FAILURE);
 }
@@ -78,7 +82,7 @@ strdup(const char *str)
 	void *ret;
 
 	if ((ret = malloc(len)) == NULL)
-		fatal("malloc");
+		fatal("malloc", errno);
 
 	return (char *) memcpy(ret, str, len);
 }
@@ -298,12 +302,9 @@ check_pinged(const char *mesg, const char *nick)
 		while (!(*mesg >= 0x41 && *mesg <= 0x7D))
 			mesg++;
 
-		//FIXME: use irc_strncmp
 		/* nick prefixes the word, following character is space or symbol */
-		if (!strncasecmp(mesg, nick, len) && !irc_isnickchar(*(mesg + len))) {
-			putchar('\a');
+		if (!irc_strncmp(mesg, nick, len) && !irc_isnickchar(*(mesg + len)))
 			return 1;
-		}
 
 		/* skip to end of word */
 		while (*mesg && *mesg != ' ')
@@ -343,7 +344,7 @@ word_wrap(int n, char **str, char *end)
 	char *ret, *tmp;
 
 	if (n < 1)
-		fatal("insufficient columns");
+		fatal("insufficient columns", 0);
 
 	/* All fits */
 	if ((end - *str) <= n)
