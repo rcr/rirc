@@ -10,18 +10,16 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "../config.h"
+
 #include "input.h"
 #include "state.h"
 #include "utils.h"
-
-/* FIXME: this has to be included after common.h for activity cols */
-#include "../config.h"
 
 #define ESC "\x1b"
 
 #define RESET_ATTRIBUTES ESC"[0m"
 
-//FIXME: remove in favour of _colour
 #define FG(X) ESC"[38;5;"#X"m"
 #define BG(X) ESC"[48;5;"#X"m"
 
@@ -162,7 +160,7 @@ _draw_buffer_line(
 		 * Since formatting codes don't occupy columns, enough space
 		 * should be allocated for all such sequences
 		 * */
-		char header[head_w + sizeof(FG(255) BG(255)) * 4 + 1];
+		char header[head_w + COLOUR_SIZE * 4 + 1];
 		char *header_ptr = header;
 
 		size_t buff_n = sizeof(header) - 1, /*  */
@@ -171,7 +169,7 @@ _draw_buffer_line(
 		struct tm *line_tm = localtime(&line->time);
 
 		if (!_draw_fmt(&header_ptr, &buff_n, &text_n, 0,
-				RESET_ATTRIBUTES FG(%d), BUFFER_LINE_HEADER_FG_NEUTRAL))
+				_colour(BUFFER_LINE_HEADER_FG_NEUTRAL, -1)))
 			goto print_header;
 
 		if (!_draw_fmt(&header_ptr, &buff_n, &text_n, 1,
@@ -188,19 +186,19 @@ _draw_buffer_line(
 		switch (line->type) {
 			case BUFFER_LINE_OTHER:
 				if (!_draw_fmt(&header_ptr, &buff_n, &text_n, 0,
-						FG(%d), BUFFER_LINE_HEADER_FG_NEUTRAL))
+						_colour(BUFFER_LINE_HEADER_FG_NEUTRAL, -1)))
 					goto print_header;
 				break;
 
 			case BUFFER_LINE_CHAT:
 				if (!_draw_fmt(&header_ptr, &buff_n, &text_n, 0,
-						FG(%d), nick_col(line->from)))
+						_colour(nick_col(line->from), -1)))
 					goto print_header;
 				break;
 
 			case BUFFER_LINE_PINGED:
 				if (!_draw_fmt(&header_ptr, &buff_n, &text_n, 0,
-						FG(%d) BG(%d), BUFFER_LINE_HEADER_FG_PINGED, BUFFER_LINE_HEADER_BG_PINGED))
+						_colour(BUFFER_LINE_HEADER_FG_PINGED, BUFFER_LINE_HEADER_BG_PINGED)))
 					goto print_header;
 				break;
 
@@ -225,7 +223,7 @@ print_header:
 
 		if ((coords.cN - coords.c1) >= sizeof(*sep) + text_w) {
 			printf(MOVE(%d, %d), coords.r1, (int)(coords.cN - (sizeof(*sep) + text_w + 1)));
-			printf(RESET_ATTRIBUTES FG(%d), BUFFER_LINE_HEADER_FG_NEUTRAL);
+			fputs(_colour(BUFFER_LINE_HEADER_FG_NEUTRAL, -1), stdout);
 			fputs(sep, stdout);
 		}
 
@@ -235,9 +233,11 @@ print_header:
 			print_p1 = p1;
 			print_p2 = word_wrap(text_w, &p1, p2);
 
-			printf(RESET_ATTRIBUTES FG(%d), line->text[0] == QUOTE_CHAR
-				? BUFFER_LINE_TEXT_FG_GREEN
-				: BUFFER_LINE_TEXT_FG_NEUTRAL);
+			fputs(_colour(line->text[0] == QUOTE_CHAR
+					? BUFFER_LINE_TEXT_FG_GREEN
+					: BUFFER_LINE_TEXT_FG_NEUTRAL,
+					-1),
+				stdout);
 
 			printf("%.*s", (int)(print_p2 - print_p1), print_p1);
 		}
