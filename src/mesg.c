@@ -5,6 +5,7 @@
 #include <string.h>
 #include <sys/time.h>
 
+#include "draw.h"
 #include "state.h"
 #include "utils.h"
 
@@ -1083,19 +1084,20 @@ recv_numeric(char *err, struct parsed_mesg *p, struct server *s)
 	/* :server <code> <target> [args] */
 
 	char *targ, *nick, *chan, *time, *type, *num;
-	int ret;
+	int ret, _code;
+
 	struct channel *c;
 
-	enum numeric code = 0;
-
 	/* Extract numeric code */
-	for (code = 0; isdigit(*p->command); p->command++) {
+	for (_code = 0; isdigit(*p->command); p->command++) {
 
-		code = code * 10 + (*p->command - '0');
+		_code = _code * 10 + (*p->command - '0');
 
-		if (code > 999)
+		if (_code > 999)
 			fail("NUMERIC: greater than 999");
 	}
+
+	enum numeric code = _code;
 
 	/* Message target is only used to establish s->nick when registering with a server */
 	if (!(targ = getarg(&p->params, " "))) {
@@ -1470,6 +1472,8 @@ recv_privmesg(char *err, struct parsed_mesg *p, struct server *s)
 		failf("PRIVMSG: channel '%s' not found", targ);
 
 	if (check_pinged(p->trailing, s->nick)) {
+
+		bell();
 
 		if (c != ccur) {
 			c->activity = ACTIVITY_PINGED;

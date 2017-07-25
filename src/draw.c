@@ -128,6 +128,13 @@ no_draw:
 	fflush(stdout);
 }
 
+void
+bell(void)
+{
+	if (BELL_ON_PINGED)
+		putchar('\a');
+}
+
 /* FIXME: works except when it doesn't.
  *
  * Fails when line headers are very long compared to text. tests/draw.c needed */
@@ -470,7 +477,7 @@ _draw_nav(struct channel *c)
 
 		colour = (tmp == c) ? NAV_CURRENT_CHAN : nav_actv_cols[tmp->activity];
 
-		if (printf(_colour(colour, -1)) < 0)
+		if (puts(_colour(colour, -1)) < 0)
 			break;
 
 		if (printf(" %s ", tmp->name) < 0)
@@ -590,7 +597,7 @@ _draw_input(struct input *in, struct coords coords)
 
 print_input:
 
-	printf(input);
+	puts(input);
 	printf(MOVE(%d, %d), coords.rN, (cursor >= coords.c1 && cursor <= coords.cN) ? cursor : coords.cN);
 	printf(CURSOR_SAVE);
 }
@@ -694,7 +701,7 @@ _draw_status(struct channel *c)
 
 print_status:
 
-	printf("%s", status_buff);
+	puts(status_buff);
 
 	/* Trailing separator */
 	while (col++ < cols)

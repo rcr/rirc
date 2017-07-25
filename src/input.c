@@ -183,7 +183,9 @@ input_cchar(char *c)
 	/* ESC begins a key sequence */
 	if (*c == 0x1b) {
 
-		if (++c == 0)
+		c++;
+
+		if (*c == 0)
 			return;
 
 		/* arrow up */

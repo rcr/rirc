@@ -21,6 +21,7 @@ union draw
 };
 
 void draw(union draw);
+void bell(void);
 void split_buffer_cols(struct buffer_line*, unsigned int*, unsigned int*, unsigned int, unsigned int);
 
 #endif

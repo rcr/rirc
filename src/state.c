@@ -441,6 +441,7 @@ auto_nick(char **autonick, char *nick)
 		size_t len = strlen(cset);
 
 		for (i = 0; i < 4; i++)
+			/* coverity[dont_call] Acceptable use of insecure rand() function */
 			*nick++ = cset[rand() % len];
 	}
 

@@ -10,7 +10,6 @@
 
 static struct avl_node* _avl_add(jmp_buf*, struct avl_node*, const char*, int (*)(const char*, const char*), void*);
 static struct avl_node* _avl_del(jmp_buf*, struct avl_node*, const char*, int (*)(const char*, const char*));
-static struct avl_node* _avl_get(jmp_buf*, struct avl_node*, const char*, int (*)(const char*, const char*, size_t), size_t);
 static struct avl_node* avl_new_node(const char*, void*);
 static void avl_free_node(struct avl_node*);
 static struct avl_node* avl_rotate_L(struct avl_node*);
@@ -66,12 +65,20 @@ avl_get(struct avl_node *n, const char *key, int (*cmp)(const char*, const char*
 {
 	/* Entry point for fetching an avl node with prefix key */
 
-	jmp_buf err;
+	int ret;
 
-	if (setjmp(err))
-		return NULL;
+	for (;;) {
 
-	return _avl_get(&err, n, key, cmp, len);
+		if (n == NULL)
+			return n;
+
+		ret = cmp(key, n->key, len);
+
+		if (ret == 0)
+			return n;
+
+		n = (ret > 0) ? n->r : n->l;
+	}
 }
 
 static struct avl_node*
@@ -276,26 +283,5 @@ _avl_del(jmp_buf *err, struct avl_node *n, const char *key, int (*cmp)(const cha
 		return avl_rotate_L(n);
 	}
 
-	return n;
-}
-
-static struct avl_node*
-_avl_get(jmp_buf *err, struct avl_node *n, const char *key, int (*cmp)(const char*, const char*, size_t), size_t len)
-{
-	/* Case insensitive search for a node whose value is prefixed by key */
-
-	/* Failed to find node */
-	if (n == NULL)
-		longjmp(*err, 1);
-
-	int ret = cmp(key, n->key, len);
-
-	if (ret > 0)
-		return _avl_get(err, n->r, key, cmp, len);
-
-	if (ret < 0)
-		return _avl_get(err, n->l, key, cmp, len);
-
-	/* Match found */
 	return n;
 }

@@ -298,12 +298,9 @@ check_pinged(const char *mesg, const char *nick)
 		while (!(*mesg >= 0x41 && *mesg <= 0x7D))
 			mesg++;
 
-		//FIXME: use irc_strncmp
 		/* nick prefixes the word, following character is space or symbol */
-		if (!strncasecmp(mesg, nick, len) && !irc_isnickchar(*(mesg + len))) {
-			putchar('\a');
+		if (!irc_strncmp(mesg, nick, len) && !irc_isnickchar(*(mesg + len)))
 			return 1;
-		}
 
 		/* skip to end of word */
 		while (*mesg && *mesg != ' ')
