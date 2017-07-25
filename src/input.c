@@ -70,7 +70,7 @@ new_input(void)
 	struct input *i;
 
 	if ((i = calloc(1, sizeof(*i))) == NULL)
-		fatal("calloc");
+		fatal("calloc", errno);
 
 	new_list_head(i);
 
@@ -101,7 +101,7 @@ new_list_head(struct input *i)
 	struct input_line *l;
 
 	if ((l = calloc(1, sizeof(*l))) == NULL)
-		fatal("calloc");
+		fatal("calloc", errno);
 
 	DLL_ADD(i->list_head, l);
 
@@ -129,7 +129,7 @@ poll_input(void)
 	struct pollfd stdin_fd[] = {{ .fd = STDIN_FILENO, .events = POLLIN }};
 
 	if ((ret = poll(stdin_fd, 1, timeout_ms)) < 0 && errno != EINTR)
-		fatal("poll");
+		fatal("poll", errno);
 
 	if (ret > 0) {
 
@@ -137,10 +137,10 @@ poll_input(void)
 
 		while ((count = read(STDIN_FILENO, inp_buff, MAX_INPUT)) < 0)
 			if (errno != EINTR)
-				fatal("read");
+				fatal("read", errno);
 
 		if (count == 0)
-			fatal("stdin closed");
+			fatal("stdin closed", 0);
 
 		*(inp_buff + count) = '\0';
 

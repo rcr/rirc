@@ -159,7 +159,7 @@ commands_add(char *key, int (*val)(char*, char*, struct server*, struct channel*
 	struct command *c;
 
 	if ((c = malloc(sizeof(struct command))) == NULL)
-		fatal("malloc");
+		fatal("malloc", errno);
 
 	c->fptr = val;
 
@@ -188,10 +188,9 @@ commands_get(const char *key, size_t len)
 		HANDLED_SEND_CMDS
 		#undef X
 
-		errno = 0; /* atexit doesn't set errno */
-
+		/* atexit doesn't set errno */
 		if (atexit(commands_free) != 0)
-			fatal("atexit");
+			fatal("atexit", 0);
 	}
 
 	return avl_get(commands, key, strncmp, len);

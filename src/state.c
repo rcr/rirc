@@ -80,10 +80,9 @@ resize(void)
 void
 init_state(void)
 {
-	errno = 0; /* atexit doesn't set errno */
-
+	/* atexit doesn't set errno */
 	if (atexit(free_state) != 0)
-		fatal("atexit");
+		fatal("atexit", 0);
 
 	state.default_channel = state.current_channel = new_channel("rirc", NULL, NULL, BUFFER_OTHER);
 
@@ -145,7 +144,7 @@ _newline(struct channel *c, enum buffer_line_t type, const char *from, const cha
 	/* Static function for handling inserting new lines into buffers */
 
 	if (c == NULL)
-		fatal("channel is null");
+		fatal("channel is null", 0);
 
 	buffer_newline(&c->buffer, type, from, mesg, strlen(from), mesg_len);
 
@@ -163,7 +162,7 @@ new_channel(char *name, struct server *s, struct channel *chanlist, enum buffer_
 	struct channel *c;
 
 	if ((c = calloc(1, sizeof(*c))) == NULL)
-		fatal("calloc");
+		fatal("calloc", errno);
 
 	c->buffer = buffer(type);
 	c->input = new_input();

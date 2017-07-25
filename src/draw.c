@@ -4,8 +4,6 @@
  *
  * Assumes vt-100 compatible escape codes, as such YMMV */
 
-//FIXME: fixed, settable colour for messages by the user
-
 #include <alloca.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -50,6 +48,9 @@
 #elif BUFFER_PADDING != 0 && BUFFER_PADDING != 1
 	#error "BUFFER_PADDING options are 0 (no pad), 1 (padded)"
 #endif
+
+static int actv_colours[ACTIVITY_T_SIZE] = ACTIVITY_COLOURS
+static int nick_colours[] = NICK_COLOURS
 
 /* Terminal coordinate row/column boundaries (inclusive) for objects being drawn
  *
@@ -225,7 +226,7 @@ print_header:
 		if ((coords.cN - coords.c1) >= sizeof(*sep) + text_w) {
 			printf(MOVE(%d, %d), coords.r1, (int)(coords.cN - (sizeof(*sep) + text_w + 1)));
 			printf(RESET_ATTRIBUTES FG(%d), BUFFER_LINE_HEADER_FG_NEUTRAL);
-			puts(sep);
+			fputs(sep, stdout);
 		}
 
 		if (*p1) {
@@ -475,9 +476,9 @@ _draw_nav(struct channel *c)
 	/* Draw coloured channel names, from frame to frame */
 	for (tmp = frame_prev; ; tmp = channel_get_next(tmp)) {
 
-		colour = (tmp == c) ? NAV_CURRENT_CHAN : nav_actv_cols[tmp->activity];
+		colour = (tmp == c) ? NAV_CURRENT_CHAN : actv_colours[tmp->activity];
 
-		if (puts(_colour(colour, -1)) < 0)
+		if (fputs(_colour(colour, -1), stdout) < 0)
 			break;
 
 		if (printf(" %s ", tmp->name) < 0)
@@ -597,7 +598,7 @@ _draw_input(struct input *in, struct coords coords)
 
 print_input:
 
-	puts(input);
+	fputs(input, stdout);
 	printf(MOVE(%d, %d), coords.rN, (cursor >= coords.c1 && cursor <= coords.cN) ? cursor : coords.cN);
 	printf(CURSOR_SAVE);
 }
@@ -701,7 +702,7 @@ _draw_status(struct channel *c)
 
 print_status:
 
-	puts(status_buff);
+	fputs(status_buff, stdout);
 
 	/* Trailing separator */
 	while (col++ < cols)
@@ -714,10 +715,10 @@ check_coords(struct coords coords)
 	/* Check coordinate validity before drawing, ensure at least one row, column */
 
 	if (coords.r1 > coords.rN)
-		fatal("row coordinates invalid");
+		fatal("row coordinates invalid", 0);
 
 	if (coords.c1 > coords.cN)
-		fatal("column coordinates invalid");
+		fatal("column coordinates invalid", 0);
 }
 
 static inline unsigned int
