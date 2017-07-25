@@ -100,9 +100,10 @@ buffer_line(struct buffer *b, unsigned int i)
 	 *  a, c : valid
 	 *  b    : invalid
 	 *  */
+
 	if (((b->head > b->tail) && (i < b->tail || i >= b->head)) ||
 	    ((b->tail > b->head) && (i < b->tail && i >= b->head)))
-		fatal("invalid index");
+		fatal("invalid index", 0);
 
 	return &b->buffer_lines[MASK(i)];
 }
@@ -115,7 +116,7 @@ buffer_line_rows(struct buffer_line *line, unsigned int w)
 	char *p;
 
 	if (w == 0)
-		fatal("width is zero");
+		fatal("width is zero", 0);
 
 	/* Empty lines occupy are considered to occupy a row */
 	if (!*line->text)
@@ -143,10 +144,10 @@ buffer_newline(
 	struct buffer_line *line;
 
 	if (from == NULL)
-		fatal("from is NULL");
+		fatal("from is NULL", 0);
 
 	if (text == NULL)
-		fatal("text is NULL");
+		fatal("text is NULL", 0);
 
 	size_t remainder_len = 0;
 

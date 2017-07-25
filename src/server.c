@@ -7,7 +7,7 @@ struct server*
 server(struct server *s, char *host, char *port, char *nicks)
 {
 	if (s == NULL && (s = calloc(1, sizeof(*s))) == NULL)
-		fatal("calloc");
+		fatal("calloc", errno);
 
 	s->host = strdup(host);
 	s->port = strdup(port);

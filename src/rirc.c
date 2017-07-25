@@ -166,12 +166,12 @@ startup(int argc, char **argv)
 
 	/* stdout is fflush()'ed on every redraw */
 	errno = 0; /* "may set errno" */
-	if (setvbuf(stdout, NULL, _IOFBF, 0) < 0)
-		fatal("setvbuf");
+	if (setvbuf(stdout, NULL, _IOFBF, 0) != 0)
+		fatal("setvbuf", errno);
 
 	/* Set terminal to raw mode */
 	if (tcgetattr(0, &oterm) < 0)
-		fatal("tcgetattr");
+		fatal("tcgetattr", errno);
 
 	struct termios nterm = oterm;
 
@@ -180,19 +180,18 @@ startup(int argc, char **argv)
 	nterm.c_cc[VTIME] = 0;
 
 	if (tcsetattr(0, TCSADRAIN, &nterm) < 0)
-		fatal("tcsetattr");
+		fatal("tcsetattr", errno);
 
 	srand(time(NULL));
 
 	/* Set up signal handlers */
 	sa_sigwinch.sa_handler = signal_sigwinch;
 	if (sigaction(SIGWINCH, &sa_sigwinch, NULL) == -1)
-		fatal("sigaction - SIGWINCH");
+		fatal("sigaction - SIGWINCH", errno);
 
-	errno = 0; /* atexit doesn't set errno */
-
+	/* atexit doesn't set errno */
 	if (atexit(cleanup) != 0)
-		fatal("atexit");
+		fatal("atexit", 0);
 
 	init_state();
 
@@ -219,7 +218,8 @@ cleanup(void)
 
 #ifndef DEBUG
 	/* Clear screen */
-	printf("\x1b[H\x1b[J");
+	if (!fatal_exit)
+		printf("\x1b[H\x1b[J");
 #endif
 
 	/* Reset terminal modes */

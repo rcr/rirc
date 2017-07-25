@@ -4,26 +4,22 @@
  *
  * Assumes vt-100 compatible escape codes, as such YMMV */
 
-//FIXME: fixed, settable colour for messages by the user
-
 #include <alloca.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
+#include "../config.h"
+
 #include "input.h"
 #include "state.h"
 #include "utils.h"
-
-/* FIXME: this has to be included after common.h for activity cols */
-#include "../config.h"
 
 #define ESC "\x1b"
 
 #define RESET_ATTRIBUTES ESC"[0m"
 
-//FIXME: remove in favour of _colour
 #define FG(X) ESC"[38;5;"#X"m"
 #define BG(X) ESC"[48;5;"#X"m"
 
@@ -50,6 +46,9 @@
 #elif BUFFER_PADDING != 0 && BUFFER_PADDING != 1
 	#error "BUFFER_PADDING options are 0 (no pad), 1 (padded)"
 #endif
+
+static int actv_colours[ACTIVITY_T_SIZE] = ACTIVITY_COLOURS
+static int nick_colours[] = NICK_COLOURS
 
 /* Terminal coordinate row/column boundaries (inclusive) for objects being drawn
  *
@@ -161,7 +160,7 @@ _draw_buffer_line(
 		 * Since formatting codes don't occupy columns, enough space
 		 * should be allocated for all such sequences
 		 * */
-		char header[head_w + sizeof(FG(255) BG(255)) * 4 + 1];
+		char header[head_w + COLOUR_SIZE * 4 + 1];
 		char *header_ptr = header;
 
 		size_t buff_n = sizeof(header) - 1, /*  */
@@ -170,7 +169,7 @@ _draw_buffer_line(
 		struct tm *line_tm = localtime(&line->time);
 
 		if (!_draw_fmt(&header_ptr, &buff_n, &text_n, 0,
-				RESET_ATTRIBUTES FG(%d), BUFFER_LINE_HEADER_FG_NEUTRAL))
+				_colour(BUFFER_LINE_HEADER_FG_NEUTRAL, -1)))
 			goto print_header;
 
 		if (!_draw_fmt(&header_ptr, &buff_n, &text_n, 1,
@@ -187,19 +186,19 @@ _draw_buffer_line(
 		switch (line->type) {
 			case BUFFER_LINE_OTHER:
 				if (!_draw_fmt(&header_ptr, &buff_n, &text_n, 0,
-						FG(%d), BUFFER_LINE_HEADER_FG_NEUTRAL))
+						_colour(BUFFER_LINE_HEADER_FG_NEUTRAL, -1)))
 					goto print_header;
 				break;
 
 			case BUFFER_LINE_CHAT:
 				if (!_draw_fmt(&header_ptr, &buff_n, &text_n, 0,
-						FG(%d), nick_col(line->from)))
+						_colour(nick_col(line->from), -1)))
 					goto print_header;
 				break;
 
 			case BUFFER_LINE_PINGED:
 				if (!_draw_fmt(&header_ptr, &buff_n, &text_n, 0,
-						FG(%d) BG(%d), BUFFER_LINE_HEADER_FG_PINGED, BUFFER_LINE_HEADER_BG_PINGED))
+						_colour(BUFFER_LINE_HEADER_FG_PINGED, BUFFER_LINE_HEADER_BG_PINGED)))
 					goto print_header;
 				break;
 
@@ -224,8 +223,8 @@ print_header:
 
 		if ((coords.cN - coords.c1) >= sizeof(*sep) + text_w) {
 			printf(MOVE(%d, %d), coords.r1, (int)(coords.cN - (sizeof(*sep) + text_w + 1)));
-			printf(RESET_ATTRIBUTES FG(%d), BUFFER_LINE_HEADER_FG_NEUTRAL);
-			puts(sep);
+			fputs(_colour(BUFFER_LINE_HEADER_FG_NEUTRAL, -1), stdout);
+			fputs(sep, stdout);
 		}
 
 		if (*p1) {
@@ -234,9 +233,11 @@ print_header:
 			print_p1 = p1;
 			print_p2 = word_wrap(text_w, &p1, p2);
 
-			printf(RESET_ATTRIBUTES FG(%d), line->text[0] == QUOTE_CHAR
-				? BUFFER_LINE_TEXT_FG_GREEN
-				: BUFFER_LINE_TEXT_FG_NEUTRAL);
+			fputs(_colour(line->text[0] == QUOTE_CHAR
+					? BUFFER_LINE_TEXT_FG_GREEN
+					: BUFFER_LINE_TEXT_FG_NEUTRAL,
+					-1),
+				stdout);
 
 			printf("%.*s", (int)(print_p2 - print_p1), print_p1);
 		}
@@ -475,9 +476,9 @@ _draw_nav(struct channel *c)
 	/* Draw coloured channel names, from frame to frame */
 	for (tmp = frame_prev; ; tmp = channel_get_next(tmp)) {
 
-		colour = (tmp == c) ? NAV_CURRENT_CHAN : nav_actv_cols[tmp->activity];
+		colour = (tmp == c) ? NAV_CURRENT_CHAN : actv_colours[tmp->activity];
 
-		if (puts(_colour(colour, -1)) < 0)
+		if (fputs(_colour(colour, -1), stdout) < 0)
 			break;
 
 		if (printf(" %s ", tmp->name) < 0)
@@ -597,7 +598,7 @@ _draw_input(struct input *in, struct coords coords)
 
 print_input:
 
-	puts(input);
+	fputs(input, stdout);
 	printf(MOVE(%d, %d), coords.rN, (cursor >= coords.c1 && cursor <= coords.cN) ? cursor : coords.cN);
 	printf(CURSOR_SAVE);
 }
@@ -701,7 +702,7 @@ _draw_status(struct channel *c)
 
 print_status:
 
-	puts(status_buff);
+	fputs(status_buff, stdout);
 
 	/* Trailing separator */
 	while (col++ < cols)
@@ -714,10 +715,10 @@ check_coords(struct coords coords)
 	/* Check coordinate validity before drawing, ensure at least one row, column */
 
 	if (coords.r1 > coords.rN)
-		fatal("row coordinates invalid");
+		fatal("row coordinates invalid", 0);
 
 	if (coords.c1 > coords.cN)
-		fatal("column coordinates invalid");
+		fatal("column coordinates invalid", 0);
 }
 
 static inline unsigned int

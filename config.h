@@ -15,16 +15,16 @@
 #define BUFFER_LINES_MAX (1 << 10)
 
 /* Colours used for nicks */
-static int nick_colours[] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14};
+#define NICK_COLOURS {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14};
 
-/* Colours for channel names in response to activity, in order of precedence */
-static int nav_actv_cols[ACTIVITY_T_SIZE] = {
-	239, /* Default colour */
-	239, /* Join/Part/Quit colour */
-	247, /* Chat colour */
-	3    /* Ping colour */
+#define ACTIVITY_COLOURS {            \
+	239, /* Default colour */         \
+	239, /* Join/Part/Quit colour */  \
+	247, /* Chat colour */            \
+	3    /* Ping colour */            \
 };
 
+/* Colours for channel names in response to activity, in order of precedence */
 #define NAV_CURRENT_CHAN 255
 
 /* Characters */

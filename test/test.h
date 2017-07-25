@@ -48,12 +48,12 @@ static void _print_testcase_name_(const char*);
 #ifdef fatal
 	#error "test.h" should be the first include within testcase files
 #else
-	#define fatal(mesg) \
+	#define fatal(M, E) \
 	do { \
 		if (_assert_fatal_) \
 			_assert_fatal_ = 0; \
 		else { \
-			snprintf(_tc_errbuf_, sizeof(_tc_errbuf_) - 1, "FATAL in "__FILE__" - %s : '%s'", __func__, mesg); \
+			snprintf(_tc_errbuf_, sizeof(_tc_errbuf_) - 1, "FATAL in "__FILE__" - %s : '%s'", __func__, M); \
 			longjmp(_testcase_jmp_buf_, 1); \
 		} \
 	} while (0)

@@ -87,7 +87,7 @@ avl_new_node(const char *key, void *val)
 	struct avl_node *n;
 
 	if ((n = calloc(1, sizeof(*n))) == NULL)
-		fatal("calloc");
+		fatal("calloc", errno);
 
 	n->height = 1;
 	n->key = strdup(key);
