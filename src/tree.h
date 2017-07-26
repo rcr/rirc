@@ -47,7 +47,7 @@ void free_avl(struct avl_node*);
 
 #define SPLAY_INIT(root) do {      \
         (root)->splay_root = NULL; \
-    } while (0)                    \
+    } while (0)
 
 
 #define SPLAY_ROTATE_RIGHT(head, tmp, field) do {                        \
@@ -243,6 +243,16 @@ name##_SPLAY(struct name *head, struct type *elm)                             \
         }                                                                     \
     }                                                                         \
     SPLAY_ASSEMBLE(head, &node, left, right, field);                          \
-}
+}                                                                             \
+                                                                              \
+/* Suppress unused function warnings */                                       \
+char name##_dummy_splay = (                                                   \
+    (void*)(name##_SPLAY_ADD)   ||                                            \
+    (void*)(name##_SPLAY_DEL)   ||                                            \
+    (void*)(name##_SPLAY_GET)   ||                                            \
+    (void*)(name##_SPLAY_MAX)   ||                                            \
+    (void*)(name##_SPLAY_MIN)   ||                                            \
+    (void*)(name##_SPLAY_NEXT)  ||                                            \
+    (void*)(name##_SPLAY_PREV));
 
 #endif
