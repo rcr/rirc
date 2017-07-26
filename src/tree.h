@@ -246,13 +246,13 @@ name##_SPLAY(struct name *head, struct type *elm)                             \
 }                                                                             \
                                                                               \
 /* Suppress unused function warnings */                                       \
-char name##_dummy_splay = (                                                   \
-    (void*)(name##_SPLAY_ADD)   ||                                            \
-    (void*)(name##_SPLAY_DEL)   ||                                            \
-    (void*)(name##_SPLAY_GET)   ||                                            \
-    (void*)(name##_SPLAY_MAX)   ||                                            \
-    (void*)(name##_SPLAY_MIN)   ||                                            \
-    (void*)(name##_SPLAY_NEXT)  ||                                            \
-    (void*)(name##_SPLAY_PREV));
+void (*name##_SPLAY_DUMMY[])(void) = {                                        \
+    (void(*)(void))(name##_SPLAY_ADD),                                        \
+    (void(*)(void))(name##_SPLAY_DEL),                                        \
+    (void(*)(void))(name##_SPLAY_GET),                                        \
+    (void(*)(void))(name##_SPLAY_MAX),                                        \
+    (void(*)(void))(name##_SPLAY_MIN),                                        \
+    (void(*)(void))(name##_SPLAY_NEXT),                                       \
+    (void(*)(void))(name##_SPLAY_PREV) };
 
 #endif
