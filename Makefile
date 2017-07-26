@@ -39,7 +39,7 @@ $(BDIR_T)%.t:
 	$(eval _SRC = $(SDIR_T)/$(shell echo '$(@F)' | sed 's|\.t$$||; s|\.|/|; s|$$|.c|'))
 	@$(PP) $(CFLAGS) -MM -MP -MT $@ $(_SRC) -MF $(@:.t=.d)
 	@$(CC) $(CFLAGS_DEBUG) $(LDFLAGS_DEBUG) -o $@ $(_SRC)
-	-@./$@ || rm $@
+	-@./$@ || mv $@ $(@:.t=.td)
 
 -include $(wildcard $(BDIR)/*.d) $(wildcard $(BDIR_T)/*.d)
 
