@@ -45,10 +45,28 @@ struct server
 	void *connecting;
 	//TODO: WIP
 	struct channel_list clist;
+
+	struct {
+		struct {
+			/* Map lower + upper -> lower + upper */
+			char F[26 * 2 + 1];
+			char T[26 * 2 + 1];
+		} PREFIX;
+		struct {
+			char *CHANMODES_A;
+			char *CHANMODES_B;
+			char *CHANMODES_C;
+			char *CHANMODES_D;
+			/* lower + upper + 4 terminators */
+			char _[26 * 2 + 4];
+		} CHANMODES;
+	} config;
 };
 
-//TODO:
-struct server* server(struct server*, char*, char*, char*);
+void server_set_N005(struct server*, char*);
+
+struct server* server(char*, char*, char*);
+
 struct server* server_add(struct server_list*, struct server*);
 struct server* server_get(struct server_list*, struct server*);
 struct server* server_del(struct server_list*, struct server*);

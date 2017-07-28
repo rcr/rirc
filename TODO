@@ -2,8 +2,6 @@ TODO
 ---------------------------
 
 this iteration:
-	- 004/005 parsing, server defaults and configuration handling
-	- CHANMODES, PREFIX=(abc)xyz
 	- Proper mode support (struct cmode/umode)
 
 Continue refactoring:

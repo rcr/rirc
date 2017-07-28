@@ -302,7 +302,7 @@ parse_mesg(struct parsed_mesg *pm, char *mesg)
 }
 
 int
-parse_N005(struct opt opts[15], char *str)
+parse_N005(struct opt opts[MAX_N005_OPTS], char *str)
 {
 	/* Parse server configuration received in numeric 005 (ISUPPORT)
 	 *
