@@ -3,9 +3,7 @@
 
 #include <errno.h>
 
-//TODO: struct string { len, text[] } for
-// fields often strlen'ed, e.g. usernames, channel names, server names
-// strcmp comparing len == len && strlen
+#define MAX_N005_OPTS 14
 
 /* Parsed IRC message */
 struct parsed_mesg
@@ -13,8 +11,14 @@ struct parsed_mesg
 	char *from;
 	char *host;
 	char *command;
-	char *params; /* TODO: char*[15] */
+	char *params;
 	char *trailing;
+};
+
+struct opt
+{
+	char *arg;
+	char *val;
 };
 
 //TODO: replace comps to channel / nicks
@@ -27,7 +31,7 @@ char* word_wrap(int, char**, char*);
 
 int check_pinged(const char*, const char*);
 int parse_mesg(struct parsed_mesg*, char*);
-int skip_sp(char**);
+int parse_N005(struct opt[MAX_N005_OPTS], char*);
 
 void handle_error(int, const char*, ...);
 

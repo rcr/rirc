@@ -12,6 +12,7 @@ Continue refactoring:
 	- Untangle headers
 	- Rewrite input DLL as circular buffer of gap buffers, with copy on repeat,
 		use abstractions in _draw_input
+	- Split net/server code
 
 RFC compliance:
 	- List all message types and error numerics from RFC, mark handled/unhandled
@@ -58,6 +59,8 @@ src/README.md
 	502 :Can't set/get mode for other users
 		 (e.g.: /raw MODE <not my nick> <flag>
 ----------------------
+valgrind reports addrinfo memory lost when cancelling hung connection
+
 show connect eta intead of ping when reconnecting
 
 show disconnected/parted in status bar for channels instead of 0 user count
