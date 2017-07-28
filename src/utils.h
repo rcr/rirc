@@ -27,6 +27,7 @@ char* word_wrap(int, char**, char*);
 
 int check_pinged(const char*, const char*);
 int parse_mesg(struct parsed_mesg*, char*);
+int skip_sp(char**);
 
 void handle_error(int, const char*, ...);
 

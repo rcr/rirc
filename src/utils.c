@@ -87,6 +87,19 @@ strdup(const char *str)
 	return (char *) memcpy(ret, str, len);
 }
 
+int
+skip_sp(char **str)
+{
+	char *p;
+
+	for (p = *str; *p && *p == ' '; p++)
+		;
+
+	*str = p;
+
+	return !!*p;
+}
+
 static inline int
 irc_toupper(const int c)
 {
@@ -98,15 +111,20 @@ irc_toupper(const int c)
 	 * equivalence of two nicknames or channel names.
 	 */
 
-	switch(c) {
+	switch (c) {
+
 		case '{':
 			return '[';
+
 		case '}':
 			return ']';
+
 		case '|':
 			return '\\';
+
 		case '^':
 			return '~';
+
 		default:
 			return (c >= 'a' && c <= 'z') ? (c + 'A' - 'a') : c;
 	}
@@ -251,30 +269,22 @@ parse_mesg(struct parsed_mesg *pm, char *mesg)
 
 	int param_count = 0;
 
-	while (*mesg) {
+	while (skip_sp(&mesg)) {
 
-		/* Skip whitespace before each parameter */
-		while (*mesg && *mesg == ' ')
-			mesg++;
-
-		/* Parameter found */
-		if (*mesg) {
-
-			/* Maximum number of parameters found */
-			if (param_count == 14) {
-				pm->trailing = mesg;
-				break;
-			}
-
-			/* Trailing section found */
-			if (*mesg == ':') {
-				pm->trailing = (mesg + 1);
-				break;
-			}
-
-			if (!pm->params)
-				pm->params = mesg;
+		/* Maximum number of parameters found */
+		if (param_count == 14) {
+			pm->trailing = mesg;
+			break;
 		}
+
+		/* Trailing section found */
+		if (*mesg == ':') {
+			pm->trailing = (mesg + 1);
+			break;
+		}
+
+		if (!pm->params)
+			pm->params = mesg;
 
 		while (*mesg && *mesg != ' ')
 			mesg++;
