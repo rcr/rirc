@@ -142,6 +142,8 @@ test_avl(void)
 	/* Test deleting string that was previously deleted */
 	if (avl_del(&root, *strings, strcmp))
 		fail_testf("_avl_del() should have failed to delete %s", *strings);
+
+	free_avl(root);
 }
 
 int

@@ -1,4 +1,3 @@
-#include <ctype.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -9,7 +8,6 @@
 
 static inline int irc_isnickchar(const char);
 static inline int irc_toupper(int);
-static inline int skip_sp(char**);
 
 int fatal_exit;
 
@@ -88,7 +86,7 @@ strdup(const char *str)
 	return (char *) memcpy(ret, str, len);
 }
 
-static inline int
+int
 skip_sp(char **str)
 {
 	char *p;
@@ -299,65 +297,6 @@ parse_mesg(struct parsed_mesg *pm, char *mesg)
 		*param_end = '\0';
 
 	return 1;
-}
-
-int
-parse_N005(struct opt opts[MAX_N005_OPTS], char *str)
-{
-	/* Parse server configuration received in numeric 005 (ISUPPORT)
-	 *
-	 * docs/ISUPPORT.txt, section 2
-	 *
-	 * ":" servername SP "005" SP nickname SP 1*13( token SP ) ":are supported by this server"
-	 *
-	 * token     =  *1"-" parameter / parameter *1( "=" value )
-	 * parameter =  1*20letter
-	 * value     =  *letpun
-	 * letter    =  ALPHA / DIGIT
-	 * punct     =  %d33-47 / %d58-64 / %d91-96 / %d123-126
-	 * letpun    =  letter / punct
-	 */
-
-	char c, *arg, *val;
-
-	size_t opt_i = 0;
-
-	while (skip_sp(&str) && opt_i < MAX_N005_OPTS) {
-
-		if (!isalnum(*str))
-			return 0;
-
-		arg = str;
-		val = NULL;
-
-		while ((c = *str) && c != '=' && c != ' ')
-			str++;
-
-		if (c)
-			*str++ = 0;
-
-		if (c == '=') {
-
-			if (*str && *str != ' ')
-				val = str;
-
-			for (; *str && *str != ' '; str++)
-				;
-
-			if (*str == ' ')
-				*str++ = 0;
-		}
-
-		opts[opt_i].arg = arg;
-		opts[opt_i].val = val;
-
-		opt_i++;
-	}
-
-	opts[opt_i].arg = NULL;
-	opts[opt_i].val = NULL;
-
-	return !!opt_i;
 }
 
 int

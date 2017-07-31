@@ -1162,7 +1162,7 @@ recv_numeric(char *err, struct parsed_mesg *p, struct server *s)
 
 		newlinef(s->channel, 0, "--", "%s ~ supported by this server", p->params);
 
-		server_set_N005(s, p->params);
+		server_set_005(s, p->params);
 		break;
 
 

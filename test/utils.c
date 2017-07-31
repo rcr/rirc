@@ -220,87 +220,6 @@ test_parse_mesg(void)
 }
 
 void
-test_parse_N005(void)
-{
-	/* Test numeric 005 parsing  */
-
-	struct opt opts[MAX_N005_OPTS];
-
-	char opts0[] = "";
-	assert_eq(parse_N005(opts, opts0), 0);
-
-	char opts1[] = "=";
-	assert_eq(parse_N005(opts, opts1), 0);
-
-	char opts2[] = " ";
-	assert_eq(parse_N005(opts, opts2), 0);
-
-	char opts3[] = "=TESTING";
-	assert_eq(parse_N005(opts, opts3), 0);
-
-	char opts4[] = "TEST =TESTING";
-	assert_eq(parse_N005(opts, opts4), 0);
-
-	char opts5[] = ":test,trailing";
-	assert_eq(parse_N005(opts, opts5), 0);
-
-#define CHECK(I, A, V) \
-	assert_strcmp(opts[I].arg, A); assert_strcmp(opts[I].val, V);
-
-	char opts6[] = "TESTING";
-	assert_eq(parse_N005(opts, opts6), 1);
-
-	CHECK(0, "TESTING", NULL);
-	CHECK(1, NULL, NULL);
-
-	char opts7[] = " TESTING ";
-	assert_eq(parse_N005(opts, opts7), 1);
-
-	CHECK(0, "TESTING", NULL);
-	CHECK(1, NULL, NULL);
-
-	char opts8[] = "TESTING=";
-	assert_eq(parse_N005(opts, opts8), 1);
-
-	CHECK(0, "TESTING", NULL);
-	CHECK(1, NULL, NULL);
-
-	char opts9[] = "TESTING1=TESTING2";
-	assert_eq(parse_N005(opts, opts9), 1);
-
-	CHECK(0, "TESTING1", "TESTING2");
-	CHECK(1, NULL, NULL);
-
-	char opts10[] = "TESTING1=TESTING2 TESTING3=";
-	assert_eq(parse_N005(opts, opts10), 1);
-
-	CHECK(0, "TESTING1", "TESTING2");
-	CHECK(1, "TESTING3", NULL);
-	CHECK(2, NULL, NULL);
-
-	char opts11[] = "000 1=t 2=t! 3= 4=  5=t,t, 6= 7=7 8===D 9=9 10=10 11= 12 13 14 15";
-	assert_eq(parse_N005(opts, opts11), 1);
-
-	CHECK(0, "000", NULL);
-	CHECK(1, "1", "t");
-	CHECK(2, "2", "t!");
-	CHECK(3, "3", NULL);
-	CHECK(4, "4", NULL);
-	CHECK(5, "5", "t,t,");
-	CHECK(6, "6", NULL);
-	CHECK(7, "7", "7");
-	CHECK(8, "8", "==D");
-	CHECK(9, "9", "9");
-	CHECK(10, "10", "10");
-	CHECK(11, "11", NULL);
-	CHECK(12, "12", NULL);
-	CHECK(13, "13", NULL);
-	CHECK(14, NULL, NULL);
-
-#undef CHECK
-}
-
-void
 test_check_pinged(void)
 {
 	/* Test detecting user's nick in message */
@@ -493,7 +412,6 @@ main(void)
 		TESTCASE(test_irc_strncmp),
 		TESTCASE(test_irc_toupper),
 		TESTCASE(test_parse_mesg),
-		TESTCASE(test_parse_N005),
 		TESTCASE(test_skip_sp),
 		TESTCASE(test_word_wrap)
 	};

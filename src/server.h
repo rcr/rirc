@@ -63,7 +63,7 @@ struct server
 	} config;
 };
 
-void server_set_N005(struct server*, char*);
+void server_set_005(struct server*, char*);
 
 struct server* server(char*, char*, char*);
 
