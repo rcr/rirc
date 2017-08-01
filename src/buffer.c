@@ -21,18 +21,18 @@
 
 #define MASK(X) ((X) & (BUFFER_LINES_MAX - 1))
 
-static unsigned int buffer_full(struct buffer*);
-static unsigned int buffer_size(struct buffer*);
+static inline unsigned int buffer_full(struct buffer*);
+static inline unsigned int buffer_size(struct buffer*);
 
 static struct buffer_line* buffer_push(struct buffer*);
 
-static unsigned int
+static inline unsigned int
 buffer_full(struct buffer *b)
 {
 	return buffer_size(b) == BUFFER_LINES_MAX;
 }
 
-static unsigned int
+static inline unsigned int
 buffer_size(struct buffer *b)
 {
 	return b->head - b->tail;

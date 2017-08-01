@@ -102,7 +102,7 @@ startup(int argc, char **argv)
 		if (c == -1)
 			break;
 
-		switch(c) {
+		switch (c) {
 
 			/* Connect to server */
 			case 'c':

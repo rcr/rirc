@@ -8,6 +8,9 @@
 #include "buffer.h"
 #include "channel.h"
 
+/* [a-zA-Z] */
+#define MODE_LEN 26 * 2
+
 struct server_list
 {
 	struct server *head;
@@ -45,10 +48,28 @@ struct server
 	void *connecting;
 	//TODO: WIP
 	struct channel_list clist;
+
+	struct {
+		struct {
+			/* Map lower + upper -> lower + upper */
+			char F[MODE_LEN + 1];
+			char T[MODE_LEN + 1];
+		} PREFIX;
+		struct {
+			char *CHANMODES_A;
+			char *CHANMODES_B;
+			char *CHANMODES_C;
+			char *CHANMODES_D;
+			/* lower + upper + 4 terminators */
+			char _[MODE_LEN + 4];
+		} CHANMODES;
+	} config;
 };
 
-//TODO:
-struct server* server(struct server*, char*, char*, char*);
+void server_set_005(struct server*, char*);
+
+struct server* server(char*, char*, char*);
+
 struct server* server_add(struct server_list*, struct server*);
 struct server* server_get(struct server_list*, struct server*);
 struct server* server_del(struct server_list*, struct server*);

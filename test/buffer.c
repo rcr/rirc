@@ -283,7 +283,7 @@ test_buffer_line_overlength(void)
 	             l3 = TEXT_LENGTH_MAX * 2 + TEXT_LENGTH_MAX / 2 - 1;
 
 	/* Add a line that's 2.5 times the maximum length */
-	char text[l3 + 1];
+	char text[(l3 + 1) + 1];
 
 	memset(&text, ' ', sizeof(text) - 1);
 
@@ -294,7 +294,7 @@ test_buffer_line_overlength(void)
 	text[f3] = 'c';
 	text[l3] = 'C';
 
-	text[sizeof(text)] = 0;
+	text[sizeof(text) - 1] = 0;
 
 	_buffer_newline(&b, text);
 

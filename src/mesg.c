@@ -1154,9 +1154,15 @@ recv_numeric(char *err, struct parsed_mesg *p, struct server *s)
 
 
 	case RPL_MYINFO:    /* 004 <params> :Are supported by this server */
+
+		newlinef(s->channel, 0, "--", "%s ~ supported by this server", p->params);
+		break;
+
 	case RPL_ISUPPORT:  /* 005 <params> :Are supported by this server */
 
 		newlinef(s->channel, 0, "--", "%s ~ supported by this server", p->params);
+
+		server_set_005(s, p->params);
 		break;
 
 

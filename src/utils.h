@@ -3,17 +3,13 @@
 
 #include <errno.h>
 
-//TODO: struct string { len, text[] } for
-// fields often strlen'ed, e.g. usernames, channel names, server names
-// strcmp comparing len == len && strlen
-
 /* Parsed IRC message */
 struct parsed_mesg
 {
 	char *from;
 	char *host;
 	char *command;
-	char *params; /* TODO: char*[15] */
+	char *params;
 	char *trailing;
 };
 
@@ -27,6 +23,7 @@ char* word_wrap(int, char**, char*);
 
 int check_pinged(const char*, const char*);
 int parse_mesg(struct parsed_mesg*, char*);
+int skip_sp(char**);
 
 void handle_error(int, const char*, ...);
 
