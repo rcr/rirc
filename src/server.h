@@ -8,6 +8,9 @@
 #include "buffer.h"
 #include "channel.h"
 
+/* [a-zA-Z] */
+#define MODE_LEN 26 * 2
+
 struct server_list
 {
 	struct server *head;
@@ -49,8 +52,8 @@ struct server
 	struct {
 		struct {
 			/* Map lower + upper -> lower + upper */
-			char F[26 * 2 + 1];
-			char T[26 * 2 + 1];
+			char F[MODE_LEN + 1];
+			char T[MODE_LEN + 1];
 		} PREFIX;
 		struct {
 			char *CHANMODES_A;
@@ -58,7 +61,7 @@ struct server
 			char *CHANMODES_C;
 			char *CHANMODES_D;
 			/* lower + upper + 4 terminators */
-			char _[26 * 2 + 4];
+			char _[MODE_LEN + 4];
 		} CHANMODES;
 	} config;
 };

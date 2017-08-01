@@ -3,6 +3,7 @@
 #include <string.h>
 
 #include "server.h"
+#include "state.h"
 #include "utils.h"
 
 struct opt
@@ -17,7 +18,7 @@ static int parse_opt(struct opt*, char **);
 	X(CHANMODES)    \
 	X(PREFIX)
 
-#define X(cmd) static void set_##cmd(struct server*, char*);
+#define X(cmd) static int set_##cmd(struct server*, char*);
 HANDLED_005
 #undef X
 
@@ -49,7 +50,9 @@ server_set_005(struct server *s, char *str)
 	struct opt opt;
 
 	while (parse_opt(&opt, &str)) {
-		#define X(cmd) if (!strcmp(opt.arg, #cmd)) { set_##cmd(s, opt.val); }
+		#define X(cmd)                                        \
+		if (!strcmp(opt.arg, #cmd) && !set_##cmd(s, opt.val)) \
+			newlinef(s->channel, 0, "-!!-", "invalid %s: %s", #cmd, opt.val);
 		HANDLED_005
 		#undef X
 	}
@@ -102,7 +105,7 @@ parse_opt(struct opt *opt, char **str)
 	return 1;
 }
 
-static void
+static int
 set_CHANMODES(struct server *s, char *val)
 {
 	UNUSED(s);
@@ -112,79 +115,47 @@ set_CHANMODES(struct server *s, char *val)
 	} else {
 		; //set default
 	}
+
+	return 1;
 }
 
-static void
+static int
 set_PREFIX(struct server *s, char *val)
 {
-	UNUSED(s);
-
-	if (val) {
-		; //set val
-	} else {
-		; //set default
-	}
-}
-
-#if 0
-int
-parse_N005(struct opt *opts, size_t max_opts, char *str)
-{
-	/* Parse server configuration received in numeric 005 (ISUPPORT)
+	/* `(modes)prefixes` in order of precedence
 	 *
-	 * docs/ISUPPORT.txt, section 2
-	 *
-	 * ":" servername SP "005" SP nickname SP 1*13( token SP ) ":are supported by this server"
-	 *
-	 * token     =  *1"-" parameter / parameter *1( "=" value )
-	 * parameter =  1*20letter
-	 * value     =  *letpun
-	 * letter    =  ALPHA / DIGIT
-	 * punct     =  %d33-47 / %d58-64 / %d91-96 / %d123-126
-	 * letpun    =  letter / punct
+	 * RFC 2812, numeric 319 (RPL_WHOISCHANNELS) states `(@+)ov`
 	 */
 
-	char c, *arg, *val;
+	char *f, *t = val;
 
-	size_t opt_i = 0;
-
-	while (skip_sp(&str) && opt_i < max_opts) {
-
-		if (!isalnum(*str))
-			return 0;
-
-		arg = str;
-		val = NULL;
-
-		while ((c = *str) && c != '=' && c != ' ')
-			str++;
-
-		if (c)
-			*str++ = 0;
-
-		if (c == '=') {
-
-			if (*str && *str != ' ')
-				val = str;
-
-			for (; *str && *str != ' '; str++)
-				;
-
-			if (*str == ' ')
-				*str++ = 0;
-		}
-
-		opts[opt_i].arg = arg;
-		opts[opt_i].val = val;
-
-		opt_i++;
+	if (val == NULL) {
+		strncpy(s->config.PREFIX.F, "ov", sizeof(s->config.PREFIX.F) - 1);
+		strncpy(s->config.PREFIX.T, "@+", sizeof(s->config.PREFIX.T) - 1);
+		return 1;
 	}
 
-	//FIXME: this is setting opt_i == 14
+	if ((t = strchr(t, '(')) == NULL)
+		return 0;
 
-	opts[opt_i].arg = NULL;
-	opts[opt_i].val = NULL;
+	f = ++t;
 
-	return !!opt_i;
+	if ((t = strchr(t, ')')) == NULL)
+		return 0;
+
+	*t++ = 0;
+
+	if ((strlen(f) != strlen(t)))
+		return 0;
+
+	if (strlen(f) > MODE_LEN)
+		return 0;
+
+	if (strlen(t) > MODE_LEN)
+		return 0;
+
+	strcpy(s->config.PREFIX.F, f);
+	strcpy(s->config.PREFIX.T, t);
+
+	return 1;
 }
-#endif
