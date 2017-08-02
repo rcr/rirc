@@ -243,15 +243,6 @@ send_mesg(char *mesg, struct channel *chan)
 		newline(chan, 0, "-!!-", errbuff);
 }
 
-//TODO: move this function to state?
-void
-send_paste(char *paste)
-{
-	/* TODO: send the paste buffer, which is preformatted with \r\n, and then
-	 * split the messages and newline them into the buffer * */
-	UNUSED(paste);
-}
-
 static int
 send_unhandled(char *err, char *cmd, char *args, struct server *s)
 {
@@ -422,7 +413,7 @@ send_ignore(char *err, char *mesg, struct server *s, struct channel *c)
 		fail("Error: Not connected to server");
 
 	if (!(nick = getarg(&mesg, " ")))
-		nicklist_print(c);
+		user_list_print(c);
 
 	else if (!avl_add(&(s->ignore), nick, irc_strcmp, NULL))
 		failf("Error: Already ignoring '%s'", nick);
@@ -565,7 +556,7 @@ send_unignore(char *err, char *mesg, struct server *s, struct channel *c)
 		fail("Error: Not connected to server");
 
 	if (!(nick = getarg(&mesg, " ")))
-		nicklist_print(c);
+		user_list_print(c);
 
 	else if (!avl_del(&(s->ignore), nick, irc_strcmp))
 		failf("Error: '%s' not on ignore list", nick);
@@ -871,10 +862,10 @@ recv_join(char *err, struct parsed_mesg *p, struct server *s)
 		if ((c = channel_list_get(&s->clist, chan)) == NULL)
 			failf("JOIN: channel '%s' not found", chan);
 
-		if (!nicklist_add(&(c->nicklist), p->from))
+		if (!user_list_add(&(c->users), p->from))
 			failf("JOIN: nick '%s' already in '%s'", p->from, chan);
 
-		if (c->nicklist.count < config.join_part_quit_threshold)
+		if (c->users.count < config.join_part_quit_threshold)
 			newlinef(c, 0, ">", "%s!%s has joined %s", p->from, p->host, chan);
 
 		draw_status();
@@ -921,7 +912,7 @@ recv_kick(char *err, struct parsed_mesg *p, struct server *s)
 			newlinef(c, 0, "--", "You've been kicked by %s", p->from, user);
 	} else {
 
-		if (!nicklist_del(&(c->nicklist), user))
+		if (!user_list_del(&(c->users), user))
 			failf("KICK: nick '%s' not found in '%s'", user, chan);
 
 		if (p->trailing)
@@ -996,7 +987,7 @@ recv_mode(char *err, struct parsed_mesg *p, struct server *s)
 
 			//TODO: channel_list_foreach
 			do {
-				if (nicklist_get(&(c->nicklist), targ, 0))
+				if (user_list_get(&(c->users), targ, 0))
 					/* [<user> set ]<target> mode: [<mode>][ <modeparams>] */
 					newlinef(c, 0, "--", "%s%s%s mode: [%s%s%s]",
 						(p->from ? p->from : ""),
@@ -1035,8 +1026,8 @@ recv_nick(char *err, struct parsed_mesg *p, struct server *s)
 	struct channel *c = s->channel;
 	//TODO: channel_list_foreach
 	do {
-		if (nicklist_del(&(c->nicklist), p->from)) {
-			nicklist_add(&(c->nicklist), nick);
+		if (user_list_del(&(c->users), p->from)) {
+			user_list_add(&(c->users), nick);
 			newlinef(c, 0, "--", "%s  >>  %s", p->from, nick);
 		}
 	} while ((c = c->next) != s->channel);
@@ -1233,7 +1224,7 @@ recv_numeric(char *err, struct parsed_mesg *p, struct server *s)
 			if (*nick == '@' || *nick == '+')
 				nick++;
 
-			nicklist_add(&(c->nicklist), nick);
+			user_list_add(&(c->users), nick);
 		}
 
 		draw_status();
@@ -1395,10 +1386,10 @@ recv_part(char *err, struct parsed_mesg *p, struct server *s)
 	if ((c = channel_list_get(&s->clist, targ)) == NULL)
 		failf("PART: channel '%s' not found", targ);
 
-	if (!nicklist_del(&(c->nicklist), p->from))
+	if (!user_list_del(&(c->users), p->from))
 		failf("PART: nick '%s' not found in '%s'", p->from, targ);
 
-	if (c->nicklist.count < config.join_part_quit_threshold) {
+	if (c->users.count < config.join_part_quit_threshold) {
 		if (p->trailing)
 			newlinef(c, 0, "<", "%s!%s has left %s (%s)", p->from, p->host, targ, p->trailing);
 		else
@@ -1503,8 +1494,8 @@ recv_quit(char *err, struct parsed_mesg *p, struct server *s)
 	struct channel *c = s->channel;
 	//TODO: channel_list_foreach
 	do {
-		if (nicklist_del(&(c->nicklist), p->from)) {
-			if (c->nicklist.count < config.join_part_quit_threshold) {
+		if (user_list_del(&(c->users), p->from)) {
+			if (c->users.count < config.join_part_quit_threshold) {
 				if (p->trailing)
 					newlinef(c, 0, "<", "%s!%s has quit (%s)", p->from, p->host, p->trailing);
 				else

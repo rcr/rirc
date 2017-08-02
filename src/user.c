@@ -1,13 +1,8 @@
-#include "nicklist.h"
+#include "user.h"
 #include "utils.h"
 
-/* TODO:
- * redesigning how avl trees are used, testing with nicklist
- * abstractions
- * */
-
 int
-nicklist_add(struct nicklist *l, const char *nick)
+user_list_add(struct user_list *l, const char *nick)
 {
 	if (avl_add(&(l->root), nick, irc_strcmp, NULL)) {
 		l->count++;
@@ -18,7 +13,7 @@ nicklist_add(struct nicklist *l, const char *nick)
 }
 
 int
-nicklist_del(struct nicklist *l, const char *nick)
+user_list_del(struct user_list *l, const char *nick)
 {
 	if (avl_del(&(l->root), nick, irc_strcmp)) {
 		l->count--;
@@ -30,7 +25,7 @@ nicklist_del(struct nicklist *l, const char *nick)
 
 //TODO: return struct nick*
 const char*
-nicklist_get(struct nicklist *l, const char *nick, size_t len)
+user_list_get(struct user_list *l, const char *nick, size_t len)
 {
 	const struct avl_node *n;
 
@@ -41,7 +36,7 @@ nicklist_get(struct nicklist *l, const char *nick, size_t len)
 }
 
 void
-nicklist_free(struct nicklist *l)
+user_list_free(struct user_list *l)
 {
 	free_avl(l->root);
 	l->root = NULL;

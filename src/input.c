@@ -580,7 +580,7 @@ tab_complete(struct input *inp)
 
 		/* For commands, append a space */
 		input_char(' ');
-	} else if ((match = nicklist_get(&(ccur->nicklist), str, len))) {
+	} else if ((match = user_list_get(&(ccur->users), str, len))) {
 		/* Nick tab completion */
 
 		/* Since matching is case insensitive, delete the prefix */

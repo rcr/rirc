@@ -14,6 +14,5 @@ const struct avl_node* commands_get(const char*, size_t);
 
 void recv_mesg(char*, int, struct server*);
 void send_mesg(char*, struct channel*);
-void send_paste(char*);
 
 #endif

@@ -151,9 +151,6 @@ set_PREFIX(struct server *s, char *val)
 	if (strlen(f) > MODE_LEN)
 		return 0;
 
-	if (strlen(t) > MODE_LEN)
-		return 0;
-
 	strcpy(s->config.PREFIX.F, f);
 	strcpy(s->config.PREFIX.T, t);
 
