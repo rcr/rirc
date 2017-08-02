@@ -23,6 +23,38 @@ void free_avl(struct avl_node*);
 #define TREE_RIGHT(elm, field) (elm)->field.tree_right
 #define TREE_ROOT(head)        (head)->tree_root
 
+/* AVL Tree */
+
+#define AVL_HEAD(type) \
+	struct type *tree_root
+
+
+#define AVL_NODE(type)           \
+	struct {                     \
+		unsigned int height;     \
+		struct type *tree_left;  \
+		struct type *tree_right; \
+	}
+
+#define AVL_ADD(name, x, y)  name##_AVL_ADD(x, y)
+#define AVL_DEL(name, x, y)  name##_AVL_DEL(x, y)
+#define AVL_GET(name, x, y)  name##_AVL_GET(x, y)
+
+#define AVL_GENERATE(name, type, field, cmp)                 \
+    struct type* name##_AVL_ADD(struct name*, struct type*); \
+    struct type* name##_AVL_DEL(struct name*, struct type*); \
+                                                             \
+static inline struct type*                                   \
+name##_AVL_GET(struct name *head, struct type *elm)          \
+{ (void)(head); (void)(elm); return NULL; }                  \
+struct type*                                                 \
+name##_AVL_DEL(struct name *head, struct type *elm)          \
+{ (void)(head); (void)(elm); return NULL; }                  \
+struct type*                                                 \
+name##_AVL_ADD(struct name *head, struct type *elm)          \
+{ (void)(head); (void)(elm); return NULL; }
+
+
 /* Splay Tree */
 
 #define SPLAY_ADD(name, x, y)  name##_SPLAY_ADD(x, y)
