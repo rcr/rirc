@@ -22,6 +22,7 @@ static int parse_opt(struct opt*, char **);
 HANDLED_005
 #undef X
 
+//TODO: refactor, not used
 struct server*
 server(char *host, char *port, char *nicks)
 {
@@ -30,8 +31,10 @@ server(char *host, char *port, char *nicks)
 	if ((s = calloc(1, sizeof(*s))) == NULL)
 		fatal("calloc", errno);
 
+	//TODO: user/host/port/modes/flag can be added as a user struct
 	s->host = strdup(host);
 	s->port = strdup(port);
+
 	s->nicks = strdup(nicks);
 
 	/* Set server defaults */

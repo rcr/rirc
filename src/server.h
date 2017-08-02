@@ -11,11 +11,6 @@
 /* [a-zA-Z] */
 #define MODE_LEN 26 * 2
 
-struct server_list
-{
-	struct server *head;
-};
-
 struct server
 {
 	//TODO: strdup this. Remove arbitrary NICKSIZE
@@ -64,6 +59,11 @@ struct server
 			char _[MODE_LEN + 4];
 		} CHANMODES;
 	} config;
+};
+
+struct server_list
+{
+	struct server *head;
 };
 
 void server_set_005(struct server*, char*);

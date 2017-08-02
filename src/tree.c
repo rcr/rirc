@@ -65,20 +65,12 @@ avl_get(struct avl_node *n, const char *key, int (*cmp)(const char*, const char*
 {
 	/* Entry point for fetching an avl node with prefix key */
 
-	int ret;
+	int comp;
 
-	for (;;) {
+	while (n && (comp = cmp(key, n->key, len)))
+		n = (comp > 0) ? n->r : n->l;
 
-		if (n == NULL)
-			return n;
-
-		ret = cmp(key, n->key, len);
-
-		if (ret == 0)
-			return n;
-
-		n = (ret > 0) ? n->r : n->l;
-	}
+	return n;
 }
 
 static struct avl_node*

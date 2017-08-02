@@ -48,10 +48,11 @@ _user_list_del(struct _user_list *ul, const char *nick)
 {
 	struct user u = { .nick = nick }, *r;
 
-	if ((r = AVL_DEL(_user_list, ul, &u)))
+	if ((r = AVL_DEL(_user_list, ul, &u))) {
 		free(r);
-	else
+
 		ul->count--;
+	}
 
 	return !!r;
 }
