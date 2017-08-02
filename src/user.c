@@ -21,7 +21,7 @@ _user_list_add(
 		const char *user,
 		const char *host)
 {
-	struct user *u;
+	struct user *u, *r;
 
 	size_t len_n = strlen(nick),
 	       len_u = strlen(user),
@@ -30,34 +30,38 @@ _user_list_add(
 	if ((u = calloc(1, sizeof(*u) + len_n + len_u + len_h + 3)) == NULL)
 		fatal("calloc", errno);
 
-	if ((u = AVL_DEL(_user_list, ul, u)) == NULL)
+	if ((r = AVL_ADD(_user_list, ul, u)) == NULL)
 		free(u);
 	else {
-		u->nick = strcpy(u->_        , nick);
+		u->nick = strcpy(u->_,         nick);
 		u->user = strcpy(u->_ + len_n, user);
 		u->host = strcpy(u->_ + len_u, host);
+
+		ul->count++;
 	}
 
-	return !!u;
+	return !!r;
 }
 
 int
 _user_list_del(struct _user_list *ul, const char *nick)
 {
-	struct user _ = { .nick = nick }, *u;
+	struct user u = { .nick = nick }, *r;
 
-	if ((u = AVL_DEL(_user_list, ul, &_)))
-		free(u);
+	if ((r = AVL_DEL(_user_list, ul, &u)))
+		free(r);
+	else
+		ul->count--;
 
-	return !!u;
+	return !!r;
 }
 
 struct user*
 _user_list_get(struct _user_list *ul, const char *nick)
 {
-	struct user _ = { .nick = nick };
+	struct user u = { .nick = nick };
 
-	return AVL_GET(_user_list, ul, &_);
+	return AVL_GET(_user_list, ul, &u);
 }
 
 /* ^ WIP */
