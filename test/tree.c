@@ -1,156 +1,222 @@
 #include "test.h"
-#include "strings.h"
-#include "../src/tree.c"
+#include "../src/tree.h"
 
-/*
- * Util functions for testing AVL properties
- * */
-
-static int
-_avl_count(struct avl_node *n)
+struct test_avl
 {
-	/* Count the number of nodes in a tree */
+	AVL_NODE(test_avl) node;
+	int val;
+};
 
-	if (n == NULL)
-		return 0;
+struct test_avl_list
+{
+	AVL_HEAD(test_avl);
+};
 
-	return 1 + _avl_count(n->l) + _avl_count(n->r);
+static inline int
+test_avl_cmp(struct test_avl *t1, struct test_avl *t2)
+{
+	return (t1->val == t2->val) ? 0 : ((t1->val < t2->val) ? -1 : 1);
 }
 
-static int
-_avl_is_binary(struct avl_node *n)
-{
-	if (n == NULL)
-		return 1;
-
-	if (n->l && (strcmp(n->key, n->l->key) <= 0))
-		return 0;
-
-	if (n->r && (strcmp(n->key, n->r->key) >= 0))
-		return 0;
-
-	return 1 & _avl_is_binary(n->l) & _avl_is_binary(n->r);
-}
-
-static int
-_avl_height(struct avl_node *n)
-{
-	if (n == NULL)
-		return 0;
-
-	return 1 + MAX(_avl_height(n->l), _avl_height(n->r));
-}
-
-/*
- * Tests
- * */
+AVL_GENERATE(test_avl_list, test_avl, node, test_avl_cmp)
 
 void
-test_avl(void)
+test_avl_get_height(void)
 {
-	/* Test AVL tree functions */
+	struct test_avl t0 = { .node.height = 1 };
 
-	struct avl_node *root = NULL;
+	assert_eq(test_avl_list_AVL_GET_HEIGHT(&t0),  1);
+	assert_eq(test_avl_list_AVL_GET_HEIGHT(NULL), 0);
+}
 
-	/* Insert strings a-z, zz-za, aa-az to hopefully excersize all combinations of rotations */
-	const char **ptr, *strings[] = {
-		"a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m",
-		"n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z",
-		"zz", "zy", "zx", "zw", "zv", "zu", "zt", "zs", "zr", "zq", "zp", "zo", "zn",
-		"zm", "zl", "zk", "zj", "zi", "zh", "zg", "zf", "ze", "zd", "zc", "zb", "za",
-		"aa", "ab", "ac", "ad", "ae", "af", "ag", "ah", "ai", "aj", "ak", "al", "am",
-		"an", "ao", "ap", "aq", "ar", "as", "at", "au", "av", "aw", "ax", "ay", "az",
-		NULL
-	};
+void
+test_avl_set_height(void)
+{
+	struct test_avl t0 = { .node.height = 1 };
+	struct test_avl t1 = { .node.tree_left = &t0 };
 
-	int ret, count = 0;
+	assert_eq(test_avl_list_AVL_SET_HEIGHT(&t1), 2);
+}
 
-	/* Hardcode caluculated maximum heigh of avl tree, avoid importing math libs */
-	double min_height; /* log_2(n + 1) */
-	double max_height; /* log_2(n + 2) * 1.618 - 0.328 */
+void
+test_avl_balance(void)
+{
+	/*     t30              balance : 2
+	 *    /   \
+	 * t20     t21          balance : 0, 1
+	 *        /   \
+	 *     t10     t11      balance : 0, 0
+	 *            /   \
+	 *         t00     t01  balance : 0, 0
+	 */
 
-	/* Add all strings to the tree */
-	for (ptr = strings; *ptr; ptr++) {
-		if (!avl_add(&root, *ptr, strcmp, NULL))
-			fail_testf("avl_add() failed to add %s", *ptr);
-		else
-			count++;
-	}
+	struct test_avl t00 = { .node.height = 1 };
+	struct test_avl t01 = { .node.height = 1 };
+	struct test_avl t10 = { .node.height = 1 };
+	struct test_avl t11 = { .node.tree_left  = &t00,
+	                        .node.tree_right = &t01 };
+	struct test_avl t20 = { .node.height = 1 };
+	struct test_avl t21 = { .node.tree_left  = &t10,
+	                        .node.tree_right = &t11 };
+	struct test_avl t30 = { .node.tree_left  = &t20,
+	                        .node.tree_right = &t21 };
 
-	/* Check that all were added correctly */
-	if ((ret = _avl_count(root)) != count)
-		fail_testf("_avl_count() returned %d, expected %d", ret, count);
+	test_avl_list_AVL_SET_HEIGHT(&t11);
+	test_avl_list_AVL_SET_HEIGHT(&t21);
+	test_avl_list_AVL_SET_HEIGHT(&t30);
 
-	/* Check that the binary properties of the tree hold */
-	if (!_avl_is_binary(root))
-		fail_test("_avl_is_binary() failed");
+	assert_eq(test_avl_list_AVL_BALANCE(&t00),  0);
+	assert_eq(test_avl_list_AVL_BALANCE(&t01),  0);
+	assert_eq(test_avl_list_AVL_BALANCE(&t10),  0);
+	assert_eq(test_avl_list_AVL_BALANCE(&t11),  0);
+	assert_eq(test_avl_list_AVL_BALANCE(&t20),  0);
+	assert_eq(test_avl_list_AVL_BALANCE(&t21),  1);
+	assert_eq(test_avl_list_AVL_BALANCE(&t30),  2);
 
-	/* Check that the height of root stays within the mathematical bounds AVL trees allow */
-	assert_eq(count, 78); /* Required for hardcoded log2 calculations */
-	min_height = 6.303;                /* log2(78 + 1) ~= 6.303 */
-	max_height = 6.321 * 1.44 - 0.328; /* log2(78 + 2) ~= 6.321 */
+	/*             t70      balance : -2
+	 *            /   \
+	 *         t60     t61  balance : 1, 0
+	 *        /   \
+	 *     t50     t51      balance : 0, 0
+	 *            /   \
+	 *         t40     t41  balance : 0, 0
+	 */
 
-	ret = _avl_height(root);
+	struct test_avl t40 = { .node.height = 1 };
+	struct test_avl t41 = { .node.height = 1 };
+	struct test_avl t50 = { .node.height = 1 };
+	struct test_avl t51 = { .node.tree_left  = &t40,
+	                        .node.tree_right = &t41 };
+	struct test_avl t60 = { .node.tree_left  = &t50,
+	                        .node.tree_right = &t51 };
+	struct test_avl t61 = { .node.height = 1 };
+	struct test_avl t70 = { .node.tree_left  = &t60,
+	                        .node.tree_right = &t61 };
 
-	if (ret < min_height)
-		fail_testf("_avl_height() returned %d, expected greater than %f", ret, min_height);
+	test_avl_list_AVL_SET_HEIGHT(&t51);
+	test_avl_list_AVL_SET_HEIGHT(&t60);
+	test_avl_list_AVL_SET_HEIGHT(&t70);
 
-	if (ret >= max_height)
-		fail_testf("_avl_height() returned %d, expected strictly less than %f", ret, max_height);
+	assert_eq(test_avl_list_AVL_BALANCE(&t40),  0);
+	assert_eq(test_avl_list_AVL_BALANCE(&t41),  0);
+	assert_eq(test_avl_list_AVL_BALANCE(&t50),  0);
+	assert_eq(test_avl_list_AVL_BALANCE(&t51),  0);
+	assert_eq(test_avl_list_AVL_BALANCE(&t60),  1);
+	assert_eq(test_avl_list_AVL_BALANCE(&t61),  0);
+	assert_eq(test_avl_list_AVL_BALANCE(&t70), -2);
+}
 
-	/* Test adding a duplicate and case sensitive duplicate */
-	if (avl_add(&root, "aa", strcmp, NULL) && count++)
-		fail_test("avl_add() failed to detect duplicate 'aa'");
+void
+test_avl_rotations(void)
+{
+	/* Exercise all 4 rotation types */
 
-	if (avl_add(&root, "aA", strcasecmp, NULL) && count++)
-		fail_test("avl_add() failed to detect case sensitive duplicate 'aA'");
+	/* Add 100, 200, 300:
+	 *
+	 *        100
+	 *          \
+	 *           200
+	 *             \
+	 *              300
+	 *
+	 * Rotates left:
+	 *
+	 *        200
+	 *        / \
+	 *     100   300
+	 */
 
-	/* Delete about half of the strings */
-	int num_delete = count / 2;
+	/* TODO */
 
-	for (ptr = strings; *ptr && num_delete > 0; ptr++, num_delete--) {
-		if (!avl_del(&root, *ptr, strcmp))
-			fail_testf("avl_del() failed to delete %s", *ptr);
-		else
-			count--;
-	}
+	/* Add 225, 275:
+	 *
+	 *        200
+	 *        / \
+	 *     100   300
+	 *           /
+	 *        225
+	 *          \
+	 *           275
+	 *
+	 * Rotates left-right:
+	 *
+	 *        200            200
+	 *        / \            / \
+	 *     100   300  ->  100   275
+	 *           /              / \
+	 *        275            225   300
+	 *        /
+	 *     225
+	 */
 
-	/* Check that all were deleted correctly */
-	if ((ret = _avl_count(root)) != count)
-		fail_testf("_avl_count() returned %d, expected %d", ret, count);
+	/* TODO */
 
-	/* Check that the binary properties of the tree still hold */
-	if (!_avl_is_binary(root))
-		fail_test("_avl_is_binary() failed");
+	/* Add 220, 215:
+	 *
+	 *        200
+	 *        / \
+	 *     100   275
+	 *           / \
+	 *        225   300
+	 *        /
+	 *     220
+	 *     /
+	 *  215
+	 *
+	 * Rotates right:
+	 *
+	 *        200
+	 *        / \
+	 *     100   275
+	 *           / \
+	 *        220   300
+	 *        / \
+	 *     215   225
+	 */
 
-	/* Check that the height of root stays within the mathematical bounds AVL trees allow */
-	assert_eq(count, 39); /* Required for hardcoded log2 calculations */
-	min_height = 5.321;                /* log2(39 + 1) ~= 5.321 */
-	max_height = 5.357 * 1.44 - 0.328; /* log2(39 + 2) ~= 5.357 */
+	/* TODO */
 
-	ret = _avl_height(root);
+	/* Add 245, 235:
+	 *
+	 *        200
+	 *        / \
+	 *     100   275
+	 *           / \
+	 *        220   300
+	 *        / \
+	 *     215   225
+	 *             \
+	 *              245
+	 *              /
+	 *           235
+	 *
+	 * Rotates right-left
+	 *
+	 *        200               200
+	 *        / \              /   \
+	 *     100   275         100   275
+	 *           / \               /  \
+	 *        220   300  ->     220   300
+	 *        / \               / \
+	 *     215   225         215   235
+	 *             \               / \
+	 *              235         225   245
+	 *                \
+	 *                 245
+	 *
+	 */
 
-	if (ret < min_height)
-		fail_testf("_avl_height() returned %d, expected greater than %f", ret, min_height);
-
-	if (ret >= max_height)
-		fail_testf("_avl_height() returned %d, expected strictly less than %f", ret, max_height);
-
-	if ((ret = _avl_height(root)) >= max_height)
-		fail_testf("_avl_height() returned %d, expected strictly less than %f", ret, max_height);
-
-	/* Test deleting string that was previously deleted */
-	if (avl_del(&root, *strings, strcmp))
-		fail_testf("_avl_del() should have failed to delete %s", *strings);
-
-	free_avl(root);
+	/* TODO */
 }
 
 int
 main(void)
 {
 	testcase tests[] = {
-		TESTCASE(test_avl)
+		TESTCASE(test_avl_get_height),
+		TESTCASE(test_avl_set_height),
+		TESTCASE(test_avl_balance),
+		TESTCASE(test_avl_rotations)
 	};
 
 	return run_tests(tests);

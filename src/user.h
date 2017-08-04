@@ -5,7 +5,7 @@
 
 struct user
 {
-	AVL_NODE(user) node;
+	//AVL_NODE(user) node;
 	char flag;
 	const char *nick;
 	const char *user;
@@ -15,7 +15,7 @@ struct user
 
 struct _user_list
 {
-	AVL_HEAD(user);
+	//AVL_HEAD(user);
 	unsigned int count;
 };
 

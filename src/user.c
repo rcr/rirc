@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#if 0
 static inline int user_cmp(struct user*, struct user*);
 
 AVL_GENERATE(_user_list, user, node, user_cmp)
@@ -66,6 +67,7 @@ _user_list_get(struct _user_list *ul, const char *nick)
 }
 
 /* ^ WIP */
+#endif
 
 int
 user_list_add(struct user_list *l, const char *nick)

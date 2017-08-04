@@ -42,4 +42,7 @@ struct channel* channel_list_add(struct channel_list*, struct channel*);
 struct channel* channel_list_del(struct channel_list*, struct channel*);
 struct channel* channel_list_get(struct channel_list*, char*);
 
+//TODO: channel/free channel_list/free
+//TODO: name##_TREE_FREE
+
 #endif
