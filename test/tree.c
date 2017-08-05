@@ -23,6 +23,8 @@ AVL_GENERATE(test_avl_list, test_avl, node, test_avl_cmp)
 void
 test_avl_get_height(void)
 {
+	//TODO: lots of missing field initializers for these avl structs
+
 	struct test_avl t0 = { .node.height = 1 };
 
 	assert_eq(test_avl_list_AVL_GET_HEIGHT(&t0),  1);
@@ -104,6 +106,69 @@ test_avl_balance(void)
 	assert_eq(test_avl_list_AVL_BALANCE(&t60),  1);
 	assert_eq(test_avl_list_AVL_BALANCE(&t61),  0);
 	assert_eq(test_avl_list_AVL_BALANCE(&t70), -2);
+}
+
+void
+test_avl_add(void)
+{
+	//FIXME: failing until implementation of ..._AVL_ADD_REC
+	return;
+
+	/* Test AVL_ADD
+	 *
+	 * Add 200, 100, 300, 50, 75, 150, 350:
+	 *
+	 *        _ 200 _
+	 *       /       \
+	 *    100         300
+	 *   /   \       /   \
+	 * 50     75  150     350
+	 */
+
+	struct test_avl_list tl = {0};
+
+	struct test_avl t0 = { .val = 200 };
+	struct test_avl t1 = { .val = 100 };
+	struct test_avl t2 = { .val = 300 };
+	struct test_avl t3 = { .val = 50 };
+	struct test_avl t4 = { .val = 75 };
+	struct test_avl t5 = { .val = 150 };
+	struct test_avl t6 = { .val = 350 };
+
+	assert_ptrequals(test_avl_list_AVL_ADD(&tl, &t0), &t0);
+	assert_ptrequals(test_avl_list_AVL_ADD(&tl, &t1), &t1);
+	assert_ptrequals(test_avl_list_AVL_ADD(&tl, &t2), &t2);
+	assert_ptrequals(test_avl_list_AVL_ADD(&tl, &t3), &t3);
+	assert_ptrequals(test_avl_list_AVL_ADD(&tl, &t4), &t4);
+	assert_ptrequals(test_avl_list_AVL_ADD(&tl, &t5), &t5);
+	assert_ptrequals(test_avl_list_AVL_ADD(&tl, &t6), &t6);
+
+	/* Duplicate */
+	assert_ptrequals(test_avl_list_AVL_ADD(&tl, &t6), NULL);
+
+	/* Check tree structure */
+	assert_ptrequals(TREE_ROOT(&tl), &t0);
+
+	assert_ptrequals(t0.node.tree_left,  &t1);
+	assert_ptrequals(t0.node.tree_right, &t2);
+
+	assert_ptrequals(t1.node.tree_left,  &t3);
+	assert_ptrequals(t1.node.tree_right, &t4);
+
+	assert_ptrequals(t2.node.tree_left,  &t5);
+	assert_ptrequals(t2.node.tree_right, &t6);
+
+	assert_ptrequals(t3.node.tree_left,  NULL);
+	assert_ptrequals(t3.node.tree_right, NULL);
+
+	assert_ptrequals(t4.node.tree_left,  NULL);
+	assert_ptrequals(t4.node.tree_right, NULL);
+
+	assert_ptrequals(t5.node.tree_left,  NULL);
+	assert_ptrequals(t5.node.tree_right, NULL);
+
+	assert_ptrequals(t6.node.tree_left,  NULL);
+	assert_ptrequals(t6.node.tree_right, NULL);
 }
 
 void
@@ -216,7 +281,8 @@ main(void)
 		TESTCASE(test_avl_get_height),
 		TESTCASE(test_avl_set_height),
 		TESTCASE(test_avl_balance),
-		TESTCASE(test_avl_rotations)
+		TESTCASE(test_avl_rotations),
+		TESTCASE(test_avl_add)
 	};
 
 	return run_tests(tests);

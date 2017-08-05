@@ -121,7 +121,8 @@ name##_AVL_GET(struct name *head, struct type *elm)                        \
 struct type*                                                               \
 name##_AVL_ADD(struct name *head, struct type *elm)                        \
 {                                                                          \
-    TREE_LEFT(elm, field)  = TREE_RIGHT(elm, field) = NULL;                \
+    TREE_LEFT(elm, field)  = NULL;                                         \
+    TREE_RIGHT(elm, field) = NULL;                                         \
     AVL_HEIGHT(elm, field) = 1;                                            \
                                                                            \
     struct type *r = name##_AVL_ADD_REC(TREE_ROOT(head), elm);             \
