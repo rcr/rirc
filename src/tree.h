@@ -41,15 +41,23 @@ void free_avl(struct avl_node*);
 
 #define AVL_NODE(type)           \
     struct {                     \
-        int height         ;     \
+        int height;              \
         struct type *tree_left;  \
         struct type *tree_right; \
     }
+
 
 #define AVL_GENERATE(name, type, field, cmp)                               \
     struct type* name##_AVL_ADD(struct name*, struct type*);               \
     struct type* name##_AVL_DEL(struct name*, struct type*);               \
     struct type* name##_AVL_ADD_REC(struct type*, struct type*);           \
+                                                                           \
+static inline void                                                         \
+name##_AVL_INIT(struct type *elm)                                          \
+{                                                                          \
+    AVL_HEIGHT(elm, field) = 1;                                            \
+    TREE_RIGHT(elm, field) = TREE_LEFT(elm, field) = NULL;                 \
+}                                                                          \
                                                                            \
 static inline int                                                          \
 name##_AVL_GET_HEIGHT(struct type *elm)                                    \
@@ -121,9 +129,7 @@ name##_AVL_GET(struct name *head, struct type *elm)                        \
 struct type*                                                               \
 name##_AVL_ADD(struct name *head, struct type *elm)                        \
 {                                                                          \
-    TREE_LEFT(elm, field)  = NULL;                                         \
-    TREE_RIGHT(elm, field) = NULL;                                         \
-    AVL_HEIGHT(elm, field) = 1;                                            \
+    name##_AVL_INIT(elm);                                                  \
                                                                            \
     struct type *r = name##_AVL_ADD_REC(TREE_ROOT(head), elm);             \
                                                                            \

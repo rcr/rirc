@@ -23,9 +23,7 @@ AVL_GENERATE(test_avl_list, test_avl, node, test_avl_cmp)
 void
 test_avl_get_height(void)
 {
-	//TODO: lots of missing field initializers for these avl structs
-
-	struct test_avl t0 = { .node.height = 1 };
+	struct test_avl t0 = { .node = { .height = 1 }};
 
 	assert_eq(test_avl_list_AVL_GET_HEIGHT(&t0),  1);
 	assert_eq(test_avl_list_AVL_GET_HEIGHT(NULL), 0);
@@ -34,8 +32,9 @@ test_avl_get_height(void)
 void
 test_avl_set_height(void)
 {
-	struct test_avl t0 = { .node.height = 1 };
-	struct test_avl t1 = { .node.tree_left = &t0 };
+	struct test_avl
+		t0 = { .node = { .height = 1 }},
+		t1 = { .node = { .tree_left = &t0 }};
 
 	assert_eq(test_avl_list_AVL_SET_HEIGHT(&t1), 2);
 }
@@ -52,48 +51,50 @@ test_avl_balance(void)
 	 *         t00     t01  balance : 0, 0
 	 */
 
-	struct test_avl t00 = { .node.height = 1 };
-	struct test_avl t01 = { .node.height = 1 };
-	struct test_avl t10 = { .node.height = 1 };
-	struct test_avl t11 = { .node.tree_left  = &t00,
-	                        .node.tree_right = &t01 };
-	struct test_avl t20 = { .node.height = 1 };
-	struct test_avl t21 = { .node.tree_left  = &t10,
-	                        .node.tree_right = &t11 };
-	struct test_avl t30 = { .node.tree_left  = &t20,
-	                        .node.tree_right = &t21 };
+	struct test_avl
+		t00 = { .node = { .height = 1 }},
+		t01 = { .node = { .height = 1 }},
+		t10 = { .node = { .height = 1 }},
+		t11 = { .node = { .tree_left  = &t00,
+		                  .tree_right = &t01 }},
+		t20 = { .node = { .height = 1 }},
+		t21 = { .node = { .tree_left  = &t10,
+		                  .tree_right = &t11 }},
+		t30 = { .node = { .tree_left  = &t20,
+		                  .tree_right = &t21 }};
 
 	test_avl_list_AVL_SET_HEIGHT(&t11);
 	test_avl_list_AVL_SET_HEIGHT(&t21);
 	test_avl_list_AVL_SET_HEIGHT(&t30);
 
-	assert_eq(test_avl_list_AVL_BALANCE(&t00),  0);
-	assert_eq(test_avl_list_AVL_BALANCE(&t01),  0);
-	assert_eq(test_avl_list_AVL_BALANCE(&t10),  0);
-	assert_eq(test_avl_list_AVL_BALANCE(&t11),  0);
-	assert_eq(test_avl_list_AVL_BALANCE(&t20),  0);
-	assert_eq(test_avl_list_AVL_BALANCE(&t21),  1);
-	assert_eq(test_avl_list_AVL_BALANCE(&t30),  2);
+	assert_eq(test_avl_list_AVL_BALANCE(&t00), 0);
+	assert_eq(test_avl_list_AVL_BALANCE(&t01), 0);
+	assert_eq(test_avl_list_AVL_BALANCE(&t10), 0);
+	assert_eq(test_avl_list_AVL_BALANCE(&t11), 0);
+	assert_eq(test_avl_list_AVL_BALANCE(&t20), 0);
+	assert_eq(test_avl_list_AVL_BALANCE(&t21), 1);
+	assert_eq(test_avl_list_AVL_BALANCE(&t30), 2);
 
-	/*             t70      balance : -2
-	 *            /   \
-	 *         t60     t61  balance : 1, 0
+	/*         t70      balance : -2
 	 *        /   \
-	 *     t50     t51      balance : 0, 0
-	 *            /   \
-	 *         t40     t41  balance : 0, 0
+	 *     t60     t61  balance : 1, 0
+	 *    /   \
+	 * t50     t51      balance : 0, 0
+	 *        /   \
+	 *     t40     t41  balance : 0, 0
 	 */
 
-	struct test_avl t40 = { .node.height = 1 };
-	struct test_avl t41 = { .node.height = 1 };
-	struct test_avl t50 = { .node.height = 1 };
-	struct test_avl t51 = { .node.tree_left  = &t40,
-	                        .node.tree_right = &t41 };
-	struct test_avl t60 = { .node.tree_left  = &t50,
-	                        .node.tree_right = &t51 };
-	struct test_avl t61 = { .node.height = 1 };
-	struct test_avl t70 = { .node.tree_left  = &t60,
-	                        .node.tree_right = &t61 };
+	struct test_avl
+		t40 = { .node = { .height = 1 }},
+		t41 = { .node = { .height = 1 }},
+		t50 = { .node = { .height = 1 }},
+		t51 = { .node = { .tree_left  = &t40,
+		                  .tree_right = &t41 }},
+		t60 = { .node = { .tree_left  = &t50,
+		                  .tree_right = &t51 }},
+		t61 = { .node = { .height = 1 }},
+		t70 = { .node = { .tree_left  = &t60,
+		                  .tree_right = &t61 }};
 
 	test_avl_list_AVL_SET_HEIGHT(&t51);
 	test_avl_list_AVL_SET_HEIGHT(&t60);
@@ -127,13 +128,14 @@ test_avl_add(void)
 
 	struct test_avl_list tl = {0};
 
-	struct test_avl t0 = { .val = 200 };
-	struct test_avl t1 = { .val = 100 };
-	struct test_avl t2 = { .val = 300 };
-	struct test_avl t3 = { .val = 50 };
-	struct test_avl t4 = { .val = 75 };
-	struct test_avl t5 = { .val = 150 };
-	struct test_avl t6 = { .val = 350 };
+	struct test_avl
+		t0 = { .val = 200 },
+		t1 = { .val = 100 },
+		t2 = { .val = 300 },
+		t3 = { .val = 50 },
+		t4 = { .val = 75 },
+		t5 = { .val = 150 },
+		t6 = { .val = 350 };
 
 	assert_ptrequals(test_avl_list_AVL_ADD(&tl, &t0), &t0);
 	assert_ptrequals(test_avl_list_AVL_ADD(&tl, &t1), &t1);
@@ -169,6 +171,13 @@ test_avl_add(void)
 
 	assert_ptrequals(t6.node.tree_left,  NULL);
 	assert_ptrequals(t6.node.tree_right, NULL);
+}
+
+void
+test_avl_del(void)
+{
+	/* TODO */
+	;
 }
 
 void
@@ -274,6 +283,13 @@ test_avl_rotations(void)
 	/* TODO */
 }
 
+void
+test_avl_free(void)
+{
+	/* TODO */
+	;
+}
+
 int
 main(void)
 {
@@ -281,8 +297,10 @@ main(void)
 		TESTCASE(test_avl_get_height),
 		TESTCASE(test_avl_set_height),
 		TESTCASE(test_avl_balance),
+		TESTCASE(test_avl_add),
+		TESTCASE(test_avl_del),
 		TESTCASE(test_avl_rotations),
-		TESTCASE(test_avl_add)
+		TESTCASE(test_avl_free)
 	};
 
 	return run_tests(tests);
