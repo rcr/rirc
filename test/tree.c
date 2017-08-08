@@ -15,12 +15,12 @@ struct test_avl_list
 static inline int
 test_avl_cmp(struct test_avl *t1, struct test_avl *t2)
 {
-	return (t1->val == t2->val) ? 0 : ((t1->val < t2->val) ? -1 : 1);
+	return (t1->val == t2->val) ? 0 : ((t1->val > t2->val) ? 1 : -1);
 }
 
 AVL_GENERATE(test_avl_list, test_avl, node, test_avl_cmp)
 
-void
+static void
 test_avl_get_height(void)
 {
 	struct test_avl t0 = { .node = { .height = 1 }};
@@ -29,7 +29,7 @@ test_avl_get_height(void)
 	assert_eq(test_avl_list_AVL_GET_HEIGHT(NULL), 0);
 }
 
-void
+static void
 test_avl_set_height(void)
 {
 	struct test_avl
@@ -39,7 +39,7 @@ test_avl_set_height(void)
 	assert_eq(test_avl_list_AVL_SET_HEIGHT(&t1), 2);
 }
 
-void
+static void
 test_avl_balance(void)
 {
 	/*     t30              balance : 2
@@ -109,21 +109,18 @@ test_avl_balance(void)
 	assert_eq(test_avl_list_AVL_BALANCE(&t70), -2);
 }
 
-void
+static void
 test_avl_add(void)
 {
-	//FIXME: failing until implementation of ..._AVL_ADD_REC
-	return;
-
 	/* Test AVL_ADD
 	 *
-	 * Add 200, 100, 300, 50, 75, 150, 350:
+	 * Add 200, 100, 300, 50, 150, 250, 350:
 	 *
 	 *        _ 200 _
 	 *       /       \
 	 *    100         300
 	 *   /   \       /   \
-	 * 50     75  150     350
+	 * 50     150 250     350
 	 */
 
 	struct test_avl_list tl = {0};
@@ -133,8 +130,8 @@ test_avl_add(void)
 		t1 = { .val = 100 },
 		t2 = { .val = 300 },
 		t3 = { .val = 50 },
-		t4 = { .val = 75 },
-		t5 = { .val = 150 },
+		t4 = { .val = 150 },
+		t5 = { .val = 250 },
 		t6 = { .val = 350 };
 
 	assert_ptrequals(test_avl_list_AVL_ADD(&tl, &t0), &t0);
@@ -173,14 +170,14 @@ test_avl_add(void)
 	assert_ptrequals(t6.node.tree_right, NULL);
 }
 
-void
+static void
 test_avl_del(void)
 {
 	/* TODO */
 	;
 }
 
-void
+static void
 test_avl_rotations(void)
 {
 	/* Exercise all 4 rotation types */
@@ -283,7 +280,7 @@ test_avl_rotations(void)
 	/* TODO */
 }
 
-void
+static void
 test_avl_free(void)
 {
 	/* TODO */
