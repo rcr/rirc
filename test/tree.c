@@ -63,10 +63,6 @@ test_avl_balance(void)
 		t30 = { .node = { .tree_left  = &t20,
 		                  .tree_right = &t21 }};
 
-	test_avl_list_AVL_SET_HEIGHT(&t11);
-	test_avl_list_AVL_SET_HEIGHT(&t21);
-	test_avl_list_AVL_SET_HEIGHT(&t30);
-
 	assert_eq(test_avl_list_AVL_BALANCE(&t00), 0);
 	assert_eq(test_avl_list_AVL_BALANCE(&t01), 0);
 	assert_eq(test_avl_list_AVL_BALANCE(&t10), 0);
@@ -95,10 +91,6 @@ test_avl_balance(void)
 		t61 = { .node = { .height = 1 }},
 		t70 = { .node = { .tree_left  = &t60,
 		                  .tree_right = &t61 }};
-
-	test_avl_list_AVL_SET_HEIGHT(&t51);
-	test_avl_list_AVL_SET_HEIGHT(&t60);
-	test_avl_list_AVL_SET_HEIGHT(&t70);
 
 	assert_eq(test_avl_list_AVL_BALANCE(&t40),  0);
 	assert_eq(test_avl_list_AVL_BALANCE(&t41),  0);
@@ -143,7 +135,7 @@ test_avl_add(void)
 	assert_ptrequals(test_avl_list_AVL_ADD(&tl, &t6), &t6);
 
 	/* Duplicate */
-	assert_ptrequals(test_avl_list_AVL_ADD(&tl, &t6), NULL);
+	assert_null(test_avl_list_AVL_ADD(&tl, &t6));
 
 	/* Check tree structure */
 	assert_ptrequals(TREE_ROOT(&tl), &t0);
@@ -157,24 +149,200 @@ test_avl_add(void)
 	assert_ptrequals(t2.node.tree_left,  &t5);
 	assert_ptrequals(t2.node.tree_right, &t6);
 
-	assert_ptrequals(t3.node.tree_left,  NULL);
-	assert_ptrequals(t3.node.tree_right, NULL);
+	assert_null(t3.node.tree_left);
+	assert_null(t3.node.tree_right);
 
-	assert_ptrequals(t4.node.tree_left,  NULL);
-	assert_ptrequals(t4.node.tree_right, NULL);
+	assert_null(t4.node.tree_left);
+	assert_null(t4.node.tree_right);
 
-	assert_ptrequals(t5.node.tree_left,  NULL);
-	assert_ptrequals(t5.node.tree_right, NULL);
+	assert_null(t5.node.tree_left);
+	assert_null(t5.node.tree_right);
 
-	assert_ptrequals(t6.node.tree_left,  NULL);
-	assert_ptrequals(t6.node.tree_right, NULL);
+	assert_null(t6.node.tree_left);
+	assert_null(t6.node.tree_right);
+
+	/* Retrieve the nodes */
+	assert_ptrequals(test_avl_list_AVL_GET(&tl, &t0), &t0);
+	assert_ptrequals(test_avl_list_AVL_GET(&tl, &t1), &t1);
+	assert_ptrequals(test_avl_list_AVL_GET(&tl, &t2), &t2);
+	assert_ptrequals(test_avl_list_AVL_GET(&tl, &t3), &t3);
+	assert_ptrequals(test_avl_list_AVL_GET(&tl, &t4), &t4);
+	assert_ptrequals(test_avl_list_AVL_GET(&tl, &t5), &t5);
+	assert_ptrequals(test_avl_list_AVL_GET(&tl, &t6), &t6);
+
+	struct test_avl t7 = { .val = -1 };
+
+	assert_null(test_avl_list_AVL_GET(&tl, &t7));
 }
 
 static void
 test_avl_del(void)
 {
-	/* TODO */
-	;
+	/* Test AVL_DEL
+	 *
+	 * Add 200, 100, 300, 50, 150, 250, 350:
+	 *
+	 *        _ 200 _
+	 *       /       \
+	 *    100         300
+	 *   /   \       /   \
+	 * 50     150 250     350
+	 */
+
+	struct test_avl_list tl = {0};
+
+	struct test_avl
+		t200 = { .val = 200 },
+		t100 = { .val = 100 },
+		t300 = { .val = 300 },
+		t050 = { .val = 50 },
+		t150 = { .val = 150 },
+		t250 = { .val = 250 },
+		t350 = { .val = 350 },
+		t0 = { .val = 0 };
+
+	assert_ptrequals(test_avl_list_AVL_ADD(&tl, &t200), &t200);
+	assert_ptrequals(test_avl_list_AVL_ADD(&tl, &t100), &t100);
+	assert_ptrequals(test_avl_list_AVL_ADD(&tl, &t300), &t300);
+	assert_ptrequals(test_avl_list_AVL_ADD(&tl, &t050), &t050);
+	assert_ptrequals(test_avl_list_AVL_ADD(&tl, &t150), &t150);
+	assert_ptrequals(test_avl_list_AVL_ADD(&tl, &t250), &t250);
+	assert_ptrequals(test_avl_list_AVL_ADD(&tl, &t350), &t350);
+
+	/* Test deleting node not found in tree */
+	assert_ptrequals(test_avl_list_AVL_DEL(&tl, &t0), NULL);
+
+	/* Delete 200; In-order successor is substituted from leaf
+	 *
+	 *        _ 250 _
+	 *       /       \
+	 *    100         300
+	 *   /   \           \
+	 * 50     150        350
+	 */
+
+	assert_ptrequals(test_avl_list_AVL_DEL(&tl, &t200), &t200);
+
+	/* Check tree structure */
+	assert_ptrequals(TREE_ROOT(&tl), &t250);
+
+	assert_ptrequals(t250.node.tree_left, &t100);
+	assert_ptrequals(t250.node.tree_right, &t300);
+
+	assert_ptrequals(t100.node.tree_left, &t050);
+	assert_ptrequals(t100.node.tree_right, &t150);
+
+	assert_null(t300.node.tree_left);
+	assert_ptrequals(t300.node.tree_right, &t350);
+
+	assert_null(t050.node.tree_left);
+	assert_null(t050.node.tree_right);
+
+	assert_null(t150.node.tree_left);
+	assert_null(t150.node.tree_right);
+
+	assert_null(t350.node.tree_left);
+	assert_null(t350.node.tree_right);
+
+	/* Delete 250; In-order successor with no left-subtree is substituted
+	 *
+	 *        _ 300 _
+	 *       /       \
+	 *    100         350
+	 *   /   \
+	 * 50     150
+	 *
+	 */
+
+	assert_ptrequals(test_avl_list_AVL_DEL(&tl, &t250), &t250);
+
+	/* Check tree structure */
+	assert_ptrequals(TREE_ROOT(&tl), &t300);
+
+	assert_ptrequals(t300.node.tree_left, &t100);
+	assert_ptrequals(t300.node.tree_right, &t350);
+
+	assert_ptrequals(t100.node.tree_left, &t050);
+	assert_ptrequals(t100.node.tree_right, &t150);
+
+	assert_null(t050.node.tree_left);
+	assert_null(t050.node.tree_right);
+
+	assert_null(t150.node.tree_left);
+	assert_null(t150.node.tree_right);
+
+	assert_null(t350.node.tree_left);
+	assert_null(t350.node.tree_right);
+
+	/* Delete 300; No successor, tree is rotated
+	 *
+	 *        350
+	 *       /
+	 *    100
+	 *   /   \
+	 * 50     150
+	 *
+	 * ->
+	 *        100
+	 *       /   \
+	 *     50     350
+	 *           /
+	 *        150
+	 */
+
+	assert_ptrequals(test_avl_list_AVL_DEL(&tl, &t300), &t300);
+
+	/* Check tree structure */
+	assert_ptrequals(TREE_ROOT(&tl), &t100);
+
+	assert_ptrequals(t100.node.tree_left, &t050);
+	assert_ptrequals(t100.node.tree_right, &t350);
+
+	assert_null(t050.node.tree_left);
+	assert_null(t050.node.tree_right);
+
+	assert_ptrequals(t350.node.tree_left, &t150);
+	assert_null(t350.node.tree_right);
+
+	assert_null(t150.node.tree_left);
+	assert_null(t150.node.tree_right);
+
+	/* Delete 50; tree is rotated
+	 *
+	 * 100
+	 *    \
+	 *     350
+	 *    /
+	 * 150
+	 *
+	 * ->
+	 *
+	 *     150
+	 *    /   \
+	 * 100     350
+	 */
+
+	assert_ptrequals(test_avl_list_AVL_DEL(&tl, &t050), &t050);
+
+	/* Check tree structure */
+	assert_ptrequals(TREE_ROOT(&tl), &t150);
+
+	assert_ptrequals(t150.node.tree_left, &t100);
+	assert_ptrequals(t150.node.tree_right, &t350);
+
+	assert_null(t100.node.tree_left);
+	assert_null(t100.node.tree_right);
+
+	assert_null(t350.node.tree_left);
+	assert_null(t350.node.tree_right);
+
+	/* Delete remaining nodes */
+
+	assert_ptrequals(test_avl_list_AVL_DEL(&tl, &t100), &t100);
+	assert_ptrequals(test_avl_list_AVL_DEL(&tl, &t150), &t150);
+	assert_ptrequals(test_avl_list_AVL_DEL(&tl, &t350), &t350);
+
+	assert_null(TREE_ROOT(&tl));
 }
 
 static void
@@ -211,16 +379,16 @@ test_avl_rotations(void)
 	assert_ptrequals(TREE_ROOT(&tl), &t1);
 
 	/* 100 */
-	assert_ptrequals(t0.node.tree_left,  NULL);
-	assert_ptrequals(t0.node.tree_right, NULL);
+	assert_null(t0.node.tree_left);
+	assert_null(t0.node.tree_right);
 
 	/* 200 */
 	assert_ptrequals(t1.node.tree_left,  &t0);
 	assert_ptrequals(t1.node.tree_right, &t2);
 
 	/* 300 */
-	assert_ptrequals(t2.node.tree_left,  NULL);
-	assert_ptrequals(t2.node.tree_right, NULL);
+	assert_null(t2.node.tree_left);
+	assert_null(t2.node.tree_right);
 
 	/* Add 225, 275:
 	 *
@@ -253,20 +421,20 @@ test_avl_rotations(void)
 	assert_ptrequals(TREE_ROOT(&tl), &t1);
 
 	/* 100 */
-	assert_ptrequals(t0.node.tree_left,  NULL);
-	assert_ptrequals(t0.node.tree_right, NULL);
+	assert_null(t0.node.tree_left);
+	assert_null(t0.node.tree_right);
 
 	/* 200 */
 	assert_ptrequals(t1.node.tree_left,  &t0);
 	assert_ptrequals(t1.node.tree_right, &t4);
 
 	/* 300 */
-	assert_ptrequals(t2.node.tree_left,  NULL);
-	assert_ptrequals(t2.node.tree_right, NULL);
+	assert_null(t2.node.tree_left);
+	assert_null(t2.node.tree_right);
 
 	/* 225 */
-	assert_ptrequals(t3.node.tree_left,  NULL);
-	assert_ptrequals(t3.node.tree_right, NULL);
+	assert_null(t3.node.tree_left);
+	assert_null(t3.node.tree_right);
 
 	/* 275 */
 	assert_ptrequals(t4.node.tree_left,  &t3);
@@ -301,20 +469,20 @@ test_avl_rotations(void)
 	assert_ptrequals(TREE_ROOT(&tl), &t1);
 
 	/* 100 */
-	assert_ptrequals(t0.node.tree_left,  NULL);
-	assert_ptrequals(t0.node.tree_right, NULL);
+	assert_null(t0.node.tree_left);
+	assert_null(t0.node.tree_right);
 
 	/* 200 */
 	assert_ptrequals(t1.node.tree_left,  &t5);
 	assert_ptrequals(t1.node.tree_right, &t4);
 
 	/* 300 */
-	assert_ptrequals(t2.node.tree_left,  NULL);
-	assert_ptrequals(t2.node.tree_right, NULL);
+	assert_null(t2.node.tree_left);
+	assert_null(t2.node.tree_right);
 
 	/* 225 */
-	assert_ptrequals(t3.node.tree_left,  NULL);
-	assert_ptrequals(t3.node.tree_right, NULL);
+	assert_null(t3.node.tree_left);
+	assert_null(t3.node.tree_right);
 
 	/* 275 */
 	assert_ptrequals(t4.node.tree_left,  &t3);
@@ -325,8 +493,8 @@ test_avl_rotations(void)
 	assert_ptrequals(t5.node.tree_right, &t0);
 
 	/* 40 */
-	assert_ptrequals(t6.node.tree_left,  NULL);
-	assert_ptrequals(t6.node.tree_right, NULL);
+	assert_null(t6.node.tree_left);
+	assert_null(t6.node.tree_right);
 
 	/* Add 45, 42:
 	 *
@@ -365,20 +533,20 @@ test_avl_rotations(void)
 	assert_ptrequals(TREE_ROOT(&tl), &t1);
 
 	/* 100 */
-	assert_ptrequals(t0.node.tree_left,  NULL);
-	assert_ptrequals(t0.node.tree_right, NULL);
+	assert_null(t0.node.tree_left);
+	assert_null(t0.node.tree_right);
 
 	/* 200 */
 	assert_ptrequals(t1.node.tree_left,  &t5);
 	assert_ptrequals(t1.node.tree_right, &t4);
 
 	/* 300 */
-	assert_ptrequals(t2.node.tree_left,  NULL);
-	assert_ptrequals(t2.node.tree_right, NULL);
+	assert_null(t2.node.tree_left);
+	assert_null(t2.node.tree_right);
 
 	/* 225 */
-	assert_ptrequals(t3.node.tree_left,  NULL);
-	assert_ptrequals(t3.node.tree_right, NULL);
+	assert_null(t3.node.tree_left);
+	assert_null(t3.node.tree_right);
 
 	/* 275 */
 	assert_ptrequals(t4.node.tree_left,  &t3);
@@ -389,12 +557,12 @@ test_avl_rotations(void)
 	assert_ptrequals(t5.node.tree_right, &t0);
 
 	/* 40 */
-	assert_ptrequals(t6.node.tree_left,  NULL);
-	assert_ptrequals(t6.node.tree_right, NULL);
+	assert_null(t6.node.tree_left);
+	assert_null(t6.node.tree_right);
 
 	/* 45 */
-	assert_ptrequals(t7.node.tree_left,  NULL);
-	assert_ptrequals(t7.node.tree_right, NULL);
+	assert_null(t7.node.tree_left);
+	assert_null(t7.node.tree_right);
 
 	/* 42 */
 	assert_ptrequals(t8.node.tree_left,  &t6);
