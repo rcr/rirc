@@ -182,102 +182,223 @@ test_avl_rotations(void)
 {
 	/* Exercise all 4 rotation types */
 
+	struct test_avl_list tl = {0};
+
 	/* Add 100, 200, 300:
 	 *
-	 *        100
-	 *          \
-	 *           200
-	 *             \
-	 *              300
+	 *       100
+	 *         \
+	 *          200
+	 *            \
+	 *             300
 	 *
 	 * Rotates left:
 	 *
-	 *        200
-	 *        / \
-	 *     100   300
+	 *       200
+	 *      /   \
+	 *   100     300
 	 */
 
-	/* TODO */
+	struct test_avl
+		t0 = { .val = 100 },
+		t1 = { .val = 200 },
+		t2 = { .val = 300 };
+
+	assert_ptrequals(test_avl_list_AVL_ADD(&tl, &t0), &t0);
+	assert_ptrequals(test_avl_list_AVL_ADD(&tl, &t1), &t1);
+	assert_ptrequals(test_avl_list_AVL_ADD(&tl, &t2), &t2);
+
+	assert_ptrequals(TREE_ROOT(&tl), &t1);
+
+	/* 100 */
+	assert_ptrequals(t0.node.tree_left,  NULL);
+	assert_ptrequals(t0.node.tree_right, NULL);
+
+	/* 200 */
+	assert_ptrequals(t1.node.tree_left,  &t0);
+	assert_ptrequals(t1.node.tree_right, &t2);
+
+	/* 300 */
+	assert_ptrequals(t2.node.tree_left,  NULL);
+	assert_ptrequals(t2.node.tree_right, NULL);
 
 	/* Add 225, 275:
 	 *
-	 *        200
-	 *        / \
-	 *     100   300
-	 *           /
-	 *        225
+	 *       200
+	 *      /   \
+	 *   100     300
+	 *          /
+	 *       225
 	 *          \
 	 *           275
 	 *
 	 * Rotates left-right:
 	 *
-	 *        200            200
-	 *        / \            / \
-	 *     100   300  ->  100   275
-	 *           /              / \
-	 *        275            225   300
-	 *        /
-	 *     225
+	 *       200              200
+	 *      /   \            /   \
+	 *   100     300  ->  100     275
+	 *          /                /   \
+	 *       275              225     300
+	 *      /
+	 *   225
 	 */
 
-	/* TODO */
+	struct test_avl
+		t3 = { .val = 225 },
+		t4 = { .val = 275 };
 
-	/* Add 220, 215:
+	assert_ptrequals(test_avl_list_AVL_ADD(&tl, &t3), &t3);
+	assert_ptrequals(test_avl_list_AVL_ADD(&tl, &t4), &t4);
+
+	assert_ptrequals(TREE_ROOT(&tl), &t1);
+
+	/* 100 */
+	assert_ptrequals(t0.node.tree_left,  NULL);
+	assert_ptrequals(t0.node.tree_right, NULL);
+
+	/* 200 */
+	assert_ptrequals(t1.node.tree_left,  &t0);
+	assert_ptrequals(t1.node.tree_right, &t4);
+
+	/* 300 */
+	assert_ptrequals(t2.node.tree_left,  NULL);
+	assert_ptrequals(t2.node.tree_right, NULL);
+
+	/* 225 */
+	assert_ptrequals(t3.node.tree_left,  NULL);
+	assert_ptrequals(t3.node.tree_right, NULL);
+
+	/* 275 */
+	assert_ptrequals(t4.node.tree_left,  &t3);
+	assert_ptrequals(t4.node.tree_right, &t2);
+
+	/* Add 50, 40, 30:
 	 *
-	 *        200
-	 *        / \
-	 *     100   275
-	 *           / \
-	 *        225   300
-	 *        /
-	 *     220
+	 *             200
+	 *            /   \
+	 *         100     275
+	 *        /       /   \
+	 *      50     225     300
 	 *     /
-	 *  215
+	 *   40
 	 *
 	 * Rotates right:
 	 *
-	 *        200
-	 *        / \
-	 *     100   275
-	 *           / \
-	 *        220   300
-	 *        / \
-	 *     215   225
+	 *         _ 200 _
+	 *        /       \
+	 *      50         275
+	 *     /  \       /   \
+	 *   40    100 225     300
 	 */
 
-	/* TODO */
+	struct test_avl
+		t5 = { .val = 50 },
+		t6 = { .val = 40 };
 
-	/* Add 245, 235:
+	assert_ptrequals(test_avl_list_AVL_ADD(&tl, &t5), &t5);
+	assert_ptrequals(test_avl_list_AVL_ADD(&tl, &t6), &t6);
+
+	assert_ptrequals(TREE_ROOT(&tl), &t1);
+
+	/* 100 */
+	assert_ptrequals(t0.node.tree_left,  NULL);
+	assert_ptrequals(t0.node.tree_right, NULL);
+
+	/* 200 */
+	assert_ptrequals(t1.node.tree_left,  &t5);
+	assert_ptrequals(t1.node.tree_right, &t4);
+
+	/* 300 */
+	assert_ptrequals(t2.node.tree_left,  NULL);
+	assert_ptrequals(t2.node.tree_right, NULL);
+
+	/* 225 */
+	assert_ptrequals(t3.node.tree_left,  NULL);
+	assert_ptrequals(t3.node.tree_right, NULL);
+
+	/* 275 */
+	assert_ptrequals(t4.node.tree_left,  &t3);
+	assert_ptrequals(t4.node.tree_right, &t2);
+
+	/* 50 */
+	assert_ptrequals(t5.node.tree_left,  &t6);
+	assert_ptrequals(t5.node.tree_right, &t0);
+
+	/* 40 */
+	assert_ptrequals(t6.node.tree_left,  NULL);
+	assert_ptrequals(t6.node.tree_right, NULL);
+
+	/* Add 45, 42:
 	 *
-	 *        200
-	 *        / \
-	 *     100   275
-	 *           / \
-	 *        220   300
-	 *        / \
-	 *     215   225
-	 *             \
-	 *              245
-	 *              /
-	 *           235
+	 *         _ 200 _
+	 *        /       \
+	 *      50         275
+	 *     /  \       /   \
+	 *   40    100 225     300
+	 *     \
+	 *      45
+	 *     /
+	 *   42
+	 *
 	 *
 	 * Rotates right-left
 	 *
-	 *        200               200
-	 *        / \              /   \
-	 *     100   275         100   275
-	 *           / \               /  \
-	 *        220   300  ->     220   300
-	 *        / \               / \
-	 *     215   225         215   235
-	 *             \               / \
-	 *              235         225   245
-	 *                \
-	 *                 245
+	 *         _ 200 _                    _ 200 _
+	 *        /       \                  /       \
+	 *      50         275             50         275
+	 *     /  \       /   \           /  \       /   \
+	 *   40    100 225     300  ->  42    100 225     300
+	 *     \                       /  \
+	 *      42                   40    45
+	 *        \
+	 *         45
 	 *
 	 */
 
-	/* TODO */
+	struct test_avl
+		t7 = { .val = 45 },
+		t8 = { .val = 42 };
+
+	assert_ptrequals(test_avl_list_AVL_ADD(&tl, &t7), &t7);
+	assert_ptrequals(test_avl_list_AVL_ADD(&tl, &t8), &t8);
+
+	assert_ptrequals(TREE_ROOT(&tl), &t1);
+
+	/* 100 */
+	assert_ptrequals(t0.node.tree_left,  NULL);
+	assert_ptrequals(t0.node.tree_right, NULL);
+
+	/* 200 */
+	assert_ptrequals(t1.node.tree_left,  &t5);
+	assert_ptrequals(t1.node.tree_right, &t4);
+
+	/* 300 */
+	assert_ptrequals(t2.node.tree_left,  NULL);
+	assert_ptrequals(t2.node.tree_right, NULL);
+
+	/* 225 */
+	assert_ptrequals(t3.node.tree_left,  NULL);
+	assert_ptrequals(t3.node.tree_right, NULL);
+
+	/* 275 */
+	assert_ptrequals(t4.node.tree_left,  &t3);
+	assert_ptrequals(t4.node.tree_right, &t2);
+
+	/* 50 */
+	assert_ptrequals(t5.node.tree_left,  &t8);
+	assert_ptrequals(t5.node.tree_right, &t0);
+
+	/* 40 */
+	assert_ptrequals(t6.node.tree_left,  NULL);
+	assert_ptrequals(t6.node.tree_right, NULL);
+
+	/* 45 */
+	assert_ptrequals(t7.node.tree_left,  NULL);
+	assert_ptrequals(t7.node.tree_right, NULL);
+
+	/* 42 */
+	assert_ptrequals(t8.node.tree_left,  &t6);
+	assert_ptrequals(t8.node.tree_right, &t7);
 }
 
 static void

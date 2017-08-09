@@ -144,9 +144,9 @@ name##_AVL_ADD(struct name *head, struct type *elm)                             
 struct type*                                                                      \
 name##_AVL_ADD_REC(struct type *n, struct type *elm)                              \
 {                                                                                 \
-    int comp, balance;                                                            \
-                                                                                  \
     struct type *tmp;                                                             \
+                                                                                  \
+    int comp, balance;                                                            \
                                                                                   \
     if (n == NULL)                                                                \
         return elm;                                                               \
@@ -156,9 +156,7 @@ name##_AVL_ADD_REC(struct type *n, struct type *elm)                            
                                                                                   \
     else if (comp > 0) {                                                          \
                                                                                   \
-        tmp = name##_AVL_ADD_REC(TREE_RIGHT(n, field), elm);                      \
-                                                                                  \
-        if (tmp == NULL)                                                          \
+        if ((tmp = name##_AVL_ADD_REC(TREE_RIGHT(n, field), elm)) == NULL)        \
             return NULL;                                                          \
                                                                                   \
         TREE_RIGHT(n, field) = tmp;                                               \
@@ -166,9 +164,7 @@ name##_AVL_ADD_REC(struct type *n, struct type *elm)                            
                                                                                   \
     else if (comp < 0) {                                                          \
                                                                                   \
-        tmp = name##_AVL_ADD_REC(TREE_LEFT(n, field), elm);                       \
-                                                                                  \
-        if (tmp == NULL)                                                          \
+        if ((tmp = name##_AVL_ADD_REC(TREE_LEFT(n, field), elm)) == NULL)         \
             return NULL;                                                          \
                                                                                   \
         TREE_LEFT(n, field) = tmp;                                                \
@@ -180,18 +176,18 @@ name##_AVL_ADD_REC(struct type *n, struct type *elm)                            
                                                                                   \
     if (balance > 1) {                                                            \
                                                                                   \
-        if (((cmp)(elm, TREE_LEFT(n, field))) > 0)                                \
-            TREE_LEFT(n, field) = name##_AVL_ROTATE_LEFT(TREE_LEFT(n, field));    \
+        if (((cmp)(elm, TREE_RIGHT(n, field))) < 0)                               \
+            TREE_RIGHT(n, field) = name##_AVL_ROTATE_RIGHT(TREE_RIGHT(n, field)); \
                                                                                   \
-        return name##_AVL_ROTATE_RIGHT(n);                                        \
+        return name##_AVL_ROTATE_LEFT(n);                                         \
     }                                                                             \
                                                                                   \
     if (balance < -1) {                                                           \
                                                                                   \
-        if (((cmp)(elm, TREE_RIGHT(n, field))) > 0)                               \
-            TREE_RIGHT(n, field) = name##_AVL_ROTATE_RIGHT(TREE_RIGHT(n, field)); \
+        if (((cmp)(elm, TREE_LEFT(n, field))) > 0)                                \
+            TREE_LEFT(n, field) = name##_AVL_ROTATE_LEFT(TREE_LEFT(n, field));    \
                                                                                   \
-        return name##_AVL_ROTATE_LEFT(n);                                         \
+        return name##_AVL_ROTATE_RIGHT(n);                                        \
     }                                                                             \
                                                                                   \
     return n;                                                                     \
