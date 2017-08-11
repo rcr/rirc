@@ -32,7 +32,6 @@ void free_avl(struct avl_node*);
 #define AVL_NEW(name, x, y) name##_AVL_NEW(x, y)
 #define AVL_ADD(name, x, y) name##_AVL_ADD(x, y)
 #define AVL_DEL(name, x, y) name##_AVL_DEL(x, y)
-#define AVL_GET(name, x, y) name##_AVL_GET(x, y)
 
 
 #define AVL_HEAD(type) \
@@ -47,7 +46,7 @@ void free_avl(struct avl_node*);
     }
 
 
-#define AVL_GENERATE(name, type, field, cmp)                                      \
+#define AVL_GENERATE(name, type, field, cmp, cmp_n)                               \
     static struct type* name##_AVL_ADD(struct name*, struct type*);               \
     static struct type* name##_AVL_DEL(struct name*, struct type*);               \
     static struct type* name##_AVL_ADD_REC(struct type*, struct type*);           \
@@ -116,7 +115,23 @@ name##_AVL_ROTATE_RIGHT(struct type *n)                                         
     return p;                                                                     \
 }                                                                                 \
                                                                                   \
-static inline struct type*                                                        \
+static void                                                                       \
+name##_AVL_FOREACH_REC(struct type *elm, void (*f)(struct type*))                 \
+{                                                                                 \
+    if (elm) {                                                                    \
+        name##_AVL_FOREACH_REC(TREE_LEFT(elm, field), f);                         \
+        name##_AVL_FOREACH_REC(TREE_RIGHT(elm, field), f);                        \
+        f(elm);                                                                   \
+    }                                                                             \
+}                                                                                 \
+                                                                                  \
+static inline void                                                                \
+name##_AVL_FOREACH(struct name *head, void (*f)(struct type*))                    \
+{                                                                                 \
+    name##_AVL_FOREACH_REC(TREE_ROOT(head), f);                                   \
+}                                                                                 \
+                                                                                  \
+static struct type*                                                               \
 name##_AVL_GET(struct name *head, struct type *elm)                               \
 {                                                                                 \
     struct type *tmp = TREE_ROOT(head);                                           \
@@ -124,6 +139,19 @@ name##_AVL_GET(struct name *head, struct type *elm)                             
     int comp;                                                                     \
                                                                                   \
     while (tmp && (comp = (cmp)(elm, tmp)))                                       \
+        tmp = (comp > 0) ? TREE_RIGHT(tmp, field) : TREE_LEFT(tmp, field);        \
+                                                                                  \
+    return tmp;                                                                   \
+}                                                                                 \
+                                                                                  \
+static struct type*                                                               \
+name##_AVL_GET_N(struct name *head, struct type *elm, size_t n)                   \
+{                                                                                 \
+    struct type *tmp = TREE_ROOT(head);                                           \
+                                                                                  \
+    int comp;                                                                     \
+                                                                                  \
+    while (tmp && (comp = (cmp_n)(elm, tmp, n)))                                  \
         tmp = (comp > 0) ? TREE_RIGHT(tmp, field) : TREE_LEFT(tmp, field);        \
                                                                                   \
     return tmp;                                                                   \

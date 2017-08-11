@@ -18,7 +18,23 @@ test_avl_cmp(struct test_avl *t1, struct test_avl *t2)
 	return (t1->val == t2->val) ? 0 : ((t1->val > t2->val) ? 1 : -1);
 }
 
-AVL_GENERATE(test_avl_list, test_avl, node, test_avl_cmp)
+static inline int
+test_avl_cmp_n(struct test_avl *t1, struct test_avl *t2, size_t n)
+{
+	int tmp = t1->val * n;
+
+	return (tmp == t2->val) ? 0 : ((tmp > t2->val) ? 1 : -1);
+}
+
+static void
+foreach_f(struct test_avl *t)
+{
+	t->val = 0;
+	t->node.tree_left = NULL;
+	t->node.tree_right = NULL;
+}
+
+AVL_GENERATE(test_avl_list, test_avl, node, test_avl_cmp, test_avl_cmp_n)
 
 static void
 test_avl_get_height(void)
@@ -346,6 +362,27 @@ test_avl_del(void)
 }
 
 static void
+test_avl_get_n(void)
+{
+	/* Test parameterized matching */
+
+	struct test_avl_list tl = {0};
+
+	struct test_avl
+		t0 = { .val =   0, },
+		t1 = { .val =  10, },
+		t2 = { .val = -15, },
+		t3 = { .val =   5, };
+
+	assert_ptrequals(test_avl_list_AVL_ADD(&tl, &t0), &t0);
+	assert_ptrequals(test_avl_list_AVL_ADD(&tl, &t1), &t1);
+	assert_ptrequals(test_avl_list_AVL_ADD(&tl, &t2), &t2);
+
+	assert_ptrequals(test_avl_list_AVL_GET_N(&tl, &t3,  2), &t1);
+	assert_ptrequals(test_avl_list_AVL_GET_N(&tl, &t3, -3), &t2);
+}
+
+static void
 test_avl_rotations(void)
 {
 	/* Exercise all 4 rotation types */
@@ -570,10 +607,58 @@ test_avl_rotations(void)
 }
 
 static void
-test_avl_free(void)
+test_avl_foreach(void)
 {
-	/* TODO */
-	;
+	/* Test that each node can be reached and altered safely (e.g. freed) */
+
+	struct test_avl_list tl = {0};
+
+	struct test_avl
+		t200 = { .val = 200 },
+		t100 = { .val = 100 },
+		t300 = { .val = 300 },
+		t050 = { .val = 50 },
+		t150 = { .val = 150 },
+		t250 = { .val = 250 },
+		t350 = { .val = 350 };
+
+	assert_ptrequals(test_avl_list_AVL_ADD(&tl, &t200), &t200);
+	assert_ptrequals(test_avl_list_AVL_ADD(&tl, &t100), &t100);
+	assert_ptrequals(test_avl_list_AVL_ADD(&tl, &t300), &t300);
+	assert_ptrequals(test_avl_list_AVL_ADD(&tl, &t050), &t050);
+	assert_ptrequals(test_avl_list_AVL_ADD(&tl, &t150), &t150);
+	assert_ptrequals(test_avl_list_AVL_ADD(&tl, &t250), &t250);
+	assert_ptrequals(test_avl_list_AVL_ADD(&tl, &t350), &t350);
+
+	test_avl_list_AVL_FOREACH(&tl, foreach_f);
+
+	assert_eq(t200.val, 0);
+	assert_null(t200.node.tree_left);
+	assert_null(t200.node.tree_right);
+
+	assert_eq(t100.val, 0);
+	assert_null(t100.node.tree_left);
+	assert_null(t100.node.tree_right);
+
+	assert_eq(t300.val, 0);
+	assert_null(t300.node.tree_left);
+	assert_null(t300.node.tree_right);
+
+	assert_eq(t050.val, 0);
+	assert_null(t050.node.tree_left);
+	assert_null(t050.node.tree_right);
+
+	assert_eq(t150.val, 0);
+	assert_null(t150.node.tree_left);
+	assert_null(t150.node.tree_right);
+
+	assert_eq(t250.val, 0);
+	assert_null(t250.node.tree_left);
+	assert_null(t250.node.tree_right);
+
+	assert_eq(t350.val, 0);
+	assert_null(t350.node.tree_left);
+	assert_null(t350.node.tree_right);
 }
 
 int
@@ -585,8 +670,9 @@ main(void)
 		TESTCASE(test_avl_balance),
 		TESTCASE(test_avl_add),
 		TESTCASE(test_avl_del),
+		TESTCASE(test_avl_get_n),
 		TESTCASE(test_avl_rotations),
-		TESTCASE(test_avl_free)
+		TESTCASE(test_avl_foreach)
 	};
 
 	return run_tests(tests);
