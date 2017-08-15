@@ -4,10 +4,12 @@
 #include <stdlib.h>
 #include <string.h>
 
-#if 0
 static inline int user_cmp(struct user*, struct user*);
+static inline int user_ncmp(struct user*, struct user*, size_t);
 
-AVL_GENERATE(_user_list, user, node, user_cmp)
+static inline void user_free(struct user*);
+
+AVL_GENERATE(user_list, user, node, user_cmp, user_ncmp)
 
 static inline int
 user_cmp(struct user *u1, struct user *u2)
@@ -15,98 +17,64 @@ user_cmp(struct user *u1, struct user *u2)
 	return irc_strcmp(u1->nick, u2->nick);
 }
 
-int
-_user_list_add(
-		struct _user_list *ul,
-		const char *nick,
-		const char *user,
-		const char *host)
+static inline int
+user_ncmp(struct user *u1, struct user *u2, size_t n)
 {
-	struct user *u, *r;
+	return irc_strncmp(u1->nick, u2->nick, n);
+}
 
-	size_t len_n = strlen(nick),
-	       len_u = strlen(user),
-	       len_h = strlen(host);
-
-	if ((u = calloc(1, sizeof(*u) + len_n + len_u + len_h + 3)) == NULL)
-		fatal("calloc", errno);
-
-	if ((r = AVL_ADD(_user_list, ul, u)) == NULL)
-		free(u);
-	else {
-		u->nick = strcpy(u->_,         nick);
-		u->user = strcpy(u->_ + len_n, user);
-		u->host = strcpy(u->_ + len_u, host);
-
-		ul->count++;
-	}
-
-	return !!r;
+static inline void
+user_free(struct user *u)
+{
+	free(u);
 }
 
 int
-_user_list_del(struct _user_list *ul, const char *nick)
+user_list_add(struct user_list *ul, char *nick)
 {
-	struct user u = { .nick = nick }, *r;
+	struct user *ret, *u;
 
-	if ((r = AVL_DEL(_user_list, ul, &u))) {
-		free(r);
+	size_t len = strlen(nick);
 
+	if ((u = calloc(1, sizeof(*u) + len + 1)) == NULL)
+		fatal("calloc", errno);
+
+	u->nick = strcpy(u->_, nick);
+
+	if ((ret = AVL_ADD(user_list, ul, u)) == NULL)
+		user_free(u);
+	else
+		ul->count++;
+
+	return !!ret;
+}
+
+int
+user_list_del(struct user_list *ul, char *nick)
+{
+	struct user *ret, u = { .nick = nick };
+
+	if ((ret = AVL_DEL(user_list, ul, &u)) != NULL) {
+		user_free(ret);
 		ul->count--;
 	}
 
-	return !!r;
+	return !!ret;
 }
 
 struct user*
-_user_list_get(struct _user_list *ul, const char *nick)
+user_list_get(struct user_list *ul, char *nick, size_t prefix_len)
 {
 	struct user u = { .nick = nick };
 
-	return AVL_GET(_user_list, ul, &u);
-}
-
-/* ^ WIP */
-#endif
-
-int
-user_list_add(struct user_list *l, const char *nick)
-{
-	if (avl_add(&(l->root), nick, irc_strcmp, NULL)) {
-		l->count++;
-		return 1;
-	}
-
-	return 0;
-}
-
-int
-user_list_del(struct user_list *l, const char *nick)
-{
-	if (avl_del(&(l->root), nick, irc_strcmp)) {
-		l->count--;
-		return 1;
-	}
-
-	return 0;
-}
-
-//TODO: return struct nick*
-const char*
-user_list_get(struct user_list *l, const char *nick, size_t len)
-{
-	const struct avl_node *n;
-
-	if ((n = avl_get(l->root, nick, irc_strncmp, len)))
-		return n->key;
+	if (prefix_len == 0)
+		return AVL_GET(user_list, ul, &u);
 	else
-		return NULL;
+		return AVL_NGET(user_list, ul, &u, prefix_len);
 }
 
 void
-user_list_free(struct user_list *l)
+user_list_free(struct user_list *ul)
 {
-	free_avl(l->root);
-	l->root = NULL;
-	l->count = 0;
+	AVL_FOREACH(user_list, ul, user_free);
 }

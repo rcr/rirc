@@ -547,10 +547,10 @@ tab_complete(struct input *inp)
 {
 	/* Case insensitive tab complete for commands and nicks */
 
-	const char *match, *str = inp->head;
+	char *match, *str = inp->head;
 	size_t len = 0;
 
-	const struct avl_node *n;
+	struct user *u;
 
 	/* Don't tab complete at beginning of line or if previous character is space */
 	if (inp->head == inp->line->text || *(inp->head - 1) == ' ')
@@ -565,10 +565,8 @@ tab_complete(struct input *inp)
 		len++, str--;
 
 	/* Check if tab completing a command at the beginning of the buffer */
-	if (*str == '/' && str == inp->line->text && (n = commands_get(++str, --len))) {
+	if (*str == '/' && str == inp->line->text && (match = command_complete(++str, --len))) {
 		/* Command tab completion */
-
-		match = n->key;
 
 		/* Since matching is case insensitive, delete the prefix */
 		while (len--)
@@ -580,8 +578,10 @@ tab_complete(struct input *inp)
 
 		/* For commands, append a space */
 		input_char(' ');
-	} else if ((match = user_list_get(&(ccur->users), str, len))) {
+	} else if ((u = user_list_get(&(ccur->users), str, len))) {
 		/* Nick tab completion */
+
+		match = u->nick;
 
 		/* Since matching is case insensitive, delete the prefix */
 		while (len--)

@@ -167,6 +167,23 @@ commands_add(char *key, int (*val)(char*, char*, struct server*, struct channel*
 }
 
 static void
+commands_init(void)
+{
+	/* Add the unhandled commands with no explicit handler */
+	#define X(cmd) commands_add(#cmd, NULL);
+	UNHANDLED_SEND_CMDS
+	#undef X
+
+	#define X(cmd) commands_add(#cmd, send_##cmd);
+	HANDLED_SEND_CMDS
+	#undef X
+
+	/* atexit doesn't set errno */
+	if (atexit(commands_free) != 0)
+		fatal("atexit", 0);
+}
+
+static void
 commands_free(void)
 {
 	/* Exit handler; must return normally */
@@ -175,25 +192,26 @@ commands_free(void)
 }
 
 const struct avl_node*
-commands_get(const char *key, size_t len)
+commands_get(char *key, size_t len)
 {
-	if (commands == NULL) {
-
-		/* Add the unhandled commands with no explicit handler */
-		#define X(cmd) commands_add(#cmd, NULL);
-		UNHANDLED_SEND_CMDS
-		#undef X
-
-		#define X(cmd) commands_add(#cmd, send_##cmd);
-		HANDLED_SEND_CMDS
-		#undef X
-
-		/* atexit doesn't set errno */
-		if (atexit(commands_free) != 0)
-			fatal("atexit", 0);
-	}
+	if (commands == NULL)
+		commands_init();
 
 	return avl_get(commands, key, strncmp, len);
+}
+
+char*
+command_complete(char *prefix, size_t len)
+{
+	const struct avl_node *n;
+
+	if (commands == NULL)
+		commands_init();
+
+	if ((n = avl_get(commands, prefix, strncmp, len)))
+		return n->key;
+	else
+		return NULL;
 }
 
 /*
@@ -1221,6 +1239,8 @@ recv_numeric(char *err, struct parsed_mesg *p, struct server *s)
 		c->type_flag = *type;
 
 		while ((nick = getarg(&p->trailing, " "))) {
+
+			//TODO: if !is_ircnickchar, flag = nick++, user->flag = flag;
 			if (*nick == '@' || *nick == '+')
 				nick++;
 
