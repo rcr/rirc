@@ -352,9 +352,13 @@ test_avl_del(void)
 	assert_null(t350.node.tree_left);
 	assert_null(t350.node.tree_right);
 
-	/* Delete remaining nodes */
+	/* Test same-key based delete returns pointer to the deleted object */
 
-	assert_ptrequals(test_avl_list_AVL_DEL(&tl, &t100), &t100);
+	struct test_avl key_test = { .val = t100.val };
+
+	assert_ptrequals(test_avl_list_AVL_DEL(&tl, &key_test), &t100);
+
+	/* Delete remaining nodes */
 	assert_ptrequals(test_avl_list_AVL_DEL(&tl, &t150), &t150);
 	assert_ptrequals(test_avl_list_AVL_DEL(&tl, &t350), &t350);
 
@@ -378,8 +382,8 @@ test_avl_get_n(void)
 	assert_ptrequals(test_avl_list_AVL_ADD(&tl, &t1), &t1);
 	assert_ptrequals(test_avl_list_AVL_ADD(&tl, &t2), &t2);
 
-	assert_ptrequals(test_avl_list_AVL_GET_N(&tl, &t3,  2), &t1);
-	assert_ptrequals(test_avl_list_AVL_GET_N(&tl, &t3, -3), &t2);
+	assert_ptrequals(test_avl_list_AVL_NGET(&tl, &t3,  2), &t1);
+	assert_ptrequals(test_avl_list_AVL_NGET(&tl, &t3, -3), &t2);
 }
 
 static void

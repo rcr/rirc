@@ -76,6 +76,9 @@ e.g.
 
 FIXME:
 ---------------------------
+Empty trailing should be null, e.g.:
+":nick!~user@host PART #channel :" -> "< ~ nick!~user@host has left #channel ()"
+
 when disconnected and reconnected, PING/PONG seems to be out of sync?
 	client continuously goes into timing out, though connection is still established
 
