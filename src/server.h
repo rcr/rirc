@@ -24,8 +24,7 @@ struct server
 	// its only relevant on successful connection
 	char *join;
 	char usermodes[MODE_SIZE];
-	//TODO: user_list
-	struct avl_node *ignore;
+	struct user_list ignore;
 	//TODO channel_list
 	struct channel *channel;
 	//TODO:

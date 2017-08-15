@@ -433,7 +433,7 @@ send_ignore(char *err, char *mesg, struct server *s, struct channel *c)
 	if (!(nick = getarg(&mesg, " ")))
 		user_list_print(c);
 
-	else if (!avl_add(&(s->ignore), nick, irc_strcmp, NULL))
+	else if (!user_list_add(&(s->ignore), nick))
 		failf("Error: Already ignoring '%s'", nick);
 
 	else
@@ -576,7 +576,7 @@ send_unignore(char *err, char *mesg, struct server *s, struct channel *c)
 	if (!(nick = getarg(&mesg, " ")))
 		user_list_print(c);
 
-	else if (!avl_del(&(s->ignore), nick, irc_strcmp))
+	else if (!user_list_del(&(s->ignore), nick))
 		failf("Error: '%s' not on ignore list", nick);
 
 	else
@@ -712,7 +712,7 @@ recv_ctcp_req(char *err, struct parsed_mesg *p, struct server *s)
 		fail("CTCP: sender's nick is null");
 
 	/* CTCP request from ignored user, do nothing */
-	if (avl_get(s->ignore, p->from, irc_strncmp, strlen(p->from)))
+	if (user_list_get(&(s->ignore), p->from, 0))
 		return 0;
 
 	if (!(targ = getarg(&p->params, " ")))
@@ -825,7 +825,7 @@ recv_ctcp_rpl(char *err, struct parsed_mesg *p, struct server *s)
 		fail("CTCP: sender's nick is null");
 
 	/* CTCP reply from ignored user, do nothing */
-	if (avl_get(s->ignore, p->from, irc_strncmp, strlen(p->from)))
+	if (user_list_get(&(s->ignore), p->from, 0))
 		return 0;
 
 	if (!(mesg = getarg(&p->trailing, "\x01")))
@@ -1072,7 +1072,7 @@ recv_notice(char *err, struct parsed_mesg *p, struct server *s)
 		fail("NOTICE: sender's nick is null");
 
 	/* Notice from ignored user, do nothing */
-	if (avl_get(s->ignore, p->from, irc_strncmp, strlen(p->from)))
+	if (user_list_get(&(s->ignore), p->from, 0))
 		return 0;
 
 	if (!(targ = getarg(&p->params, " ")))
@@ -1467,7 +1467,7 @@ recv_privmesg(char *err, struct parsed_mesg *p, struct server *s)
 		fail("PRIVMSG: sender's nick is null");
 
 	/* Privmesg from ignored user, do nothing */
-	if (avl_get(s->ignore, p->from, irc_strncmp, strlen(p->from)))
+	if (user_list_get(&(s->ignore), p->from, 0))
 		return 0;
 
 	if (!(targ = getarg(&p->params, " ")))
