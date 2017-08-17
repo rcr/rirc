@@ -29,6 +29,27 @@
 /* Max length of user action message */
 #define MAX_ACTION_MESG 256
 
+/* List of common IRC commands for tab completion */
+static char* irc_commands[] = {
+	"admin",    "away",     "clear",   "close",
+	"connect",  "ctcp",     "die",     "disconnect",
+	"encap",    "help",     "ignore",  "info",
+	"invite",   "ison",     "join",    "kick",
+	"kill",     "knock",    "links",   "list",
+	"lusers",   "me",       "mode",    "motd",
+	"msg",      "names",    "namesx",  "nick",
+	"notice",   "oper",     "part",    "pass",
+	"privmsg",  "quit",     "raw",     "rehash",
+	"restart",  "rules",    "server",  "service",
+	"servlist", "setname",  "silence", "squery",
+	"squit",    "stats",    "summon",  "time",
+	"topic",    "trace",    "uhnames", "unignore",
+	"user",     "userhost", "userip",  "users",
+	"version",  "wallops",  "watch",   "who",
+	"whois",    "whowas",
+	NULL
+};
+
 char *action_message;
 
 /* User input handlers */
@@ -44,6 +65,8 @@ static char action_buff[MAX_ACTION_MESG];
 static int action_find_channel(char);
 
 /* Case insensitive tab complete for commands and nicks */
+static void tab_complete_command(struct input*, char*, size_t);
+static void tab_complete_nick(struct input*, char*, size_t);
 static void tab_complete(struct input*);
 
 /* Send the current input to be parsed and handled */
@@ -547,10 +570,8 @@ tab_complete(struct input *inp)
 {
 	/* Case insensitive tab complete for commands and nicks */
 
-	char *match, *str = inp->head;
+	char *str = inp->head;
 	size_t len = 0;
-
-	struct user *u;
 
 	/* Don't tab complete at beginning of line or if previous character is space */
 	if (inp->head == inp->line->text || *(inp->head - 1) == ' ')
@@ -564,32 +585,56 @@ tab_complete(struct input *inp)
 	while (str > inp->line->text && *(str - 1) != ' ')
 		len++, str--;
 
-	/* Check if tab completing a command at the beginning of the buffer */
-	if (*str == '/' && str == inp->line->text && (match = command_complete(++str, --len))) {
-		/* Command tab completion */
+	if (*str == '/')
+		tab_complete_command(inp, ++str, --len);
+	else
+		tab_complete_nick(inp, ++str, --len);
+}
 
-		/* Since matching is case insensitive, delete the prefix */
+static void
+tab_complete_command(struct input *inp, char *str, size_t len)
+{
+	/* Command tab completion */
+
+	char *p, **command = irc_commands;
+
+	while (*command && strncmp(*command, str, len))
+		command++;
+
+	if (command) {
+
+		p = *command;
+
+		/* Case insensitive matching, delete prefix */
 		while (len--)
 			delete_left(inp);
 
-		/* Then insert the matching string */
-		while (*match && input_char(*match++))
-			; /* do nothing */
+		while (*p && input_char(*p++))
+			;
 
-		/* For commands, append a space */
 		input_char(' ');
-	} else if ((u = user_list_get(&(ccur->users), str, len))) {
-		/* Nick tab completion */
+	}
+}
 
-		match = u->nick;
+static void
+tab_complete_nick(struct input *inp, char *str, size_t len)
+{
+	/* Nick tab completion */
 
-		/* Since matching is case insensitive, delete the prefix */
+	char *p;
+
+	struct user *u;
+
+	if ((u = user_list_get(&(ccur->users), str, len))) {
+
+		p = u->nick;
+
+		/* Case insensitive matching, delete prefix */
 		while (len--)
 			delete_left(inp);
 
-		/* Then insert the matching string */
-		while (*match && input_char(*match++))
-			; /* do nothing */
+		while (*p && input_char(*p++))
+			;
 
 		/* Tab completing first word in input, append delimiter and space */
 		if (str == inp->line->text) {
