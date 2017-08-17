@@ -52,6 +52,7 @@ server_set_005(struct server *s, char *str)
 
 	struct opt opt;
 
+	/* TODO: gperf */
 	while (parse_opt(&opt, &str)) {
 		#define X(cmd)                                        \
 		if (!strcmp(opt.arg, #cmd) && !set_##cmd(s, opt.val)) \
