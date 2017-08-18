@@ -23,6 +23,7 @@
 
 #define IS_ME(X) !strcmp(X, s->nick)
 
+/* Must be kept in sync with mesg.gperf hash table */
 #define SEND_HANDLERS \
 	X(clear) \
 	X(close) \
@@ -47,25 +48,35 @@
 SEND_HANDLERS
 #undef X
 
+/* Must be kept in sync with mesg.gperf hash table */
+#define RECV_HANDLERS \
+	X(error) \
+	X(join) \
+	X(kick) \
+	X(mode) \
+	X(nick) \
+	X(notice) \
+	X(part) \
+	X(ping) \
+	X(pong) \
+	X(privmsg) \
+	X(quit) \
+	X(topic)
+
+/* Recv handler prototypes */
+#define X(cmd) static int recv_##cmd(char*, struct parsed_mesg*, struct server*);
+RECV_HANDLERS
+#undef X
+
+/* Special cases handlers, CTCP messages are embedded in PRIVMSG */
+static int recv_ctcp_req(char*, struct parsed_mesg*, struct server*);
+static int recv_ctcp_rpl(char*, struct parsed_mesg*, struct server*);
+
+/* Special case handler for numeric replies */
+static int recv_numeric(char*, struct parsed_mesg*, struct server*);
+
 /* Handler for errors deemed fatal to a server's state */
 static void server_fatal(struct server*, char*, ...);
-
-/* Message receiving handlers */
-static int recv_ctcp_req (char*, struct parsed_mesg*, struct server*);
-static int recv_ctcp_rpl (char*, struct parsed_mesg*, struct server*);
-static int recv_error    (char*, struct parsed_mesg*, struct server*);
-static int recv_join     (char*, struct parsed_mesg*, struct server*);
-static int recv_kick     (char*, struct parsed_mesg*, struct server*);
-static int recv_mode     (char*, struct parsed_mesg*, struct server*);
-static int recv_nick     (char*, struct parsed_mesg*, struct server*);
-static int recv_notice   (char*, struct parsed_mesg*, struct server*);
-static int recv_numeric  (char*, struct parsed_mesg*, struct server*);
-static int recv_part     (char*, struct parsed_mesg*, struct server*);
-static int recv_ping     (char*, struct parsed_mesg*, struct server*);
-static int recv_pong     (char*, struct parsed_mesg*, struct server*);
-static int recv_privmesg (char*, struct parsed_mesg*, struct server*);
-static int recv_quit     (char*, struct parsed_mesg*, struct server*);
-static int recv_topic    (char*, struct parsed_mesg*, struct server*);
 
 /* Numeric Reply Codes */
 enum numeric {
@@ -139,7 +150,7 @@ send_handler_hash(register const char *str, register size_t len)
 		25, 25, 25, 25, 25, 25, 25, 25, 25, 25,
 		25, 25, 25, 25, 25, 25, 25,  5,  5,  5,
 		25, 10, 25,  0, 20, 25, 25,  0,  0,  0,
-		0, 15,  0,  5,  0,  0, 10,  0, 25, 25,
+		 0, 15,  0,  5,  0,  0, 10,  0, 25, 25,
 		25, 25, 25, 25, 25, 25, 25, 25, 25, 25,
 		25, 25, 25, 25, 25, 25, 25, 25, 25, 25,
 		25, 25, 25, 25, 25, 25, 25, 25, 25, 25,
@@ -170,6 +181,7 @@ send_handler_hash(register const char *str, register size_t len)
 			hval += asso_values[(unsigned char)str[0]];
 			break;
     }
+
 	return hval;
 }
 
@@ -607,7 +619,6 @@ send_version(char *err, char *mesg, struct server *s, struct channel *c)
 	if (s == NULL) {
 		newline(c, 0, "--", "rirc v"VERSION);
 		newline(c, 0, "--", "http://rcr.io/rirc.html");
-
 		return 0;
 	}
 
@@ -621,61 +632,139 @@ send_version(char *err, char *mesg, struct server *s, struct channel *c)
  * Message receiving handlers
  * */
 
+struct recv_handler
+{
+	char *name;
+	int (*func)(char*, struct parsed_mesg*, struct server*);
+};
+
+static unsigned int
+recv_handler_hash(register const char *str, register size_t len)
+{
+	static const unsigned char asso_values[] = {
+		25, 25, 25, 25, 25, 25, 25, 25, 25, 25,
+		25, 25, 25, 25, 25, 25, 25, 25, 25, 25,
+		25, 25, 25, 25, 25, 25, 25, 25, 25, 25,
+		25, 25, 25, 25, 25, 25, 25, 25, 25, 25,
+		25, 25, 25, 25, 25, 25, 25, 25, 25, 25,
+		25, 25, 25, 25, 25, 25, 25, 25, 25, 25,
+		25, 25, 25, 25, 25, 14, 25, 25, 25,  5,
+		25, 25, 25,  5,  9, 15, 25,  4,  5,  0,
+		 0, 10,  0, 25,  0,  5, 25, 25, 25, 25,
+		25, 25, 25, 25, 25, 25, 25, 25, 25, 25,
+		25, 25, 25, 25, 25, 25, 25, 25, 25, 25,
+		25, 25, 25, 25, 25, 25, 25, 25, 25, 25,
+		25, 25, 25, 25, 25, 25, 25, 25, 25, 25,
+		25, 25, 25, 25, 25, 25, 25, 25, 25, 25,
+		25, 25, 25, 25, 25, 25, 25, 25, 25, 25,
+		25, 25, 25, 25, 25, 25, 25, 25, 25, 25,
+		25, 25, 25, 25, 25, 25, 25, 25, 25, 25,
+		25, 25, 25, 25, 25, 25, 25, 25, 25, 25,
+		25, 25, 25, 25, 25, 25, 25, 25, 25, 25,
+		25, 25, 25, 25, 25, 25, 25, 25, 25, 25,
+		25, 25, 25, 25, 25, 25, 25, 25, 25, 25,
+		25, 25, 25, 25, 25, 25, 25, 25, 25, 25,
+		25, 25, 25, 25, 25, 25, 25, 25, 25, 25,
+		25, 25, 25, 25, 25, 25, 25, 25, 25, 25,
+		25, 25, 25, 25, 25, 25, 25, 25, 25, 25,
+		25, 25, 25, 25, 25, 25
+    };
+
+	return len + asso_values[(unsigned char)str[1]] + asso_values[(unsigned char)str[0]];
+}
+
+const struct recv_handler *
+recv_handler_lookup (register const char *str, register size_t len)
+{
+	enum {
+		TOTAL_KEYWORDS  = 12,
+		MIN_WORD_LENGTH = 4,
+		MAX_WORD_LENGTH = 7,
+		MIN_HASH_VALUE  = 4,
+		MAX_HASH_VALUE  = 24
+	};
+
+	static const struct recv_handler recv_handlers[] = {
+		{"",        NULL},
+		{"",        NULL},
+		{"",        NULL},
+		{"",        NULL},
+		{"PONG",    recv_pong},
+		{"TOPIC",   recv_topic},
+		{"",        NULL},
+		{"PRIVMSG", recv_privmsg},
+		{"MODE",    recv_mode},
+		{"PING",    recv_ping},
+		{"ERROR",   recv_error},
+		{"NOTICE",  recv_notice},
+		{"",        NULL},
+		{"JOIN",    recv_join},
+		{"NICK",    recv_nick},
+		{"",        NULL},
+		{"",        NULL},
+		{"",        NULL},
+		{"PART",    recv_part},
+		{"QUIT",    recv_quit},
+		{"",        NULL},
+		{"",        NULL},
+		{"",        NULL},
+		{"",        NULL},
+		{"KICK",    recv_kick}
+	};
+
+	if (len <= MAX_WORD_LENGTH && len >= MIN_WORD_LENGTH) {
+
+		register unsigned int key = recv_handler_hash (str, len);
+
+		if (key <= MAX_HASH_VALUE) {
+			register const char *s = recv_handlers[key].name;
+
+			if (*str == *s && !strcmp (str + 1, s + 1))
+				return &recv_handlers[key];
+		}
+	}
+
+	return 0;
+}
+
 void
 recv_mesg(char *inp, int count, struct server *s)
 {
+	/* FIXME Move to connection struct, handle in net. recv_mesg should
+	 * only receive messages ready to parse */
 	char *ptr = s->iptr;
 	char *max = s->input + BUFFSIZE;
 
 	char errbuff[MAX_ERROR];
 
-	int err = 0;
-
-	struct parsed_mesg p;
-
 	while (count--) {
 		if (*inp == '\r') {
+
+			int err = 0;
 
 			*ptr = '\0';
 
 #ifdef DEBUG
 			newline(s->channel, 0, "DEBUG <<", s->input);
 #endif
+			const struct recv_handler* handler;
 
-			//TODO: gperf, mimic send handlers
+			struct parsed_mesg p;
+
 			if (!(parse_mesg(&p, s->input)))
 				newlinef(s->channel, 0, "-!!-", "Failed to parse: %s", s->input);
+
 			else if (isdigit(*p.command))
 				err = recv_numeric(errbuff, &p, s);
-			else if (!strcmp(p.command, "PRIVMSG"))
-				err = recv_privmesg(errbuff, &p, s);
-			else if (!strcmp(p.command, "JOIN"))
-				err = recv_join(errbuff, &p, s);
-			else if (!strcmp(p.command, "PART"))
-				err = recv_part(errbuff, &p, s);
-			else if (!strcmp(p.command, "QUIT"))
-				err = recv_quit(errbuff, &p, s);
-			else if (!strcmp(p.command, "NOTICE"))
-				err = recv_notice(errbuff, &p, s);
-			else if (!strcmp(p.command, "NICK"))
-				err = recv_nick(errbuff, &p, s);
-			else if (!strcmp(p.command, "PING"))
-				err = recv_ping(errbuff, &p, s);
-			else if (!strcmp(p.command, "PONG"))
-				err = recv_pong(errbuff, &p, s);
-			else if (!strcmp(p.command, "KICK"))
-				err = recv_kick(errbuff, &p, s);
-			else if (!strcmp(p.command, "MODE"))
-				err = recv_mode(errbuff, &p, s);
-			else if (!strcmp(p.command, "ERROR"))
-				err = recv_error(errbuff, &p, s);
-			else if (!strcmp(p.command, "TOPIC"))
-				err = recv_topic(errbuff, &p, s);
+
+			else if ((handler = recv_handler_lookup(p.command, strlen(p.command))))
+				err = handler->func(errbuff, &p, s);
+
 			else
 				newlinef(s->channel, 0, "-!!-", "Message type '%s' unknown", p.command);
 
 			if (err)
-				newlinef(s->channel, 0, "-!!-", "%s", errbuff);
+				newline(s->channel, 0, "-!!-", errbuff);
 
 			ptr = s->input;
 
@@ -1441,7 +1530,7 @@ recv_pong(char *err, struct parsed_mesg *p, struct server *s)
 }
 
 static int
-recv_privmesg(char *err, struct parsed_mesg *p, struct server *s)
+recv_privmsg(char *err, struct parsed_mesg *p, struct server *s)
 {
 	/* :nick!user@hostname.domain PRIVMSG <target> :<message> */
 
@@ -1458,7 +1547,7 @@ recv_privmesg(char *err, struct parsed_mesg *p, struct server *s)
 	if (!p->from)
 		fail("PRIVMSG: sender's nick is null");
 
-	/* Privmesg from ignored user, do nothing */
+	/* Privmsg from ignored user, do nothing */
 	if (user_list_get(&(s->ignore), p->from, 0))
 		return 0;
 
