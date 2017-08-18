@@ -258,8 +258,10 @@ send_mesg(char *mesg, struct channel *chan)
 
 		int err;
 
-		if (!(cmd_str = getarg(&mesg, " ")))
+		if (!(cmd_str = getarg(&mesg, " "))) {
 			newline(chan, 0, "-!!-", "Messages beginning with '/' require a command");
+			return;
+		}
 
 		/* command -> COMMAND */
 		for (p = cmd_str; *p; p++)

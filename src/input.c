@@ -601,7 +601,7 @@ tab_complete_command(struct input *inp, char *str, size_t len)
 	while (*command && strncmp(*command, str, len))
 		command++;
 
-	if (command) {
+	if (*command) {
 
 		p = *command;
 
