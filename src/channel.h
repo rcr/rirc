@@ -2,8 +2,8 @@
 #define CHANNEL_H
 
 #include "buffer.h"
-#include "nicklist.h"
 #include "tree.h"
+#include "user.h"
 
 #define MODE_SIZE (26 * 2) + 1 /* Supports modes [az-AZ] */
 
@@ -29,8 +29,8 @@ struct channel
 	struct channel *next;
 	struct channel *prev;
 	struct input *input;
-	struct nicklist nicklist;
 	struct server *server;
+	struct user_list users;
 };
 
 struct channel_list
@@ -41,5 +41,8 @@ struct channel_list
 struct channel* channel_list_add(struct channel_list*, struct channel*);
 struct channel* channel_list_del(struct channel_list*, struct channel*);
 struct channel* channel_list_get(struct channel_list*, char*);
+
+//TODO: channel/free channel_list/free
+//TODO: name##_TREE_FREE
 
 #endif

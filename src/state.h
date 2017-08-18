@@ -52,7 +52,7 @@ void channel_set_mode(struct channel*, const char*);
 void free_channel(struct channel*);
 void newline(struct channel*, enum buffer_line_t, const char*, const char*);
 void newlinef(struct channel*, enum buffer_line_t, const char*, const char*, ...);
-void nicklist_print(struct channel*);
+void user_list_print(struct channel*);
 void part_channel(struct channel*);
 void reset_channel(struct channel*);
 void server_set_mode(struct server*, const char*);

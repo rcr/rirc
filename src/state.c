@@ -184,7 +184,7 @@ new_channel(char *name, struct server *s, struct channel *chanlist, enum buffer_
 void
 free_channel(struct channel *c)
 {
-	nicklist_free(&(c->nicklist));
+	user_list_free(&(c->users));
 
 	free_input(c->input);
 	free(c->name);
@@ -226,7 +226,7 @@ action_close_server(char c)
 }
 
 void
-nicklist_print(struct channel *c)
+user_list_print(struct channel *c)
 {
 	newline(c, 0, "TODO", "Print ignore list to channel");
 }
@@ -236,7 +236,7 @@ reset_channel(struct channel *c)
 {
 	memset(c->chanmodes, 0, MODE_SIZE);
 
-	nicklist_free(&(c->nicklist));
+	user_list_free(&(c->users));
 }
 
 void

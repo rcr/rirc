@@ -22,6 +22,7 @@ static int parse_opt(struct opt*, char **);
 HANDLED_005
 #undef X
 
+//TODO: refactor, not used
 struct server*
 server(char *host, char *port, char *nicks)
 {
@@ -30,8 +31,10 @@ server(char *host, char *port, char *nicks)
 	if ((s = calloc(1, sizeof(*s))) == NULL)
 		fatal("calloc", errno);
 
+	//TODO: user/host/port/modes/flag can be added as a user struct
 	s->host = strdup(host);
 	s->port = strdup(port);
+
 	s->nicks = strdup(nicks);
 
 	/* Set server defaults */
@@ -49,6 +52,7 @@ server_set_005(struct server *s, char *str)
 
 	struct opt opt;
 
+	/* TODO: gperf */
 	while (parse_opt(&opt, &str)) {
 		#define X(cmd)                                        \
 		if (!strcmp(opt.arg, #cmd) && !set_##cmd(s, opt.val)) \
@@ -149,9 +153,6 @@ set_PREFIX(struct server *s, char *val)
 		return 0;
 
 	if (strlen(f) > MODE_LEN)
-		return 0;
-
-	if (strlen(t) > MODE_LEN)
 		return 0;
 
 	strcpy(s->config.PREFIX.F, f);

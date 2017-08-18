@@ -23,26 +23,8 @@
 
 #define IS_ME(X) !strcmp(X, s->nick)
 
-/* List of common IRC commands with no explicit handling */
-#define UNHANDLED_SEND_CMDS \
-	X(admin)   X(away)     X(die) \
-	X(encap)   X(help)     X(info) \
-	X(invite)  X(ison)     X(kick) \
-	X(kill)    X(knock)    X(links) \
-	X(list)    X(lusers)   X(mode) \
-	X(motd)    X(names)    X(namesx) \
-	X(notice)  X(oper)     X(pass) \
-	X(rehash)  X(restart)  X(rules) \
-	X(server)  X(service)  X(servlist) \
-	X(setname) X(silence)  X(squery) \
-	X(squit)   X(stats)    X(summon) \
-	X(time)    X(trace)    X(uhnames) \
-	X(user)    X(userhost) X(userip) \
-	X(users)   X(wallops)  X(watch) \
-	X(who)     X(whois)    X(whowas)
-
-/* List of commands (some rirc-specific) which are explicitly handled */
-#define HANDLED_SEND_CMDS \
+/* Must be kept in sync with mesg.gperf hash table */
+#define SEND_HANDLERS \
 	X(clear) \
 	X(close) \
 	X(connect) \
@@ -61,49 +43,40 @@
 	X(unignore) \
 	X(version)
 
-//TODO: recv/send handlers should take a struct ctx with err, server, channel
-
-/* Function prototypes for explicitly handled commands */
+/* Send handler prototypes */
 #define X(cmd) static int send_##cmd(char*, char*, struct server*, struct channel*);
-HANDLED_SEND_CMDS
+SEND_HANDLERS
 #undef X
 
-/* Encapsulate a function pointer in a struct so AVL tree cleanup can free it */
-struct command
-{
-	int (*fptr)(char*, char*, struct server*, struct channel*);
-};
+/* Must be kept in sync with mesg.gperf hash table */
+#define RECV_HANDLERS \
+	X(error) \
+	X(join) \
+	X(kick) \
+	X(mode) \
+	X(nick) \
+	X(notice) \
+	X(part) \
+	X(ping) \
+	X(pong) \
+	X(privmsg) \
+	X(quit) \
+	X(topic)
 
-static struct avl_node* commands;
+/* Recv handler prototypes */
+#define X(cmd) static int recv_##cmd(char*, struct parsed_mesg*, struct server*);
+RECV_HANDLERS
+#undef X
 
-static void commands_add(char*, int (*)(char*, char*, struct server*, struct channel*));
-static void commands_free(void);
+/* Special cases handlers, CTCP messages are embedded in PRIVMSG */
+static int recv_ctcp_req(char*, struct parsed_mesg*, struct server*);
+static int recv_ctcp_rpl(char*, struct parsed_mesg*, struct server*);
+
+/* Special case handler for numeric replies */
+static int recv_numeric(char*, struct parsed_mesg*, struct server*);
 
 /* Handler for errors deemed fatal to a server's state */
 static void server_fatal(struct server*, char*, ...);
-
-/* Special case handler for sending non-command input */
-static int send_default(char*, char*, struct server*, struct channel*);
-
-/* Default case handler for sending commands */
-static int send_unhandled(char*, char*, char*, struct server*);
-
-/* Message receiving handlers */
-static int recv_ctcp_req (char*, struct parsed_mesg*, struct server*);
-static int recv_ctcp_rpl (char*, struct parsed_mesg*, struct server*);
-static int recv_error    (char*, struct parsed_mesg*, struct server*);
-static int recv_join     (char*, struct parsed_mesg*, struct server*);
-static int recv_kick     (char*, struct parsed_mesg*, struct server*);
-static int recv_mode     (char*, struct parsed_mesg*, struct server*);
-static int recv_nick     (char*, struct parsed_mesg*, struct server*);
-static int recv_notice   (char*, struct parsed_mesg*, struct server*);
-static int recv_numeric  (char*, struct parsed_mesg*, struct server*);
-static int recv_part     (char*, struct parsed_mesg*, struct server*);
-static int recv_ping     (char*, struct parsed_mesg*, struct server*);
-static int recv_pong     (char*, struct parsed_mesg*, struct server*);
-static int recv_privmesg (char*, struct parsed_mesg*, struct server*);
-static int recv_quit     (char*, struct parsed_mesg*, struct server*);
-static int recv_topic    (char*, struct parsed_mesg*, struct server*);
 
 /* Numeric Reply Codes */
 enum numeric {
@@ -153,52 +126,121 @@ server_fatal(struct server *s, char *fmt, ...)
 	server_disconnect(s, 1, 0, errbuff);
 }
 
-static void
-commands_add(char *key, int (*val)(char*, char*, struct server*, struct channel*))
-{
-	struct command *c;
-
-	if ((c = malloc(sizeof(struct command))) == NULL)
-		fatal("malloc", errno);
-
-	c->fptr = val;
-
-	avl_add(&commands, key, strcmp, c);
-}
-
-static void
-commands_free(void)
-{
-	/* Exit handler; must return normally */
-
-	free_avl(commands);
-}
-
-const struct avl_node*
-commands_get(const char *key, size_t len)
-{
-	if (commands == NULL) {
-
-		/* Add the unhandled commands with no explicit handler */
-		#define X(cmd) commands_add(#cmd, NULL);
-		UNHANDLED_SEND_CMDS
-		#undef X
-
-		#define X(cmd) commands_add(#cmd, send_##cmd);
-		HANDLED_SEND_CMDS
-		#undef X
-
-		/* atexit doesn't set errno */
-		if (atexit(commands_free) != 0)
-			fatal("atexit", 0);
-	}
-
-	return avl_get(commands, key, strncmp, len);
-}
-
 /*
  * Message sending handlers
  * */
+
+struct send_handler
+{
+	char *name;
+	int (*func)(char*, char*, struct server*, struct channel*);
+};
+
+static unsigned int
+send_handler_hash(register const char *str, register size_t len)
+{
+	/* Perfect hash function, generated by gperf mesg.gperf */
+
+	static const unsigned char asso_values[] = {
+		25, 25, 25, 25, 25, 25, 25, 25, 25, 25,
+		25, 25, 25, 25, 25, 25, 25, 25, 25, 25,
+		25, 25, 25, 25, 25, 25, 25, 25, 25, 25,
+		25, 25, 25, 25, 25, 25, 25, 25, 25, 25,
+		25, 25, 25, 25, 25, 25, 25, 25, 25, 25,
+		25, 25, 25, 25, 25, 25, 25, 25, 25, 25,
+		25, 25, 25, 25, 25, 25, 25,  5,  5,  5,
+		25, 10, 25,  0, 20, 25, 25,  0,  0,  0,
+		 0, 15,  0,  5,  0,  0, 10,  0, 25, 25,
+		25, 25, 25, 25, 25, 25, 25, 25, 25, 25,
+		25, 25, 25, 25, 25, 25, 25, 25, 25, 25,
+		25, 25, 25, 25, 25, 25, 25, 25, 25, 25,
+		25, 25, 25, 25, 25, 25, 25, 25, 25, 25,
+		25, 25, 25, 25, 25, 25, 25, 25, 25, 25,
+		25, 25, 25, 25, 25, 25, 25, 25, 25, 25,
+		25, 25, 25, 25, 25, 25, 25, 25, 25, 25,
+		25, 25, 25, 25, 25, 25, 25, 25, 25, 25,
+		25, 25, 25, 25, 25, 25, 25, 25, 25, 25,
+		25, 25, 25, 25, 25, 25, 25, 25, 25, 25,
+		25, 25, 25, 25, 25, 25, 25, 25, 25, 25,
+		25, 25, 25, 25, 25, 25, 25, 25, 25, 25,
+		25, 25, 25, 25, 25, 25, 25, 25, 25, 25,
+		25, 25, 25, 25, 25, 25, 25, 25, 25, 25,
+		25, 25, 25, 25, 25, 25, 25, 25, 25, 25,
+		25, 25, 25, 25, 25, 25, 25, 25, 25, 25,
+		25, 25, 25, 25, 25, 25
+	};
+
+	register unsigned int hval = len;
+
+	switch (hval) {
+		default:
+			hval += asso_values[(unsigned char)str[2]];
+		/* FALLTHROUGH */
+		case 2:
+		case 1:
+			hval += asso_values[(unsigned char)str[0]];
+			break;
+    }
+
+	return hval;
+}
+
+const struct send_handler*
+send_handler_lookup(register const char *str, register size_t len)
+{
+	/* Perfect hash function lookup, generated by gperf mesg.gperf */
+
+	enum {
+		TOTAL_KEYWORDS  = 17,
+		MIN_WORD_LENGTH = 2,
+		MAX_WORD_LENGTH = 10,
+		MIN_HASH_VALUE  = 2,
+		MAX_HASH_VALUE  = 24
+	};
+
+	static const struct send_handler send_handlers[] = {
+		{"",           NULL},
+		{"",           NULL},
+		{"ME",         send_me},
+		{"RAW",        send_raw},
+		{"PART",       send_part},
+		{"TOPIC",      send_topic},
+		{"IGNORE",     send_ignore},
+		{"PRIVMSG",    send_privmsg},
+		{"UNIGNORE",   send_unignore},
+		{"NICK",       send_nick},
+		{"CLOSE",      send_close},
+		{"",           NULL},
+		{"CONNECT",    send_connect},
+		{"MSG",        send_msg},
+		{"CTCP",       send_ctcp},
+		{"CLEAR",      send_clear},
+		{"",           NULL},
+		{"VERSION",    send_version},
+		{"",           NULL},
+		{"QUIT",       send_quit},
+		{"DISCONNECT", send_disconnect},
+		{"",           NULL},
+		{"",           NULL},
+		{"",           NULL},
+		{"JOIN",       send_join}
+    };
+
+	if (len <= MAX_WORD_LENGTH && len >= MIN_WORD_LENGTH) {
+
+		register unsigned int key = send_handler_hash(str, len);
+
+		if (key <= MAX_HASH_VALUE) {
+
+			register const char *s = send_handlers[key].name;
+
+			if (*str == *s && !strcmp(str + 1, s + 1))
+				return &send_handlers[key];
+		}
+	}
+
+	return NULL;
+}
 
 void
 send_mesg(char *mesg, struct channel *chan)
@@ -210,60 +252,48 @@ send_mesg(char *mesg, struct channel *chan)
 	 *	- an unhandled command beginning with '/'
 	 */
 
-	char *cmd_str, errbuff[MAX_ERROR];
-	const struct avl_node *cmd;
-	int err = 0;
+	char *p, *cmd_str, errbuff[MAX_ERROR];
 
-	if (*mesg == '/') {
+	if (*mesg == '/' && *(++mesg) != '/') {
 
-		mesg++;
+		int err;
 
-		if (*mesg == '/')
-			err = send_default(errbuff, mesg, chan->server, chan);
-
-		else if (!(cmd_str = getarg(&mesg, " ")))
+		if (!(cmd_str = getarg(&mesg, " ")))
 			newline(chan, 0, "-!!-", "Messages beginning with '/' require a command");
 
-		else if (!(cmd = commands_get(cmd_str, strlen(cmd_str))))
-			newlinef(chan, 0, "-!!-", "Unknown command: '%s'", cmd_str);
+		/* command -> COMMAND */
+		for (p = cmd_str; *p; p++)
+			*p = toupper(*p);
 
-		else {
-			struct command *c = (struct command*)(cmd->val);
+		const struct send_handler* handler = send_handler_lookup(cmd_str, strlen(cmd_str));
 
-			if (c)
-				err = c->fptr(errbuff, mesg, chan->server, chan);
-			else
-				err = send_unhandled(errbuff, cmd_str, mesg, chan->server);
-		}
+		if (handler)
+			err = handler->func(errbuff, mesg, chan->server, chan);
+		else
+			err = sendf(errbuff, chan->server, "%s %s", cmd_str, mesg);
+
+		if (err)
+			newline(chan, 0, "-!!-", errbuff);
+
 	} else {
-		err = send_default(errbuff, mesg, chan->server, chan);
+
+		/* Send to current channel */
+
+		if (*mesg == 0)
+			fatal("message is empty", 0);
+
+		else if (chan->buffer.type != BUFFER_CHANNEL && chan->buffer.type != BUFFER_PRIVATE)
+			newline(chan, 0, "-!!-", "Error: This is not a channel");
+
+		else if (chan->parted)
+			newline(chan, 0, "-!!-", "Error: Parted from channel");
+
+		else if (sendf(errbuff, chan->server, "PRIVMSG %s :%s", chan->name, mesg))
+			newline(chan, 0, "-!!-", errbuff);
+
+		else
+			newline(chan, BUFFER_LINE_CHAT, chan->server->nick, mesg);
 	}
-
-	if (err)
-		newline(chan, 0, "-!!-", errbuff);
-}
-
-//TODO: move this function to state?
-void
-send_paste(char *paste)
-{
-	/* TODO: send the paste buffer, which is preformatted with \r\n, and then
-	 * split the messages and newline them into the buffer * */
-	UNUSED(paste);
-}
-
-static int
-send_unhandled(char *err, char *cmd, char *args, struct server *s)
-{
-	/* All commands defined in the UNHANDLED_CMDS */
-
-	char *ptr;
-
-	/* command -> COMMAND */
-	for (ptr = cmd; *ptr; ptr++)
-		*ptr = toupper(*ptr);
-
-	return sendf(err, s, "%s %s", cmd, args);
 }
 
 static int
@@ -360,24 +390,6 @@ send_ctcp(char *err, char *mesg, struct server *s, struct channel *c)
 }
 
 static int
-send_default(char *err, char *mesg, struct server *s, struct channel *c)
-{
-	/* All messages not beginning with '/'  */
-
-	if (c->buffer.type == BUFFER_SERVER)
-		fail("Error: This is not a channel");
-
-	if (c->parted)
-		fail("Error: Parted from channel");
-
-	fail_if(sendf(err, s, "PRIVMSG %s :%s", c->name, mesg));
-
-	newline(c, BUFFER_LINE_CHAT, s->nick, mesg);
-
-	return 0;
-}
-
-static int
 send_disconnect(char *err, char *mesg, struct server *s, struct channel *c)
 {
 	/* /disconnect [quit message] */
@@ -422,9 +434,9 @@ send_ignore(char *err, char *mesg, struct server *s, struct channel *c)
 		fail("Error: Not connected to server");
 
 	if (!(nick = getarg(&mesg, " ")))
-		nicklist_print(c);
+		user_list_print(c);
 
-	else if (!avl_add(&(s->ignore), nick, irc_strcmp, NULL))
+	else if (!user_list_add(&(s->ignore), nick))
 		failf("Error: Already ignoring '%s'", nick);
 
 	else
@@ -565,9 +577,9 @@ send_unignore(char *err, char *mesg, struct server *s, struct channel *c)
 		fail("Error: Not connected to server");
 
 	if (!(nick = getarg(&mesg, " ")))
-		nicklist_print(c);
+		user_list_print(c);
 
-	else if (!avl_del(&(s->ignore), nick, irc_strcmp))
+	else if (!user_list_del(&(s->ignore), nick))
 		failf("Error: '%s' not on ignore list", nick);
 
 	else
@@ -607,7 +619,6 @@ send_version(char *err, char *mesg, struct server *s, struct channel *c)
 	if (s == NULL) {
 		newline(c, 0, "--", "rirc v"VERSION);
 		newline(c, 0, "--", "http://rcr.io/rirc.html");
-
 		return 0;
 	}
 
@@ -621,60 +632,139 @@ send_version(char *err, char *mesg, struct server *s, struct channel *c)
  * Message receiving handlers
  * */
 
+struct recv_handler
+{
+	char *name;
+	int (*func)(char*, struct parsed_mesg*, struct server*);
+};
+
+static unsigned int
+recv_handler_hash(register const char *str, register size_t len)
+{
+	static const unsigned char asso_values[] = {
+		25, 25, 25, 25, 25, 25, 25, 25, 25, 25,
+		25, 25, 25, 25, 25, 25, 25, 25, 25, 25,
+		25, 25, 25, 25, 25, 25, 25, 25, 25, 25,
+		25, 25, 25, 25, 25, 25, 25, 25, 25, 25,
+		25, 25, 25, 25, 25, 25, 25, 25, 25, 25,
+		25, 25, 25, 25, 25, 25, 25, 25, 25, 25,
+		25, 25, 25, 25, 25, 14, 25, 25, 25,  5,
+		25, 25, 25,  5,  9, 15, 25,  4,  5,  0,
+		 0, 10,  0, 25,  0,  5, 25, 25, 25, 25,
+		25, 25, 25, 25, 25, 25, 25, 25, 25, 25,
+		25, 25, 25, 25, 25, 25, 25, 25, 25, 25,
+		25, 25, 25, 25, 25, 25, 25, 25, 25, 25,
+		25, 25, 25, 25, 25, 25, 25, 25, 25, 25,
+		25, 25, 25, 25, 25, 25, 25, 25, 25, 25,
+		25, 25, 25, 25, 25, 25, 25, 25, 25, 25,
+		25, 25, 25, 25, 25, 25, 25, 25, 25, 25,
+		25, 25, 25, 25, 25, 25, 25, 25, 25, 25,
+		25, 25, 25, 25, 25, 25, 25, 25, 25, 25,
+		25, 25, 25, 25, 25, 25, 25, 25, 25, 25,
+		25, 25, 25, 25, 25, 25, 25, 25, 25, 25,
+		25, 25, 25, 25, 25, 25, 25, 25, 25, 25,
+		25, 25, 25, 25, 25, 25, 25, 25, 25, 25,
+		25, 25, 25, 25, 25, 25, 25, 25, 25, 25,
+		25, 25, 25, 25, 25, 25, 25, 25, 25, 25,
+		25, 25, 25, 25, 25, 25, 25, 25, 25, 25,
+		25, 25, 25, 25, 25, 25
+    };
+
+	return len + asso_values[(unsigned char)str[1]] + asso_values[(unsigned char)str[0]];
+}
+
+const struct recv_handler *
+recv_handler_lookup (register const char *str, register size_t len)
+{
+	enum {
+		TOTAL_KEYWORDS  = 12,
+		MIN_WORD_LENGTH = 4,
+		MAX_WORD_LENGTH = 7,
+		MIN_HASH_VALUE  = 4,
+		MAX_HASH_VALUE  = 24
+	};
+
+	static const struct recv_handler recv_handlers[] = {
+		{"",        NULL},
+		{"",        NULL},
+		{"",        NULL},
+		{"",        NULL},
+		{"PONG",    recv_pong},
+		{"TOPIC",   recv_topic},
+		{"",        NULL},
+		{"PRIVMSG", recv_privmsg},
+		{"MODE",    recv_mode},
+		{"PING",    recv_ping},
+		{"ERROR",   recv_error},
+		{"NOTICE",  recv_notice},
+		{"",        NULL},
+		{"JOIN",    recv_join},
+		{"NICK",    recv_nick},
+		{"",        NULL},
+		{"",        NULL},
+		{"",        NULL},
+		{"PART",    recv_part},
+		{"QUIT",    recv_quit},
+		{"",        NULL},
+		{"",        NULL},
+		{"",        NULL},
+		{"",        NULL},
+		{"KICK",    recv_kick}
+	};
+
+	if (len <= MAX_WORD_LENGTH && len >= MIN_WORD_LENGTH) {
+
+		register unsigned int key = recv_handler_hash (str, len);
+
+		if (key <= MAX_HASH_VALUE) {
+			register const char *s = recv_handlers[key].name;
+
+			if (*str == *s && !strcmp (str + 1, s + 1))
+				return &recv_handlers[key];
+		}
+	}
+
+	return 0;
+}
+
 void
 recv_mesg(char *inp, int count, struct server *s)
 {
+	/* FIXME Move to connection struct, handle in net. recv_mesg should
+	 * only receive messages ready to parse */
 	char *ptr = s->iptr;
 	char *max = s->input + BUFFSIZE;
 
 	char errbuff[MAX_ERROR];
 
-	int err = 0;
-
-	struct parsed_mesg p;
-
 	while (count--) {
 		if (*inp == '\r') {
+
+			int err = 0;
 
 			*ptr = '\0';
 
 #ifdef DEBUG
 			newline(s->channel, 0, "DEBUG <<", s->input);
 #endif
+			const struct recv_handler* handler;
+
+			struct parsed_mesg p;
 
 			if (!(parse_mesg(&p, s->input)))
 				newlinef(s->channel, 0, "-!!-", "Failed to parse: %s", s->input);
+
 			else if (isdigit(*p.command))
 				err = recv_numeric(errbuff, &p, s);
-			else if (!strcmp(p.command, "PRIVMSG"))
-				err = recv_privmesg(errbuff, &p, s);
-			else if (!strcmp(p.command, "JOIN"))
-				err = recv_join(errbuff, &p, s);
-			else if (!strcmp(p.command, "PART"))
-				err = recv_part(errbuff, &p, s);
-			else if (!strcmp(p.command, "QUIT"))
-				err = recv_quit(errbuff, &p, s);
-			else if (!strcmp(p.command, "NOTICE"))
-				err = recv_notice(errbuff, &p, s);
-			else if (!strcmp(p.command, "NICK"))
-				err = recv_nick(errbuff, &p, s);
-			else if (!strcmp(p.command, "PING"))
-				err = recv_ping(errbuff, &p, s);
-			else if (!strcmp(p.command, "PONG"))
-				err = recv_pong(errbuff, &p, s);
-			else if (!strcmp(p.command, "KICK"))
-				err = recv_kick(errbuff, &p, s);
-			else if (!strcmp(p.command, "MODE"))
-				err = recv_mode(errbuff, &p, s);
-			else if (!strcmp(p.command, "ERROR"))
-				err = recv_error(errbuff, &p, s);
-			else if (!strcmp(p.command, "TOPIC"))
-				err = recv_topic(errbuff, &p, s);
+
+			else if ((handler = recv_handler_lookup(p.command, strlen(p.command))))
+				err = handler->func(errbuff, &p, s);
+
 			else
 				newlinef(s->channel, 0, "-!!-", "Message type '%s' unknown", p.command);
 
 			if (err)
-				newlinef(s->channel, 0, "-!!-", "%s", errbuff);
+				newline(s->channel, 0, "-!!-", errbuff);
 
 			ptr = s->input;
 
@@ -703,7 +793,7 @@ recv_ctcp_req(char *err, struct parsed_mesg *p, struct server *s)
 		fail("CTCP: sender's nick is null");
 
 	/* CTCP request from ignored user, do nothing */
-	if (avl_get(s->ignore, p->from, irc_strncmp, strlen(p->from)))
+	if (user_list_get(&(s->ignore), p->from, 0))
 		return 0;
 
 	if (!(targ = getarg(&p->params, " ")))
@@ -816,7 +906,7 @@ recv_ctcp_rpl(char *err, struct parsed_mesg *p, struct server *s)
 		fail("CTCP: sender's nick is null");
 
 	/* CTCP reply from ignored user, do nothing */
-	if (avl_get(s->ignore, p->from, irc_strncmp, strlen(p->from)))
+	if (user_list_get(&(s->ignore), p->from, 0))
 		return 0;
 
 	if (!(mesg = getarg(&p->trailing, "\x01")))
@@ -871,10 +961,10 @@ recv_join(char *err, struct parsed_mesg *p, struct server *s)
 		if ((c = channel_list_get(&s->clist, chan)) == NULL)
 			failf("JOIN: channel '%s' not found", chan);
 
-		if (!nicklist_add(&(c->nicklist), p->from))
+		if (!user_list_add(&(c->users), p->from))
 			failf("JOIN: nick '%s' already in '%s'", p->from, chan);
 
-		if (c->nicklist.count < config.join_part_quit_threshold)
+		if (c->users.count < config.join_part_quit_threshold)
 			newlinef(c, 0, ">", "%s!%s has joined %s", p->from, p->host, chan);
 
 		draw_status();
@@ -921,7 +1011,7 @@ recv_kick(char *err, struct parsed_mesg *p, struct server *s)
 			newlinef(c, 0, "--", "You've been kicked by %s", p->from, user);
 	} else {
 
-		if (!nicklist_del(&(c->nicklist), user))
+		if (!user_list_del(&(c->users), user))
 			failf("KICK: nick '%s' not found in '%s'", user, chan);
 
 		if (p->trailing)
@@ -996,7 +1086,7 @@ recv_mode(char *err, struct parsed_mesg *p, struct server *s)
 
 			//TODO: channel_list_foreach
 			do {
-				if (nicklist_get(&(c->nicklist), targ, 0))
+				if (user_list_get(&(c->users), targ, 0))
 					/* [<user> set ]<target> mode: [<mode>][ <modeparams>] */
 					newlinef(c, 0, "--", "%s%s%s mode: [%s%s%s]",
 						(p->from ? p->from : ""),
@@ -1035,8 +1125,8 @@ recv_nick(char *err, struct parsed_mesg *p, struct server *s)
 	struct channel *c = s->channel;
 	//TODO: channel_list_foreach
 	do {
-		if (nicklist_del(&(c->nicklist), p->from)) {
-			nicklist_add(&(c->nicklist), nick);
+		if (user_list_del(&(c->users), p->from)) {
+			user_list_add(&(c->users), nick);
 			newlinef(c, 0, "--", "%s  >>  %s", p->from, nick);
 		}
 	} while ((c = c->next) != s->channel);
@@ -1063,7 +1153,7 @@ recv_notice(char *err, struct parsed_mesg *p, struct server *s)
 		fail("NOTICE: sender's nick is null");
 
 	/* Notice from ignored user, do nothing */
-	if (avl_get(s->ignore, p->from, irc_strncmp, strlen(p->from)))
+	if (user_list_get(&(s->ignore), p->from, 0))
 		return 0;
 
 	if (!(targ = getarg(&p->params, " ")))
@@ -1230,10 +1320,12 @@ recv_numeric(char *err, struct parsed_mesg *p, struct server *s)
 		c->type_flag = *type;
 
 		while ((nick = getarg(&p->trailing, " "))) {
+
+			//TODO: if !is_ircnickchar, flag = nick++, user->flag = flag;
 			if (*nick == '@' || *nick == '+')
 				nick++;
 
-			nicklist_add(&(c->nicklist), nick);
+			user_list_add(&(c->users), nick);
 		}
 
 		draw_status();
@@ -1395,10 +1487,10 @@ recv_part(char *err, struct parsed_mesg *p, struct server *s)
 	if ((c = channel_list_get(&s->clist, targ)) == NULL)
 		failf("PART: channel '%s' not found", targ);
 
-	if (!nicklist_del(&(c->nicklist), p->from))
+	if (!user_list_del(&(c->users), p->from))
 		failf("PART: nick '%s' not found in '%s'", p->from, targ);
 
-	if (c->nicklist.count < config.join_part_quit_threshold) {
+	if (c->users.count < config.join_part_quit_threshold) {
 		if (p->trailing)
 			newlinef(c, 0, "<", "%s!%s has left %s (%s)", p->from, p->host, targ, p->trailing);
 		else
@@ -1438,7 +1530,7 @@ recv_pong(char *err, struct parsed_mesg *p, struct server *s)
 }
 
 static int
-recv_privmesg(char *err, struct parsed_mesg *p, struct server *s)
+recv_privmsg(char *err, struct parsed_mesg *p, struct server *s)
 {
 	/* :nick!user@hostname.domain PRIVMSG <target> :<message> */
 
@@ -1455,8 +1547,8 @@ recv_privmesg(char *err, struct parsed_mesg *p, struct server *s)
 	if (!p->from)
 		fail("PRIVMSG: sender's nick is null");
 
-	/* Privmesg from ignored user, do nothing */
-	if (avl_get(s->ignore, p->from, irc_strncmp, strlen(p->from)))
+	/* Privmsg from ignored user, do nothing */
+	if (user_list_get(&(s->ignore), p->from, 0))
 		return 0;
 
 	if (!(targ = getarg(&p->params, " ")))
@@ -1503,8 +1595,8 @@ recv_quit(char *err, struct parsed_mesg *p, struct server *s)
 	struct channel *c = s->channel;
 	//TODO: channel_list_foreach
 	do {
-		if (nicklist_del(&(c->nicklist), p->from)) {
-			if (c->nicklist.count < config.join_part_quit_threshold) {
+		if (user_list_del(&(c->users), p->from)) {
+			if (c->users.count < config.join_part_quit_threshold) {
 				if (p->trailing)
 					newlinef(c, 0, "<", "%s!%s has quit (%s)", p->from, p->host, p->trailing);
 				else
