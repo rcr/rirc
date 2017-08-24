@@ -35,6 +35,8 @@ src/README.md
 
 	409 :No origin specified, (eg "/raw PING")
 
+	421 <command> :Unknown command
+
 	435 cannot change nickname while banned
 		(eg unregistered in channel and trying to /nick)
 

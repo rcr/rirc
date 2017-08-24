@@ -7,7 +7,7 @@ struct user
 {
 	AVL_NODE(user) node;
 	char *nick;
-	char flag;
+	char prefix;
 	char _[];
 };
 

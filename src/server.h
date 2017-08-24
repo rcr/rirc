@@ -45,7 +45,7 @@ struct server
 
 	struct {
 		struct {
-			/* Map lower + upper -> lower + upper */
+			/* Map a-zA-Z -> a-zA-Z */
 			char F[MODE_LEN + 1];
 			char T[MODE_LEN + 1];
 		} PREFIX;
@@ -64,6 +64,8 @@ struct server_list
 {
 	struct server *head;
 };
+
+char server_get_prefix(struct server*, char, char);
 
 void server_set_005(struct server*, char*);
 

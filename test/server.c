@@ -12,8 +12,7 @@ void newlinef(struct channel *c, enum buffer_line_t t, const char *f, const char
 	UNUSED(m);
 }
 
-
-void
+static void
 test_parse_opt(void)
 {
 	/* Test numeric 005 parsing  */
@@ -93,7 +92,7 @@ test_parse_opt(void)
 #undef CHECK
 }
 
-void
+static void
 test_set_PREFIX(void)
 {
 	struct server s;
@@ -127,12 +126,37 @@ test_set_PREFIX(void)
 	assert_strcmp(s.config.PREFIX.T, "!@#$");
 }
 
+static void
+test_server_get_prefix(void)
+{
+	struct server s = {
+		.config.PREFIX.F = "abc",
+		.config.PREFIX.T = "123"
+	};
+
+	/* Test lower mode flag doesn't take prescedence */
+	assert_eq(server_get_prefix(&s, '1', 'c'), '1');
+
+	/* Test higher mode flag takes prescedence */
+	assert_eq(server_get_prefix(&s, '3', 'b'), '2');
+
+	/* Test abscent prefix */
+	assert_eq(server_get_prefix(&s, 0, 'b'), '2');
+
+	/* Test new mode not in PREFIX config */
+	assert_eq(server_get_prefix(&s, '3', 'd'), '3');
+
+	/* Test abscent prefix and new mode not in PREFIX config */
+	assert_eq(server_get_prefix(&s, 0, 'd'), 0);
+}
+
 int
 main(void)
 {
 	testcase tests[] = {
 		TESTCASE(test_parse_opt),
 		TESTCASE(test_set_PREFIX),
+		TESTCASE(test_server_get_prefix)
 	};
 
 	return run_tests(tests);

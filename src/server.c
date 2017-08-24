@@ -160,3 +160,23 @@ set_PREFIX(struct server *s, char *val)
 
 	return 1;
 }
+
+char
+server_get_prefix(struct server *s, char prefix, char mode)
+{
+	/* Return the most prescedent user prefix, given a current prefix
+	 * and a new mode flag */
+
+	int from = 0, to = 0;
+
+	char *prefix_f = s->config.PREFIX.F,
+	     *prefix_t = s->config.PREFIX.T;
+
+	while (*prefix_f && *prefix_f++ != mode)
+		from++;
+
+	while (*prefix_t && *prefix_t++ != prefix)
+		to++;
+
+	return (from < to) ? s->config.PREFIX.T[from] : prefix;
+}

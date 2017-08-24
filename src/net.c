@@ -165,6 +165,8 @@ sendf(char *err, struct server *s, const char *fmt, ...)
 	if (send(soc, sendbuff, len, 0) < 0)
 		SENDF_ERR(strerror(errno));
 
+#undef SENDF_ERR
+
 	return 0;
 }
 
