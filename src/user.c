@@ -9,6 +9,8 @@ static inline int user_ncmp(struct user*, struct user*, size_t);
 
 static inline void user_free(struct user*);
 
+static struct user* user(char*, char);
+
 AVL_GENERATE(user_list, user, node, user_cmp, user_ncmp)
 
 static inline int
@@ -29,17 +31,24 @@ user_free(struct user *u)
 	free(u);
 }
 
+static struct user*
+user(char *nick, char prefix)
+{
+	struct user *u;
+
+	if ((u = calloc(1, sizeof(*u) + strlen(nick) + 1)) == NULL)
+		fatal("calloc", errno);
+
+	u->nick   = strcpy(u->_, nick);
+	u->prefix = prefix;
+
+	return u;
+}
+
 int
 user_list_add(struct user_list *ul, char *nick)
 {
-	struct user *ret, *u;
-
-	size_t len = strlen(nick);
-
-	if ((u = calloc(1, sizeof(*u) + len + 1)) == NULL)
-		fatal("calloc", errno);
-
-	u->nick = strcpy(u->_, nick);
+	struct user *ret, *u = user(nick, 0);
 
 	if ((ret = AVL_ADD(user_list, ul, u)) == NULL)
 		user_free(u);
