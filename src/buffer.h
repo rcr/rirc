@@ -3,6 +3,8 @@
 
 #include <time.h>
 
+#include "../config.h"
+
 #define TEXT_LENGTH_MAX 510
 #define FROM_LENGTH_MAX 100
 
@@ -31,13 +33,18 @@ enum buffer_t
 struct buffer_line
 {
 	enum buffer_line_t type;
+	char prefix; /* TODO */
 	char from[FROM_LENGTH_MAX + 1];
 	char text[TEXT_LENGTH_MAX + 1];
 	size_t from_len;
 	size_t text_len;
 	time_t time;
-	unsigned int _rows; /* Cached number of rows occupied when wrapping on w columns */
-	unsigned int _w;    /* Cached width for rows */
+	struct {
+		unsigned int colour; /* Cached colour of `from` text */
+		unsigned int rows;   /* Cached number of rows occupied when wrapping on w columns */
+		unsigned int w;      /* Cached width for rows */
+		unsigned char initialized :1;
+	} cached;
 };
 
 struct buffer

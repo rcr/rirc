@@ -153,6 +153,12 @@ _draw_buffer_line(
 	     *p1 = line->text,
 	     *p2 = line->text + line->text_len;
 
+	if (!line->cached.initialized) {
+		/* Initialize static cached properties of drawn lines */
+		line->cached.colour = nick_col(line->from);
+		line->cached.initialized = 1;
+	}
+
 	if (skip == 0) {
 
 		/* Print the line header
@@ -192,7 +198,7 @@ _draw_buffer_line(
 
 			case BUFFER_LINE_CHAT:
 				if (!_draw_fmt(&header_ptr, &buff_n, &text_n, 0,
-						_colour(nick_col(line->from), -1)))
+						_colour(line->cached.colour, -1)))
 					goto print_header;
 				break;
 
