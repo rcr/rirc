@@ -46,9 +46,9 @@ user(char *nick, char prefix)
 }
 
 int
-user_list_add(struct user_list *ul, char *nick)
+user_list_add(struct user_list *ul, char *nick, char flag)
 {
-	struct user *ret, *u = user(nick, 0);
+	struct user *ret, *u = user(nick, flag);
 
 	if ((ret = AVL_ADD(user_list, ul, u)) == NULL)
 		user_free(u);

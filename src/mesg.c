@@ -438,7 +438,7 @@ send_ignore(char *err, char *mesg, struct server *s, struct channel *c)
 	if (!(nick = getarg(&mesg, " ")))
 		user_list_print(c);
 
-	else if (!user_list_add(&(s->ignore), nick))
+	else if (!user_list_add(&(s->ignore), nick, 0))
 		failf("Error: Already ignoring '%s'", nick);
 
 	else
@@ -963,8 +963,7 @@ recv_join(char *err, struct parsed_mesg *p, struct server *s)
 		if ((c = channel_list_get(&s->clist, chan)) == NULL)
 			failf("JOIN: channel '%s' not found", chan);
 
-		if (!user_list_add(&(c->users), p->from))
-			failf("JOIN: nick '%s' already in '%s'", p->from, chan);
+		user_list_add(&(c->users), p->from, 0);
 
 		if (c->users.count < config.join_part_quit_threshold)
 			newlinef(c, 0, ">", "%s!%s has joined %s", p->from, p->host, chan);
@@ -1321,11 +1320,12 @@ recv_numeric(char *err, struct parsed_mesg *p, struct server *s)
 
 		while ((nick = getarg(&p->trailing, " "))) {
 
-			//TODO: if !is_ircnickchar, flag = nick++, user->flag = flag;
-			if (*nick == '@' || *nick == '+')
-				nick++;
+			char prefix = 0;
 
-			user_list_add(&(c->users), nick);
+			if (!irc_isnickchar(*nick))
+				prefix = *nick++;
+
+			user_list_add(&(c->users), nick, prefix);
 		}
 
 		draw_status();

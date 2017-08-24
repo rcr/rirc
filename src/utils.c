@@ -33,7 +33,6 @@
 #error "gperf generated tables don't work with this execution character set. Please report a bug to <bug-gperf@gnu.org>."
 #endif
 
-static inline int irc_isnickchar(const char);
 static inline int irc_toupper(int);
 
 int fatal_exit;
@@ -156,7 +155,7 @@ irc_toupper(const int c)
 	}
 }
 
-static inline int
+int
 irc_isnickchar(const char c)
 {
 	/* RFC 2812, section 2.3.1

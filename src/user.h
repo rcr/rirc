@@ -17,7 +17,7 @@ struct user_list
 	unsigned int count;
 };
 
-int user_list_add(struct user_list*, char*);
+int user_list_add(struct user_list*, char*, char);
 int user_list_del(struct user_list*, char*);
 int user_list_rpl(struct user_list*, char*, char*);
 
