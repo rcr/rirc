@@ -31,7 +31,6 @@ server(char *host, char *port, char *nicks)
 	if ((s = calloc(1, sizeof(*s))) == NULL)
 		fatal("calloc", errno);
 
-	//TODO: user/host/port/modes/flag can be added as a user struct
 	s->host = strdup(host);
 	s->port = strdup(port);
 
@@ -52,7 +51,6 @@ server_set_005(struct server *s, char *str)
 
 	struct opt opt;
 
-	/* TODO: gperf */
 	while (parse_opt(&opt, &str)) {
 		#define X(cmd)                                        \
 		if (!strcmp(opt.arg, #cmd) && !set_##cmd(s, opt.val)) \
@@ -60,6 +58,16 @@ server_set_005(struct server *s, char *str)
 		HANDLED_005
 		#undef X
 	}
+}
+
+void
+server_set_004(struct server *s, char *str)
+{
+	/* <server_name> <version> <user_modes> <chan_modes> */
+
+	//TODO
+	(void)(s);
+	(void)(str);
 }
 
 static int
@@ -134,8 +142,8 @@ set_PREFIX(struct server *s, char *val)
 	char *f, *t = val;
 
 	if (val == NULL) {
-		strncpy(s->config.PREFIX.F, "ov", sizeof(s->config.PREFIX.F) - 1);
-		strncpy(s->config.PREFIX.T, "@+", sizeof(s->config.PREFIX.T) - 1);
+		strncpy(s->mode_config.PREFIX.F, "ov", sizeof(s->mode_config.PREFIX.F) - 1);
+		strncpy(s->mode_config.PREFIX.T, "@+", sizeof(s->mode_config.PREFIX.T) - 1);
 		return 1;
 	}
 
@@ -155,28 +163,8 @@ set_PREFIX(struct server *s, char *val)
 	if (strlen(f) > MODE_LEN)
 		return 0;
 
-	strcpy(s->config.PREFIX.F, f);
-	strcpy(s->config.PREFIX.T, t);
+	strcpy(s->mode_config.PREFIX.F, f);
+	strcpy(s->mode_config.PREFIX.T, t);
 
 	return 1;
-}
-
-char
-server_get_prefix(struct server *s, char prefix, char mode)
-{
-	/* Return the most prescedent user prefix, given a current prefix
-	 * and a new mode flag */
-
-	int from = 0, to = 0;
-
-	char *prefix_f = s->config.PREFIX.F,
-	     *prefix_t = s->config.PREFIX.T;
-
-	while (*prefix_f && *prefix_f++ != mode)
-		from++;
-
-	while (*prefix_t && *prefix_t++ != prefix)
-		to++;
-
-	return (from < to) ? s->config.PREFIX.T[from] : prefix;
 }

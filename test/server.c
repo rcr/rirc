@@ -122,32 +122,8 @@ test_set_PREFIX(void)
 	char s5[] = "(abcd)!@#$";
 	ptr = s5;
 	assert_eq(set_PREFIX(&s, ptr), 1);
-	assert_strcmp(s.config.PREFIX.F, "abcd");
-	assert_strcmp(s.config.PREFIX.T, "!@#$");
-}
-
-static void
-test_server_get_prefix(void)
-{
-	struct server s = {
-		.config.PREFIX.F = "abc",
-		.config.PREFIX.T = "123"
-	};
-
-	/* Test lower mode flag doesn't take prescedence */
-	assert_eq(server_get_prefix(&s, '1', 'c'), '1');
-
-	/* Test higher mode flag takes prescedence */
-	assert_eq(server_get_prefix(&s, '3', 'b'), '2');
-
-	/* Test abscent prefix */
-	assert_eq(server_get_prefix(&s, 0, 'b'), '2');
-
-	/* Test new mode not in PREFIX config */
-	assert_eq(server_get_prefix(&s, '3', 'd'), '3');
-
-	/* Test abscent prefix and new mode not in PREFIX config */
-	assert_eq(server_get_prefix(&s, 0, 'd'), 0);
+	assert_strcmp(s.mode_config.PREFIX.F, "abcd");
+	assert_strcmp(s.mode_config.PREFIX.T, "!@#$");
 }
 
 int
@@ -156,7 +132,6 @@ main(void)
 	testcase tests[] = {
 		TESTCASE(test_parse_opt),
 		TESTCASE(test_set_PREFIX),
-		TESTCASE(test_server_get_prefix)
 	};
 
 	return run_tests(tests);

@@ -620,7 +620,7 @@ send_version(char *err, char *mesg, struct server *s, struct channel *c)
 
 	if (s == NULL) {
 		newline(c, 0, "--", "rirc v"VERSION);
-		newline(c, 0, "--", "http://rcr.io/rirc.html");
+		newline(c, 0, "--", "http://rcr.io/rirc");
 		return 0;
 	}
 
@@ -868,7 +868,7 @@ recv_ctcp_req(char *err, struct parsed_mesg *p, struct server *s)
 		newlinef(s->channel, 0, "--", "CTCP VERSION request from %s", p->from);
 
 		return sendf(err, s,
-			"NOTICE %s :\x01""VERSION rirc v"VERSION", http://rcr.io/rirc.html\x01", p->from);
+			"NOTICE %s :\x01""VERSION rirc v"VERSION", http://rcr.io/rirc\x01", p->from);
 	}
 
 	if (!strcmp(cmd, "TIME")) {
@@ -1245,6 +1245,8 @@ recv_numeric(char *err, struct parsed_mesg *p, struct server *s)
 	case RPL_MYINFO:    /* 004 <params> :Are supported by this server */
 
 		newlinef(s->channel, 0, "--", "%s ~ supported by this server", p->params);
+
+		server_set_004(s, p->params);
 		break;
 
 	case RPL_ISUPPORT:  /* 005 <params> :Are supported by this server */

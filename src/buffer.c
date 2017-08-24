@@ -132,6 +132,9 @@ buffer_line_rows(struct buffer_line *line, unsigned int w)
 	return line->cached.rows;
 }
 
+/* TODO:
+ * if prefix, from_len++, prepend to from
+ * */
 void
 buffer_newline(
 		struct buffer *b,

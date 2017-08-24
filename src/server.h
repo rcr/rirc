@@ -7,6 +7,7 @@
 
 #include "buffer.h"
 #include "channel.h"
+#include "mode.h"
 
 /* [a-zA-Z] */
 #define MODE_LEN 26 * 2
@@ -42,22 +43,7 @@ struct server
 	void *connecting;
 	//TODO: WIP
 	struct channel_list clist;
-
-	struct {
-		struct {
-			/* Map a-zA-Z -> a-zA-Z */
-			char F[MODE_LEN + 1];
-			char T[MODE_LEN + 1];
-		} PREFIX;
-		struct {
-			char *CHANMODES_A;
-			char *CHANMODES_B;
-			char *CHANMODES_C;
-			char *CHANMODES_D;
-			/* lower + upper + 4 terminators */
-			char _[MODE_LEN + 4];
-		} CHANMODES;
-	} config;
+	struct mode_config mode_config;
 };
 
 struct server_list
@@ -65,8 +51,7 @@ struct server_list
 	struct server *head;
 };
 
-char server_get_prefix(struct server*, char, char);
-
+void server_set_004(struct server*, char*);
 void server_set_005(struct server*, char*);
 
 struct server* server(char*, char*, char*);
