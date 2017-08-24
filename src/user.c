@@ -71,6 +71,23 @@ user_list_del(struct user_list *ul, char *nick)
 	return !!ret;
 }
 
+int
+user_list_rpl(struct user_list *ul, char *nick_old, char *nick_new)
+{
+	struct user *ret, u = { .nick = nick_old };
+
+	if ((ret = AVL_DEL(user_list, ul, &u)) != NULL) {
+
+		char prefix = ret->prefix;
+
+		AVL_ADD(user_list, ul, user(nick_new, prefix));
+
+		user_free(ret);
+	}
+
+	return !!ret;
+}
+
 struct user*
 user_list_get(struct user_list *ul, char *nick, size_t prefix_len)
 {

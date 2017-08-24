@@ -1127,10 +1127,8 @@ recv_nick(char *err, struct parsed_mesg *p, struct server *s)
 	struct channel *c = s->channel;
 	//TODO: channel_list_foreach
 	do {
-		if (user_list_del(&(c->users), p->from)) {
-			user_list_add(&(c->users), nick);
+		if (user_list_rpl(&(c->users), p->from, nick))
 			newlinef(c, 0, "--", "%s  >>  %s", p->from, nick);
-		}
 	} while ((c = c->next) != s->channel);
 
 	return 0;
