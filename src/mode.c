@@ -1,3 +1,5 @@
+#include <ctype.h>
+
 #include "mode.h"
 
 /* TODO:
@@ -6,15 +8,20 @@
  *    is received it is silently ignored (RFC2811 section 4.2.6)
  *
  *  - received MODE messages should check the target, either:
- *		- current user   (usermode)
- *		- a channel name (chanmode, possibly with additional params)
+ *		- rirc user   (usermode)
+ *		- a channel name
+ *			- in PREFIX  (chanusermode)
+ *			- otherwise  (chanmode)
  *
  *	- safe channels ('!' prefix) (see RFC2811)
- *
- *
  */
 
+static inline char char_mode(char);
+static inline char mode_char(char);
+
 static char mode_get_prefix(struct mode_config*, char, char);
+
+static void mode_set_str(char*, char*);
 
 void
 mode_config_defaults(struct mode_config *m)
@@ -79,6 +86,24 @@ mode_config_defaults(struct mode_config *m)
 	};
 }
 
+static inline char
+char_mode(char c)
+{
+	if (isupper(c))
+		return c - 'A' + 26;
+
+	if (islower(c))
+		return c - 'a';
+
+	return -1;
+}
+
+static inline char
+mode_char(char m)
+{
+	return (m < 26 ? m + 'a' : m + 'A' - 26);
+}
+
 static char
 mode_get_prefix(struct mode_config *m, char prefix, char mode)
 {
@@ -99,3 +124,42 @@ mode_get_prefix(struct mode_config *m, char prefix, char mode)
 	return (from < to) ? m->PREFIX.T[from] : prefix;
 }
 
+static void
+mode_set_str(char *modes, char *str)
+{
+	/* Repack the mode string with set modes */
+
+	int i;
+
+	for (i = 0; i <= MODE_LEN; i++)
+		if (modes[i])
+			*str++ = mode_char(i);
+
+	*str = 0;
+}
+
+int
+usermode_set(struct usermode *usermode, int mode)
+{
+	if ((mode = char_mode(mode)) < 0)
+		return 1;
+
+	usermode->modes[mode] = 1;
+
+	mode_set_str(usermode->modes, usermode->str);
+
+	return 0;
+}
+
+int
+usermode_unset(struct usermode *usermode, int mode)
+{
+	if ((mode = char_mode(mode)) < 0)
+		return 1;
+
+	usermode->modes[mode] = 0;
+
+	mode_set_str(usermode->modes, usermode->str);
+
+	return 0;
+}
