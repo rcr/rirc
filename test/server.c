@@ -1,5 +1,6 @@
 #include "test.h"
 #include "../src/server.c"
+#include "../src/mode.c"    /* mode_config_defaults */
 #include "../src/utils.c"   /* skip_sp */
 
 void newlinef(struct channel *c, enum buffer_line_t t, const char *f, const char *m, ...)

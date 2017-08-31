@@ -1,3 +1,6 @@
+#ifndef MODE_H
+#define MODE_H
+
 /* Usermodes, Chanmodes and server mode configuration
  *
  * `usermodes`, `chanmodes`, parsed from numeric 004 (RPL_MYINFO)
@@ -19,6 +22,8 @@
  *     - user +o  ->  "@user"
  *     - user -o  ->  "+user"
  *     - user -v  ->   "user"
+ *
+ * Prefix modes are not included in CHANMODES
  */
 
 /* [a-zA-Z] */
@@ -41,11 +46,18 @@ struct mode_config
 	} PREFIX;
 };
 
-struct mode
+struct usermode
 {
+	char prefix;
 	char str[MODE_LEN + 1];
 };
 
-void mode_defaults(struct mode_config*);
+struct chanmode
+{
+	char prefix;
+	char str[MODE_LEN + 1];
+};
 
-char mode_get_prefix(struct mode_config*, char, char);
+void mode_config_defaults(struct mode_config*);
+
+#endif

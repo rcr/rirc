@@ -23,6 +23,7 @@
 #endif
 
 #include "buffer.h"
+#include "mode.h"
 #include "net.h"
 #include "state.h"
 #include "utils.h"
@@ -77,6 +78,9 @@ get_server_head(void)
 static struct server*
 new_server(char *host, char *port, char *join, char *nicks)
 {
+	/* FIXME: refactor connections out of server, use server constructor
+	 * from server.c*/
+
 	struct server *s;
 
 	if ((s = calloc(1, sizeof(*s))) == NULL)
@@ -101,6 +105,8 @@ new_server(char *host, char *port, char *join, char *nicks)
 	auto_nick(&(s->nptr), s->nick);
 
 	s->channel = new_channel(host, s, NULL, BUFFER_SERVER);
+
+	mode_config_defaults(&(s->mode_config));
 
 	DLL_ADD(server_head, s);
 

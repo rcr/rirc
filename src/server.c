@@ -22,7 +22,7 @@ static int parse_opt(struct opt*, char **);
 HANDLED_005
 #undef X
 
-//TODO: refactor, not used
+//TODO: refactor, not currently used
 struct server*
 server(char *host, char *port, char *nicks)
 {
@@ -40,6 +40,8 @@ server(char *host, char *port, char *nicks)
 	#define X(cmd) set_##cmd(s, NULL);
 	HANDLED_005
 	#undef X
+
+	mode_config_defaults(&(s->mode_config));
 
 	return s;
 }
@@ -122,11 +124,11 @@ set_CHANMODES(struct server *s, char *val)
 {
 	UNUSED(s);
 
-	if (val) {
-		; //set val
-	} else {
-		; //set default
-	}
+	/* Server defaults are set by mode_defaults */
+	if (val == NULL)
+		return 1;
+
+	/* TODO, parse CHANMODES */
 
 	return 1;
 }
@@ -134,18 +136,13 @@ set_CHANMODES(struct server *s, char *val)
 static int
 set_PREFIX(struct server *s, char *val)
 {
-	/* `(modes)prefixes` in order of precedence
-	 *
-	 * RFC 2812, numeric 319 (RPL_WHOISCHANNELS) states `(@+)ov`
-	 */
+	/* `(modes)prefixes` in order of precedence */
 
 	char *f, *t = val;
 
-	if (val == NULL) {
-		strncpy(s->mode_config.PREFIX.F, "ov", sizeof(s->mode_config.PREFIX.F) - 1);
-		strncpy(s->mode_config.PREFIX.T, "@+", sizeof(s->mode_config.PREFIX.T) - 1);
+	/* Server defaults are set by mode_defaults */
+	if (val == NULL)
 		return 1;
-	}
 
 	if ((t = strchr(t, '(')) == NULL)
 		return 0;
