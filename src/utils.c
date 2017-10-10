@@ -125,6 +125,8 @@ skip_sp(char **str)
 	return !!*p;
 }
 
+//TODO: CASEMAPPING,
+//        - if `ascii` only az->AZ is used for nick/channel comp
 static inline int
 irc_toupper(const int c)
 {

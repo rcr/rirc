@@ -616,6 +616,7 @@ tab_complete_command(struct input *inp, char *str, size_t len)
 	}
 }
 
+/* FIXME: broken?? */
 static void
 tab_complete_nick(struct input *inp, char *str, size_t len)
 {

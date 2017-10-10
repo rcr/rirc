@@ -1,7 +1,7 @@
 #ifndef MODE_H
 #define MODE_H
 
-/* Usermodes, Chanmodes and server mode configuration
+/* usermodes, chanmodes and prfxmode configuration
  *
  * `usermodes`, `chanmodes`, parsed from numeric 004 (RPL_MYINFO)
  * `CHANMODES`, `PREFIX`, parsed from numeric 005 (RPL_ISUPPORT)
@@ -9,7 +9,7 @@
  * Three categories of modes exist, depending on the MODE message target:
  *   - Modes set server-wide for the rirc user (usermode)
  *   - Modes set for a channel                 (chanmode)
- *   - Modes set for a user on a channel       (chanusermode)
+ *   - Modes set for a user on a channel       (prfxmode)
  *
  * mode_config.chanmodes apply to a channel and the subtypes are given by A,B,C,D:
  *   - A = Mode that adds or removes a nick or address to a list. Always has a parameter.
@@ -19,7 +19,7 @@
  *
  * mode_config.usermodes apply to the IRC user at a server level
  *
- * Prefix maps a subset of chanmodes to user prefixes for that channel, in order of
+ * PREFIX maps a subset of modes to user prefixes for that channel, in order of
  * precedence. Multiple prefix modes can be set for a user, but only one mode flag
  * should be shown, e.g.:
  *   - if "ov" maps to "@+", then:
@@ -28,53 +28,93 @@
  *     - user -o  ->  "+user"
  *     - user -v  ->   "user"
  *
- * Prefix modes are not included in CHANMODES
+ * PREFIX modes are not included in CHANMODES
+ *
+ * Numeric 353 (RPL_NAMREPLY) sets chanmode and prfxmode for users on a channel
+ * by providing the prefix character rather than the flag
  */
 
+#include <stdint.h>
+
 /* [a-zA-Z] */
-#define MODE_LEN 26 * 2
+#define MODE_STR_LEN 26 * 2
+
+enum mode_err
+{
+	MODE_ERR_INVALID_CONFIG = -3,
+	MODE_ERR_INVALID_PREFIX = -2,
+	MODE_ERR_INVALID_FLAG   = -1,
+	MODE_ERR_NONE
+};
+
+enum mode_config_t
+{
+	MODE_CONFIG_DEFAULTS,  /* Set RFC2811 mode defaults */
+	MODE_CONFIG_USERMODES, /* Set numeric 004 usermodes string */
+	MODE_CONFIG_CHANMODES, /* Set numeric 004 chanmdoes string */
+	MODE_CONFIG_ABCD,      /* Set numeric 005 CHANMODES subtypes */
+	MODE_CONFIG_PREFIX,    /* Set numeric 005 PREFIX */
+	MODE_CONFIG_T_SIZE
+};
+
+enum mode_set_t
+{
+	MODE_SET_OFF = 0,
+	MODE_SET_ON  = 1,
+	MODE_SET_SIZE_T
+};
+
+/* Mode string printing requirements differs by type */
+enum mode_str_t
+{
+	MODE_STR_UNSET = 0, /* Ensure a mode_str type is explicitly set */
+	MODE_STR_CHANMODE,
+	MODE_STR_USERMODE,
+	MODE_STR_PRFXMODE,
+	MODE_STR_T_SIZE
+};
 
 struct mode_config
 {
-	char chanmodes[MODE_LEN + 1];
-	char usermodes[MODE_LEN + 1];
-	struct {
-		char *A;
+	char chanmodes[MODE_STR_LEN + 1]; /* Numeric 004 chanmodes string */
+	char usermodes[MODE_STR_LEN + 1]; /* Numeric 004 usermodes string */
+	struct
+	{
+		char *A; /* Numeric 005 CHANMODES substrings */
 		char *B;
 		char *C;
 		char *D;
-		char _[MODE_LEN + 4];
+		char _[MODE_STR_LEN + 4];
 	} CHANMODES;
-	struct {
-		char F[MODE_LEN + 1];
-		char T[MODE_LEN + 1];
+	struct
+	{
+		char F[MODE_STR_LEN + 1]; /* prfxmode mapping `from` */
+		char T[MODE_STR_LEN + 1]; /* prfxmode mapping `to`  */
 	} PREFIX;
 };
 
-struct usermode
+struct mode
 {
-	char modes[MODE_LEN + 1];
-	char str[MODE_LEN + 1];
+	char prefix;    /* Prefix character for chanmode, prfxmode */
+	uint32_t lower; /* Lowercase mode bits */
+	uint32_t upper; /* Uppercase mode bits */
 };
 
-struct chanmode
+struct mode_str
 {
-	char prefix;
-	char modes[MODE_LEN + 1];
-	char str[MODE_LEN + 1];
+	char str[MODE_STR_LEN + 1];
+	enum mode_str_t type;
 };
 
-struct chanusermode
-{
-	char prefix;
-	char modes[MODE_LEN + 1];
-	char str[MODE_LEN + 1];
-};
+int mode_config(struct mode_config*, char*, enum mode_config_t);
 
-void mode_config_defaults(struct mode_config*);
+int mode_chanmode_set(struct mode*, struct mode_config*, int, enum mode_set_t);
+int mode_prfxmode_set(struct mode*, struct mode_config*, int, enum mode_set_t);
+int mode_usermode_set(struct mode*, struct mode_config*, int, enum mode_set_t);
 
-/* Mode set/unset functions return non-zero on error */
-int usermode_set(struct usermode*, int);
-int usermode_unset(struct usermode*, int);
+int mode_chanmode_prefix(struct mode*, struct mode_config*, int);
+int mode_prfxmode_prefix(struct mode*, struct mode_config*, int);
+
+char* mode_str(struct mode*, struct mode_str*);
 
 #endif

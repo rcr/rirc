@@ -27,6 +27,7 @@ static void signal_sigwinch(int);
 
 static struct termios oterm;
 static struct sigaction sa_sigwinch;
+
 static volatile sig_atomic_t flag_sigwinch;
 
 /* Global configuration */

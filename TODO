@@ -4,27 +4,26 @@ TODO
 this iteration:
 	- Proper mode support (struct cmode/umode)
 
+next iteration:
+	- hook up new server/channel/mode/etc implementations
+
 Continue refactoring:
 	- Move/split components (e.g. server, channel, input, etc):
-		src/components/*.{c,h}
+		src/components/*.{c,h}, src/README.md
 	- Untangle headers
 	- Rewrite input DLL as circular buffer of gap buffers, with copy on repeat,
 		use abstractions in _draw_input
 	- Split net/server code
 
 RFC compliance:
+	- List required message types and associated error messages
 	- List all message types and error numerics from RFC, mark handled/unhandled
 
-src/README.md
-
 ----------------------
-	/NICKS
-		print the current nicks to the channel
+	/NICKS, /IGNORE, /UNIGNORE,
+		print the current nicks, ignore list, to the channel
 		^(Also print this implicitly when end of nicks numeric is received)
-		^(Also print server's ignore list for '/ignore' and '/unignore')
-
-	/IGNORE, /UNIGNORE,
-		print the ignore list
+		^(Print as buffer_line type dynamically to fill available terminal space)
 
 	Numerics:
 	221 +<flags> :(null)

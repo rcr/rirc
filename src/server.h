@@ -9,6 +9,7 @@
 #include "channel.h"
 #include "mode.h"
 
+//TODO: replaced by mode.c
 /* [a-zA-Z] */
 #define MODE_LEN 26 * 2
 
@@ -24,6 +25,7 @@ struct server
 	//TODO: this shouldn't persist with the server,
 	// its only relevant on successful connection
 	char *join;
+	//TODO: reaplced by mode.c -> struct usermode
 	char usermodes[MODE_SIZE];
 	struct user_list ignore;
 	//TODO channel_list
@@ -59,5 +61,8 @@ struct server* server(char*, char*, char*);
 struct server* server_add(struct server_list*, struct server*);
 struct server* server_get(struct server_list*, struct server*);
 struct server* server_del(struct server_list*, struct server*);
+
+//TODO
+void server_free(struct server*);
 
 #endif

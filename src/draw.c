@@ -4,6 +4,11 @@
  *
  * Assumes vt-100 compatible escape codes, as such YMMV */
 
+/* TODO:
+ *
+ * setvbuf can be used for testing draw routines, pointing to static buffer
+ * */
+
 #include <alloca.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -376,6 +381,7 @@ _draw_buffer(struct buffer *b, struct coords coords)
 	}
 }
 
+/* TODO: cache channel name length, remove strlen */
 /* TODO
  *
  * | [server-name[:port]] *#chan |
@@ -673,6 +679,7 @@ _draw_status(struct channel *c)
 		if (ret < 0 || (col += ret) >= cols)
 			goto print_status;
 
+		//TODO: chanmode.prefix
 		if (c->type_flag) {
 			ret = snprintf(status_buff + col, cols - col + 1, " %c", c->type_flag);
 			if (ret < 0 || (col += ret) >= cols)

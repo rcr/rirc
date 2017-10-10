@@ -5,7 +5,7 @@
 
 #include "../config.h"
 
-#define TEXT_LENGTH_MAX 510
+#define TEXT_LENGTH_MAX 510 /* FIXME: remove max lengths in favour of growable buffer */
 #define FROM_LENGTH_MAX 100
 
 #ifndef BUFFER_LINES_MAX
@@ -33,7 +33,7 @@ enum buffer_t
 struct buffer_line
 {
 	enum buffer_line_t type;
-	char prefix; /* TODO */
+	char prefix; /* TODO, this should just be part of 'from' */
 	char from[FROM_LENGTH_MAX + 1];
 	char text[TEXT_LENGTH_MAX + 1];
 	size_t from_len;

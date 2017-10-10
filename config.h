@@ -1,4 +1,4 @@
-/* Rirc configuration header
+/* rirc configuration header
  *
  * Colours can be set [0, 255], Any other value (e.g. -1) will set
  * the default terminal foreground/background */
@@ -17,6 +17,7 @@
 /* Colours used for nicks */
 #define NICK_COLOURS {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14};
 
+/* Colours for channel names in response to activity, in order of precedence */
 #define ACTIVITY_COLOURS {            \
 	239, /* Default colour */         \
 	239, /* Join/Part/Quit colour */  \
@@ -24,7 +25,6 @@
 	3    /* Ping colour */            \
 };
 
-/* Colours for channel names in response to activity, in order of precedence */
 #define NAV_CURRENT_CHAN 255
 
 /* Characters */

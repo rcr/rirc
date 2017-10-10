@@ -41,7 +41,7 @@ server(char *host, char *port, char *nicks)
 	HANDLED_005
 	#undef X
 
-	mode_config_defaults(&(s->mode_config));
+	mode_config(&(s->mode_config), NULL, MODE_CONFIG_DEFAULTS);
 
 	return s;
 }
@@ -119,6 +119,7 @@ parse_opt(struct opt *opt, char **str)
 	return 1;
 }
 
+//*TODO: move these to mode_config, check ret value
 static int
 set_CHANMODES(struct server *s, char *val)
 {

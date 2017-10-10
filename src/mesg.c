@@ -994,7 +994,7 @@ recv_kick(char *err, struct parsed_mesg *p, struct server *s)
 	if ((c = channel_list_get(&s->clist, chan)) == NULL)
 		failf("KICK: channel '%s' not found", chan);
 
-	/* RFC 2812, 3.2.8:
+	/* RFC 2812, section 3.2.8:
 	 *
 	 * If a "comment" is given, this will be sent instead of the default message,
 	 * the nickname of the user issuing the KICK.
@@ -1307,7 +1307,12 @@ recv_numeric(char *err, struct parsed_mesg *p, struct server *s)
 
 	/* 353 ("="/"*"/"@") <channel> :*([ "@" / "+" ]<nick>) */
 	case RPL_NAMREPLY:
-
+		//TODO:
+		//
+		// should set the s/p flags
+		//
+		// should set the prefix mode for the nick
+		//
 		/* @:secret   *:private   =:public */
 		if (!(type = getarg(&p->params, " ")))
 			fail("RPL_NAMEREPLY: type is null");
