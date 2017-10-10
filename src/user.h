@@ -6,6 +6,7 @@
 struct user
 {
 	AVL_NODE(user) node;
+	/* TODO: struct mode */
 	char *nick;
 	char prefix;
 	char _[];

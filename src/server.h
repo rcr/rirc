@@ -26,7 +26,7 @@ struct server
 	// its only relevant on successful connection
 	char *join;
 	//TODO: reaplced by mode.c -> struct usermode
-	char usermodes[MODE_SIZE];
+	char usermodes[MODE_SIZE]; /* TODO: replacing with struct mode, struct mode_str */
 	struct user_list ignore;
 	//TODO channel_list
 	struct channel *channel;

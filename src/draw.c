@@ -618,6 +618,8 @@ print_input:
 static void
 _draw_status(struct channel *c)
 {
+	/* TODO: channel modes, channel type_flag, servermodes */
+
 	/* server / private chat:
 	 * |-[usermodes]-(latency)---...|
 	 *

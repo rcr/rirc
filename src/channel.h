@@ -21,7 +21,7 @@ enum activity_t
 struct channel
 {
 	//TODO: combined struct chanmode
-	char chanmodes[MODE_SIZE];
+	char chanmodes[MODE_SIZE]; /* TODO: replacing with struct mode, struct mode_str */
 	char type_flag; /* TODO: chanmode.prefix */
 	//TODO: cache length for draw_nav
 	char *name;

@@ -1031,6 +1031,24 @@ recv_mode(char *err, struct parsed_mesg *p, struct server *s)
 {
 	/* :nick!user@hostname.domain MODE <targ> *( ( "-" / "+" ) *<modes> *<modeparams> ) */
 
+	/* TODO:
+	 *
+	 * fix current mode implementation/drawing for
+	 *  - channel
+	 *  - server
+	 *
+	 * add mode support for channel users
+	 *  - check user prefix on newline for channel buffer
+	 *  - draw prefix char in buffer
+	 *
+	 * complete rewrite, get target as:
+	 *  - usermode targetting rirc user
+	 *  - chanmode targetting channel
+	 *  - prfxmode targetting user on channel
+	 *
+	 * call appropriate function, draw appropriate component
+	 * */
+
 	char *targ;
 	struct channel *c;
 
