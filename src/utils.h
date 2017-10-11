@@ -17,8 +17,9 @@ struct parsed_mesg
 /* Dynamically allocated string with cached length */
 struct string
 {
+	char *str;
 	size_t len;
-	char str[];
+	char _[];
 };
 
 int irc_isnickchar(const char);

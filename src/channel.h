@@ -4,6 +4,7 @@
 #include "buffer.h"
 #include "tree.h"
 #include "user.h"
+#include "utils.h"
 
 //TODO: replaced by mode struct
 #define MODE_SIZE (26 * 2) + 1 /* Supports modes [az-AZ] */
@@ -23,10 +24,10 @@ struct channel
 	//TODO: combined struct chanmode
 	char chanmodes[MODE_SIZE]; /* TODO: replacing with struct mode, struct mode_str */
 	char type_flag; /* TODO: chanmode.prefix */
-	//TODO: cache length for draw_nav
-	char *name;
+
+
+
 	enum activity_t activity;
-	//TODO: bitfield
 	int parted;
 	SPLAY_NODE(channel) node; /* Fast unordered retrieval */
 	struct buffer buffer;
@@ -34,6 +35,7 @@ struct channel
 	struct channel *prev;
 	struct input *input;
 	struct server *server;
+	struct string *name;
 	struct user_list users;
 };
 

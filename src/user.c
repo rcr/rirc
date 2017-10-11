@@ -36,6 +36,11 @@ user(char *nick, char prefix)
 {
 	struct user *u;
 
+	/* TODO: struct string for nick
+	 *
+	 * use cached length in drawing
+	 * use cached length in user_cmp */
+
 	if ((u = calloc(1, sizeof(*u) + strlen(nick) + 1)) == NULL)
 		fatal("calloc", errno);
 
