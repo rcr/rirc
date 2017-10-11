@@ -103,13 +103,33 @@ getarg(char **str, const char *sep)
 char*
 strdup(const char *str)
 {
+	/* Return dynamically allocated duplicate string */
+
 	size_t len = strlen(str) + 1;
+
 	void *ret;
 
 	if ((ret = malloc(len)) == NULL)
 		fatal("malloc", errno);
 
 	return (char *) memcpy(ret, str, len);
+}
+
+struct string*
+string(const char *str)
+{
+	/* Return dynamically allocated duplicate string with cached length */
+
+	size_t len = strlen(str) + 1;
+
+	struct string *s;
+
+	if ((s = malloc(sizeof(*s) + len)) == NULL)
+		fatal("malloc", errno);
+
+	memcpy(s->str, str, len);
+
+	return s;
 }
 
 int
