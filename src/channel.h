@@ -4,7 +4,9 @@
 #include "buffer.h"
 #include "tree.h"
 #include "user.h"
+#include "utils.h"
 
+//TODO: replaced by mode struct
 #define MODE_SIZE (26 * 2) + 1 /* Supports modes [az-AZ] */
 
 /* Channel activity types, in order of precedence */
@@ -19,9 +21,12 @@ enum activity_t
 
 struct channel
 {
-	char chanmodes[MODE_SIZE];
-	char *name;
-	char type_flag;
+	//TODO: combined struct chanmode
+	char chanmodes[MODE_SIZE]; /* TODO: replacing with struct mode, struct mode_str */
+	char type_flag; /* TODO: chanmode.prefix */
+
+
+
 	enum activity_t activity;
 	int parted;
 	SPLAY_NODE(channel) node; /* Fast unordered retrieval */
@@ -30,6 +35,7 @@ struct channel
 	struct channel *prev;
 	struct input *input;
 	struct server *server;
+	struct string *name;
 	struct user_list users;
 };
 

@@ -6,8 +6,9 @@
 struct user
 {
 	AVL_NODE(user) node;
+	/* TODO: struct mode */
 	char *nick;
-	char flag;
+	char prefix;
 	char _[];
 };
 
@@ -17,8 +18,9 @@ struct user_list
 	unsigned int count;
 };
 
-int user_list_add(struct user_list*, char*);
+int user_list_add(struct user_list*, char*, char);
 int user_list_del(struct user_list*, char*);
+int user_list_rpl(struct user_list*, char*, char*);
 
 struct user* user_list_get(struct user_list*, char*, size_t);
 

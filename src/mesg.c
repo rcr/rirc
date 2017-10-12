@@ -438,7 +438,7 @@ send_ignore(char *err, char *mesg, struct server *s, struct channel *c)
 	if (!(nick = getarg(&mesg, " ")))
 		user_list_print(c);
 
-	else if (!user_list_add(&(s->ignore), nick))
+	else if (!user_list_add(&(s->ignore), nick, 0))
 		failf("Error: Already ignoring '%s'", nick);
 
 	else
@@ -620,7 +620,7 @@ send_version(char *err, char *mesg, struct server *s, struct channel *c)
 
 	if (s == NULL) {
 		newline(c, 0, "--", "rirc v"VERSION);
-		newline(c, 0, "--", "http://rcr.io/rirc.html");
+		newline(c, 0, "--", "http://rcr.io/rirc");
 		return 0;
 	}
 
@@ -868,7 +868,7 @@ recv_ctcp_req(char *err, struct parsed_mesg *p, struct server *s)
 		newlinef(s->channel, 0, "--", "CTCP VERSION request from %s", p->from);
 
 		return sendf(err, s,
-			"NOTICE %s :\x01""VERSION rirc v"VERSION", http://rcr.io/rirc.html\x01", p->from);
+			"NOTICE %s :\x01""VERSION rirc v"VERSION", http://rcr.io/rirc\x01", p->from);
 	}
 
 	if (!strcmp(cmd, "TIME")) {
@@ -963,8 +963,7 @@ recv_join(char *err, struct parsed_mesg *p, struct server *s)
 		if ((c = channel_list_get(&s->clist, chan)) == NULL)
 			failf("JOIN: channel '%s' not found", chan);
 
-		if (!user_list_add(&(c->users), p->from))
-			failf("JOIN: nick '%s' already in '%s'", p->from, chan);
+		user_list_add(&(c->users), p->from, 0);
 
 		if (c->users.count < config.join_part_quit_threshold)
 			newlinef(c, 0, ">", "%s!%s has joined %s", p->from, p->host, chan);
@@ -995,7 +994,7 @@ recv_kick(char *err, struct parsed_mesg *p, struct server *s)
 	if ((c = channel_list_get(&s->clist, chan)) == NULL)
 		failf("KICK: channel '%s' not found", chan);
 
-	/* RFC 2812, 3.2.8:
+	/* RFC 2812, section 3.2.8:
 	 *
 	 * If a "comment" is given, this will be sent instead of the default message,
 	 * the nickname of the user issuing the KICK.
@@ -1031,6 +1030,24 @@ static int
 recv_mode(char *err, struct parsed_mesg *p, struct server *s)
 {
 	/* :nick!user@hostname.domain MODE <targ> *( ( "-" / "+" ) *<modes> *<modeparams> ) */
+
+	/* TODO:
+	 *
+	 * fix current mode implementation/drawing for
+	 *  - channel
+	 *  - server
+	 *
+	 * add mode support for channel users
+	 *  - check user prefix on newline for channel buffer
+	 *  - draw prefix char in buffer
+	 *
+	 * complete rewrite, get target as:
+	 *  - usermode targetting rirc user
+	 *  - chanmode targetting channel
+	 *  - prfxmode targetting user on channel
+	 *
+	 * call appropriate function, draw appropriate component
+	 * */
 
 	char *targ;
 	struct channel *c;
@@ -1127,10 +1144,8 @@ recv_nick(char *err, struct parsed_mesg *p, struct server *s)
 	struct channel *c = s->channel;
 	//TODO: channel_list_foreach
 	do {
-		if (user_list_del(&(c->users), p->from)) {
-			user_list_add(&(c->users), nick);
+		if (user_list_rpl(&(c->users), p->from, nick))
 			newlinef(c, 0, "--", "%s  >>  %s", p->from, nick);
-		}
 	} while ((c = c->next) != s->channel);
 
 	return 0;
@@ -1248,6 +1263,8 @@ recv_numeric(char *err, struct parsed_mesg *p, struct server *s)
 	case RPL_MYINFO:    /* 004 <params> :Are supported by this server */
 
 		newlinef(s->channel, 0, "--", "%s ~ supported by this server", p->params);
+
+		server_set_004(s, p->params);
 		break;
 
 	case RPL_ISUPPORT:  /* 005 <params> :Are supported by this server */
@@ -1308,7 +1325,12 @@ recv_numeric(char *err, struct parsed_mesg *p, struct server *s)
 
 	/* 353 ("="/"*"/"@") <channel> :*([ "@" / "+" ]<nick>) */
 	case RPL_NAMREPLY:
-
+		//TODO:
+		//
+		// should set the s/p flags
+		//
+		// should set the prefix mode for the nick
+		//
 		/* @:secret   *:private   =:public */
 		if (!(type = getarg(&p->params, " ")))
 			fail("RPL_NAMEREPLY: type is null");
@@ -1323,11 +1345,12 @@ recv_numeric(char *err, struct parsed_mesg *p, struct server *s)
 
 		while ((nick = getarg(&p->trailing, " "))) {
 
-			//TODO: if !is_ircnickchar, flag = nick++, user->flag = flag;
-			if (*nick == '@' || *nick == '+')
-				nick++;
+			char prefix = 0;
 
-			user_list_add(&(c->users), nick);
+			if (!irc_isnickchar(*nick))
+				prefix = *nick++;
+
+			user_list_add(&(c->users), nick, prefix);
 		}
 
 		draw_status();

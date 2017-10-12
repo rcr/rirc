@@ -4,6 +4,11 @@
  *
  * Assumes vt-100 compatible escape codes, as such YMMV */
 
+/* TODO:
+ *
+ * setvbuf can be used for testing draw routines, pointing to static buffer
+ * */
+
 #include <alloca.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -153,6 +158,12 @@ _draw_buffer_line(
 	     *p1 = line->text,
 	     *p2 = line->text + line->text_len;
 
+	if (!line->cached.initialized) {
+		/* Initialize static cached properties of drawn lines */
+		line->cached.colour = nick_col(line->from);
+		line->cached.initialized = 1;
+	}
+
 	if (skip == 0) {
 
 		/* Print the line header
@@ -192,7 +203,7 @@ _draw_buffer_line(
 
 			case BUFFER_LINE_CHAT:
 				if (!_draw_fmt(&header_ptr, &buff_n, &text_n, 0,
-						_colour(nick_col(line->from), -1)))
+						_colour(line->cached.colour, -1)))
 					goto print_header;
 				break;
 
@@ -407,7 +418,7 @@ _draw_nav(struct channel *c)
 	size_t len, total_len = 0;
 
 	/* Bump the channel frames, if applicable */
-	if ((total_len = (strlen(c->name) + 2)) >= _term_cols())
+	if ((total_len = (c->name->len + 2)) >= _term_cols())
 		return;
 	else if (c == frame_prev && frame_prev != c_first)
 		frame_prev = channel_get_prev(frame_prev);
@@ -424,14 +435,14 @@ _draw_nav(struct channel *c)
 			/* Pad out nextward */
 
 			tmp = channel_get_next(tmp_next);
-			len = strlen(tmp->name);
+			len = tmp->name->len;
 
 			while ((total_len += (len + 2)) < _term_cols() && tmp != c_first) {
 
 				tmp_next = tmp;
 
 				tmp = channel_get_next(tmp);
-				len = strlen(tmp->name);
+				len = tmp->name->len;
 			}
 
 			break;
@@ -442,21 +453,21 @@ _draw_nav(struct channel *c)
 			/* Pad out prevward */
 
 			tmp = channel_get_prev(tmp_prev);
-			len = strlen(tmp->name);
+			len = tmp->name->len;
 
 			while ((total_len += (len + 2)) < _term_cols() && tmp != c_last) {
 
 				tmp_prev = tmp;
 
 				tmp = channel_get_prev(tmp);
-				len = strlen(tmp->name);
+				len = tmp->name->len;
 			}
 
 			break;
 		}
 
 		tmp = nextward ? channel_get_next(tmp_next) : channel_get_prev(tmp_prev);
-		len = strlen(tmp->name);
+		len = tmp->name->len;
 
 		/* Next channel doesn't fit */
 		if ((total_len += (len + 2)) >= _term_cols())
@@ -481,7 +492,7 @@ _draw_nav(struct channel *c)
 		if (fputs(_colour(colour, -1), stdout) < 0)
 			break;
 
-		if (printf(" %s ", tmp->name) < 0)
+		if (printf(" %s ", tmp->name->str) < 0)
 			break;
 
 		if (tmp == frame_next)
@@ -606,6 +617,8 @@ print_input:
 static void
 _draw_status(struct channel *c)
 {
+	/* TODO: channel modes, channel type_flag, servermodes */
+
 	/* server / private chat:
 	 * |-[usermodes]-(latency)---...|
 	 *
@@ -667,6 +680,7 @@ _draw_status(struct channel *c)
 		if (ret < 0 || (col += ret) >= cols)
 			goto print_status;
 
+		//TODO: chanmode.prefix
 		if (c->type_flag) {
 			ret = snprintf(status_buff + col, cols - col + 1, " %c", c->type_flag);
 			if (ret < 0 || (col += ret) >= cols)

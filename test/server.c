@@ -1,5 +1,6 @@
 #include "test.h"
 #include "../src/server.c"
+#include "../src/mode.c"    /* mode_config_defaults */
 #include "../src/utils.c"   /* skip_sp */
 
 void newlinef(struct channel *c, enum buffer_line_t t, const char *f, const char *m, ...)
@@ -12,8 +13,7 @@ void newlinef(struct channel *c, enum buffer_line_t t, const char *f, const char
 	UNUSED(m);
 }
 
-
-void
+static void
 test_parse_opt(void)
 {
 	/* Test numeric 005 parsing  */
@@ -93,7 +93,7 @@ test_parse_opt(void)
 #undef CHECK
 }
 
-void
+static void
 test_set_PREFIX(void)
 {
 	struct server s;
@@ -123,8 +123,8 @@ test_set_PREFIX(void)
 	char s5[] = "(abcd)!@#$";
 	ptr = s5;
 	assert_eq(set_PREFIX(&s, ptr), 1);
-	assert_strcmp(s.config.PREFIX.F, "abcd");
-	assert_strcmp(s.config.PREFIX.T, "!@#$");
+	assert_strcmp(s.mode_config.PREFIX.F, "abcd");
+	assert_strcmp(s.mode_config.PREFIX.T, "!@#$");
 }
 
 int

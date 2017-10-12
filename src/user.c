@@ -9,6 +9,8 @@ static inline int user_ncmp(struct user*, struct user*, size_t);
 
 static inline void user_free(struct user*);
 
+static struct user* user(char*, char);
+
 AVL_GENERATE(user_list, user, node, user_cmp, user_ncmp)
 
 static inline int
@@ -29,17 +31,29 @@ user_free(struct user *u)
 	free(u);
 }
 
-int
-user_list_add(struct user_list *ul, char *nick)
+static struct user*
+user(char *nick, char prefix)
 {
-	struct user *ret, *u;
+	struct user *u;
 
-	size_t len = strlen(nick);
+	/* TODO: struct string for nick
+	 *
+	 * use cached length in drawing
+	 * use cached length in user_cmp */
 
-	if ((u = calloc(1, sizeof(*u) + len + 1)) == NULL)
+	if ((u = calloc(1, sizeof(*u) + strlen(nick) + 1)) == NULL)
 		fatal("calloc", errno);
 
-	u->nick = strcpy(u->_, nick);
+	u->nick   = strcpy(u->_, nick);
+	u->prefix = prefix;
+
+	return u;
+}
+
+int
+user_list_add(struct user_list *ul, char *nick, char flag)
+{
+	struct user *ret, *u = user(nick, flag);
 
 	if ((ret = AVL_ADD(user_list, ul, u)) == NULL)
 		user_free(u);
@@ -57,6 +71,23 @@ user_list_del(struct user_list *ul, char *nick)
 	if ((ret = AVL_DEL(user_list, ul, &u)) != NULL) {
 		user_free(ret);
 		ul->count--;
+	}
+
+	return !!ret;
+}
+
+int
+user_list_rpl(struct user_list *ul, char *nick_old, char *nick_new)
+{
+	struct user *ret, u = { .nick = nick_old };
+
+	if ((ret = AVL_DEL(user_list, ul, &u)) != NULL) {
+
+		char prefix = ret->prefix;
+
+		AVL_ADD(user_list, ul, user(nick_new, prefix));
+
+		user_free(ret);
 	}
 
 	return !!ret;

@@ -22,7 +22,7 @@ static int parse_opt(struct opt*, char **);
 HANDLED_005
 #undef X
 
-//TODO: refactor, not used
+//TODO: refactor, not currently used
 struct server*
 server(char *host, char *port, char *nicks)
 {
@@ -31,7 +31,6 @@ server(char *host, char *port, char *nicks)
 	if ((s = calloc(1, sizeof(*s))) == NULL)
 		fatal("calloc", errno);
 
-	//TODO: user/host/port/modes/flag can be added as a user struct
 	s->host = strdup(host);
 	s->port = strdup(port);
 
@@ -41,6 +40,8 @@ server(char *host, char *port, char *nicks)
 	#define X(cmd) set_##cmd(s, NULL);
 	HANDLED_005
 	#undef X
+
+	mode_config(&(s->mode_config), NULL, MODE_CONFIG_DEFAULTS);
 
 	return s;
 }
@@ -52,7 +53,6 @@ server_set_005(struct server *s, char *str)
 
 	struct opt opt;
 
-	/* TODO: gperf */
 	while (parse_opt(&opt, &str)) {
 		#define X(cmd)                                        \
 		if (!strcmp(opt.arg, #cmd) && !set_##cmd(s, opt.val)) \
@@ -60,6 +60,16 @@ server_set_005(struct server *s, char *str)
 		HANDLED_005
 		#undef X
 	}
+}
+
+void
+server_set_004(struct server *s, char *str)
+{
+	/* <server_name> <version> <user_modes> <chan_modes> */
+
+	//TODO
+	(void)(s);
+	(void)(str);
 }
 
 static int
@@ -109,16 +119,17 @@ parse_opt(struct opt *opt, char **str)
 	return 1;
 }
 
+//*TODO: move these to mode_config, check ret value
 static int
 set_CHANMODES(struct server *s, char *val)
 {
 	UNUSED(s);
 
-	if (val) {
-		; //set val
-	} else {
-		; //set default
-	}
+	/* Server defaults are set by mode_defaults */
+	if (val == NULL)
+		return 1;
+
+	/* TODO, parse CHANMODES */
 
 	return 1;
 }
@@ -126,18 +137,13 @@ set_CHANMODES(struct server *s, char *val)
 static int
 set_PREFIX(struct server *s, char *val)
 {
-	/* `(modes)prefixes` in order of precedence
-	 *
-	 * RFC 2812, numeric 319 (RPL_WHOISCHANNELS) states `(@+)ov`
-	 */
+	/* `(modes)prefixes` in order of precedence */
 
 	char *f, *t = val;
 
-	if (val == NULL) {
-		strncpy(s->config.PREFIX.F, "ov", sizeof(s->config.PREFIX.F) - 1);
-		strncpy(s->config.PREFIX.T, "@+", sizeof(s->config.PREFIX.T) - 1);
+	/* Server defaults are set by mode_defaults */
+	if (val == NULL)
 		return 1;
-	}
 
 	if ((t = strchr(t, '(')) == NULL)
 		return 0;
@@ -155,8 +161,8 @@ set_PREFIX(struct server *s, char *val)
 	if (strlen(f) > MODE_LEN)
 		return 0;
 
-	strcpy(s->config.PREFIX.F, f);
-	strcpy(s->config.PREFIX.T, t);
+	strcpy(s->mode_config.PREFIX.F, f);
+	strcpy(s->mode_config.PREFIX.T, t);
 
 	return 1;
 }

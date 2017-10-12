@@ -120,18 +120,21 @@ buffer_line_rows(struct buffer_line *line, unsigned int w)
 
 	/* Empty lines occupy are considered to occupy a row */
 	if (!*line->text)
-		return line->_rows = 1;
+		return line->cached.rows = 1;
 
-	if (line->_w != w) {
-		line->_w = w;
+	if (line->cached.w != w) {
+		line->cached.w = w;
 
-		for (p = line->text, line->_rows = 0; *p; line->_rows++)
+		for (p = line->text, line->cached.rows = 0; *p; line->cached.rows++)
 			word_wrap(w, &p, line->text + line->text_len);
 	}
 
-	return line->_rows;
+	return line->cached.rows;
 }
 
+/* TODO:
+ * if prefix, from_len++, prepend to from
+ * */
 void
 buffer_newline(
 		struct buffer *b,

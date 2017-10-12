@@ -156,6 +156,7 @@ _newline(struct channel *c, enum buffer_line_t type, const char *from, const cha
 		draw_nav();
 }
 
+/* TODO: why is this here? why is this not in channel.c??? */
 struct channel*
 new_channel(char *name, struct server *s, struct channel *chanlist, enum buffer_t type)
 {
@@ -166,7 +167,7 @@ new_channel(char *name, struct server *s, struct channel *chanlist, enum buffer_
 
 	c->buffer = buffer(type);
 	c->input = new_input();
-	c->name = strdup(name);
+	c->name = string(name);
 	c->server = s;
 
 	/* Append the new channel to the list */

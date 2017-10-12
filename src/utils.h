@@ -2,6 +2,7 @@
 #define UTILS_H
 
 #include <errno.h>
+#include <stddef.h>
 
 /* Parsed IRC message */
 struct parsed_mesg
@@ -13,6 +14,15 @@ struct parsed_mesg
 	char *trailing;
 };
 
+/* Dynamically allocated string with cached length */
+struct string
+{
+	char *str;
+	size_t len;
+	char _[];
+};
+
+int irc_isnickchar(const char);
 //TODO: replace comps to channel / nicks
 int irc_strcmp(const char*, const char*);
 int irc_strncmp(const char*, const char*, size_t);
@@ -24,6 +34,8 @@ char* word_wrap(int, char**, char*);
 int check_pinged(const char*, const char*);
 int parse_mesg(struct parsed_mesg*, char*);
 int skip_sp(char**);
+
+struct string* string(const char*);
 
 void handle_error(int, const char*, ...);
 
@@ -66,6 +78,5 @@ extern int fatal_exit;
 			((N)->prev)->next = ((N)->next); \
 		} \
 	} while (0)
-
 
 #endif

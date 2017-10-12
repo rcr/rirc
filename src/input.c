@@ -482,7 +482,7 @@ search_channels(struct channel *start, char *search)
 
 	while (c != start) {
 
-		if (strstr(c->name, search))
+		if (strstr(c->name->str, search))
 			return c;
 
 		c = channel_get_next(c);
@@ -616,6 +616,7 @@ tab_complete_command(struct input *inp, char *str, size_t len)
 	}
 }
 
+/* FIXME: broken?? */
 static void
 tab_complete_nick(struct input *inp, char *str, size_t len)
 {

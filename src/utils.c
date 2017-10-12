@@ -33,7 +33,6 @@
 #error "gperf generated tables don't work with this execution character set. Please report a bug to <bug-gperf@gnu.org>."
 #endif
 
-static inline int irc_isnickchar(const char);
 static inline int irc_toupper(int);
 
 int fatal_exit;
@@ -104,13 +103,39 @@ getarg(char **str, const char *sep)
 char*
 strdup(const char *str)
 {
+	/* Return dynamically allocated duplicate string */
+
 	size_t len = strlen(str) + 1;
+
 	void *ret;
 
 	if ((ret = malloc(len)) == NULL)
 		fatal("malloc", errno);
 
 	return (char *) memcpy(ret, str, len);
+}
+
+struct string*
+string(const char *str)
+{
+	/* Return dynamically allocated duplicate string with cached length
+	 *
+	 * ->str points to ->_[] to allow for casting struct string to char*
+	 * and allows for static initialization to existing strings, e.g.:
+	 *
+	 *  - struct string str = { .str = str, .len = strlen(str) }; */
+
+	size_t len = strlen(str) + 1;
+
+	struct string *s;
+
+	if ((s = malloc(sizeof(*s) + len)) == NULL)
+		fatal("malloc", errno);
+
+	s->len = len - 1;
+	s->str = memcpy(s->_, str, len);
+
+	return s;
 }
 
 int
@@ -126,6 +151,8 @@ skip_sp(char **str)
 	return !!*p;
 }
 
+//TODO: CASEMAPPING,
+//        - if `ascii` only az->AZ is used for nick/channel comp
 static inline int
 irc_toupper(const int c)
 {
@@ -156,7 +183,7 @@ irc_toupper(const int c)
 	}
 }
 
-static inline int
+int
 irc_isnickchar(const char c)
 {
 	/* RFC 2812, section 2.3.1
