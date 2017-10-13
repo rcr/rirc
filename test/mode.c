@@ -4,6 +4,9 @@
 
 #define MODE_EMPTY {0}
 
+#define ALL_LOWERS "abcdefghijklmnopqrstuvwxyz"
+#define ALL_UPPERS "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+
 static void
 test_flag_bit(void)
 {
@@ -24,9 +27,6 @@ static void
 test_mode_str(void)
 {
 	/* Test setting mode string */
-
-#define ALL_LOWERS "abcdefghijklmnopqrstuvwxyz"
-#define ALL_UPPERS "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
 	struct mode m = MODE_EMPTY;
 	struct mode_str m_str = {0};
@@ -58,9 +58,6 @@ test_mode_str(void)
 	m.upper = UINT32_MAX;
 
 	assert_strcmp(mode_str(&m, &m_str), ALL_LOWERS ALL_UPPERS);
-
-#undef ALL_LOWERS
-#undef ALL_UPPERS
 }
 
 static void
@@ -323,13 +320,49 @@ test_prfxmode_prefix(void)
 static void
 test_mode_config_usermodes(void)
 {
-	; /* TODO */
+	/* Test configuring server usermodes */
+
+	struct mode_config c;
+
+	/* Test empty string */
+	assert_eq(mode_config_usermodes(&c, ""), MODE_ERR_NONE);
+	assert_strcmp(c.usermodes, "");
+
+	/* Test invalid flags */
+	assert_eq(mode_config_usermodes(&c, "$abc1!xyz."), MODE_ERR_NONE);
+	assert_strcmp(c.usermodes, "abcxyz");
+
+	/* Test duplicate flags */
+	assert_eq(mode_config_usermodes(&c, "aaabbc"), MODE_ERR_NONE);
+	assert_strcmp(c.usermodes, "abc");
+
+	/* Test valid string */
+	assert_eq(mode_config_usermodes(&c, ALL_LOWERS ALL_UPPERS), MODE_ERR_NONE);
+	assert_strcmp(c.usermodes, ALL_LOWERS ALL_UPPERS);
 }
 
 static void
 test_mode_config_chanmodes(void)
 {
-	; /* TODO */
+	/* Test configuring server chanmodes */
+
+	struct mode_config c;
+
+	/* Test empty string */
+	assert_eq(mode_config_chanmodes(&c, ""), MODE_ERR_NONE);
+	assert_strcmp(c.chanmodes, "");
+
+	/* Test invalid flags */
+	assert_eq(mode_config_chanmodes(&c, "$abc1!xyz."), MODE_ERR_NONE);
+	assert_strcmp(c.chanmodes, "abcxyz");
+
+	/* Test duplicate flags */
+	assert_eq(mode_config_chanmodes(&c, "aaabbc"), MODE_ERR_NONE);
+	assert_strcmp(c.chanmodes, "abc");
+
+	/* Test valid string */
+	assert_eq(mode_config_chanmodes(&c, ALL_LOWERS ALL_UPPERS), MODE_ERR_NONE);
+	assert_strcmp(c.chanmodes, ALL_LOWERS ALL_UPPERS);
 }
 
 static void

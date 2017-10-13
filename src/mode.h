@@ -74,6 +74,9 @@ enum mode_str_t
 	MODE_STR_T_SIZE
 };
 
+/* TODO: chanmodes/usermodes, a,b,c,d can be uint32 pairs, struct modes?
+ * consider static internal functions that check/set/unset mode structs
+ * regardless of case instead of checking ISLOWER all over the place */
 struct mode_config
 {
 	char chanmodes[MODE_STR_LEN + 1]; /* Numeric 004 chanmodes string */
@@ -106,7 +109,7 @@ struct mode_str
 	enum mode_str_t type;
 };
 
-int mode_config(struct mode_config*, char*, enum mode_config_t);
+int mode_config(struct mode_config*, const char*, enum mode_config_t);
 
 int mode_chanmode_set(struct mode*, struct mode_config*, int, enum mode_set_t);
 int mode_prfxmode_set(struct mode*, struct mode_config*, int, enum mode_set_t);
