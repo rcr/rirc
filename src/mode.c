@@ -1,12 +1,4 @@
-/* TODO:
- *  - received MODE messages should check the target, either:
- *		- rirc user   (usermode)
- *		- a channel name
- *			- in PREFIX  (chanusermode)
- *			- otherwise  (chanmode)
- *
- *	- safe channels ('!' prefix) (see RFC2811)
- */
+/* TODO: safe channels ('!' prefix) (see RFC2811) */
 
 #include <string.h>
 
@@ -30,10 +22,13 @@ enum mode_chanmode_prefix_t
 static inline int mode_isset(struct mode*, int);
 static inline uint32_t flag_bit(int);
 
-static int mode_config_usermodes(struct mode_config*, const char*);
 static int mode_config_chanmodes(struct mode_config*, const char*);
-static int mode_config_abcd(struct mode_config*, const char*);
+static int mode_config_usermodes(struct mode_config*, const char*);
+static int mode_config_subtypes(struct mode_config*, const char*);
 static int mode_config_prefix(struct mode_config*, const char*);
+
+/* TODO: static inline void mode_bit_set(struct mode*, uint32_t); */
+/* TODO: static inline void mode_bit_isset(struct mode*, uint32_t); */
 
 static inline int
 mode_isset(struct mode *m, int flag)
@@ -128,31 +123,24 @@ mode_config(struct mode_config *config, const char *config_str, enum mode_config
 		case MODE_CONFIG_DEFAULTS:
 			*config = (struct mode_config)
 			{
-				/* TODO: chanmodes, usermodes, A,B,C,D can be uint32 pairs
-				 *       for faster lookups */
-				.chanmodes = "OovaimnqpsrtklbeI",
-				.usermodes = "aiwroOs",
-				.CHANMODES = {
-					.A = "beI",
-					.B = "k",
-					.C = "l",
-					.D = "aimnqpsrtO"
-				},
 				.PREFIX = {
 					.F = "ov",
 					.T = "@+"
 				}
 			};
+			mode_config_chanmodes(config, "OovaimnqpsrtklbeI");
+			mode_config_usermodes(config, "aiwroOs");
+			mode_config_subtypes(config, "beI,k,l,aimnqpsrtO");
 			break;
-
-		case MODE_CONFIG_USERMODES:
-			return mode_config_usermodes(config, config_str);
 
 		case MODE_CONFIG_CHANMODES:
 			return mode_config_chanmodes(config, config_str);
 
-		case MODE_CONFIG_ABCD:
-			return mode_config_abcd(config, config_str);
+		case MODE_CONFIG_USERMODES:
+			return mode_config_usermodes(config, config_str);
+
+		case MODE_CONFIG_SUBTYPES:
+			return mode_config_subtypes(config, config_str);
 
 		case MODE_CONFIG_PREFIX:
 			return mode_config_prefix(config, config_str);
@@ -206,11 +194,11 @@ mode_chanmode_set(struct mode *m, struct mode_config *config, int flag, enum mod
 
 	uint32_t bit;
 
-	if (!strchr(config->chanmodes, flag))
+	if (!mode_isset(&(config->chanmodes), flag))
 		return MODE_ERR_INVALID_FLAG;
 
 	/* Mode subtypes A don't set a flag */
-	if (strchr(config->CHANMODES.A, flag))
+	if (mode_isset(&(config->CHANMODES.A), flag))
 		return MODE_ERR_NONE;
 
 	if (flag != 's' && flag != 'p') {
@@ -304,7 +292,7 @@ mode_usermode_set(struct mode *m, struct mode_config *config, int flag, enum mod
 
 	uint32_t bit;
 
-	if (!strchr(config->usermodes, flag))
+	if (!mode_isset(&(config->usermodes), flag))
 		return MODE_ERR_INVALID_FLAG;
 
 	bit = flag_bit(flag);
@@ -449,73 +437,127 @@ mode_reset(struct mode *m, struct mode_str *s)
 }
 
 static int
-mode_config_usermodes(struct mode_config *config, const char *str)
-{
-	char c, *p = config->usermodes;
-
-	struct mode m = {0};
-
-	uint32_t bit;
-
-	while ((c = *str++)) {
-
-		if ((bit = flag_bit(c)) == 0)
-			continue; /* TODO: aggregate warnings, invalid flag */
-
-		if (mode_isset(&m, c))
-			continue; /* TODO: aggregate warnings, duplicate flag */
-
-		if (MODE_ISLOWER(c))
-			MODE_SET(m.lower, bit, MODE_SET_ON);
-		else
-			MODE_SET(m.upper, bit, MODE_SET_ON);
-
-		*p++ = c;
-	}
-
-	*p = 0;
-
-	return MODE_ERR_NONE;
-}
-
-static int
 mode_config_chanmodes(struct mode_config *config, const char *str)
 {
-	char c, *p = config->chanmodes;
+	/* Parse and configure chanmodes string */
 
-	struct mode m = {0};
-
+	char c;
 	uint32_t bit;
 
+	struct mode *chanmodes = &(config->chanmodes);
+
+	chanmodes->lower = 0;
+	chanmodes->upper = 0;
 
 	while ((c = *str++)) {
 
 		if ((bit = flag_bit(c)) == 0)
 			continue; /* TODO: aggregate warnings, invalid flag */
 
-		if (mode_isset(&m, c))
+		if (mode_isset(chanmodes, c))
 			continue; /* TODO: aggregate warnings, duplicate flag */
 
 		if (MODE_ISLOWER(c))
-			MODE_SET(m.lower, bit, MODE_SET_ON);
+			MODE_SET(chanmodes->lower, bit, MODE_SET_ON);
 		else
-			MODE_SET(m.upper, bit, MODE_SET_ON);
-
-		*p++ = c;
+			MODE_SET(chanmodes->upper, bit, MODE_SET_ON);
 	}
-
-	*p = 0;
 
 	return MODE_ERR_NONE;
 }
 
 static int
-mode_config_abcd(struct mode_config *config, const char *str)
+mode_config_usermodes(struct mode_config *config, const char *str)
 {
-	/* TODO: test */
+	/* Parse and configure usermodes string */
 
-	(void)(config);
-	(void)(str);
+	char c;
+	uint32_t bit;
+
+	struct mode *usermodes = &(config->usermodes);
+
+	usermodes->lower = 0;
+	usermodes->upper = 0;
+
+	while ((c = *str++)) {
+
+		if ((bit = flag_bit(c)) == 0)
+			continue; /* TODO: aggregate warnings, invalid flag */
+
+		if (mode_isset(usermodes, c))
+			continue; /* TODO: aggregate warnings, duplicate flag */
+
+		if (MODE_ISLOWER(c))
+			MODE_SET(usermodes->lower, bit, MODE_SET_ON);
+		else
+			MODE_SET(usermodes->upper, bit, MODE_SET_ON);
+	}
+
+	return MODE_ERR_NONE;
+}
+
+static int
+mode_config_subtypes(struct mode_config *config, const char *str)
+{
+	/* Parse and configure CHANMODE subtypes, e.g.:
+	 *
+	 * "abc,d,ef,xyz" sets mode bits:
+	 *  - A = a | b | c
+	 *  - B = d
+	 *  - C = e | f
+	 *  - D = x | y | z
+	 */
+
+	char c;
+
+	struct mode *subtypes[] = {
+		&(config->CHANMODES.A),
+		&(config->CHANMODES.B),
+		&(config->CHANMODES.C),
+		&(config->CHANMODES.D)
+	};
+
+	struct mode duplicates, *setting = subtypes[0];
+
+	memset(&(config->CHANMODES.A), 0, sizeof (struct mode));
+	memset(&(config->CHANMODES.B), 0, sizeof (struct mode));
+	memset(&(config->CHANMODES.C), 0, sizeof (struct mode));
+	memset(&(config->CHANMODES.D), 0, sizeof (struct mode));
+	memset(&duplicates, 0, sizeof (struct mode));
+
+	uint32_t bit, commas = 0;
+
+	while ((c = *str++)) {
+
+		if (c == ',') {
+			switch (commas) {
+				case 0:
+				case 1:
+				case 2:
+					setting = subtypes[++commas];
+					break;
+				default:
+					return MODE_ERR_INVALID_CONFIG;
+			}
+			continue;
+		}
+
+		if ((bit = flag_bit(c)) == 0)
+			continue; /* TODO: aggregate warnings, invalid flag */
+
+		if (mode_isset(&duplicates, c))
+			continue; /* TODO: aggregate warnings, duplicate flag */
+
+		if (MODE_ISLOWER(c)) {
+			MODE_SET(duplicates.lower, bit, MODE_SET_ON);
+			MODE_SET(setting->lower, bit, MODE_SET_ON);
+		}
+		else {
+			MODE_SET(duplicates.upper, bit, MODE_SET_ON);
+			MODE_SET(setting->upper, bit, MODE_SET_ON);
+		}
+	}
+
 	return MODE_ERR_NONE;
 }
 

@@ -50,10 +50,10 @@ enum mode_err
 enum mode_config_t
 {
 	MODE_CONFIG_DEFAULTS,  /* Set RFC2811 mode defaults */
-	MODE_CONFIG_USERMODES, /* Set numeric 004 usermodes string */
 	MODE_CONFIG_CHANMODES, /* Set numeric 004 chanmdoes string */
-	MODE_CONFIG_ABCD,      /* Set numeric 005 CHANMODES subtypes */
+	MODE_CONFIG_USERMODES, /* Set numeric 004 usermodes string */
 	MODE_CONFIG_PREFIX,    /* Set numeric 005 PREFIX */
+	MODE_CONFIG_SUBTYPES,  /* Set numeric 005 CHANMODES subtypes */
 	MODE_CONFIG_T_SIZE
 };
 
@@ -74,33 +74,29 @@ enum mode_str_t
 	MODE_STR_T_SIZE
 };
 
-/* TODO: chanmodes/usermodes, a,b,c,d can be uint32 pairs, struct modes?
- * consider static internal functions that check/set/unset mode structs
- * regardless of case instead of checking ISLOWER all over the place */
+struct mode
+{
+	char prefix;    /* Prefix character for chanmode, prfxmode */
+	uint32_t lower; /* Lowercase mode bits */
+	uint32_t upper; /* Uppercase mode bits */
+};
+
 struct mode_config
 {
-	char chanmodes[MODE_STR_LEN + 1]; /* Numeric 004 chanmodes string */
-	char usermodes[MODE_STR_LEN + 1]; /* Numeric 004 usermodes string */
+	struct mode chanmodes; /* Numeric 004 chanmodes string */
+	struct mode usermodes; /* Numeric 004 usermodes string */
 	struct
 	{
-		char *A; /* Numeric 005 CHANMODES substrings */
-		char *B;
-		char *C;
-		char *D;
-		char _[MODE_STR_LEN + 4];
+		struct mode A; /* Numeric 005 CHANMODES substrings */
+		struct mode B;
+		struct mode C;
+		struct mode D;
 	} CHANMODES;
 	struct
 	{
 		char F[MODE_STR_LEN + 1]; /* prfxmode mapping `from` */
 		char T[MODE_STR_LEN + 1]; /* prfxmode mapping `to`  */
 	} PREFIX;
-};
-
-struct mode
-{
-	char prefix;    /* Prefix character for chanmode, prfxmode */
-	uint32_t lower; /* Lowercase mode bits */
-	uint32_t upper; /* Uppercase mode bits */
 };
 
 struct mode_str

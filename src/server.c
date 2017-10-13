@@ -152,7 +152,7 @@ server_set_CHANMODES(struct server *s, char *val)
 
 	enum mode_err err;
 
-	err = mode_config(&(s->mode_config), val, MODE_CONFIG_ABCD);
+	err = mode_config(&(s->mode_config), val, MODE_CONFIG_SUBTYPES);
 
 	return (err != MODE_ERR_NONE);
 }
