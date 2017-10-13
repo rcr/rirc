@@ -30,6 +30,11 @@ enum mode_chanmode_prefix_t
 static inline int mode_isset(struct mode*, int);
 static inline uint32_t flag_bit(int);
 
+static int mode_config_usermodes(struct mode_config*, char*);
+static int mode_config_chanmodes(struct mode_config*, char*);
+static int mode_config_abcd(struct mode_config*, char*);
+static int mode_config_prefix(struct mode_config*, char*);
+
 static inline int
 mode_isset(struct mode *m, int flag)
 {
@@ -116,33 +121,43 @@ mode_config(struct mode_config *config, char *config_str, enum mode_config_t con
 	 *       states chanmode user prefixes map o,v to @,+ respectively.
 	 */
 
-	*config = (struct mode_config)
-	{
-		.chanmodes = "OovaimnqpsrtklbeI",
-		.usermodes = "aiwroOs",
-		.CHANMODES = {
-			.A = "beI",
-			.B = "k",
-			.C = "l",
-			.D = "aimnqpsrtO"
-		},
-		.PREFIX = {
-			.F = "ov",
-			.T = "@+"
-		}
-	};
 
-	/* TODO: configure: (move from server.c)
-	 *
-	 * MODE_CONFIG_USERMODES,
-	 * MODE_CONFIG_CHANMODES,
-	 * MODE_CONFIG_ABCD,
-	 * MODE_CONFIG_PREFIX,
-	 *
-	 * - check azAZ validity of usermode,chanmode,CHANMODE,PREFIX strings */
+	switch (config_t) {
 
-	(void)(config_str);
-	(void)(config_t);
+		case MODE_CONFIG_DEFAULTS:
+			*config = (struct mode_config)
+			{
+				.chanmodes = "OovaimnqpsrtklbeI",
+				.usermodes = "aiwroOs",
+				.CHANMODES = {
+					.A = "beI",
+					.B = "k",
+					.C = "l",
+					.D = "aimnqpsrtO"
+				},
+				.PREFIX = {
+					.F = "ov",
+					.T = "@+"
+				}
+			};
+			break;
+
+		case MODE_CONFIG_USERMODES:
+			return mode_config_usermodes(config, config_str);
+
+		case MODE_CONFIG_CHANMODES:
+			return mode_config_chanmodes(config, config_str);
+
+		case MODE_CONFIG_ABCD:
+			return mode_config_abcd(config, config_str);
+
+		case MODE_CONFIG_PREFIX:
+			return mode_config_prefix(config, config_str);
+
+		default:
+			fatal("mode configuration type unknown", 0);
+	}
+
 	return MODE_ERR_NONE;
 }
 
@@ -412,4 +427,57 @@ mode_str(struct mode *m, struct mode_str *m_str)
 	*str = 0;
 
 	return m_str->str;
+}
+
+void
+mode_reset(struct mode *m, struct mode_str *s)
+{
+	/* Set mode and mode_str to initial state */
+
+	if (!m || !s)
+		fatal("mode or mode_str is null", 0);
+
+	enum mode_str_t type = s->type;
+
+	memset(m, 0, sizeof(*m));
+	memset(s, 0, sizeof(*s));
+
+	s->type = type;
+}
+
+/* TODO:
+ * configuration needs to check azAZ, invalid and duplicates
+ * check against uint32_t _lower, _upper; report errors as string is parsed
+ * */
+
+static int
+mode_config_usermodes(struct mode_config *c, char *str)
+{
+	(void)(c);
+	(void)(str);
+	return MODE_ERR_NONE;
+}
+
+static int
+mode_config_chanmodes(struct mode_config *c, char *str)
+{
+	(void)(c);
+	(void)(str);
+	return MODE_ERR_NONE;
+}
+
+static int
+mode_config_abcd(struct mode_config *c, char *str)
+{
+	(void)(c);
+	(void)(str);
+	return MODE_ERR_NONE;
+}
+
+static int
+mode_config_prefix(struct mode_config *c, char *str)
+{
+	(void)(c);
+	(void)(str);
+	return MODE_ERR_NONE;
 }

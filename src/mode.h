@@ -117,4 +117,6 @@ int mode_prfxmode_prefix(struct mode*, struct mode_config*, int);
 
 char* mode_str(struct mode*, struct mode_str*);
 
+void mode_reset(struct mode*, struct mode_str*);
+
 #endif

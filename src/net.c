@@ -370,11 +370,12 @@ server_disconnect(struct server *s, int err, int kill, char *mesg)
 		close(s->soc);
 
 		/* Set all server attributes back to default */
-		memset(s->usermodes, 0, MODE_SIZE);
+		mode_reset(&(s->usermodes), &(s->usermodes_str));
 		s->soc = -1;
 		s->iptr = s->input;
 		s->nptr = s->nicks;
 		s->latency_delta = 0;
+
 
 		/* Reset the nick that reconnects will attempt to register with */
 		auto_nick(&(s->nptr), s->nick);

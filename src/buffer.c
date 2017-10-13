@@ -7,7 +7,13 @@
  *                    ^                         ^
  *          line(n).user             line(n+1).user
  *
- * will allow removal of text/from truncation */
+ * will allow removal of text/from truncation
+ *
+ * TODO: cache a sensible number of line breaks (2?) against the line width
+ * and dynamically calculate the rest, terminal size rarely changes
+ *
+ * TODO: prefix character for users
+ * */
 
 #include <string.h>
 

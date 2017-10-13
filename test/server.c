@@ -3,7 +3,19 @@
 #include "../src/mode.c"    /* mode_config_defaults */
 #include "../src/utils.c"   /* skip_sp */
 
-void newlinef(struct channel *c, enum buffer_line_t t, const char *f, const char *m, ...)
+void
+newline(struct channel *c, enum buffer_line_t t, const char *f, const char *m)
+{
+	/* Mock */
+
+	UNUSED(c);
+	UNUSED(t);
+	UNUSED(f);
+	UNUSED(m);
+}
+
+void
+newlinef(struct channel *c, enum buffer_line_t t, const char *f, const char *m, ...)
 {
 	/* Mock */
 
@@ -93,46 +105,11 @@ test_parse_opt(void)
 #undef CHECK
 }
 
-static void
-test_set_PREFIX(void)
-{
-	struct server s;
-
-	char *ptr;
-
-	char s0[] = "abcd)!@#$";
-	ptr = s0;
-	assert_eq(set_PREFIX(&s, ptr), 0);
-
-	char s1[] = "(abcd!@#$";
-	ptr = s1;
-	assert_eq(set_PREFIX(&s, ptr), 0);
-
-	char s2[] = "(abcd)@#$";
-	ptr = s2;
-	assert_eq(set_PREFIX(&s, ptr), 0);
-
-	char s3[] = "(abcdefghijklmnopqrstuvwxyza)!@#$";
-	ptr = s3;
-	assert_eq(set_PREFIX(&s, ptr), 0);
-
-	char s4[] = "!@#$(abcdefghijklmnopqrstuvwxyza)";
-	ptr = s4;
-	assert_eq(set_PREFIX(&s, ptr), 0);
-
-	char s5[] = "(abcd)!@#$";
-	ptr = s5;
-	assert_eq(set_PREFIX(&s, ptr), 1);
-	assert_strcmp(s.mode_config.PREFIX.F, "abcd");
-	assert_strcmp(s.mode_config.PREFIX.T, "!@#$");
-}
-
 int
 main(void)
 {
 	testcase tests[] = {
-		TESTCASE(test_parse_opt),
-		TESTCASE(test_set_PREFIX),
+		TESTCASE(test_parse_opt)
 	};
 
 	return run_tests(tests);

@@ -649,12 +649,12 @@ _draw_status(struct channel *c)
 	memset(status_buff, 0, cols + 1);
 
 	/* -[usermodes] */
-	if (c->server && *c->server->usermodes) {
+	if (c->server && *(c->server->usermodes_str.str)) {
 		ret = snprintf(status_buff + col, cols - col + 1, "%s", HORIZONTAL_SEPARATOR "[+");
 		if (ret < 0 || (col += ret) >= cols)
 			goto print_status;
 
-		ret = snprintf(status_buff + col, cols - col + 1, "%s", c->server->usermodes);
+		ret = snprintf(status_buff + col, cols - col + 1, "%s", c->server->usermodes_str.str);
 		if (ret < 0 || (col += ret) >= cols)
 			goto print_status;
 
@@ -680,15 +680,14 @@ _draw_status(struct channel *c)
 		if (ret < 0 || (col += ret) >= cols)
 			goto print_status;
 
-		//TODO: chanmode.prefix
-		if (c->type_flag) {
-			ret = snprintf(status_buff + col, cols - col + 1, " %c", c->type_flag);
+		if (c->chanmodes.prefix) {
+			ret = snprintf(status_buff + col, cols - col + 1, " %c", c->chanmodes.prefix);
 			if (ret < 0 || (col += ret) >= cols)
 				goto print_status;
 		}
 
-		if (*c->chanmodes) {
-			ret = snprintf(status_buff + col, cols - col + 1, " +%s", c->chanmodes);
+		if (*(c->chanmodes_str.str)) {
+			ret = snprintf(status_buff + col, cols - col + 1, " +%s", c->chanmodes_str.str);
 			if (ret < 0 || (col += ret) >= cols)
 				goto print_status;
 		}

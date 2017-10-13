@@ -18,7 +18,7 @@ static int parse_opt(struct opt*, char **);
 	X(CHANMODES)    \
 	X(PREFIX)
 
-#define X(cmd) static int set_##cmd(struct server*, char*);
+#define X(cmd) static int server_set_##cmd(struct server*, char*);
 HANDLED_005
 #undef X
 
@@ -36,14 +36,50 @@ server(char *host, char *port, char *nicks)
 
 	s->nicks = strdup(nicks);
 
-	/* Set server defaults */
-	#define X(cmd) set_##cmd(s, NULL);
-	HANDLED_005
-	#undef X
-
 	mode_config(&(s->mode_config), NULL, MODE_CONFIG_DEFAULTS);
 
 	return s;
+}
+
+void
+server_set_004(struct server *s, char *str)
+{
+	/* <server_name> <version> <user_modes> <chan_modes> */
+
+	struct channel *c = s->channel;
+
+	char *server_name, /* Not used */
+	     *version,     /* Not used */
+	     *user_modes,  /* Configure server usermodes */
+	     *chan_modes;  /* Configure server chanmodes */
+
+	if (!(server_name = getarg(&str, " ")))
+		newline(c, 0, "-!!-", "invalid numeric 004: server_name is null");
+
+	if (!(version = getarg(&str, " ")))
+		newline(c, 0, "-!!-", "invalid numeric 004: version is null");
+
+	if (!(user_modes = getarg(&str, " ")))
+		newline(c, 0, "-!!-", "invalid numeric 004: user_modes is null");
+
+	if (!(chan_modes = getarg(&str, " ")))
+		newline(c, 0, "-!!-", "invalid numeric 004: chan_modes is null");
+
+	enum mode_err err;
+
+	if (user_modes) {
+		err = mode_config(&(s->mode_config), chan_modes, MODE_CONFIG_CHANMODES);
+
+		if (err != MODE_ERR_NONE)
+			newlinef(c, 0, "-!!-", "invalid numeric 004 chan_modes: %s", chan_modes);
+	}
+
+	if (chan_modes) {
+		err = mode_config(&(s->mode_config), chan_modes, MODE_CONFIG_USERMODES);
+
+		if (err != MODE_ERR_NONE)
+			newlinef(c, 0, "-!!-", "invalid numeric 004 user_modes: %s", user_modes);
+	}
 }
 
 void
@@ -54,22 +90,12 @@ server_set_005(struct server *s, char *str)
 	struct opt opt;
 
 	while (parse_opt(&opt, &str)) {
-		#define X(cmd)                                        \
-		if (!strcmp(opt.arg, #cmd) && !set_##cmd(s, opt.val)) \
+		#define X(cmd) \
+		if (!strcmp(opt.arg, #cmd) && !server_set_##cmd(s, opt.val)) \
 			newlinef(s->channel, 0, "-!!-", "invalid %s: %s", #cmd, opt.val);
 		HANDLED_005
 		#undef X
 	}
-}
-
-void
-server_set_004(struct server *s, char *str)
-{
-	/* <server_name> <version> <user_modes> <chan_modes> */
-
-	//TODO
-	(void)(s);
-	(void)(str);
 }
 
 static int
@@ -119,50 +145,26 @@ parse_opt(struct opt *opt, char **str)
 	return 1;
 }
 
-//*TODO: move these to mode_config, check ret value
 static int
-set_CHANMODES(struct server *s, char *val)
+server_set_CHANMODES(struct server *s, char *val)
 {
-	UNUSED(s);
+	/* Delegated to mode.c  */
 
-	/* Server defaults are set by mode_defaults */
-	if (val == NULL)
-		return 1;
+	enum mode_err err;
 
-	/* TODO, parse CHANMODES */
+	err = mode_config(&(s->mode_config), val, MODE_CONFIG_ABCD);
 
-	return 1;
+	return (err != MODE_ERR_NONE);
 }
 
 static int
-set_PREFIX(struct server *s, char *val)
+server_set_PREFIX(struct server *s, char *val)
 {
-	/* `(modes)prefixes` in order of precedence */
+	/* Delegated to mode.c  */
 
-	char *f, *t = val;
+	enum mode_err err;
 
-	/* Server defaults are set by mode_defaults */
-	if (val == NULL)
-		return 1;
+	err = mode_config(&(s->mode_config), val, MODE_CONFIG_PREFIX);
 
-	if ((t = strchr(t, '(')) == NULL)
-		return 0;
-
-	f = ++t;
-
-	if ((t = strchr(t, ')')) == NULL)
-		return 0;
-
-	*t++ = 0;
-
-	if ((strlen(f) != strlen(t)))
-		return 0;
-
-	if (strlen(f) > MODE_LEN)
-		return 0;
-
-	strcpy(s->mode_config.PREFIX.F, f);
-	strcpy(s->mode_config.PREFIX.T, t);
-
-	return 1;
+	return (err != MODE_ERR_NONE);
 }

@@ -43,7 +43,7 @@ struct buffer_line
 		unsigned int colour; /* Cached colour of `from` text */
 		unsigned int rows;   /* Cached number of rows occupied when wrapping on w columns */
 		unsigned int w;      /* Cached width for rows */
-		unsigned int initialized :1;
+		unsigned int initialized : 1;
 	} cached;
 };
 

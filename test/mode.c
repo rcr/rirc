@@ -320,6 +320,30 @@ test_prfxmode_prefix(void)
 	assert_eq(m.prefix, '2');
 }
 
+static void
+test_mode_config_usermodes(void)
+{
+	; /* TODO */
+}
+
+static void
+test_mode_config_chanmodes(void)
+{
+	; /* TODO */
+}
+
+static void
+test_mode_config_abcd(void)
+{
+	; /* TODO */
+}
+
+static void
+test_mode_config_prefix(void)
+{
+	; /* TODO */
+}
+
 int
 main(void)
 {
@@ -330,7 +354,11 @@ main(void)
 		TESTCASE(test_prfxmode_set),
 		TESTCASE(test_usermode_set),
 		TESTCASE(test_chanmode_prefix),
-		TESTCASE(test_prfxmode_prefix)
+		TESTCASE(test_prfxmode_prefix),
+		TESTCASE(test_mode_config_usermodes),
+		TESTCASE(test_mode_config_chanmodes),
+		TESTCASE(test_mode_config_abcd),
+		TESTCASE(test_mode_config_prefix)
 	};
 
 	return run_tests(tests);
