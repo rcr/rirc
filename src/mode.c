@@ -1,5 +1,6 @@
 /* TODO: safe channels ('!' prefix) (see RFC2811) */
 
+#include <ctype.h>
 #include <string.h>
 
 #include "mode.h"
@@ -564,9 +565,75 @@ mode_config_subtypes(struct mode_config *config, const char *str)
 static int
 mode_config_prefix(struct mode_config *config, const char *str)
 {
-	/* TODO: test */
+	/* Parse and configure PREFIX e.g.:
+	 *
+	 * "(abc)!@#" maps
+	 *  - a -> !
+	 *  - b -> @
+	 *  - c -> #
+	 */
 
-	(void)(config);
-	(void)(str);
+	char *str_f, cf,
+	     *str_t, ct,
+		 *config_f = config->PREFIX.F,
+		 *config_t = config->PREFIX.T,
+	     _str[strlen(str) + 1];
+
+	struct mode duplicates;
+
+	uint32_t bit;
+
+	strcpy(_str, str);
+
+	if (*(str_f = _str) != '(')
+		goto error;
+
+	if (!(str_t = strchr(str_f, ')')))
+		goto error;
+
+	*str_f++ = 0;
+	*str_t++ = 0;
+
+	if (strlen(str_f) != strlen(str_t))
+		goto error;
+
+	memset(&duplicates, 0, sizeof duplicates);
+
+	while (*str_f) {
+
+		cf = *str_f++;
+		ct = *str_t++;
+
+		/* Check printable prefix */
+		if (!(isgraph(ct)))
+			goto error;
+
+		/* Check valid flag */
+		if ((bit = flag_bit(cf)) == 0)
+			goto error;
+
+		/* Check duplicates */
+		if (mode_isset(&duplicates, cf))
+			goto error;
+
+		if (MODE_ISLOWER(cf))
+			MODE_SET(duplicates.lower, bit, MODE_SET_ON);
+		else
+			MODE_SET(duplicates.upper, bit, MODE_SET_ON);
+
+		*config_f++ = cf;
+		*config_t++ = ct;
+	}
+
+	*config_f = 0;
+	*config_t = 0;
+
 	return MODE_ERR_NONE;
+
+error:
+
+	*(config->PREFIX.F) = 0;
+	*(config->PREFIX.T) = 0;
+
+	return MODE_ERR_INVALID_CONFIG;
 }

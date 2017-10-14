@@ -397,7 +397,54 @@ test_mode_config_subtypes(void)
 static void
 test_mode_config_prefix(void)
 {
-	; /* TODO */
+	/* Test configuring PREFIX */
+
+	struct mode_config c;
+
+#define CHECK(_F, _T) \
+	assert_strcmp(c.PREFIX.F, (_F)); assert_strcmp(c.PREFIX.T, (_T));
+
+	/* Test empty string */
+	assert_eq(mode_config_prefix(&c, ""), MODE_ERR_INVALID_CONFIG);
+	CHECK("", "");
+
+	/* Test invalid formats */
+	assert_eq(mode_config_prefix(&c, "abc123"), MODE_ERR_INVALID_CONFIG);
+	CHECK("", "");
+
+	assert_eq(mode_config_prefix(&c, "abc)123"), MODE_ERR_INVALID_CONFIG);
+	CHECK("", "");
+
+	assert_eq(mode_config_prefix(&c, "(abc123"), MODE_ERR_INVALID_CONFIG);
+	CHECK("", "");
+
+	assert_eq(mode_config_prefix(&c, ")(abc"), MODE_ERR_INVALID_CONFIG);
+	CHECK("", "");
+
+	/* Test unequal lengths */
+	assert_eq(mode_config_prefix(&c, "(abc)12"), MODE_ERR_INVALID_CONFIG);
+	CHECK("", "");
+
+	assert_eq(mode_config_prefix(&c, "(ab)123"), MODE_ERR_INVALID_CONFIG);
+	CHECK("", "");
+
+	/* Test invalid flags */
+	assert_eq(mode_config_prefix(&c, "(ab1)12"), MODE_ERR_INVALID_CONFIG);
+	CHECK("", "");
+
+	/* Test unprintable prefix */
+	assert_eq(mode_config_prefix(&c, "(abc)1" "\x01" "3"), MODE_ERR_INVALID_CONFIG);
+	CHECK("", "");
+
+	/* Test duplicates flags */
+	assert_eq(mode_config_prefix(&c, "(aabc)1234"), MODE_ERR_INVALID_CONFIG);
+	CHECK("", "");
+
+	/* Test valid string */
+	assert_eq(mode_config_prefix(&c, "(abc)123"), MODE_ERR_NONE);
+	CHECK("abc", "123");
+
+#undef CHECK
 }
 
 int

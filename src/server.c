@@ -68,17 +68,27 @@ server_set_004(struct server *s, char *str)
 	enum mode_err err;
 
 	if (user_modes) {
+
+#ifdef DEBUG
+		newlinef(c, 0, "DEBUG", "Setting numeric 004 user_modes: %s", user_modes);
+#endif
+
+		err = mode_config(&(s->mode_config), user_modes, MODE_CONFIG_USERMODES);
+
+		if (err != MODE_ERR_NONE)
+			newlinef(c, 0, "-!!-", "invalid numeric 004 user_modes: %s", user_modes);
+	}
+
+	if (chan_modes) {
+
+#ifdef DEBUG
+		newlinef(c, 0, "DEBUG", "Setting numeric 004 chan_modes: %s", chan_modes);
+#endif
+
 		err = mode_config(&(s->mode_config), chan_modes, MODE_CONFIG_CHANMODES);
 
 		if (err != MODE_ERR_NONE)
 			newlinef(c, 0, "-!!-", "invalid numeric 004 chan_modes: %s", chan_modes);
-	}
-
-	if (chan_modes) {
-		err = mode_config(&(s->mode_config), chan_modes, MODE_CONFIG_USERMODES);
-
-		if (err != MODE_ERR_NONE)
-			newlinef(c, 0, "-!!-", "invalid numeric 004 user_modes: %s", user_modes);
 	}
 }
 
@@ -90,6 +100,14 @@ server_set_005(struct server *s, char *str)
 	struct opt opt;
 
 	while (parse_opt(&opt, &str)) {
+
+#ifdef DEBUG
+		if (opt.val == NULL)
+			newlinef(s->channel, 0, "DEBUG", "Setting numeric 005 %s", opt.arg);
+		else
+			newlinef(s->channel, 0, "DEBUG", "Setting numeric 005 %s: %s", opt.arg, opt.val);
+#endif
+
 		#define X(cmd) \
 		if (!strcmp(opt.arg, #cmd) && !server_set_##cmd(s, opt.val)) \
 			newlinef(s->channel, 0, "-!!-", "invalid %s: %s", #cmd, opt.val);
