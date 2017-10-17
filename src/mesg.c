@@ -290,7 +290,7 @@ send_mesg(char *mesg, struct channel *chan)
 		else if (chan->parted)
 			newline(chan, 0, "-!!-", "Error: Parted from channel");
 
-		else if (sendf(errbuff, chan->server, "PRIVMSG %s :%s", chan->name, mesg))
+		else if (sendf(errbuff, chan->server, "PRIVMSG %s :%s", chan->name.str, mesg))
 			newline(chan, 0, "-!!-", errbuff);
 
 		else
@@ -418,7 +418,7 @@ send_me(char *err, char *mesg, struct server *s, struct channel *c)
 	if (c->parted)
 		fail("Error: Parted from channel");
 
-	fail_if(sendf(err, s, "PRIVMSG %s :\x01""ACTION %s\x01", c->name, mesg));
+	fail_if(sendf(err, s, "PRIVMSG %s :\x01""ACTION %s\x01", c->name.str, mesg));
 
 	newlinef(c, 0, "*", "%s %s", s->nick, mesg);
 
@@ -466,7 +466,7 @@ send_join(char *err, char *mesg, struct server *s, struct channel *c)
 	if (!c->parted)
 		fail("Error: Not parted from channel");
 
-	return sendf(err, s, "JOIN %s", c->name);
+	return sendf(err, s, "JOIN %s", c->name.str);
 }
 
 static int
@@ -514,7 +514,7 @@ send_part(char *err, char *mesg, struct server *s, struct channel *c)
 	if (c->parted)
 		fail("Error: Already parted from channel");
 
-	return sendf(err, s, "PART %s :%s", c->name, DEFAULT_QUIT_MESG);
+	return sendf(err, s, "PART %s :%s", c->name.str, DEFAULT_QUIT_MESG);
 }
 
 static int
@@ -563,9 +563,9 @@ send_topic(char *err, char *mesg, struct server *s, struct channel *c)
 		mesg++;
 
 	if (*mesg == '\0')
-		return sendf(err, s, "TOPIC %s", c->name);
+		return sendf(err, s, "TOPIC %s", c->name.str);
 
-	return sendf(err, s, "TOPIC %s :%s", c->name, mesg);
+	return sendf(err, s, "TOPIC %s :%s", c->name.str, mesg);
 }
 
 static int
@@ -1033,91 +1033,27 @@ recv_mode(char *err, struct parsed_mesg *p, struct server *s)
 
 	/* TODO:
 	 *
-	 * fix current mode implementation/drawing for
-	 *  - channel
-	 *  - server
+	 * Breaking recv_mode, needs full rewrite.
 	 *
-	 * add mode support for channel users
-	 *  - check user prefix on newline for channel buffer
-	 *  - draw prefix char in buffer
+	 * Get target as either:
+	 *   - usermode (rirc user)
+	 *   - chanmode (channel)
+	 *   - prfxmode (user on channel (flag in PREFIX))
 	 *
-	 * complete rewrite, get target as:
-	 *  - usermode targetting rirc user
-	 *  - chanmode targetting channel
-	 *  - prfxmode targetting user on channel
+	 * Call the appropriate mode setting function
 	 *
-	 * call appropriate function, draw appropriate component
+	 * Draw the appropriate component
+	 *
 	 * */
 
-	char *targ;
-	struct channel *c;
-
-	if (!(targ = getarg(&p->params, " ")))
-		fail("MODE: target is null");
-
-	/* If the target channel isn't found,  */
-	if (IS_ME(targ))
-		c = s->channel;
-	else
-		c = channel_list_get(&s->clist, targ);
-
-	char *modes, *modeparams, *modetmp = NULL;
-
-	/* FIXME: Some servers do this...
+	/* FIXME
 	 * MODE user :+abc
 	 * MODE #chan +abc
-	 *
-	 * instead, getarg(parsed_mesg) should try params, then trailing
-	 * */
-	while ((modes = modetmp) || (modes = getarg(&p->params, " ")) || (modes = getarg(&p->trailing, " "))) {
+	 */
 
-		if (!(*modes == '+') && !(*modes == '-'))
-			fail("MODE: invalid mode format");
-
-		/* Modeparams are optional, and only used for printing when present */
-		if ((modeparams = getarg(&p->params, " ")) && (*modeparams == '+' || *modeparams == '-'))
-			/* modeparam here is actually a modestring, set modetmp for the next iteration to use */
-			modetmp = modeparams;
-		else
-			modetmp = NULL;
-
-		/* Having c set means the target is the server modes or a specific channel's modes */
-		if (c) {
-			if (IS_ME(targ))
-				server_set_mode(s, modes);
-			else
-				channel_set_mode(c, modes);
-
-			/* [<user> set ]<target> mode: [<mode>][ <modeparams>] */
-			newlinef(c, 0, "--", "%s%s%s mode: [%s%s%s]",
-				(p->from ? p->from : ""),
-				(p->from ? " set " : ""),
-				targ,
-				modes,
-				(modeparams ? " " : ""),
-				(modeparams ? modeparams : "")
-			);
-		} else {
-
-			/* If the channel isn't found, search for the target as a user in all channels
-			 * and print where found */
-			c = s->channel;
-
-			//TODO: channel_list_foreach
-			do {
-				if (user_list_get(&(c->users), targ, 0))
-					/* [<user> set ]<target> mode: [<mode>][ <modeparams>] */
-					newlinef(c, 0, "--", "%s%s%s mode: [%s%s%s]",
-						(p->from ? p->from : ""),
-						(p->from ? " set " : ""),
-						targ,
-						modes,
-						(modeparams ? " " : ""),
-						(modeparams ? modeparams : "")
-					);
-			} while ((c = c->next) != s->channel);
-		}
-	}
+	UNUSED(err);
+	UNUSED(p);
+	UNUSED(s);
 
 	return 0;
 }
@@ -1241,7 +1177,7 @@ recv_numeric(char *err, struct parsed_mesg *p, struct server *s)
 			//TODO: channel_list_foreach
 			do {
 				if (c->buffer.type == BUFFER_CHANNEL && !c->parted)
-					fail_if(sendf(err, s, "JOIN %s", c->name));
+					fail_if(sendf(err, s, "JOIN %s", c->name.str));
 				c = c->next;
 			} while (c != s->channel);
 		}
@@ -1256,6 +1192,7 @@ recv_numeric(char *err, struct parsed_mesg *p, struct server *s)
 	case RPL_YOURHOST:  /* 002 :<Host info, server version, etc> */
 	case RPL_CREATED:   /* 003 :<Server creation date message> */
 
+		/* FIXME: trailing can be null, here and elsewhere, eg `:d 003 nick VG` */
 		newline(s->channel, 0, "--", p->trailing);
 		break;
 
@@ -1325,12 +1262,6 @@ recv_numeric(char *err, struct parsed_mesg *p, struct server *s)
 
 	/* 353 ("="/"*"/"@") <channel> :*([ "@" / "+" ]<nick>) */
 	case RPL_NAMREPLY:
-		//TODO:
-		//
-		// should set the s/p flags
-		//
-		// should set the prefix mode for the nick
-		//
 		/* @:secret   *:private   =:public */
 		if (!(type = getarg(&p->params, " ")))
 			fail("RPL_NAMEREPLY: type is null");
@@ -1341,12 +1272,15 @@ recv_numeric(char *err, struct parsed_mesg *p, struct server *s)
 		if ((c = channel_list_get(&s->clist, chan)) == NULL)
 			failf("RPL_NAMEREPLY: channel '%s' not found", chan);
 
-		c->type_flag = *type;
+		if ((ret = mode_chanmode_prefix(&(c->chanmodes), &(s->mode_config), *type))) {
+			; //TODO: report mode error message as non-fatal warning
+		}
 
 		while ((nick = getarg(&p->trailing, " "))) {
 
 			char prefix = 0;
 
+			/* TODO: mode_usermode_prefix, report error messages as non-fatal warnings */
 			if (!irc_isnickchar(*nick))
 				prefix = *nick++;
 

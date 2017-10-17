@@ -50,10 +50,10 @@ enum mode_err
 enum mode_config_t
 {
 	MODE_CONFIG_DEFAULTS,  /* Set RFC2811 mode defaults */
-	MODE_CONFIG_USERMODES, /* Set numeric 004 usermodes string */
 	MODE_CONFIG_CHANMODES, /* Set numeric 004 chanmdoes string */
-	MODE_CONFIG_ABCD,      /* Set numeric 005 CHANMODES subtypes */
+	MODE_CONFIG_USERMODES, /* Set numeric 004 usermodes string */
 	MODE_CONFIG_PREFIX,    /* Set numeric 005 PREFIX */
+	MODE_CONFIG_SUBTYPES,  /* Set numeric 005 CHANMODES subtypes */
 	MODE_CONFIG_T_SIZE
 };
 
@@ -74,17 +74,23 @@ enum mode_str_t
 	MODE_STR_T_SIZE
 };
 
+struct mode
+{
+	char prefix;    /* Prefix character for chanmode, prfxmode */
+	uint32_t lower; /* Lowercase mode bits */
+	uint32_t upper; /* Uppercase mode bits */
+};
+
 struct mode_config
 {
-	char chanmodes[MODE_STR_LEN + 1]; /* Numeric 004 chanmodes string */
-	char usermodes[MODE_STR_LEN + 1]; /* Numeric 004 usermodes string */
+	struct mode chanmodes; /* Numeric 004 chanmodes string */
+	struct mode usermodes; /* Numeric 004 usermodes string */
 	struct
 	{
-		char *A; /* Numeric 005 CHANMODES substrings */
-		char *B;
-		char *C;
-		char *D;
-		char _[MODE_STR_LEN + 4];
+		struct mode A; /* Numeric 005 CHANMODES substrings */
+		struct mode B;
+		struct mode C;
+		struct mode D;
 	} CHANMODES;
 	struct
 	{
@@ -93,20 +99,13 @@ struct mode_config
 	} PREFIX;
 };
 
-struct mode
-{
-	char prefix;    /* Prefix character for chanmode, prfxmode */
-	uint32_t lower; /* Lowercase mode bits */
-	uint32_t upper; /* Uppercase mode bits */
-};
-
 struct mode_str
 {
 	char str[MODE_STR_LEN + 1];
 	enum mode_str_t type;
 };
 
-int mode_config(struct mode_config*, char*, enum mode_config_t);
+int mode_config(struct mode_config*, const char*, enum mode_config_t);
 
 int mode_chanmode_set(struct mode*, struct mode_config*, int, enum mode_set_t);
 int mode_prfxmode_set(struct mode*, struct mode_config*, int, enum mode_set_t);
@@ -116,5 +115,7 @@ int mode_chanmode_prefix(struct mode*, struct mode_config*, int);
 int mode_prfxmode_prefix(struct mode*, struct mode_config*, int);
 
 char* mode_str(struct mode*, struct mode_str*);
+
+void mode_reset(struct mode*, struct mode_str*);
 
 #endif

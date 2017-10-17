@@ -9,13 +9,9 @@
 #include "channel.h"
 #include "mode.h"
 
-//TODO: replaced by mode.c
-/* [a-zA-Z] */
-#define MODE_LEN 26 * 2
-
 struct server
 {
-	//TODO: strdup this. Remove arbitrary NICKSIZE
+	//TODO: struct string. Remove arbitrary NICKSIZE
 	char nick[NICKSIZE + 1];
 	//TODO: can be grouped together, autonick
 	char *nicks;
@@ -25,8 +21,6 @@ struct server
 	//TODO: this shouldn't persist with the server,
 	// its only relevant on successful connection
 	char *join;
-	//TODO: reaplced by mode.c -> struct usermode
-	char usermodes[MODE_SIZE]; /* TODO: replacing with struct mode, struct mode_str */
 	struct user_list ignore;
 	//TODO channel_list
 	struct channel *channel;
@@ -45,6 +39,8 @@ struct server
 	void *connecting;
 	//TODO: WIP
 	struct channel_list clist;
+	struct mode usermodes;
+	struct mode_str usermodes_str;
 	struct mode_config mode_config;
 };
 

@@ -2,12 +2,10 @@
 #define CHANNEL_H
 
 #include "buffer.h"
+#include "mode.h"
 #include "tree.h"
 #include "user.h"
 #include "utils.h"
-
-//TODO: replaced by mode struct
-#define MODE_SIZE (26 * 2) + 1 /* Supports modes [az-AZ] */
 
 /* Channel activity types, in order of precedence */
 enum activity_t
@@ -19,24 +17,28 @@ enum activity_t
 	ACTIVITY_T_SIZE
 };
 
+/* TODO: pointer from channel back to server can be eliminated which
+ * simplifies architecture by having stateful functions aware of the
+ * current context, and having input keybind functions, and send_mesg
+ * returned from input() instead of calling them from input.c
+ *
+ * input shouldn't be a pointer, and thus shouldn't require being freed
+ * */
+
 struct channel
 {
-	//TODO: combined struct chanmode
-	char chanmodes[MODE_SIZE]; /* TODO: replacing with struct mode, struct mode_str */
-	char type_flag; /* TODO: chanmode.prefix */
-
-
-
 	enum activity_t activity;
-	int parted;
 	SPLAY_NODE(channel) node; /* Fast unordered retrieval */
 	struct buffer buffer;
 	struct channel *next;
 	struct channel *prev;
 	struct input *input;
+	struct mode chanmodes;
+	struct mode_str chanmodes_str;
 	struct server *server;
-	struct string *name;
+	struct string name;
 	struct user_list users;
+	unsigned int parted : 1;
 };
 
 struct channel_list
@@ -44,11 +46,12 @@ struct channel_list
 	SPLAY_HEAD(channel);
 };
 
+struct channel* channel(const char*);
+
 struct channel* channel_list_add(struct channel_list*, struct channel*);
 struct channel* channel_list_del(struct channel_list*, struct channel*);
 struct channel* channel_list_get(struct channel_list*, char*);
 
-//TODO: channel/free channel_list/free
-//TODO: name##_TREE_FREE
+void channel_free(struct channel*);
 
 #endif

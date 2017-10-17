@@ -27,7 +27,7 @@ void resize(void);
 void init_state(void);
 void free_state(void);
 
-//TODO: move to channel.c
+//TODO: move to channel.c, function of server's channel list
 /* Useful state retrieval abstractions */
 struct channel* channel_get(char*, struct server*);
 struct channel* channel_get_first(void);
@@ -48,14 +48,13 @@ void channel_close(struct channel*);
 void channel_move_prev(void);
 void channel_move_next(void);
 void channel_set_current(struct channel*);
-void channel_set_mode(struct channel*, const char*);
+
 void free_channel(struct channel*);
 void newline(struct channel*, enum buffer_line_t, const char*, const char*);
 void newlinef(struct channel*, enum buffer_line_t, const char*, const char*, ...);
 void user_list_print(struct channel*);
 void part_channel(struct channel*);
 void reset_channel(struct channel*);
-void server_set_mode(struct server*, const char*);
 
 /* TODO: refactor, should be static in state */
 /* Function prototypes for setting draw bits */

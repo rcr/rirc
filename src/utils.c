@@ -116,24 +116,19 @@ strdup(const char *str)
 }
 
 struct string*
-string(const char *str)
+string(struct string *s, const char *str)
 {
-	/* Return dynamically allocated duplicate string with cached length
-	 *
-	 * ->str points to ->_[] to allow for casting struct string to char*
-	 * and allows for static initialization to existing strings, e.g.:
-	 *
-	 *  - struct string str = { .str = str, .len = strlen(str) }; */
+	/* Return dynamically allocated duplicate string with cached length */
 
 	size_t len = strlen(str) + 1;
 
-	struct string *s;
+	void *ret;
 
-	if ((s = malloc(sizeof(*s) + len)) == NULL)
+	if ((ret = malloc(len)) == NULL)
 		fatal("malloc", errno);
 
 	s->len = len - 1;
-	s->str = memcpy(s->_, str, len);
+	s->str = memcpy(ret, str, len);
 
 	return s;
 }

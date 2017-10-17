@@ -33,8 +33,8 @@ enum buffer_t
 struct buffer_line
 {
 	enum buffer_line_t type;
-	char prefix; /* TODO, this should just be part of 'from' */
-	char from[FROM_LENGTH_MAX + 1];
+	char prefix; /* TODO as part of `from` */
+	char from[FROM_LENGTH_MAX + 1]; /* TODO: from/text as struct string */
 	char text[TEXT_LENGTH_MAX + 1];
 	size_t from_len;
 	size_t text_len;
@@ -43,7 +43,7 @@ struct buffer_line
 		unsigned int colour; /* Cached colour of `from` text */
 		unsigned int rows;   /* Cached number of rows occupied when wrapping on w columns */
 		unsigned int w;      /* Cached width for rows */
-		unsigned int initialized :1;
+		unsigned int initialized : 1;
 	} cached;
 };
 

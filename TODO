@@ -1,6 +1,5 @@
 TODO
 ---------------------------
-
 this iteration:
 	- Proper mode support (struct cmode/umode)
 
@@ -14,6 +13,17 @@ Continue refactoring:
 	- Rewrite input DLL as circular buffer of gap buffers, with copy on repeat,
 		use abstractions in _draw_input
 	- Split net/server code
+	- Error/warning writing from stateless components, e.g.:
+		- mode.c should be able to call err("...") on some passed parameter
+		  and have it written to the appropriate buffer with the appropriate
+		  `from`, etc
+		- this should be easily overridden in testing to assert the right error
+		  messages are being reported (fix current mock newline/newlinef)
+		- this code might live in state.c, should be callable from anywher (e.g. mesg.c)
+		- review stateless components and add any extra errors/warnings that could
+		  be added
+	- more debug information, levels, for various events, a debug pannel as a new channel
+	  type when debug flag is set
 
 RFC compliance:
 	- List required message types and associated error messages

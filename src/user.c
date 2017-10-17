@@ -11,17 +11,21 @@ static inline void user_free(struct user*);
 
 static struct user* user(char*, char);
 
+/* TODO: userlist as splay vs avl..? */
+
 AVL_GENERATE(user_list, user, node, user_cmp, user_ncmp)
 
 static inline int
 user_cmp(struct user *u1, struct user *u2)
 {
+	/* TODO: CASEMAPPING */
 	return irc_strcmp(u1->nick, u2->nick);
 }
 
 static inline int
 user_ncmp(struct user *u1, struct user *u2, size_t n)
 {
+	/* TODO: CASEMAPPING */
 	return irc_strncmp(u1->nick, u2->nick, n);
 }
 
@@ -50,7 +54,7 @@ user(char *nick, char prefix)
 	return u;
 }
 
-int
+struct user*
 user_list_add(struct user_list *ul, char *nick, char flag)
 {
 	struct user *ret, *u = user(nick, flag);
@@ -60,10 +64,10 @@ user_list_add(struct user_list *ul, char *nick, char flag)
 	else
 		ul->count++;
 
-	return !!ret;
+	return ret;
 }
 
-int
+struct user*
 user_list_del(struct user_list *ul, char *nick)
 {
 	struct user *ret, u = { .nick = nick };
@@ -73,10 +77,12 @@ user_list_del(struct user_list *ul, char *nick)
 		ul->count--;
 	}
 
-	return !!ret;
+	/* FIXME: return after free */
+
+	return ret;
 }
 
-int
+struct user*
 user_list_rpl(struct user_list *ul, char *nick_old, char *nick_new)
 {
 	struct user *ret, u = { .nick = nick_old };
@@ -90,7 +96,7 @@ user_list_rpl(struct user_list *ul, char *nick_old, char *nick_new)
 		user_free(ret);
 	}
 
-	return !!ret;
+	return ret;
 }
 
 struct user*

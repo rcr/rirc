@@ -19,7 +19,6 @@ struct string
 {
 	char *str;
 	size_t len;
-	char _[];
 };
 
 int irc_isnickchar(const char);
@@ -35,7 +34,7 @@ int check_pinged(const char*, const char*);
 int parse_mesg(struct parsed_mesg*, char*);
 int skip_sp(char**);
 
-struct string* string(const char*);
+struct string* string(struct string*, const char*);
 
 void handle_error(int, const char*, ...);
 
