@@ -1,3 +1,4 @@
+#include <stdlib.h>
 #include <string.h>
 
 #include "channel.h"
@@ -10,10 +11,28 @@ SPLAY_GENERATE(channel_list, channel, node, channel_cmp)
 static inline int
 channel_cmp(struct channel *c1, struct channel *c2)
 {
-	struct string *n1 = c1->name;
-	struct string *n2 = c2->name;
+	/* TODO: CASEMAPPING, as ftpr held by the server */
+	return irc_strcmp(c1->name.str, c2->name.str);
+}
 
-	return (n1->len == n2->len) && irc_strcmp(n1->str, n2->str);
+struct channel*
+channel(const char *name)
+{
+	struct channel *c;
+
+	if ((c = calloc(1, sizeof(*c))) == NULL)
+		fatal("calloc", errno);
+
+	string(&(c->name), name);
+
+	return c;
+}
+
+void
+channel_free(struct channel *c)
+{
+	free(c->name.str);
+	free(c);
 }
 
 struct channel*
@@ -31,8 +50,7 @@ channel_list_del(struct channel_list *cl, struct channel *c)
 struct channel*
 channel_list_get(struct channel_list *cl, char *name)
 {
-	struct string _name = { .str = name, .len = strlen(name) };
-	struct channel _chan = { .name = &_name };
+	struct channel _chan = { .name = { .str = name } };
 
 	return SPLAY_GET(channel_list, cl, &_chan);
 }

@@ -290,7 +290,7 @@ send_mesg(char *mesg, struct channel *chan)
 		else if (chan->parted)
 			newline(chan, 0, "-!!-", "Error: Parted from channel");
 
-		else if (sendf(errbuff, chan->server, "PRIVMSG %s :%s", chan->name, mesg))
+		else if (sendf(errbuff, chan->server, "PRIVMSG %s :%s", chan->name.str, mesg))
 			newline(chan, 0, "-!!-", errbuff);
 
 		else
@@ -418,7 +418,7 @@ send_me(char *err, char *mesg, struct server *s, struct channel *c)
 	if (c->parted)
 		fail("Error: Parted from channel");
 
-	fail_if(sendf(err, s, "PRIVMSG %s :\x01""ACTION %s\x01", c->name, mesg));
+	fail_if(sendf(err, s, "PRIVMSG %s :\x01""ACTION %s\x01", c->name.str, mesg));
 
 	newlinef(c, 0, "*", "%s %s", s->nick, mesg);
 
@@ -466,7 +466,7 @@ send_join(char *err, char *mesg, struct server *s, struct channel *c)
 	if (!c->parted)
 		fail("Error: Not parted from channel");
 
-	return sendf(err, s, "JOIN %s", c->name);
+	return sendf(err, s, "JOIN %s", c->name.str);
 }
 
 static int
@@ -514,7 +514,7 @@ send_part(char *err, char *mesg, struct server *s, struct channel *c)
 	if (c->parted)
 		fail("Error: Already parted from channel");
 
-	return sendf(err, s, "PART %s :%s", c->name, DEFAULT_QUIT_MESG);
+	return sendf(err, s, "PART %s :%s", c->name.str, DEFAULT_QUIT_MESG);
 }
 
 static int
@@ -563,9 +563,9 @@ send_topic(char *err, char *mesg, struct server *s, struct channel *c)
 		mesg++;
 
 	if (*mesg == '\0')
-		return sendf(err, s, "TOPIC %s", c->name);
+		return sendf(err, s, "TOPIC %s", c->name.str);
 
-	return sendf(err, s, "TOPIC %s :%s", c->name, mesg);
+	return sendf(err, s, "TOPIC %s :%s", c->name.str, mesg);
 }
 
 static int
@@ -1177,7 +1177,7 @@ recv_numeric(char *err, struct parsed_mesg *p, struct server *s)
 			//TODO: channel_list_foreach
 			do {
 				if (c->buffer.type == BUFFER_CHANNEL && !c->parted)
-					fail_if(sendf(err, s, "JOIN %s", c->name));
+					fail_if(sendf(err, s, "JOIN %s", c->name.str));
 				c = c->next;
 			} while (c != s->channel);
 		}
@@ -1192,6 +1192,7 @@ recv_numeric(char *err, struct parsed_mesg *p, struct server *s)
 	case RPL_YOURHOST:  /* 002 :<Host info, server version, etc> */
 	case RPL_CREATED:   /* 003 :<Server creation date message> */
 
+		/* FIXME: trailing can be null, here and elsewhere, eg `:d 003 nick VG` */
 		newline(s->channel, 0, "--", p->trailing);
 		break;
 

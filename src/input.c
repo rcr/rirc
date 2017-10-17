@@ -13,6 +13,11 @@
 //TODO: complete rewrite,
 // line->end is not properly set in a lot of cases,
 // should be rewritten with a better thought out design
+//
+// poll_input should be in state and call input()
+//
+// keybind handlers or send_mesg() should be returned from input
+// to be called by the stateful code, for easier testing
 
 #include <ctype.h>
 #include <poll.h>
@@ -100,6 +105,7 @@ new_input(void)
 	return i;
 }
 
+/* TODO: ideally inputs shouldnt require being freed */
 void
 free_input(struct input *i)
 {
@@ -482,7 +488,7 @@ search_channels(struct channel *start, char *search)
 
 	while (c != start) {
 
-		if (strstr(c->name->str, search))
+		if (strstr(c->name.str, search))
 			return c;
 
 		c = channel_get_next(c);
@@ -550,15 +556,15 @@ action_find_channel(char c)
 		/* Found a channel */
 		if (search_cptr->server == ccur->server) {
 			action(action_find_channel, "Find: %s -- %s",
-					search_cptr->name, search_buff);
+					search_cptr->name.str, search_buff);
 		} else {
 			if (!strcmp(search_cptr->server->port, "6667"))
 				action(action_find_channel, "Find: %s/%s -- %s",
-						search_cptr->server->host, search_cptr->name, search_buff);
+						search_cptr->server->host, search_cptr->name.str, search_buff);
 			else
 				action(action_find_channel, "Find: %s:%s/%s -- %s",
 						search_cptr->server->host, search_cptr->server->port,
-						search_cptr->name, search_buff);
+						search_cptr->name.str, search_buff);
 		}
 	}
 
@@ -585,10 +591,10 @@ tab_complete(struct input *inp)
 	while (str > inp->line->text && *(str - 1) != ' ')
 		len++, str--;
 
-	if (*str == '/')
+	if (str == inp->line->text && *str == '/')
 		tab_complete_command(inp, ++str, --len);
 	else
-		tab_complete_nick(inp, ++str, --len);
+		tab_complete_nick(inp, str, len);
 }
 
 static void
@@ -616,7 +622,6 @@ tab_complete_command(struct input *inp, char *str, size_t len)
 	}
 }
 
-/* FIXME: broken?? */
 static void
 tab_complete_nick(struct input *inp, char *str, size_t len)
 {

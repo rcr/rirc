@@ -418,7 +418,7 @@ _draw_nav(struct channel *c)
 	size_t len, total_len = 0;
 
 	/* Bump the channel frames, if applicable */
-	if ((total_len = (c->name->len + 2)) >= _term_cols())
+	if ((total_len = (c->name.len + 2)) >= _term_cols())
 		return;
 	else if (c == frame_prev && frame_prev != c_first)
 		frame_prev = channel_get_prev(frame_prev);
@@ -435,14 +435,14 @@ _draw_nav(struct channel *c)
 			/* Pad out nextward */
 
 			tmp = channel_get_next(tmp_next);
-			len = tmp->name->len;
+			len = tmp->name.len;
 
 			while ((total_len += (len + 2)) < _term_cols() && tmp != c_first) {
 
 				tmp_next = tmp;
 
 				tmp = channel_get_next(tmp);
-				len = tmp->name->len;
+				len = tmp->name.len;
 			}
 
 			break;
@@ -453,21 +453,21 @@ _draw_nav(struct channel *c)
 			/* Pad out prevward */
 
 			tmp = channel_get_prev(tmp_prev);
-			len = tmp->name->len;
+			len = tmp->name.len;
 
 			while ((total_len += (len + 2)) < _term_cols() && tmp != c_last) {
 
 				tmp_prev = tmp;
 
 				tmp = channel_get_prev(tmp);
-				len = tmp->name->len;
+				len = tmp->name.len;
 			}
 
 			break;
 		}
 
 		tmp = nextward ? channel_get_next(tmp_next) : channel_get_prev(tmp_prev);
-		len = tmp->name->len;
+		len = tmp->name.len;
 
 		/* Next channel doesn't fit */
 		if ((total_len += (len + 2)) >= _term_cols())
@@ -492,7 +492,7 @@ _draw_nav(struct channel *c)
 		if (fputs(_colour(colour, -1), stdout) < 0)
 			break;
 
-		if (printf(" %s ", tmp->name->str) < 0)
+		if (printf(" %s ", tmp->name.str) < 0)
 			break;
 
 		if (tmp == frame_next)

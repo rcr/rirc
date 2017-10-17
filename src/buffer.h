@@ -33,8 +33,8 @@ enum buffer_t
 struct buffer_line
 {
 	enum buffer_line_t type;
-	char prefix; /* TODO, this should just be part of 'from' */
-	char from[FROM_LENGTH_MAX + 1];
+	char prefix; /* TODO as part of `from` */
+	char from[FROM_LENGTH_MAX + 1]; /* TODO: from/text as struct string */
 	char text[TEXT_LENGTH_MAX + 1];
 	size_t from_len;
 	size_t text_len;

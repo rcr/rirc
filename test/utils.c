@@ -405,14 +405,14 @@ test_word_wrap(void)
 static void
 test_string(void)
 {
-	struct string *s;
+	struct string s;
 
-	s = string("abcde");
+	string(&s, "abcde");
 
-	assert_strcmp(s->str, "abcde");
-	assert_eq((int)s->len, 5);
+	assert_strcmp(s.str, "abcde");
+	assert_eq((int)s.len, 5);
 
-	free(s);
+	free(s.str);
 }
 
 int

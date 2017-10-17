@@ -1,6 +1,5 @@
 TODO
 ---------------------------
-
 this iteration:
 	- Proper mode support (struct cmode/umode)
 

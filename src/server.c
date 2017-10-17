@@ -109,7 +109,7 @@ server_set_005(struct server *s, char *str)
 #endif
 
 		#define X(cmd) \
-		if (!strcmp(opt.arg, #cmd) && !server_set_##cmd(s, opt.val)) \
+		if (!strcmp(opt.arg, #cmd) && server_set_##cmd(s, opt.val)) \
 			newlinef(s->channel, 0, "-!!-", "invalid %s: %s", #cmd, opt.val);
 		HANDLED_005
 		#undef X

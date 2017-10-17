@@ -116,6 +116,7 @@ newline(struct channel *c, enum buffer_line_t type, const char *from, const char
 {
 	/* Default wrapper for _newline because length of message won't be known */
 
+	/* FIXME: mesg can be null */
 	_newline(c, type, from, mesg, strlen(mesg));
 }
 
@@ -128,6 +129,9 @@ newlinef(struct channel *c, enum buffer_line_t type, const char *from, const cha
 	int len;
 	va_list ap;
 
+	/* FIXME: potential overflow here 
+	 *
+	 * These functions should be moved to buffer.c anyways? */
 	va_start(ap, fmt);
 	len = vsnprintf(buff, BUFFSIZE, fmt, ap);
 	va_end(ap);
@@ -156,19 +160,16 @@ _newline(struct channel *c, enum buffer_line_t type, const char *from, const cha
 		draw_nav();
 }
 
-/* TODO: why is this here? why is this not in channel.c??? */
 struct channel*
 new_channel(char *name, struct server *s, struct channel *chanlist, enum buffer_t type)
 {
-	struct channel *c;
+	struct channel *c = channel(name);
 
-	if ((c = calloc(1, sizeof(*c))) == NULL)
-		fatal("calloc", errno);
+	/* TODO: deprecated, move to channel.c */
 
 	c->buffer = buffer(type);
 	c->chanmodes_str.type = MODE_STR_CHANMODE;
 	c->input = new_input();
-	c->name = string(name);
 	c->server = s;
 
 	/* Append the new channel to the list */
@@ -186,11 +187,12 @@ new_channel(char *name, struct server *s, struct channel *chanlist, enum buffer_
 void
 free_channel(struct channel *c)
 {
-	user_list_free(&(c->users));
+	/* TODO: deprecated, move to channel.c */
 
+	user_list_free(&(c->users));
 	free_input(c->input);
-	free(c->name);
-	free(c);
+
+	channel_free(c);
 }
 
 void
@@ -278,7 +280,7 @@ channel_close(struct channel *c)
 		/* Closing a channel */
 
 		if (c->buffer.type == BUFFER_CHANNEL && !c->parted)
-			sendf(NULL, c->server, "PART %s", c->name);
+			sendf(NULL, c->server, "PART %s", c->name.str);
 
 		/* If closing the current channel, update state to a new channel */
 		if (c == ccur) {
