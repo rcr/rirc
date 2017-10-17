@@ -44,6 +44,25 @@ static void _print_testcase_name_(const char*);
 		_failures_++; \
 	} while (0)
 
+#define abort_test(M) \
+	do { \
+		_print_testcase_name_(__func__); \
+		printf("    %d: " M "\n", __LINE__); \
+		printf("    ---Testcase aborted---\n"); \
+		_failures_++; \
+		return; \
+	} while (0)
+
+#define abort_testf(...) \
+	do { \
+		_print_testcase_name_(__func__); \
+		printf("    %d: ", __LINE__); \
+		printf(__VA_ARGS__ "\n"); \
+		printf("    ---Testcase aborted---\n"); \
+		_failures_++; \
+		return; \
+	} while (0)
+
 /* Precludes the definition in utils.h
  *   in normal operation should fatally exit the program
  *   in testing should be considered a failure but should NOT continue running the testcase */
