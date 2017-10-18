@@ -50,15 +50,19 @@ user(const char *nick)
 }
 
 enum user_err
-user_list_add(struct user_list *ul, const char *nick)
+user_list_add(struct user_list *ul, const char *nick, struct mode prfxmodes)
 {
 	/* Create user and add to userlist */
+
+	struct user *u;
 
 	if (user_list_get(ul, nick, 0) != NULL)
 		return USER_ERR_DUPLICATE;
 
-	AVL_ADD(user_list, ul, user(nick));
+	u = AVL_ADD(user_list, ul, user(nick));
 	ul->count++;
+
+	u->prfxmodes = prfxmodes;
 
 	return USER_ERR_NONE;
 }
@@ -68,15 +72,15 @@ user_list_del(struct user_list *ul, const char *nick)
 {
 	/* Delete user and remove from userlist */
 
-	struct user *ret;
+	struct user *u;
 
-	if ((ret = user_list_get(ul, nick, 0)) == NULL)
+	if ((u = user_list_get(ul, nick, 0)) == NULL)
 		return USER_ERR_NOT_FOUND;
 
-	AVL_DEL(user_list, ul, ret);
+	AVL_DEL(user_list, ul, u);
 	ul->count--;
 
-	user_free(ret);
+	user_free(u);
 
 	return USER_ERR_NONE;
 }

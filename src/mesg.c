@@ -438,7 +438,7 @@ send_ignore(char *err, char *mesg, struct server *s, struct channel *c)
 	if (!(nick = getarg(&mesg, " ")))
 		; /* TODO: print ignore list */
 
-	else if (user_list_add(&(s->ignore), nick) == USER_ERR_DUPLICATE)
+	else if (user_list_add(&(s->ignore), nick, MODE_EMPTY) == USER_ERR_DUPLICATE)
 		failf("Error: Already ignoring '%s'", nick);
 
 	else
@@ -963,7 +963,7 @@ recv_join(char *err, struct parsed_mesg *p, struct server *s)
 		if ((c = channel_list_get(&s->clist, chan)) == NULL)
 			failf("JOIN: channel '%s' not found", chan);
 
-		if (user_list_add(&(c->users), p->from) == USER_ERR_DUPLICATE)
+		if (user_list_add(&(c->users), p->from, MODE_EMPTY) == USER_ERR_DUPLICATE)
 			failf("Error: user '%s' alread on channel '%s'", p->from, c->name.str);
 
 		if (c->users.count < config.join_part_quit_threshold)
@@ -1046,6 +1046,8 @@ recv_mode(char *err, struct parsed_mesg *p, struct server *s)
 	 * Draw the appropriate component
 	 *
 	 * */
+
+	/* TODO: THIS */
 
 	/* FIXME
 	 * MODE user :+abc
@@ -1275,18 +1277,24 @@ recv_numeric(char *err, struct parsed_mesg *p, struct server *s)
 		if ((c = channel_list_get(&s->clist, chan)) == NULL)
 			failf("RPL_NAMEREPLY: channel '%s' not found", chan);
 
-		if ((ret = mode_chanmode_prefix(&(c->chanmodes), &(s->mode_config), *type))) {
-			; //TODO: report mode error message as non-fatal warning
-		}
+		if ((ret = mode_chanmode_prefix(&(c->chanmodes), &(s->mode_config), *type)))
+			newlinef(c, 0, "-!!-", "RPL_NAMEREPLY: invalid channel flag: '%c'", *type);
 
 		while ((nick = getarg(&p->trailing, " "))) {
 
-			/* TODO: call mode_usermode_prefix, report error messages as non-fatal warnings */
-			if (!irc_isnickchar(*nick))
-				nick++;
+			char prefix = 0;
 
-			if (user_list_add(&(c->users), nick) == USER_ERR_DUPLICATE)
-				newlinef(c, 0, "-!!-", "Duplicate nick '%s'", nick);
+			struct mode m = MODE_EMPTY;
+
+			/* Set user prefix */
+			if (!irc_isnickchar(*nick))
+				prefix = *nick++;
+
+			if (prefix && mode_prfxmode_prefix(&m, &(s->mode_config), prefix) != MODE_ERR_NONE)
+				newlinef(c, 0, "-!!-", "Invalid user prefix: '%c'", prefix);
+
+			if (user_list_add(&(c->users), nick, m) == USER_ERR_DUPLICATE)
+				newlinef(c, 0, "-!!-", "Duplicate nick: '%s'", nick);
 		}
 
 		draw_status();

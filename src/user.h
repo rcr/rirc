@@ -26,7 +26,7 @@ struct user_list
 	unsigned int count;
 };
 
-enum user_err user_list_add(struct user_list*, const char*);
+enum user_err user_list_add(struct user_list*, const char*, struct mode);
 enum user_err user_list_del(struct user_list*, const char*);
 enum user_err user_list_rpl(struct user_list*, const char*, const char*);
 

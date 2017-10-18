@@ -12,8 +12,6 @@
  * TODO: cache a sensible number of line breaks (2?) against the line width
  * and dynamically calculate the rest, terminal size rarely changes
  *
- * TODO: prefix character for users
- *
  * TODO: buffer_newline should accept the formatting arguments rather than
  * vsnprintf to a temp buffer and pass, e.g.:
  * void buffer_newline(buffer*, buffer_line_t, struct user*, const char*, ...)

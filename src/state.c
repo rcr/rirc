@@ -116,10 +116,12 @@ newline(struct channel *c, enum buffer_line_t type, const char *from, const char
 {
 	/* Default wrapper for _newline because length of message won't be known */
 
-	if (mesg == NULL)
-		fatal("mesg is null", 0);
+	char errmesg[] = "newline error: mesg is null";
 
-	_newline(c, type, from, mesg, strlen(mesg));
+	if (mesg == NULL)
+		_newline(c, type, from, errmesg, strlen(errmesg));
+	else
+		_newline(c, type, from, mesg, strlen(mesg));
 }
 
 void

@@ -39,6 +39,13 @@
 /* [a-zA-Z] */
 #define MODE_STR_LEN 26 * 2
 
+#define MODE_EMPTY (struct mode) \
+{                \
+	.prefix = 0, \
+	.lower  = 0, \
+	.upper  = 0, \
+}
+
 enum mode_err
 {
 	MODE_ERR_INVALID_CONFIG = -3,

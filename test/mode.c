@@ -2,8 +2,6 @@
 
 #include "../src/mode.c"
 
-#define MODE_EMPTY {0}
-
 #define ALL_LOWERS "abcdefghijklmnopqrstuvwxyz"
 #define ALL_UPPERS "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 

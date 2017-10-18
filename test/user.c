@@ -14,15 +14,15 @@ test_user_list(void)
 	memset(&ulist, 0, sizeof(ulist));
 
 	/* Test adding users to list */
-	assert_eq(user_list_add(&ulist, "aaa"), USER_ERR_NONE);
-	assert_eq(user_list_add(&ulist, "bbb"), USER_ERR_NONE);
-	assert_eq(user_list_add(&ulist, "ccc"), USER_ERR_NONE);
+	assert_eq(user_list_add(&ulist, "aaa", MODE_EMPTY), USER_ERR_NONE);
+	assert_eq(user_list_add(&ulist, "bbb", MODE_EMPTY), USER_ERR_NONE);
+	assert_eq(user_list_add(&ulist, "ccc", MODE_EMPTY), USER_ERR_NONE);
 
 	if (ulist.count != 3)
 		abort_test("Failed to add users to list");
 
 	/* Test adding duplicates */
-	assert_eq(user_list_add(&ulist, "aaa"), USER_ERR_DUPLICATE);
+	assert_eq(user_list_add(&ulist, "aaa", MODE_EMPTY), USER_ERR_DUPLICATE);
 
 	/* Test retrieving by name, failure */
 	assert_null(user_list_get(&ulist, "a", 0));
