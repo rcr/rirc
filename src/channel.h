@@ -39,6 +39,7 @@ struct channel
 	struct string name;
 	struct user_list users;
 	unsigned int parted : 1;
+	char _[];
 };
 
 struct channel_list
@@ -50,7 +51,7 @@ struct channel* channel(const char*);
 
 struct channel* channel_list_add(struct channel_list*, struct channel*);
 struct channel* channel_list_del(struct channel_list*, struct channel*);
-struct channel* channel_list_get(struct channel_list*, char*);
+struct channel* channel_list_get(struct channel_list*, const char*);
 
 void channel_free(struct channel*);
 

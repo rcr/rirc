@@ -17,7 +17,7 @@ struct parsed_mesg
 /* Dynamically allocated string with cached length */
 struct string
 {
-	char *str;
+	const char *str;
 	size_t len;
 };
 
@@ -35,6 +35,7 @@ int parse_mesg(struct parsed_mesg*, char*);
 int skip_sp(char**);
 
 struct string* string(struct string*, const char*);
+void string_free(struct string*);
 
 void handle_error(int, const char*, ...);
 
