@@ -64,18 +64,18 @@ test_user_list(void)
 	assert_eq(user_list_rpl(&ulist, "bbb", "ccc"), USER_ERR_DUPLICATE);
 
 	/* Test replacing user in list, success */
-	u3->modes.lower = 0x123;
-	u3->modes.upper = 0x456;
-	u3->modes.prefix = '*';
+	u3->prfxmodes.lower = 0x123;
+	u3->prfxmodes.upper = 0x456;
+	u3->prfxmodes.prefix = '*';
 
 	assert_eq(user_list_rpl(&ulist, "ccc", "ddd"), USER_ERR_NONE);
 
 	if ((u4 = user_list_get(&ulist, "ddd", 0)) == NULL)
 		abort_test("Failed to retrieve u4 by prefix");
 
-	assert_eq(u4->modes.lower, 0x123);
-	assert_eq(u4->modes.upper, 0x456);
-	assert_eq(u4->modes.prefix, '*');
+	assert_eq(u4->prfxmodes.lower, 0x123);
+	assert_eq(u4->prfxmodes.upper, 0x456);
+	assert_eq(u4->prfxmodes.prefix, '*');
 
 	assert_strcmp(u4->nick.str, "ddd");
 

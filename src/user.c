@@ -99,7 +99,7 @@ user_list_rpl(struct user_list *ul, const char *nick_old, const char *nick_new)
 	AVL_ADD(user_list, ul, new);
 	AVL_DEL(user_list, ul, old);
 
-	new->modes = old->modes;
+	new->prfxmodes = old->prfxmodes;
 
 	user_free(old);
 

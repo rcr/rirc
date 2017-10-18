@@ -13,12 +13,15 @@
  * and dynamically calculate the rest, terminal size rarely changes
  *
  * TODO: prefix character for users
+ *
+ * TODO: buffer_newline should accept the formatting arguments rather than
+ * vsnprintf to a temp buffer and pass, e.g.:
+ * void buffer_newline(buffer*, buffer_line_t, struct user*, const char*, ...)
  * */
 
 #include <string.h>
 
 #include "buffer.h"
-#include "utils.h"
 
 #if (BUFFER_LINES_MAX & (BUFFER_LINES_MAX - 1)) != 0
 	/* Required for proper masking when indexing */
@@ -124,7 +127,7 @@ buffer_line_rows(struct buffer_line *line, unsigned int w)
 	if (w == 0)
 		fatal("width is zero", 0);
 
-	/* Empty lines occupy are considered to occupy a row */
+	/* Empty lines are considered to occupy a row */
 	if (!*line->text)
 		return line->cached.rows = 1;
 
@@ -138,63 +141,51 @@ buffer_line_rows(struct buffer_line *line, unsigned int w)
 	return line->cached.rows;
 }
 
-/* TODO:
- * if prefix, from_len++, prepend to from
- * */
 void
 buffer_newline(
 		struct buffer *b,
 		enum buffer_line_t type,
-		const char *from,
-		const char *text,
-		size_t from_len,
-		size_t text_len)
+		struct string from,
+		struct string text,
+		char prefix)
 {
 	struct buffer_line *line;
 
-	if (from == NULL)
-		fatal("from is NULL", 0);
+	if (from.str == NULL)
+		fatal("from string is NULL", 0);
 
-	if (text == NULL)
-		fatal("text is NULL", 0);
-
-	size_t remainder_len = 0;
-
-	if (!from_len)
-		from_len = strlen(from);
-
-	if (!text_len)
-		text_len = strlen(text);
+	if (text.str == NULL)
+		fatal("text string is NULL", 0);
 
 	line = memset(buffer_push(b), 0, sizeof(*line));
 
-	/* Split overlength lines into continuations */
-	if (text_len > TEXT_LENGTH_MAX) {
-		remainder_len = text_len - TEXT_LENGTH_MAX;
-		text_len = TEXT_LENGTH_MAX;
-	}
+	line->from_len = MIN(from.len + (!!prefix), FROM_LENGTH_MAX);
+	line->text_len = MIN(text.len,              TEXT_LENGTH_MAX);
 
-	/* Silently truncate */
-	if (from_len > FROM_LENGTH_MAX)
-		from_len = FROM_LENGTH_MAX;
+	if (prefix)
+		*line->from = prefix;
 
-	memcpy(line->from, from, from_len);
-	memcpy(line->text, text, text_len);
+	memcpy(line->from + (!!prefix), from.str, line->from_len);
+	memcpy(line->text,              text.str, line->text_len);
 
-	*(line->from + from_len) = '\0';
-	*(line->text + text_len) = '\0';
-
-	line->from_len = from_len;
-	line->text_len = text_len;
+	*(line->from + line->from_len) = '\0';
+	*(line->text + line->text_len) = '\0';
 
 	line->time = time(NULL);
 	line->type = type;
 
-	if (from_len > b->pad)
-		b->pad = from_len;
+	if (from.len > b->pad)
+		b->pad = from.len;
 
-	if (remainder_len)
-		buffer_newline(b, type, from, text + TEXT_LENGTH_MAX, from_len, remainder_len);
+	if (text.len > TEXT_LENGTH_MAX) {
+
+		struct string _text = {
+			.str = text.str + TEXT_LENGTH_MAX,
+			.len = text.len - TEXT_LENGTH_MAX
+		};
+
+		buffer_newline(b, type, from, _text, prefix);
+	}
 }
 
 float

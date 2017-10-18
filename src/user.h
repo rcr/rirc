@@ -15,7 +15,7 @@ enum user_err
 struct user
 {
 	AVL_NODE(user) ul;
-	struct mode modes;
+	struct mode prfxmodes;
 	struct string nick;
 	char _[];
 };

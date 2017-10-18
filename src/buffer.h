@@ -3,6 +3,7 @@
 
 #include <time.h>
 
+#include "utils.h"
 #include "../config.h"
 
 #define TEXT_LENGTH_MAX 510 /* FIXME: remove max lengths in favour of growable buffer */
@@ -70,6 +71,6 @@ struct buffer_line* buffer_head(struct buffer*);
 struct buffer_line* buffer_tail(struct buffer*);
 struct buffer_line* buffer_line(struct buffer*, unsigned int);
 
-void buffer_newline(struct buffer*, enum buffer_line_t, const char*, const char*, size_t, size_t);
+void buffer_newline(struct buffer*, enum buffer_line_t, struct string, struct string, char);
 
 #endif
