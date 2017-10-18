@@ -23,10 +23,10 @@ enum mode_chanmode_prefix_t
 static inline int mode_isset(struct mode*, int);
 static inline uint32_t flag_bit(int);
 
-static int mode_config_chanmodes(struct mode_config*, const char*);
-static int mode_config_usermodes(struct mode_config*, const char*);
-static int mode_config_subtypes(struct mode_config*, const char*);
-static int mode_config_prefix(struct mode_config*, const char*);
+static enum mode_err mode_config_chanmodes(struct mode_config*, const char*);
+static enum mode_err mode_config_usermodes(struct mode_config*, const char*);
+static enum mode_err mode_config_subtypes(struct mode_config*, const char*);
+static enum mode_err mode_config_prefix(struct mode_config*, const char*);
 
 /* TODO: static inline void mode_bit_set(struct mode*, uint32_t); */
 /* TODO: static inline void mode_bit_isset(struct mode*, uint32_t); */
@@ -73,7 +73,7 @@ flag_bit(int c)
 	return 0;
 }
 
-int
+enum mode_err
 mode_config(struct mode_config *config, const char *config_str, enum mode_config_t config_t)
 {
 	/* Initialize a mode_config to the RFC2812, RFC2811 defaults
@@ -153,7 +153,7 @@ mode_config(struct mode_config *config, const char *config_str, enum mode_config
 	return MODE_ERR_NONE;
 }
 
-int
+enum mode_err
 mode_chanmode_set(struct mode *m, struct mode_config *config, int flag, enum mode_set_t set_t)
 {
 	/* Set/unset chanmode flags
@@ -252,7 +252,7 @@ mode_chanmode_set(struct mode *m, struct mode_config *config, int flag, enum mod
 	return MODE_ERR_NONE;
 }
 
-int
+enum mode_err
 mode_prfxmode_set(struct mode *m, struct mode_config *config, int flag, enum mode_set_t set_t)
 {
 	/* Set/unset prfxmode flags and mode prefix */
@@ -286,7 +286,7 @@ mode_prfxmode_set(struct mode *m, struct mode_config *config, int flag, enum mod
 	return MODE_ERR_NONE;
 }
 
-int
+enum mode_err
 mode_usermode_set(struct mode *m, struct mode_config *config, int flag, enum mode_set_t set_t)
 {
 	/* Set/unset usermode flags */
@@ -306,7 +306,7 @@ mode_usermode_set(struct mode *m, struct mode_config *config, int flag, enum mod
 	return MODE_ERR_NONE;
 }
 
-int
+enum mode_err
 mode_chanmode_prefix(struct mode *m, struct mode_config *config, int flag)
 {
 	/* Set chanmode flag and prefix give the prefix character, e.g.:
@@ -348,7 +348,7 @@ mode_chanmode_prefix(struct mode *m, struct mode_config *config, int flag)
 	return MODE_ERR_NONE;
 }
 
-int
+enum mode_err
 mode_prfxmode_prefix(struct mode *m, struct mode_config *config, int flag)
 {
 	/* Set prfxmode flag and prefix given the prefix character, e.g.: 
@@ -391,8 +391,8 @@ mode_str(struct mode *m, struct mode_str *m_str)
 
 	char c, *skip = "", *str = m_str->str;
 
-	uint32_t lower = m->lower;
-	uint32_t upper = m->upper;
+	uint32_t lower = m->lower,
+	         upper = m->upper;
 
 	/* 's' and 'p' flags should not appear in chanmode mode strings */
 	switch (m_str->type) {
@@ -437,7 +437,7 @@ mode_reset(struct mode *m, struct mode_str *s)
 	s->type = type;
 }
 
-static int
+static enum mode_err
 mode_config_chanmodes(struct mode_config *config, const char *str)
 {
 	/* Parse and configure chanmodes string */
@@ -467,7 +467,7 @@ mode_config_chanmodes(struct mode_config *config, const char *str)
 	return MODE_ERR_NONE;
 }
 
-static int
+static enum mode_err
 mode_config_usermodes(struct mode_config *config, const char *str)
 {
 	/* Parse and configure usermodes string */
@@ -497,7 +497,7 @@ mode_config_usermodes(struct mode_config *config, const char *str)
 	return MODE_ERR_NONE;
 }
 
-static int
+static enum mode_err
 mode_config_subtypes(struct mode_config *config, const char *str)
 {
 	/* Parse and configure CHANMODE subtypes, e.g.:
@@ -562,7 +562,7 @@ mode_config_subtypes(struct mode_config *config, const char *str)
 	return MODE_ERR_NONE;
 }
 
-static int
+static enum mode_err
 mode_config_prefix(struct mode_config *config, const char *str)
 {
 	/* Parse and configure PREFIX e.g.:

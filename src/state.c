@@ -230,12 +230,6 @@ action_close_server(char c)
 }
 
 void
-user_list_print(struct channel *c)
-{
-	newline(c, 0, "TODO", "Print ignore list to channel");
-}
-
-void
 reset_channel(struct channel *c)
 {
 	mode_reset(&(c->chanmodes), &(c->chanmodes_str));

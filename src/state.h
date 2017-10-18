@@ -52,7 +52,6 @@ void channel_set_current(struct channel*);
 void free_channel(struct channel*);
 void newline(struct channel*, enum buffer_line_t, const char*, const char*);
 void newlinef(struct channel*, enum buffer_line_t, const char*, const char*, ...);
-void user_list_print(struct channel*);
 void part_channel(struct channel*);
 void reset_channel(struct channel*);
 

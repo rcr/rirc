@@ -436,9 +436,9 @@ send_ignore(char *err, char *mesg, struct server *s, struct channel *c)
 		fail("Error: Not connected to server");
 
 	if (!(nick = getarg(&mesg, " ")))
-		user_list_print(c);
+		; /* TODO: print ignore list */
 
-	else if (!user_list_add(&(s->ignore), nick, 0))
+	else if (user_list_add(&(s->ignore), nick) == USER_ERR_DUPLICATE)
 		failf("Error: Already ignoring '%s'", nick);
 
 	else
@@ -579,9 +579,9 @@ send_unignore(char *err, char *mesg, struct server *s, struct channel *c)
 		fail("Error: Not connected to server");
 
 	if (!(nick = getarg(&mesg, " ")))
-		user_list_print(c);
+		; /* TODO: print ignore list */
 
-	else if (!user_list_del(&(s->ignore), nick))
+	else if (user_list_del(&(s->ignore), nick) == USER_ERR_NOT_FOUND)
 		failf("Error: '%s' not on ignore list", nick);
 
 	else
@@ -963,7 +963,8 @@ recv_join(char *err, struct parsed_mesg *p, struct server *s)
 		if ((c = channel_list_get(&s->clist, chan)) == NULL)
 			failf("JOIN: channel '%s' not found", chan);
 
-		user_list_add(&(c->users), p->from, 0);
+		if (user_list_add(&(c->users), p->from) == USER_ERR_DUPLICATE)
+			failf("Error: user '%s' alread on channel '%s'", p->from, c->name.str);
 
 		if (c->users.count < config.join_part_quit_threshold)
 			newlinef(c, 0, ">", "%s!%s has joined %s", p->from, p->host, chan);
@@ -1012,7 +1013,7 @@ recv_kick(char *err, struct parsed_mesg *p, struct server *s)
 			newlinef(c, 0, "--", "You've been kicked by %s", p->from, user);
 	} else {
 
-		if (!user_list_del(&(c->users), user))
+		if (user_list_del(&(c->users), user) == USER_ERR_NOT_FOUND)
 			failf("KICK: nick '%s' not found in '%s'", user, chan);
 
 		if (p->trailing)
@@ -1080,7 +1081,9 @@ recv_nick(char *err, struct parsed_mesg *p, struct server *s)
 	struct channel *c = s->channel;
 	//TODO: channel_list_foreach
 	do {
-		if (user_list_rpl(&(c->users), p->from, nick))
+		if (user_list_rpl(&(c->users), p->from, nick) == USER_ERR_DUPLICATE)
+			newlinef(c, 0, "-!!-", "Error: user '%s' alread on channel '%s'", p->from, c->name.str);
+		else
 			newlinef(c, 0, "--", "%s  >>  %s", p->from, nick);
 	} while ((c = c->next) != s->channel);
 
@@ -1278,13 +1281,12 @@ recv_numeric(char *err, struct parsed_mesg *p, struct server *s)
 
 		while ((nick = getarg(&p->trailing, " "))) {
 
-			char prefix = 0;
-
-			/* TODO: mode_usermode_prefix, report error messages as non-fatal warnings */
+			/* TODO: call mode_usermode_prefix, report error messages as non-fatal warnings */
 			if (!irc_isnickchar(*nick))
-				prefix = *nick++;
+				nick++;
 
-			user_list_add(&(c->users), nick, prefix);
+			if (user_list_add(&(c->users), nick) == USER_ERR_DUPLICATE)
+				newlinef(c, 0, "-!!-", "Duplicate nick '%s'", nick);
 		}
 
 		draw_status();
@@ -1446,7 +1448,7 @@ recv_part(char *err, struct parsed_mesg *p, struct server *s)
 	if ((c = channel_list_get(&s->clist, targ)) == NULL)
 		failf("PART: channel '%s' not found", targ);
 
-	if (!user_list_del(&(c->users), p->from))
+	if (user_list_del(&(c->users), p->from) == USER_ERR_NOT_FOUND)
 		failf("PART: nick '%s' not found in '%s'", p->from, targ);
 
 	if (c->users.count < config.join_part_quit_threshold) {
@@ -1554,7 +1556,7 @@ recv_quit(char *err, struct parsed_mesg *p, struct server *s)
 	struct channel *c = s->channel;
 	//TODO: channel_list_foreach
 	do {
-		if (user_list_del(&(c->users), p->from)) {
+		if (user_list_del(&(c->users), p->from) == USER_ERR_NONE) {
 			if (c->users.count < config.join_part_quit_threshold) {
 				if (p->trailing)
 					newlinef(c, 0, "<", "%s!%s has quit (%s)", p->from, p->host, p->trailing);

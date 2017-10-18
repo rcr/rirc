@@ -105,14 +105,14 @@ struct mode_str
 	enum mode_str_t type;
 };
 
-int mode_config(struct mode_config*, const char*, enum mode_config_t);
+enum mode_err mode_config(struct mode_config*, const char*, enum mode_config_t);
 
-int mode_chanmode_set(struct mode*, struct mode_config*, int, enum mode_set_t);
-int mode_prfxmode_set(struct mode*, struct mode_config*, int, enum mode_set_t);
-int mode_usermode_set(struct mode*, struct mode_config*, int, enum mode_set_t);
+enum mode_err mode_chanmode_set(struct mode*, struct mode_config*, int, enum mode_set_t);
+enum mode_err mode_prfxmode_set(struct mode*, struct mode_config*, int, enum mode_set_t);
+enum mode_err mode_usermode_set(struct mode*, struct mode_config*, int, enum mode_set_t);
 
-int mode_chanmode_prefix(struct mode*, struct mode_config*, int);
-int mode_prfxmode_prefix(struct mode*, struct mode_config*, int);
+enum mode_err mode_chanmode_prefix(struct mode*, struct mode_config*, int);
+enum mode_err mode_prfxmode_prefix(struct mode*, struct mode_config*, int);
 
 char* mode_str(struct mode*, struct mode_str*);
 

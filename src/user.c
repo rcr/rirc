@@ -4,14 +4,12 @@
 #include <stdlib.h>
 #include <string.h>
 
+static struct user* user(const char*);
+
 static inline int user_cmp(struct user*, struct user*);
 static inline int user_ncmp(struct user*, struct user*, size_t);
 
 static inline void user_free(struct user*);
-
-static struct user* user(char*, char);
-
-/* TODO: userlist as splay vs avl..? */
 
 AVL_GENERATE(user_list, user, node, user_cmp, user_ncmp)
 
@@ -36,67 +34,74 @@ user_free(struct user *u)
 }
 
 static struct user*
-user(char *nick, char prefix)
+user(const char *nick)
 {
 	struct user *u;
-
-	/* TODO: struct string for nick
-	 *
-	 * use cached length in drawing
-	 * use cached length in user_cmp */
 
 	if ((u = calloc(1, sizeof(*u) + strlen(nick) + 1)) == NULL)
 		fatal("calloc", errno);
 
-	u->nick   = strcpy(u->_, nick);
-	u->prefix = prefix;
+	u->nick = strcpy(u->_, nick);
 
 	return u;
 }
 
-struct user*
-user_list_add(struct user_list *ul, char *nick, char flag)
+enum user_err
+user_list_add(struct user_list *ul, char *nick)
 {
-	struct user *ret, *u = user(nick, flag);
+	/* Create user and add to userlist */
 
-	if ((ret = AVL_ADD(user_list, ul, u)) == NULL)
-		user_free(u);
-	else
-		ul->count++;
+	if (user_list_get(ul, nick, 0) != NULL)
+		return USER_ERR_DUPLICATE;
 
-	return ret;
+	AVL_ADD(user_list, ul, user(nick));
+	ul->count++;
+
+	return USER_ERR_NONE;
 }
 
-struct user*
+enum user_err
 user_list_del(struct user_list *ul, char *nick)
 {
-	struct user *ret, u = { .nick = nick };
+	/* Delete user and remove from userlist */
 
-	if ((ret = AVL_DEL(user_list, ul, &u)) != NULL) {
-		user_free(ret);
-		ul->count--;
-	}
+	struct user *ret;
 
-	/* FIXME: return after free */
+	if ((ret = user_list_get(ul, nick, 0)) == NULL)
+		return USER_ERR_NOT_FOUND;
 
-	return ret;
+	AVL_DEL(user_list, ul, ret);
+	ul->count--;
+
+	user_free(ret);
+
+	return USER_ERR_NONE;
 }
 
-struct user*
+enum user_err
 user_list_rpl(struct user_list *ul, char *nick_old, char *nick_new)
 {
-	struct user *ret, u = { .nick = nick_old };
+	/* Replace a user in a list by name, maintaining modes */
 
-	if ((ret = AVL_DEL(user_list, ul, &u)) != NULL) {
+	struct user *old, *new;
 
-		char prefix = ret->prefix;
+	if ((old = user_list_get(ul, nick_old, 0)) == NULL)
+		return USER_ERR_NOT_FOUND;
 
-		AVL_ADD(user_list, ul, user(nick_new, prefix));
+	if ((new = user_list_get(ul, nick_new, 0)) != NULL)
+		return USER_ERR_DUPLICATE;
 
-		user_free(ret);
-	}
+	new = user(nick_new);
 
-	return ret;
+	AVL_ADD(user_list, ul, new);
+	AVL_DEL(user_list, ul, old);
+
+	/* TODO: copy all modes */
+	new->prefix = old->prefix;
+
+	user_free(old);
+
+	return USER_ERR_NONE;
 }
 
 struct user*
