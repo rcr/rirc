@@ -30,6 +30,9 @@
  *
  * PREFIX modes are not included in CHANMODES
  *
+ * MODES specifies the maximum number of channel modes with parameter
+ * allowed per MODE command
+ *
  * Numeric 353 (RPL_NAMREPLY) sets chanmode and prfxmode for users on a channel
  * by providing the prefix character rather than the flag
  */
@@ -61,6 +64,7 @@ enum mode_config_t
 	MODE_CONFIG_USERMODES, /* Set numeric 004 usermodes string */
 	MODE_CONFIG_PREFIX,    /* Set numeric 005 PREFIX */
 	MODE_CONFIG_SUBTYPES,  /* Set numeric 005 CHANMODES subtypes */
+	MODE_CONFIG_MODES,     /* Set numeric 005 MODES */
 	MODE_CONFIG_T_SIZE
 };
 
@@ -90,6 +94,7 @@ struct mode
 
 struct mode_config
 {
+	unsigned int MODES;    /* Numeric 005 MODES */
 	struct mode chanmodes; /* Numeric 004 chanmodes string */
 	struct mode usermodes; /* Numeric 004 usermodes string */
 	struct

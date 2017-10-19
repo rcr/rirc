@@ -445,6 +445,35 @@ test_mode_config_prefix(void)
 #undef CHECK
 }
 
+static void
+test_mode_config_modes(void)
+{
+	/* Test configuring MODES */
+
+	struct mode_config c = { .MODES = 3 };
+
+	/* Test empty string */
+	assert_eq(mode_config_modes(&c, ""), MODE_ERR_INVALID_CONFIG);
+	assert_eq(c.MODES, 3);
+
+	/* Test not a number */
+	assert_eq(mode_config_modes(&c, "1abc"), MODE_ERR_INVALID_CONFIG);
+	assert_eq(mode_config_modes(&c, "wxyz"), MODE_ERR_INVALID_CONFIG);
+	assert_eq(c.MODES, 3);
+
+	/* Test invalid number (i.e.: not [1-99]) */
+	assert_eq(mode_config_modes(&c, "0"),   MODE_ERR_INVALID_CONFIG);
+	assert_eq(mode_config_modes(&c, "100"), MODE_ERR_INVALID_CONFIG);
+	assert_eq(c.MODES, 3);
+
+	/* Teset valid numbers */
+	assert_eq(mode_config_modes(&c, "1"),  MODE_ERR_NONE);
+	assert_eq(c.MODES, 1);
+
+	assert_eq(mode_config_modes(&c, "99"), MODE_ERR_NONE);
+	assert_eq(c.MODES, 99);
+}
+
 int
 main(void)
 {
@@ -459,7 +488,8 @@ main(void)
 		TESTCASE(test_mode_config_usermodes),
 		TESTCASE(test_mode_config_chanmodes),
 		TESTCASE(test_mode_config_subtypes),
-		TESTCASE(test_mode_config_prefix)
+		TESTCASE(test_mode_config_prefix),
+		TESTCASE(test_mode_config_modes)
 	};
 
 	return run_tests(tests);

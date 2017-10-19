@@ -27,7 +27,9 @@ static enum mode_err mode_config_chanmodes(struct mode_config*, const char*);
 static enum mode_err mode_config_usermodes(struct mode_config*, const char*);
 static enum mode_err mode_config_subtypes(struct mode_config*, const char*);
 static enum mode_err mode_config_prefix(struct mode_config*, const char*);
+static enum mode_err mode_config_modes(struct mode_config*, const char*);
 
+/* TODO: check validity of set_t on all mode settings */
 /* TODO: static inline void mode_bit_set(struct mode*, uint32_t); */
 /* TODO: static inline void mode_bit_isset(struct mode*, uint32_t); */
 
@@ -112,7 +114,12 @@ mode_config(struct mode_config *config, const char *config_str, enum mode_config
 	 *   O - local operator flag;
 	 *   s - marks a user for receipt of server notices.
 	 *
-	 * Note: PREFIX and CHANMODES are ubiquitous additions to the IRC
+	 * MODES (RFC2811, section 3.2.3)
+	 *
+	 *   "Note that there is a maximum limit of three (3) changes per command
+	 *    for modes that take a parameter."
+	 *
+	 * Note: PREFIX, MODES and CHANMODES are ubiquitous additions to the IRC
 	 *       protocol given by numeric 005 (RPL_ISUPPORT). As such,
 	 *       they've been interpreted here in terms of A,B,C,D subcategories
 	 *       for the sake of default settings. Numeric 319 (RPL_WHOISCHANNELS)
@@ -127,7 +134,8 @@ mode_config(struct mode_config *config, const char *config_str, enum mode_config
 				.PREFIX = {
 					.F = "ov",
 					.T = "@+"
-				}
+				},
+				.MODES = 3
 			};
 			mode_config_chanmodes(config, "OovaimnqpsrtklbeI");
 			mode_config_usermodes(config, "aiwroOs");
@@ -145,6 +153,9 @@ mode_config(struct mode_config *config, const char *config_str, enum mode_config
 
 		case MODE_CONFIG_PREFIX:
 			return mode_config_prefix(config, config_str);
+
+		case MODE_CONFIG_MODES:
+			return mode_config_modes(config, config_str);
 
 		default:
 			fatal("mode configuration type unknown", 0);
@@ -636,4 +647,26 @@ error:
 	*(config->PREFIX.T) = 0;
 
 	return MODE_ERR_INVALID_CONFIG;
+}
+
+static enum mode_err
+mode_config_modes(struct mode_config *config, const char *str)
+{
+	/* Parse and configure MODES, valid values are numeric strings [1-99] */
+
+	unsigned int modes = 0;
+
+	for (modes = 0; modes < 100 && *str; str++) {
+		if (isdigit(*str))
+			modes = modes * 10 + (*str - '0');
+		else
+			return MODE_ERR_INVALID_CONFIG;
+	}
+
+	if (!(modes > 0 && modes < 100))
+		return MODE_ERR_INVALID_CONFIG;
+
+	config->MODES = modes;
+
+	return MODE_ERR_NONE;
 }

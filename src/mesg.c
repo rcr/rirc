@@ -120,7 +120,7 @@ server_fatal(struct server *s, char *fmt, ...)
 	va_list ap;
 
 	va_start(ap, fmt);
-	vsnprintf(errbuff, MAX_ERROR, fmt, ap);
+	vsnprintf(errbuff, MAX_ERROR - 1, fmt, ap);
 	va_end(ap);
 
 	server_disconnect(s, 1, 0, errbuff);
