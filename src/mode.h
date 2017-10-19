@@ -85,6 +85,16 @@ enum mode_str_t
 	MODE_STR_T_SIZE
 };
 
+enum mode_flag_t
+{
+	MODE_FLAG_INVALID,
+	MODE_FLAG_USERMODE,       /* Usermode flag */
+	MODE_FLAG_CHANMODE,       /* Chanmode flag without parameter */
+	MODE_FLAG_CHANMODE_PARAM, /* Chanmode flag with parameter */
+	MODE_FLAG_PREFIX,         /* Chanmode flag that sets prfxmode */
+	MODE_FLAG_T_SIZE
+};
+
 struct mode
 {
 	char prefix;    /* Prefix character for chanmode, prfxmode */
@@ -116,6 +126,8 @@ struct mode_str
 	char str[MODE_STR_LEN + 1];
 	enum mode_str_t type;
 };
+
+enum mode_flag_t mode_flag_t(struct mode_config *config, int, int);
 
 enum mode_err mode_config(struct mode_config*, const char*, enum mode_config_t);
 

@@ -474,6 +474,57 @@ test_mode_config_modes(void)
 	assert_eq(c.MODES, 99);
 }
 
+static void
+test_mode_flag_t(void)
+{
+	/* Test retrieving a mode flag type */
+
+	struct mode_config c;
+
+	int config_errs = 0;
+
+	config_errs -= mode_config(&c, "a",       MODE_CONFIG_USERMODES);
+	config_errs -= mode_config(&c, "bcdef",   MODE_CONFIG_CHANMODES);
+	config_errs -= mode_config(&c, "b,c,d,e", MODE_CONFIG_SUBTYPES);
+	config_errs -= mode_config(&c, "(f)@",    MODE_CONFIG_PREFIX);
+
+	if (config_errs != MODE_ERR_NONE)
+		abort_test("Configuration error");
+
+	/* Test invalid '+'/'-' */
+	assert_eq(mode_flag_t(&c, '=', 'a'), MODE_FLAG_INVALID);
+
+	/* Test invalid flag */
+	assert_eq(mode_flag_t(&c, '+', '!'), MODE_FLAG_INVALID);
+
+	/* Test flag not in usermodes, chanmodes */
+	assert_eq(mode_flag_t(&c, '+', 'z'), MODE_FLAG_INVALID);
+
+	/* Test usermode flag */
+	assert_eq(mode_flag_t(&c, '+', 'a'), MODE_FLAG_USERMODE);
+	assert_eq(mode_flag_t(&c, '-', 'a'), MODE_FLAG_USERMODE);
+
+	/* Test chanmode A (always has a parameter) */
+	assert_eq(mode_flag_t(&c, '+', 'b'), MODE_FLAG_CHANMODE_PARAM);
+	assert_eq(mode_flag_t(&c, '-', 'b'), MODE_FLAG_CHANMODE_PARAM);
+
+	/* Test chanmode B (always has a parameter) */
+	assert_eq(mode_flag_t(&c, '+', 'c'), MODE_FLAG_CHANMODE_PARAM);
+	assert_eq(mode_flag_t(&c, '-', 'c'), MODE_FLAG_CHANMODE_PARAM);
+
+	/* Test chanmode C (only has a parameter when set) */
+	assert_eq(mode_flag_t(&c, '+', 'd'), MODE_FLAG_CHANMODE_PARAM);
+	assert_eq(mode_flag_t(&c, '-', 'd'), MODE_FLAG_CHANMODE);
+
+	/* Test chanmode D (never has a parameter) */
+	assert_eq(mode_flag_t(&c, '+', 'e'), MODE_FLAG_CHANMODE);
+	assert_eq(mode_flag_t(&c, '-', 'e'), MODE_FLAG_CHANMODE);
+
+	/* Test prefix flag */
+	assert_eq(mode_flag_t(&c, '+', 'f'), MODE_FLAG_PREFIX);
+	assert_eq(mode_flag_t(&c, '-', 'f'), MODE_FLAG_PREFIX);
+}
+
 int
 main(void)
 {
@@ -489,7 +540,8 @@ main(void)
 		TESTCASE(test_mode_config_chanmodes),
 		TESTCASE(test_mode_config_subtypes),
 		TESTCASE(test_mode_config_prefix),
-		TESTCASE(test_mode_config_modes)
+		TESTCASE(test_mode_config_modes),
+		TESTCASE(test_mode_flag_t)
 	};
 
 	return run_tests(tests);

@@ -656,7 +656,7 @@ mode_config_modes(struct mode_config *config, const char *str)
 
 	unsigned int modes = 0;
 
-	for (modes = 0; modes < 100 && *str; str++) {
+	for (; modes < 100 && *str; str++) {
 		if (isdigit(*str))
 			modes = modes * 10 + (*str - '0');
 		else
@@ -669,4 +669,46 @@ mode_config_modes(struct mode_config *config, const char *str)
 	config->MODES = modes;
 
 	return MODE_ERR_NONE;
+}
+
+enum mode_flag_t
+mode_flag_t(struct mode_config *config, int set, int flag)
+{
+	/* Return the mode flag type specified by config where:
+	 *
+	 *  - set  = [+-]
+	 *  - flag = [azAZ]
+	 */
+
+	if (!(set == '+' || set == '-'))
+		return MODE_FLAG_INVALID;
+
+	if (mode_isset(&(config->usermodes), flag))
+		return MODE_FLAG_USERMODE;
+
+	if (mode_isset(&(config->chanmodes), flag)) {
+
+		if (strchr(config->PREFIX.F, flag))
+			return MODE_FLAG_PREFIX;
+
+		if (mode_isset(&(config->CHANMODES.A), flag))
+			return MODE_FLAG_CHANMODE_PARAM;
+
+		if (mode_isset(&(config->CHANMODES.B), flag))
+			return MODE_FLAG_CHANMODE_PARAM;
+
+		if (mode_isset(&(config->CHANMODES.C), flag)) {
+
+			if (set == '+')
+				return MODE_FLAG_CHANMODE_PARAM;
+
+			if (set == '-')
+				return MODE_FLAG_CHANMODE;
+		}
+
+		if (mode_isset(&(config->CHANMODES.D), flag))
+			return MODE_FLAG_CHANMODE;
+	}
+
+	return MODE_FLAG_INVALID;
 }
