@@ -92,11 +92,44 @@ test_user_list(void)
 	assert_eq(ulist.count, 0);
 }
 
+static void
+test_user_list_free(void)
+{
+	/* Test userlist can be freed and used again */
+
+	struct user_list ulist;
+
+	memset(&ulist, 0, sizeof(ulist));
+
+	const char **p, *users[] = {
+		"aaa", "bbb", "ccc", "ddd", "eee", "fff",
+		"ggg", "hhh", "iii", "jjj", "kkk", "lll",
+		"mmm", "nnn", "ooo", "ppp", "qqq", "rrr",
+		"sss", "ttt", "uuu", "vvv", "www", "xxx",
+		"yyy", "zzz", NULL
+	};
+
+	for (p = users; *p; p++) {
+		if (user_list_add(&ulist, *p, MODE_EMPTY) != USER_ERR_NONE)
+			abort_test("Failed to add users to list");
+	}
+
+	user_list_free(&ulist);
+
+	for (p = users; *p; p++) {
+		if (user_list_add(&ulist, *p, MODE_EMPTY) != USER_ERR_NONE)
+			fail_testf("Duplicate user: %s", *p);
+	}
+
+	user_list_free(&ulist);
+}
+
 int
 main(void)
 {
 	testcase tests[] = {
-		TESTCASE(test_user_list)
+		TESTCASE(test_user_list),
+		TESTCASE(test_user_list_free)
 	};
 
 	return run_tests(tests);

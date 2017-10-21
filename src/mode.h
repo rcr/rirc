@@ -4,7 +4,7 @@
 /* usermodes, chanmodes and prfxmode configuration
  *
  * `usermodes`, `chanmodes`, parsed from numeric 004 (RPL_MYINFO)
- * `CHANMODES`, `PREFIX`, parsed from numeric 005 (RPL_ISUPPORT)
+ * `CHANMODES`, `PREFIX`,    parsed from numeric 005 (RPL_ISUPPORT)
  *
  * Three categories of modes exist, depending on the MODE message target:
  *   - Modes set server-wide for the rirc user (usermode)
@@ -39,14 +39,14 @@
 
 #include <stdint.h>
 
-/* [a-zA-Z] */
+/* [azAZ] */
 #define MODE_STR_LEN 26 * 2
 
 #define MODE_EMPTY (struct mode) \
 {                \
-	.prefix = 0, \
-	.lower  = 0, \
-	.upper  = 0, \
+    .prefix = 0, \
+    .lower  = 0, \
+    .upper  = 0, \
 }
 
 enum mode_err
@@ -127,18 +127,18 @@ struct mode_str
 	enum mode_str_t type;
 };
 
-enum mode_flag_t mode_flag_t(struct mode_config *config, int, int);
+enum mode_flag_t mode_flag_t(const struct mode_config*, int, int);
 
 enum mode_err mode_config(struct mode_config*, const char*, enum mode_config_t);
 
-enum mode_err mode_chanmode_set(struct mode*, struct mode_config*, int, enum mode_set_t);
-enum mode_err mode_prfxmode_set(struct mode*, struct mode_config*, int, enum mode_set_t);
-enum mode_err mode_usermode_set(struct mode*, struct mode_config*, int, enum mode_set_t);
+enum mode_err mode_chanmode_set(struct mode*, const struct mode_config*, int, enum mode_set_t);
+enum mode_err mode_prfxmode_set(struct mode*, const struct mode_config*, int, enum mode_set_t);
+enum mode_err mode_usermode_set(struct mode*, const struct mode_config*, int, enum mode_set_t);
 
-enum mode_err mode_chanmode_prefix(struct mode*, struct mode_config*, int);
-enum mode_err mode_prfxmode_prefix(struct mode*, struct mode_config*, int);
+enum mode_err mode_chanmode_prefix(struct mode*, const struct mode_config*, int);
+enum mode_err mode_prfxmode_prefix(struct mode*, const struct mode_config*, int);
 
-char* mode_str(struct mode*, struct mode_str*);
+char* mode_str(const struct mode*, struct mode_str*);
 
 void mode_reset(struct mode*, struct mode_str*);
 

@@ -27,7 +27,9 @@ test_mode_str(void)
 	/* Test setting mode string */
 
 	struct mode m = MODE_EMPTY;
-	struct mode_str m_str = {0};
+	struct mode_str m_str;
+
+	memset(&m_str, 0, sizeof(struct mode_str));
 
 	/* mode_str type not set */
 	assert_fatal(mode_str(&m, &m_str));
@@ -475,7 +477,7 @@ test_mode_config_modes(void)
 }
 
 static void
-test_mode_flag_t(void)
+test_chanmode_type(void)
 {
 	/* Test retrieving a mode flag type */
 
@@ -492,37 +494,33 @@ test_mode_flag_t(void)
 		abort_test("Configuration error");
 
 	/* Test invalid '+'/'-' */
-	assert_eq(mode_flag_t(&c, '=', 'a'), MODE_FLAG_INVALID);
+	assert_eq(chanmode_type(&c, '=', 'a'), MODE_FLAG_INVALID);
 
 	/* Test invalid flag */
-	assert_eq(mode_flag_t(&c, '+', '!'), MODE_FLAG_INVALID);
+	assert_eq(chanmode_type(&c, '+', '!'), MODE_FLAG_INVALID);
 
 	/* Test flag not in usermodes, chanmodes */
-	assert_eq(mode_flag_t(&c, '+', 'z'), MODE_FLAG_INVALID);
-
-	/* Test usermode flag */
-	assert_eq(mode_flag_t(&c, '+', 'a'), MODE_FLAG_USERMODE);
-	assert_eq(mode_flag_t(&c, '-', 'a'), MODE_FLAG_USERMODE);
+	assert_eq(chanmode_type(&c, '+', 'z'), MODE_FLAG_INVALID);
 
 	/* Test chanmode A (always has a parameter) */
-	assert_eq(mode_flag_t(&c, '+', 'b'), MODE_FLAG_CHANMODE_PARAM);
-	assert_eq(mode_flag_t(&c, '-', 'b'), MODE_FLAG_CHANMODE_PARAM);
+	assert_eq(chanmode_type(&c, '+', 'b'), MODE_FLAG_CHANMODE_PARAM);
+	assert_eq(chanmode_type(&c, '-', 'b'), MODE_FLAG_CHANMODE_PARAM);
 
 	/* Test chanmode B (always has a parameter) */
-	assert_eq(mode_flag_t(&c, '+', 'c'), MODE_FLAG_CHANMODE_PARAM);
-	assert_eq(mode_flag_t(&c, '-', 'c'), MODE_FLAG_CHANMODE_PARAM);
+	assert_eq(chanmode_type(&c, '+', 'c'), MODE_FLAG_CHANMODE_PARAM);
+	assert_eq(chanmode_type(&c, '-', 'c'), MODE_FLAG_CHANMODE_PARAM);
 
 	/* Test chanmode C (only has a parameter when set) */
-	assert_eq(mode_flag_t(&c, '+', 'd'), MODE_FLAG_CHANMODE_PARAM);
-	assert_eq(mode_flag_t(&c, '-', 'd'), MODE_FLAG_CHANMODE);
+	assert_eq(chanmode_type(&c, '+', 'd'), MODE_FLAG_CHANMODE_PARAM);
+	assert_eq(chanmode_type(&c, '-', 'd'), MODE_FLAG_CHANMODE);
 
 	/* Test chanmode D (never has a parameter) */
-	assert_eq(mode_flag_t(&c, '+', 'e'), MODE_FLAG_CHANMODE);
-	assert_eq(mode_flag_t(&c, '-', 'e'), MODE_FLAG_CHANMODE);
+	assert_eq(chanmode_type(&c, '+', 'e'), MODE_FLAG_CHANMODE);
+	assert_eq(chanmode_type(&c, '-', 'e'), MODE_FLAG_CHANMODE);
 
 	/* Test prefix flag */
-	assert_eq(mode_flag_t(&c, '+', 'f'), MODE_FLAG_PREFIX);
-	assert_eq(mode_flag_t(&c, '-', 'f'), MODE_FLAG_PREFIX);
+	assert_eq(chanmode_type(&c, '+', 'f'), MODE_FLAG_PREFIX);
+	assert_eq(chanmode_type(&c, '-', 'f'), MODE_FLAG_PREFIX);
 }
 
 int
@@ -541,7 +539,7 @@ main(void)
 		TESTCASE(test_mode_config_subtypes),
 		TESTCASE(test_mode_config_prefix),
 		TESTCASE(test_mode_config_modes),
-		TESTCASE(test_mode_flag_t)
+		TESTCASE(test_chanmode_type)
 	};
 
 	return run_tests(tests);

@@ -125,4 +125,6 @@ void
 user_list_free(struct user_list *ul)
 {
 	AVL_FOREACH(user_list, ul, user_free);
+
+	memset(ul, 0, sizeof(*ul));
 }

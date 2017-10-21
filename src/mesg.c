@@ -1083,10 +1083,14 @@ recv_nick(char *err, struct parsed_mesg *p, struct server *s)
 	struct channel *c = s->channel;
 	//TODO: channel_list_foreach
 	do {
-		if (user_list_rpl(&(c->users), p->from, nick) == USER_ERR_DUPLICATE)
-			newlinef(c, 0, "-!!-", "Error: user '%s' alread on channel '%s'", p->from, c->name.str);
-		else
+		enum user_err ret;
+
+		if ((ret = user_list_rpl(&(c->users), p->from, nick)) == USER_ERR_NONE)
 			newlinef(c, 0, "--", "%s  >>  %s", p->from, nick);
+
+		else if (ret == USER_ERR_DUPLICATE)
+			newlinef(c, 0, "-!!-", "Error: user '%s' alread on channel '%s'", p->from, c->name.str);
+
 	} while ((c = c->next) != s->channel);
 
 	return 0;
@@ -1267,6 +1271,7 @@ recv_numeric(char *err, struct parsed_mesg *p, struct server *s)
 
 	/* 353 ("="/"*"/"@") <channel> :*([ "@" / "+" ]<nick>) */
 	case RPL_NAMREPLY:
+
 		/* @:secret   *:private   =:public */
 		if (!(type = getarg(&p->params, " ")))
 			fail("RPL_NAMEREPLY: type is null");

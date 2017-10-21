@@ -20,7 +20,7 @@ enum mode_chanmode_prefix_t
 	MODE_CHANMODE_PREFIX_T_SIZE
 };
 
-static inline int mode_isset(struct mode*, int);
+static inline int mode_isset(const struct mode*, int);
 static inline uint32_t flag_bit(int);
 
 static enum mode_err mode_config_chanmodes(struct mode_config*, const char*);
@@ -34,7 +34,7 @@ static enum mode_err mode_config_modes(struct mode_config*, const char*);
 /* TODO: static inline void mode_bit_isset(struct mode*, uint32_t); */
 
 static inline int
-mode_isset(struct mode *m, int flag)
+mode_isset(const struct mode *m, int flag)
 {
 	/* Test if mode flag is set, assumes valid flag */
 
@@ -165,7 +165,7 @@ mode_config(struct mode_config *config, const char *config_str, enum mode_config
 }
 
 enum mode_err
-mode_chanmode_set(struct mode *m, struct mode_config *config, int flag, enum mode_set_t set_t)
+mode_chanmode_set(struct mode *m, const struct mode_config *config, int flag, enum mode_set_t set_t)
 {
 	/* Set/unset chanmode flags
 	 *
@@ -264,7 +264,7 @@ mode_chanmode_set(struct mode *m, struct mode_config *config, int flag, enum mod
 }
 
 enum mode_err
-mode_prfxmode_set(struct mode *m, struct mode_config *config, int flag, enum mode_set_t set_t)
+mode_prfxmode_set(struct mode *m, const struct mode_config *config, int flag, enum mode_set_t set_t)
 {
 	/* Set/unset prfxmode flags and mode prefix */
 
@@ -280,8 +280,8 @@ mode_prfxmode_set(struct mode *m, struct mode_config *config, int flag, enum mod
 	else
 		MODE_SET(m->upper, bit, set_t);
 
-	char *f = config->PREFIX.F,
-	     *t = config->PREFIX.T;
+	const char *f = config->PREFIX.F,
+	           *t = config->PREFIX.T;
 
 	while (*f) {
 
@@ -298,7 +298,7 @@ mode_prfxmode_set(struct mode *m, struct mode_config *config, int flag, enum mod
 }
 
 enum mode_err
-mode_usermode_set(struct mode *m, struct mode_config *config, int flag, enum mode_set_t set_t)
+mode_usermode_set(struct mode *m, const struct mode_config *config, int flag, enum mode_set_t set_t)
 {
 	/* Set/unset usermode flags */
 
@@ -318,7 +318,7 @@ mode_usermode_set(struct mode *m, struct mode_config *config, int flag, enum mod
 }
 
 enum mode_err
-mode_chanmode_prefix(struct mode *m, struct mode_config *config, int flag)
+mode_chanmode_prefix(struct mode *m, const struct mode_config *config, int flag)
 {
 	/* Set chanmode flag and prefix give the prefix character, e.g.:
 	 *
@@ -360,7 +360,7 @@ mode_chanmode_prefix(struct mode *m, struct mode_config *config, int flag)
 }
 
 enum mode_err
-mode_prfxmode_prefix(struct mode *m, struct mode_config *config, int flag)
+mode_prfxmode_prefix(struct mode *m, const struct mode_config *config, int flag)
 {
 	/* Set prfxmode flag and prefix given the prefix character, e.g.: 
 	 *
@@ -371,8 +371,8 @@ mode_prfxmode_prefix(struct mode *m, struct mode_config *config, int flag)
 
 	uint32_t bit;
 
-	char *f = config->PREFIX.F,
-	     *t = config->PREFIX.T;
+	const char *f = config->PREFIX.F,
+	           *t = config->PREFIX.T;
 
 	while (*t != flag) {
 
@@ -396,7 +396,7 @@ mode_prfxmode_prefix(struct mode *m, struct mode_config *config, int flag)
 }
 
 char*
-mode_str(struct mode *m, struct mode_str *m_str)
+mode_str(const struct mode *m, struct mode_str *m_str)
 {
 	/* Write the mode bits to a mode string */
 
@@ -672,9 +672,9 @@ mode_config_modes(struct mode_config *config, const char *str)
 }
 
 enum mode_flag_t
-mode_flag_t(struct mode_config *config, int set, int flag)
+chanmode_type(struct mode_config *config, int set, int flag)
 {
-	/* Return the mode flag type specified by config where:
+	/* Return the chanmode flag type specified by config where:
 	 *
 	 *  - set  = [+-]
 	 *  - flag = [azAZ]
@@ -682,9 +682,6 @@ mode_flag_t(struct mode_config *config, int set, int flag)
 
 	if (!(set == '+' || set == '-'))
 		return MODE_FLAG_INVALID;
-
-	if (mode_isset(&(config->usermodes), flag))
-		return MODE_FLAG_USERMODE;
 
 	if (mode_isset(&(config->chanmodes), flag)) {
 
