@@ -78,8 +78,8 @@ static int recv_numeric(char*, struct parsed_mesg*, struct server*);
 /* Handler for errors deemed fatal to a server's state */
 static void server_fatal(struct server*, char*, ...);
 
-static int recv_mode_chanmodes(char*, char*, struct channel*);
-static int recv_mode_usermodes(char*, char*, struct server*);
+static int recv_mode_chanmodes(char*, struct parsed_mesg*, const struct mode_config*, struct channel*);
+static int recv_mode_usermodes(char*, struct parsed_mesg*, const struct mode_config*, struct server*);
 
 /* Numeric Reply Codes */
 enum numeric {
@@ -1034,7 +1034,12 @@ recv_kick(char *err, struct parsed_mesg *p, struct server *s)
 static int
 recv_mode(char *err, struct parsed_mesg *p, struct server *s)
 {
-	/* :nick!user@hostname.domain MODE <targ> *( ( "-" / "+" ) *<modes> *<modeparams> )
+	/* MODE <targ> 1*[<modestring> [<mode arguments>]]
+	 *
+	 * modestring  =  1*(modeset)
+	 * modeset     =  plusminus *(modechar)
+	 * plusminus   =  %x53 / %x55            ; '+' / '-'
+	 * modechar    =  ALPHA
 	 *
 	 * Any number of mode flags can be set or unset in a MODE message, but
 	 * the maximum number of modes with parameters is given by the server's
@@ -1053,38 +1058,82 @@ recv_mode(char *err, struct parsed_mesg *p, struct server *s)
 
 	struct channel *c;
 
-	char *targ, *modes;
+	char *targ;
 
 	if (!(targ = getarg(&p->params, " ")))
 		fail("MODE: target is null");
 
-	if (!(modes = getarg(&p->params, " ")))
-		fail("MODE: modes are null");
-
 	if (IS_ME(targ))
-		return recv_mode_usermodes(err, modes, s);
+		return recv_mode_usermodes(err, p, &(s->mode_config), s);
 
 	if ((c = channel_list_get(&s->clist, targ)))
-		return recv_mode_chanmodes(err, modes, c);
+		return recv_mode_chanmodes(err, p, &(s->mode_config), c);
 
 	failf("MODE: target '%s' not found", targ);
 }
 
 static int
-recv_mode_chanmodes(char *err, char *modes, struct channel *c)
+recv_mode_chanmodes(char *err, struct parsed_mesg *p, const struct mode_config *config, struct channel *c)
 {
 	(void)(err);
-	(void)(modes);
+	(void)(p);
+	(void)(config);
 	(void)(c);
 	return 0;
 }
 
 static int
-recv_mode_usermodes(char *err, char *modes, struct server *s)
+recv_mode_usermodes(char *err, struct parsed_mesg *p, const struct mode_config *config, struct server *s)
 {
-	(void)(err);
-	(void)(modes);
-	(void)(s);
+	struct mode *usermodes = &(s->usermodes);
+
+	char c, *modes;
+	enum mode_err_t mode_err;
+	enum mode_set_t mode_set;
+
+#define MODE_GETARG(M, P) \
+	(((M) = getarg(&(P)->params, " ")) || ((M) = getarg(&(P)->trailing, " ")))
+
+	if (!MODE_GETARG(modes, p))
+		fail("MODE: modes are null");
+
+	do {
+		mode_set = MODE_SET_INVALID;
+
+		while ((c = *modes++)) {
+
+			if (c == '+') {
+				mode_set = MODE_SET_ON;
+				continue;
+			}
+
+			if (c == '-') {
+				mode_set = MODE_SET_OFF;
+				continue;
+			}
+
+			mode_err = mode_usermode_set(usermodes, config, c, mode_set);
+
+			if (mode_err == MODE_ERR_NONE)
+				newlinef(s->channel, 0, "--", "%s%smode: %c%c",
+						(p->from ? p->from : ""),
+						(p->from ? " set " : ""),
+						(mode_set == MODE_SET_ON ? '+' : '-'),
+						c);
+
+			else if (mode_err == MODE_ERR_INVALID_SET)
+				newlinef(s->channel, 0, "-!!-", "MODE: missing '+'/'-'");
+
+			else if (mode_err == MODE_ERR_INVALID_FLAG)
+				newlinef(s->channel, 0, "-!!-", "MODE: invalid flag '%c'", c);
+		}
+	} while (MODE_GETARG(modes, p));
+
+#undef MODE_GETARG
+
+	mode_str(usermodes, &(s->usermodes_str));
+	draw_status();
+
 	return 0;
 }
 

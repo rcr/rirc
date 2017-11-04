@@ -41,7 +41,6 @@ struct server
 	void *connecting;
 	//TODO: WIP
 	struct channel_list clist;
-
 	struct mode        usermodes;
 	struct mode_str    usermodes_str;
 	struct mode_config mode_config;

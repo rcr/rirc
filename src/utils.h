@@ -5,6 +5,11 @@
 #include <stddef.h>
 
 /* Parsed IRC message */
+
+/* FIXME: don't seperate trailing from params
+ * simplify retrieving/tokenizing arguments
+ * from a parsed_mesg struct
+ */
 struct parsed_mesg
 {
 	char *from;

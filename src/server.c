@@ -38,6 +38,7 @@ server(char *host, char *port, char *nicks)
 
 	s->nicks = strdup(nicks);
 
+	s->usermodes_str.type = MODE_STR_USERMODE;
 	mode_config(&(s->mode_config), NULL, MODE_CONFIG_DEFAULTS);
 
 	return s;

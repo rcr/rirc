@@ -206,6 +206,9 @@ mode_chanmode_set(struct mode *m, const struct mode_config *config, int flag, en
 
 	uint32_t bit;
 
+	if (!(set_t == MODE_SET_ON || set_t == MODE_SET_OFF))
+		return MODE_ERR_INVALID_SET;
+
 	if (!mode_isset(&(config->chanmodes), flag))
 		return MODE_ERR_INVALID_FLAG;
 
@@ -270,6 +273,9 @@ mode_prfxmode_set(struct mode *m, const struct mode_config *config, int flag, en
 
 	uint32_t bit;
 
+	if (!(set_t == MODE_SET_ON || set_t == MODE_SET_OFF))
+		return MODE_ERR_INVALID_SET;
+
 	if (!strchr(config->PREFIX.F, flag))
 		return MODE_ERR_INVALID_FLAG;
 
@@ -303,6 +309,9 @@ mode_usermode_set(struct mode *m, const struct mode_config *config, int flag, en
 	/* Set/unset usermode flags */
 
 	uint32_t bit;
+
+	if (!(set_t == MODE_SET_ON || set_t == MODE_SET_OFF))
+		return MODE_ERR_INVALID_SET;
 
 	if (!mode_isset(&(config->usermodes), flag))
 		return MODE_ERR_INVALID_FLAG;

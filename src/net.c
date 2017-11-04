@@ -106,6 +106,7 @@ new_server(char *host, char *port, char *join, char *nicks)
 
 	s->channel = new_channel(host, s, NULL, BUFFER_SERVER);
 
+	s->usermodes_str.type = MODE_STR_USERMODE;
 	mode_config(&(s->mode_config), NULL, MODE_CONFIG_DEFAULTS);
 
 	DLL_ADD(server_head, s);
