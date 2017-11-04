@@ -49,7 +49,7 @@
     .upper  = 0, \
 }
 
-enum mode_err
+enum mode_err_t
 {
 	MODE_ERR_INVALID_CONFIG = -3,
 	MODE_ERR_INVALID_PREFIX = -2,
@@ -72,7 +72,7 @@ enum mode_set_t
 {
 	MODE_SET_OFF = 0,
 	MODE_SET_ON  = 1,
-	MODE_SET_SIZE_T
+	MODE_SET_T_SIZE
 };
 
 /* Mode string printing requirements differs by type */
@@ -85,10 +85,9 @@ enum mode_str_t
 	MODE_STR_T_SIZE
 };
 
-enum mode_flag_t
+enum chanmode_flag_t
 {
 	MODE_FLAG_INVALID,
-	MODE_FLAG_USERMODE,       /* Usermode flag */
 	MODE_FLAG_CHANMODE,       /* Chanmode flag without parameter */
 	MODE_FLAG_CHANMODE_PARAM, /* Chanmode flag with parameter */
 	MODE_FLAG_PREFIX,         /* Chanmode flag that sets prfxmode */
@@ -127,16 +126,16 @@ struct mode_str
 	enum mode_str_t type;
 };
 
-enum mode_flag_t mode_flag_t(const struct mode_config*, int, int);
+enum chanmode_flag_t chanmode_type(const struct mode_config*, enum mode_set_t, int);
 
-enum mode_err mode_config(struct mode_config*, const char*, enum mode_config_t);
+enum mode_err_t mode_config(struct mode_config*, const char*, enum mode_config_t);
 
-enum mode_err mode_chanmode_set(struct mode*, const struct mode_config*, int, enum mode_set_t);
-enum mode_err mode_prfxmode_set(struct mode*, const struct mode_config*, int, enum mode_set_t);
-enum mode_err mode_usermode_set(struct mode*, const struct mode_config*, int, enum mode_set_t);
+enum mode_err_t mode_chanmode_set(struct mode*, const struct mode_config*, int, enum mode_set_t);
+enum mode_err_t mode_prfxmode_set(struct mode*, const struct mode_config*, int, enum mode_set_t);
+enum mode_err_t mode_usermode_set(struct mode*, const struct mode_config*, int, enum mode_set_t);
 
-enum mode_err mode_chanmode_prefix(struct mode*, const struct mode_config*, int);
-enum mode_err mode_prfxmode_prefix(struct mode*, const struct mode_config*, int);
+enum mode_err_t mode_chanmode_prefix(struct mode*, const struct mode_config*, int);
+enum mode_err_t mode_prfxmode_prefix(struct mode*, const struct mode_config*, int);
 
 char* mode_str(const struct mode*, struct mode_str*);
 

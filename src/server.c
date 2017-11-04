@@ -67,7 +67,7 @@ server_set_004(struct server *s, char *str)
 	if (!(chan_modes = getarg(&str, " ")))
 		newline(c, 0, "-!!-", "invalid numeric 004: chan_modes is null");
 
-	enum mode_err err;
+	enum mode_err_t err;
 
 	if (user_modes) {
 
@@ -166,7 +166,7 @@ server_set_CHANMODES(struct server *s, char *val)
 			newlinef(s->channel, 0, "DEBUG", "Setting numeric 005 CHANMODES: %s", val);
 #endif
 
-	enum mode_err err;
+	enum mode_err_t err;
 
 	err = mode_config(&(s->mode_config), val, MODE_CONFIG_SUBTYPES);
 
@@ -182,7 +182,7 @@ server_set_PREFIX(struct server *s, char *val)
 			newlinef(s->channel, 0, "DEBUG", "Setting numeric 005 PREFIX: %s", val);
 #endif
 
-	enum mode_err err;
+	enum mode_err_t err;
 
 	err = mode_config(&(s->mode_config), val, MODE_CONFIG_PREFIX);
 
@@ -198,7 +198,7 @@ server_set_MODES(struct server *s, char *val)
 			newlinef(s->channel, 0, "DEBUG", "Setting numeric 005 MODES: %s", val);
 #endif
 
-	enum mode_err err;
+	enum mode_err_t err;
 
 	err = mode_config(&(s->mode_config), val, MODE_CONFIG_MODES);
 

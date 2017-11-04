@@ -21,7 +21,7 @@
 #define fail_if(C) \
 	do { if (C) return 1; } while (0)
 
-#define IS_ME(X) !strcmp(X, s->nick)
+#define IS_ME(X) !strcmp((X), s->nick)
 
 /* Must be kept in sync with mesg.gperf hash table */
 #define SEND_HANDLERS \
@@ -77,6 +77,9 @@ static int recv_numeric(char*, struct parsed_mesg*, struct server*);
 
 /* Handler for errors deemed fatal to a server's state */
 static void server_fatal(struct server*, char*, ...);
+
+static int recv_mode_chanmodes(char*, char*, struct channel*);
+static int recv_mode_usermodes(char*, char*, struct server*);
 
 /* Numeric Reply Codes */
 enum numeric {
@@ -136,6 +139,7 @@ struct send_handler
 	int (*func)(char*, char*, struct server*, struct channel*);
 };
 
+/* TODO: prototype this and other functions */
 static unsigned int
 send_handler_hash(register const char *str, register size_t len)
 {
@@ -1030,34 +1034,57 @@ recv_kick(char *err, struct parsed_mesg *p, struct server *s)
 static int
 recv_mode(char *err, struct parsed_mesg *p, struct server *s)
 {
-	/* :nick!user@hostname.domain MODE <targ> *( ( "-" / "+" ) *<modes> *<modeparams> ) */
-
-	/* TODO:
+	/* :nick!user@hostname.domain MODE <targ> *( ( "-" / "+" ) *<modes> *<modeparams> )
 	 *
-	 * Breaking recv_mode, needs full rewrite.
+	 * Any number of mode flags can be set or unset in a MODE message, but
+	 * the maximum number of modes with parameters is given by the server's
+	 * MODES configuration.
 	 *
-	 * Get target as either:
-	 *   - usermode (rirc user)
-	 *   - chanmode (channel)
-	 *   - prfxmode (user on channel (flag in PREFIX))
+	 * Mode flags that require a parameter are configured as the server's
+	 * CHANMODE subtypes; A,B,C,D
 	 *
-	 * Call the appropriate mode setting function
+	 * The following formats are equivalent, if e.g.:
+	 *  - 'a' and 'c' require parameters
+	 *  - 'b' has no parameter
 	 *
-	 * Draw the appropriate component
-	 *
-	 * */
-
-	/* TODO: THIS */
-
-	/* FIXME
-	 * MODE user :+abc
-	 * MODE #chan +abc
+	 *   MODE <chan> +ab  <param a> +c <param c>
+	 *   MODE <chan> +abc <param a>    <param c>
 	 */
 
-	UNUSED(err);
-	UNUSED(p);
-	UNUSED(s);
+	struct channel *c;
 
+	char *targ, *modes;
+
+	if (!(targ = getarg(&p->params, " ")))
+		fail("MODE: target is null");
+
+	if (!(modes = getarg(&p->params, " ")))
+		fail("MODE: modes are null");
+
+	if (IS_ME(targ))
+		return recv_mode_usermodes(err, modes, s);
+
+	if ((c = channel_list_get(&s->clist, targ)))
+		return recv_mode_chanmodes(err, modes, c);
+
+	failf("MODE: target '%s' not found", targ);
+}
+
+static int
+recv_mode_chanmodes(char *err, char *modes, struct channel *c)
+{
+	(void)(err);
+	(void)(modes);
+	(void)(c);
+	return 0;
+}
+
+static int
+recv_mode_usermodes(char *err, char *modes, struct server *s)
+{
+	(void)(err);
+	(void)(modes);
+	(void)(s);
 	return 0;
 }
 

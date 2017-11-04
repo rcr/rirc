@@ -8,6 +8,8 @@
  *          line(n).user             line(n+1).user
  *
  * will allow removal of text/from truncation
+ *    - line pointers would have to be updated (by offset) to point to the
+ *      newly allocated space if it moves
  *
  * TODO: cache a sensible number of line breaks (2?) against the line width
  * and dynamically calculate the rest, terminal size rarely changes

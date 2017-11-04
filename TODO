@@ -2,9 +2,17 @@ TODO
 ---------------------------
 this iteration:
 	- Proper mode support (struct cmode/umode)
+	- bug, nick 'aaa' shortened to +a with prefix
+	 22:04  -- ~ Topic set by blah
+     22:52   > ~ foo has joined ##channel
+     00:11  +a ~ hi
 
 next iteration:
+	- segfault on reconnect/rejoin?
 	- hook up new server/channel/mode/etc implementations
+
+next next iteration:
+	- TODO/FIXME cleanups
 
 Continue refactoring:
 	- Move/split components (e.g. server, channel, input, etc):
@@ -28,6 +36,15 @@ Continue refactoring:
 RFC compliance:
 	- List required message types and associated error messages
 	- List all message types and error numerics from RFC, mark handled/unhandled
+
+Testing:
+	- Stateful code integration testing
+	- Coverage (gcov)
+		- link test/foo.c against src/foo.o built with coverage flags
+	- Fuzzing handlers (afl)
+	- Try musl C
+
+TLS/SASL
 
 ----------------------
 	/NICKS, /IGNORE, /UNIGNORE,

@@ -253,6 +253,7 @@ connected(struct server *s)
 	//or should auto_nick take a server argument and write to a buffer of NICKSIZE length?
 }
 
+/* TODO: on failed connection, initiate rolling backoff reconnection attempt */
 static void*
 threaded_connect(void *arg)
 {

@@ -45,7 +45,7 @@ $(BDIR_T)%.t:
 
 clean:
 	@echo cleaning
-	@rm -f rirc $(BDIR)/*{o,d} $(BDIR_T)/*.{t,d}
+	@rm -f rirc $(BDIR)/*{o,d} $(BDIR_T)/*.{t,d,td}
 
 debug: CFLAGS   = $(CFLAGS_DEBUG)
 debug: LDFLAGS += $(LDFLAGS_DEBUG)

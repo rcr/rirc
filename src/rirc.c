@@ -199,6 +199,11 @@ startup(int argc, char **argv)
 	config.default_nick = getenv("USER");
 
 	for (i = 0; i <= server_i; i++) {
+
+		//TODO: - split server.c / net.c
+		//      - add servers to server list
+		//      - add channels per server to server's channel list
+		//      - initiate connection
 		server_connect(
 			auto_servers[i].host,
 			auto_servers[i].port ? auto_servers[i].port : "6667",

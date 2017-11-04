@@ -494,33 +494,33 @@ test_chanmode_type(void)
 		abort_test("Configuration error");
 
 	/* Test invalid '+'/'-' */
-	assert_eq(chanmode_type(&c, '=', 'a'), MODE_FLAG_INVALID);
+	assert_eq(chanmode_type(&c, MODE_SET_T_SIZE, 'a'), MODE_FLAG_INVALID);
 
 	/* Test invalid flag */
-	assert_eq(chanmode_type(&c, '+', '!'), MODE_FLAG_INVALID);
+	assert_eq(chanmode_type(&c, MODE_SET_ON, '!'), MODE_FLAG_INVALID);
 
 	/* Test flag not in usermodes, chanmodes */
-	assert_eq(chanmode_type(&c, '+', 'z'), MODE_FLAG_INVALID);
+	assert_eq(chanmode_type(&c, MODE_SET_ON, 'z'), MODE_FLAG_INVALID);
 
 	/* Test chanmode A (always has a parameter) */
-	assert_eq(chanmode_type(&c, '+', 'b'), MODE_FLAG_CHANMODE_PARAM);
-	assert_eq(chanmode_type(&c, '-', 'b'), MODE_FLAG_CHANMODE_PARAM);
+	assert_eq(chanmode_type(&c, MODE_SET_ON,  'b'), MODE_FLAG_CHANMODE_PARAM);
+	assert_eq(chanmode_type(&c, MODE_SET_OFF, 'b'), MODE_FLAG_CHANMODE_PARAM);
 
 	/* Test chanmode B (always has a parameter) */
-	assert_eq(chanmode_type(&c, '+', 'c'), MODE_FLAG_CHANMODE_PARAM);
-	assert_eq(chanmode_type(&c, '-', 'c'), MODE_FLAG_CHANMODE_PARAM);
+	assert_eq(chanmode_type(&c, MODE_SET_ON,  'c'), MODE_FLAG_CHANMODE_PARAM);
+	assert_eq(chanmode_type(&c, MODE_SET_OFF, 'c'), MODE_FLAG_CHANMODE_PARAM);
 
 	/* Test chanmode C (only has a parameter when set) */
-	assert_eq(chanmode_type(&c, '+', 'd'), MODE_FLAG_CHANMODE_PARAM);
-	assert_eq(chanmode_type(&c, '-', 'd'), MODE_FLAG_CHANMODE);
+	assert_eq(chanmode_type(&c, MODE_SET_ON,  'd'), MODE_FLAG_CHANMODE_PARAM);
+	assert_eq(chanmode_type(&c, MODE_SET_OFF, 'd'), MODE_FLAG_CHANMODE);
 
 	/* Test chanmode D (never has a parameter) */
-	assert_eq(chanmode_type(&c, '+', 'e'), MODE_FLAG_CHANMODE);
-	assert_eq(chanmode_type(&c, '-', 'e'), MODE_FLAG_CHANMODE);
+	assert_eq(chanmode_type(&c, MODE_SET_ON,  'e'), MODE_FLAG_CHANMODE);
+	assert_eq(chanmode_type(&c, MODE_SET_OFF, 'e'), MODE_FLAG_CHANMODE);
 
 	/* Test prefix flag */
-	assert_eq(chanmode_type(&c, '+', 'f'), MODE_FLAG_PREFIX);
-	assert_eq(chanmode_type(&c, '-', 'f'), MODE_FLAG_PREFIX);
+	assert_eq(chanmode_type(&c, MODE_SET_ON,  'f'), MODE_FLAG_PREFIX);
+	assert_eq(chanmode_type(&c, MODE_SET_OFF, 'f'), MODE_FLAG_PREFIX);
 }
 
 int
