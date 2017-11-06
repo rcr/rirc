@@ -7,15 +7,11 @@
 
 #include "buffer.h"
 #include "channel.h"
-
-struct server_list
-{
-	struct server *head;
-};
+#include "mode.h"
 
 struct server
 {
-	//TODO: strdup this. Remove arbitrary NICKSIZE
+	//TODO: struct string. Remove arbitrary NICKSIZE
 	char nick[NICKSIZE + 1];
 	//TODO: can be grouped together, autonick
 	char *nicks;
@@ -24,10 +20,10 @@ struct server
 	char *port;
 	//TODO: this shouldn't persist with the server,
 	// its only relevant on successful connection
+	// when parsing the cli args, add channels to the channel
+	// list, they'll be joined on connect
 	char *join;
-	char usermodes[MODE_SIZE];
-	//TODO: nicklist
-	struct avl_node *ignore;
+	struct user_list ignore;
 	//TODO channel_list
 	struct channel *channel;
 	//TODO:
@@ -45,12 +41,26 @@ struct server
 	void *connecting;
 	//TODO: WIP
 	struct channel_list clist;
+	struct mode        usermodes;
+	struct mode_str    usermodes_str;
+	struct mode_config mode_config;
 };
 
-//TODO:
-struct server* server(struct server*, char*, char*, char*);
+struct server_list
+{
+	struct server *head;
+};
+
+void server_set_004(struct server*, char*);
+void server_set_005(struct server*, char*);
+
+struct server* server(char*, char*, char*);
+
 struct server* server_add(struct server_list*, struct server*);
 struct server* server_get(struct server_list*, struct server*);
 struct server* server_del(struct server_list*, struct server*);
+
+//TODO
+void server_free(struct server*);
 
 #endif

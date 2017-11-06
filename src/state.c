@@ -116,7 +116,12 @@ newline(struct channel *c, enum buffer_line_t type, const char *from, const char
 {
 	/* Default wrapper for _newline because length of message won't be known */
 
-	_newline(c, type, from, mesg, strlen(mesg));
+	char errmesg[] = "newline error: mesg is null";
+
+	if (mesg == NULL)
+		_newline(c, type, from, errmesg, strlen(errmesg));
+	else
+		_newline(c, type, from, mesg, strlen(mesg));
 }
 
 void
@@ -129,7 +134,7 @@ newlinef(struct channel *c, enum buffer_line_t type, const char *from, const cha
 	va_list ap;
 
 	va_start(ap, fmt);
-	len = vsnprintf(buff, BUFFSIZE, fmt, ap);
+	len = vsnprintf(buff, BUFFSIZE - 1, fmt, ap);
 	va_end(ap);
 
 	if (len < 0)
@@ -146,7 +151,17 @@ _newline(struct channel *c, enum buffer_line_t type, const char *from, const cha
 	if (c == NULL)
 		fatal("channel is null", 0);
 
-	buffer_newline(&c->buffer, type, from, mesg, strlen(from), mesg_len);
+	struct user *u;
+
+	struct string _from = { .str = from };
+	struct string _text = { .str = mesg, .len = mesg_len };
+
+	if ((u = user_list_get(&(c->users), from, 0)) != NULL)
+		_from.len = u->nick.len;
+	else
+		_from.len = strlen(from);
+
+	buffer_newline(&(c->buffer), type, _from, _text, ((u == NULL) ? 0 : u->prfxmodes.prefix));
 
 	c->activity = MAX(c->activity, ACTIVITY_ACTIVE);
 
@@ -159,14 +174,13 @@ _newline(struct channel *c, enum buffer_line_t type, const char *from, const cha
 struct channel*
 new_channel(char *name, struct server *s, struct channel *chanlist, enum buffer_t type)
 {
-	struct channel *c;
+	struct channel *c = channel(name);
 
-	if ((c = calloc(1, sizeof(*c))) == NULL)
-		fatal("calloc", errno);
+	/* TODO: deprecated, move to channel.c */
 
 	c->buffer = buffer(type);
+	c->chanmodes_str.type = MODE_STR_CHANMODE;
 	c->input = new_input();
-	c->name = strdup(name);
 	c->server = s;
 
 	/* Append the new channel to the list */
@@ -184,11 +198,12 @@ new_channel(char *name, struct server *s, struct channel *chanlist, enum buffer_
 void
 free_channel(struct channel *c)
 {
-	nicklist_free(&(c->nicklist));
+	/* TODO: deprecated, move to channel.c */
 
+	user_list_free(&(c->users));
 	free_input(c->input);
-	free(c->name);
-	free(c);
+
+	channel_free(c);
 }
 
 void
@@ -226,17 +241,11 @@ action_close_server(char c)
 }
 
 void
-nicklist_print(struct channel *c)
-{
-	newline(c, 0, "TODO", "Print ignore list to channel");
-}
-
-void
 reset_channel(struct channel *c)
 {
-	memset(c->chanmodes, 0, MODE_SIZE);
+	mode_reset(&(c->chanmodes), &(c->chanmodes_str));
 
-	nicklist_free(&(c->nicklist));
+	user_list_free(&(c->users));
 }
 
 void
@@ -276,7 +285,7 @@ channel_close(struct channel *c)
 		/* Closing a channel */
 
 		if (c->buffer.type == BUFFER_CHANNEL && !c->parted)
-			sendf(NULL, c->server, "PART %s", c->name);
+			sendf(NULL, c->server, "PART %s", c->name.str);
 
 		/* If closing the current channel, update state to a new channel */
 		if (c == ccur) {
@@ -445,68 +454,6 @@ auto_nick(char **autonick, char *nick)
 	}
 
 	*nick = '\0';
-}
-
-static void
-set_mode_str(char mode_str[MODE_SIZE], const char *modes)
-{
-	/* Given a string of modes, eg: +abc, add or remove flags
-	 * from the mode_str set, maintaining alphabetic order */
-
-	char *ptr, pm = 0;
-
-	while (*modes) {
-
-		if (*modes == '-' || *modes == '+')
-			pm = *modes;
-
-		/* Silently skip invalid flags */
-		else if (!isalpha(*modes) || !pm)
-			;
-
-		/* Add flags */
-		else if (pm == '+' && !strchr(mode_str, *modes)) {
-
-			char *tmp;
-
-			/* Find location to insert, alphabetically */
-			for (ptr = mode_str; *ptr && *ptr < *modes; ptr++)
-				;
-
-			/* Shift flags */
-			for (tmp = strchr(mode_str, '\0') + 1; tmp > ptr; tmp--)
-				*tmp = *(tmp - 1);
-
-			*ptr = *modes;
-		}
-
-		/* Remove flags, if found */
-		else if (pm == '-' && (ptr = strchr(mode_str, *modes))) {
-			do {
-				*ptr = *(ptr + 1);
-			} while (*ptr++);
-		}
-
-		modes++;
-	}
-}
-
-void
-server_set_mode(struct server *s, const char *modes)
-{
-	set_mode_str(s->usermodes, modes);
-
-	if (ccur->server == s)
-		draw_status();
-}
-
-void
-channel_set_mode(struct channel *c, const char *modes)
-{
-	set_mode_str(c->chanmodes, modes);
-
-	if (ccur == c)
-		draw_status();
 }
 
 /* Usefull server/channel structure abstractions for drawing */

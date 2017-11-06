@@ -23,6 +23,7 @@
 #endif
 
 #include "buffer.h"
+#include "mode.h"
 #include "net.h"
 #include "state.h"
 #include "utils.h"
@@ -77,6 +78,9 @@ get_server_head(void)
 static struct server*
 new_server(char *host, char *port, char *join, char *nicks)
 {
+	/* FIXME: refactor connections out of server, use server constructor
+	 * from server.c*/
+
 	struct server *s;
 
 	if ((s = calloc(1, sizeof(*s))) == NULL)
@@ -101,6 +105,9 @@ new_server(char *host, char *port, char *join, char *nicks)
 	auto_nick(&(s->nptr), s->nick);
 
 	s->channel = new_channel(host, s, NULL, BUFFER_SERVER);
+
+	s->usermodes_str.type = MODE_STR_USERMODE;
+	mode_config(&(s->mode_config), NULL, MODE_CONFIG_DEFAULTS);
 
 	DLL_ADD(server_head, s);
 
@@ -164,6 +171,8 @@ sendf(char *err, struct server *s, const char *fmt, ...)
 
 	if (send(soc, sendbuff, len, 0) < 0)
 		SENDF_ERR(strerror(errno));
+
+#undef SENDF_ERR
 
 	return 0;
 }
@@ -245,6 +254,7 @@ connected(struct server *s)
 	//or should auto_nick take a server argument and write to a buffer of NICKSIZE length?
 }
 
+/* TODO: on failed connection, initiate rolling backoff reconnection attempt */
 static void*
 threaded_connect(void *arg)
 {
@@ -362,11 +372,12 @@ server_disconnect(struct server *s, int err, int kill, char *mesg)
 		close(s->soc);
 
 		/* Set all server attributes back to default */
-		memset(s->usermodes, 0, MODE_SIZE);
+		mode_reset(&(s->usermodes), &(s->usermodes_str));
 		s->soc = -1;
 		s->iptr = s->input;
 		s->nptr = s->nicks;
 		s->latency_delta = 0;
+
 
 		/* Reset the nick that reconnects will attempt to register with */
 		auto_nick(&(s->nptr), s->nick);

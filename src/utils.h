@@ -2,21 +2,31 @@
 #define UTILS_H
 
 #include <errno.h>
-
-//TODO: struct string { len, text[] } for
-// fields often strlen'ed, e.g. usernames, channel names, server names
-// strcmp comparing len == len && strlen
+#include <stddef.h>
 
 /* Parsed IRC message */
+
+/* FIXME: don't seperate trailing from params
+ * simplify retrieving/tokenizing arguments
+ * from a parsed_mesg struct
+ */
 struct parsed_mesg
 {
 	char *from;
 	char *host;
 	char *command;
-	char *params; /* TODO: char*[15] */
+	char *params;
 	char *trailing;
 };
 
+/* Dynamically allocated string with cached length */
+struct string
+{
+	const char *str;
+	size_t len;
+};
+
+int irc_isnickchar(const char);
 //TODO: replace comps to channel / nicks
 int irc_strcmp(const char*, const char*);
 int irc_strncmp(const char*, const char*, size_t);
@@ -27,6 +37,10 @@ char* word_wrap(int, char**, char*);
 
 int check_pinged(const char*, const char*);
 int parse_mesg(struct parsed_mesg*, char*);
+int skip_sp(char**);
+
+struct string* string(struct string*, const char*);
+void string_free(struct string*);
 
 void handle_error(int, const char*, ...);
 
@@ -69,6 +83,5 @@ extern int fatal_exit;
 			((N)->prev)->next = ((N)->next); \
 		} \
 	} while (0)
-
 
 #endif

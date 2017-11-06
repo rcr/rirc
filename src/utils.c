@@ -1,4 +1,3 @@
-#include <ctype.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -7,7 +6,33 @@
 
 #include "utils.h"
 
-static inline int irc_isnickchar(const char);
+#if !((' ' == 32) && ('!' == 33) && ('"' == 34) && ('#' == 35) \
+      && ('%' == 37) && ('&' == 38) && ('\'' == 39) && ('(' == 40) \
+      && (')' == 41) && ('*' == 42) && ('+' == 43) && (',' == 44) \
+      && ('-' == 45) && ('.' == 46) && ('/' == 47) && ('0' == 48) \
+      && ('1' == 49) && ('2' == 50) && ('3' == 51) && ('4' == 52) \
+      && ('5' == 53) && ('6' == 54) && ('7' == 55) && ('8' == 56) \
+      && ('9' == 57) && (':' == 58) && (';' == 59) && ('<' == 60) \
+      && ('=' == 61) && ('>' == 62) && ('?' == 63) && ('A' == 65) \
+      && ('B' == 66) && ('C' == 67) && ('D' == 68) && ('E' == 69) \
+      && ('F' == 70) && ('G' == 71) && ('H' == 72) && ('I' == 73) \
+      && ('J' == 74) && ('K' == 75) && ('L' == 76) && ('M' == 77) \
+      && ('N' == 78) && ('O' == 79) && ('P' == 80) && ('Q' == 81) \
+      && ('R' == 82) && ('S' == 83) && ('T' == 84) && ('U' == 85) \
+      && ('V' == 86) && ('W' == 87) && ('X' == 88) && ('Y' == 89) \
+      && ('Z' == 90) && ('[' == 91) && ('\\' == 92) && (']' == 93) \
+      && ('^' == 94) && ('_' == 95) && ('a' == 97) && ('b' == 98) \
+      && ('c' == 99) && ('d' == 100) && ('e' == 101) && ('f' == 102) \
+      && ('g' == 103) && ('h' == 104) && ('i' == 105) && ('j' == 106) \
+      && ('k' == 107) && ('l' == 108) && ('m' == 109) && ('n' == 110) \
+      && ('o' == 111) && ('p' == 112) && ('q' == 113) && ('r' == 114) \
+      && ('s' == 115) && ('t' == 116) && ('u' == 117) && ('v' == 118) \
+      && ('w' == 119) && ('x' == 120) && ('y' == 121) && ('z' == 122) \
+      && ('{' == 123) && ('|' == 124) && ('}' == 125) && ('~' == 126))
+/* The character set is not based on ISO-646.  */
+#error "gperf generated tables don't work with this execution character set. Please report a bug to <bug-gperf@gnu.org>."
+#endif
+
 static inline int irc_toupper(int);
 
 int fatal_exit;
@@ -78,7 +103,10 @@ getarg(char **str, const char *sep)
 char*
 strdup(const char *str)
 {
+	/* Return dynamically allocated duplicate string */
+
 	size_t len = strlen(str) + 1;
+
 	void *ret;
 
 	if ((ret = malloc(len)) == NULL)
@@ -87,6 +115,39 @@ strdup(const char *str)
 	return (char *) memcpy(ret, str, len);
 }
 
+struct string*
+string(struct string *s, const char *str)
+{
+	/* Return dynamically allocated duplicate string with cached length */
+
+	size_t len = strlen(str) + 1;
+
+	void *ret;
+
+	if ((ret = malloc(len)) == NULL)
+		fatal("malloc", errno);
+
+	s->len = len - 1;
+	s->str = memcpy(ret, str, len);
+
+	return s;
+}
+
+int
+skip_sp(char **str)
+{
+	char *p;
+
+	for (p = *str; *p && *p == ' '; p++)
+		;
+
+	*str = p;
+
+	return !!*p;
+}
+
+//TODO: CASEMAPPING,
+//        - if `ascii` only az->AZ is used for nick/channel comp
 static inline int
 irc_toupper(const int c)
 {
@@ -98,21 +159,26 @@ irc_toupper(const int c)
 	 * equivalence of two nicknames or channel names.
 	 */
 
-	switch(c) {
+	switch (c) {
+
 		case '{':
 			return '[';
+
 		case '}':
 			return ']';
+
 		case '|':
 			return '\\';
+
 		case '^':
 			return '~';
+
 		default:
 			return (c >= 'a' && c <= 'z') ? (c + 'A' - 'a') : c;
 	}
 }
 
-static inline int
+int
 irc_isnickchar(const char c)
 {
 	/* RFC 2812, section 2.3.1
@@ -251,30 +317,22 @@ parse_mesg(struct parsed_mesg *pm, char *mesg)
 
 	int param_count = 0;
 
-	while (*mesg) {
+	while (skip_sp(&mesg)) {
 
-		/* Skip whitespace before each parameter */
-		while (*mesg && *mesg == ' ')
-			mesg++;
-
-		/* Parameter found */
-		if (*mesg) {
-
-			/* Maximum number of parameters found */
-			if (param_count == 14) {
-				pm->trailing = mesg;
-				break;
-			}
-
-			/* Trailing section found */
-			if (*mesg == ':') {
-				pm->trailing = (mesg + 1);
-				break;
-			}
-
-			if (!pm->params)
-				pm->params = mesg;
+		/* Maximum number of parameters found */
+		if (param_count == 14) {
+			pm->trailing = mesg;
+			break;
 		}
+
+		/* Trailing section found */
+		if (*mesg == ':') {
+			pm->trailing = (mesg + 1);
+			break;
+		}
+
+		if (!pm->params)
+			pm->params = mesg;
 
 		while (*mesg && *mesg != ' ')
 			mesg++;

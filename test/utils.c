@@ -256,6 +256,29 @@ test_check_pinged(void)
 }
 
 void
+test_skip_sp(void)
+{
+	/* Test skipping space at the begging of a string pointer
+	 * and returning 0 when no non-space character is found */
+
+	char *mesg1 = "testing";
+	assert_eq(skip_sp(&mesg1), 1);
+	assert_strcmp(mesg1, "testing");
+
+	char *mesg2 = " testing ";
+	assert_eq(skip_sp(&mesg2), 1);
+	assert_strcmp(mesg2, "testing ");
+
+	char *mesg3 = "";
+	assert_eq(skip_sp(&mesg3), 0);
+	assert_strcmp(mesg3, "");
+
+	char *mesg4 = " ";
+	assert_eq(skip_sp(&mesg4), 0);
+	assert_strcmp(mesg4, "");
+}
+
+void
 test_word_wrap(void)
 {
 	/*	_test_word_wrap(
@@ -379,6 +402,19 @@ test_word_wrap(void)
 		fail_test("seg1 should be advanced to end of string");
 }
 
+static void
+test_string(void)
+{
+	struct string s;
+
+	string(&s, "abcde");
+
+	assert_strcmp(s.str, "abcde");
+	assert_eq((int)s.len, 5);
+
+	free((void*)s.str);
+}
+
 int
 main(void)
 {
@@ -389,7 +425,9 @@ main(void)
 		TESTCASE(test_irc_strncmp),
 		TESTCASE(test_irc_toupper),
 		TESTCASE(test_parse_mesg),
-		TESTCASE(test_word_wrap)
+		TESTCASE(test_skip_sp),
+		TESTCASE(test_word_wrap),
+		TESTCASE(test_string)
 	};
 
 	return run_tests(tests);

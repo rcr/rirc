@@ -1,6 +1,8 @@
 #ifndef TEST_H
 #define TEST_H
 
+/* TODO: list the test types at the top of file with usage */
+
 #include <inttypes.h>
 #include <setjmp.h>
 #include <stdio.h>
@@ -22,7 +24,7 @@ static jmp_buf _testcase_jmp_buf_;
 static int _assert_fatal_, _failures_, _failures_t_, _failure_printed_;
 static char _tc_errbuf_[512];
 
-static int _assert_strcmp(char*, char*);
+static int _assert_strcmp(const char*, const char*);
 
 static void _print_testcase_name_(const char*);
 
@@ -40,6 +42,25 @@ static void _print_testcase_name_(const char*);
 		printf(__VA_ARGS__); \
 		printf("\n"); \
 		_failures_++; \
+	} while (0)
+
+#define abort_test(M) \
+	do { \
+		_print_testcase_name_(__func__); \
+		printf("    %d: " M "\n", __LINE__); \
+		printf("    ---Testcase aborted---\n"); \
+		_failures_++; \
+		return; \
+	} while (0)
+
+#define abort_testf(...) \
+	do { \
+		_print_testcase_name_(__func__); \
+		printf("    %d: ", __LINE__); \
+		printf(__VA_ARGS__ "\n"); \
+		printf("    ---Testcase aborted---\n"); \
+		_failures_++; \
+		return; \
 	} while (0)
 
 /* Precludes the definition in utils.h
@@ -117,7 +138,7 @@ static void _print_testcase_name_(const char*);
 	} while (0)
 
 static int
-_assert_strcmp(char *p1, char *p2)
+_assert_strcmp(const char *p1, const char *p2)
 {
 	if (p1 == NULL || p2 == NULL)
 		return p1 != p2;

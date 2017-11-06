@@ -1,31 +1,50 @@
 TODO
 ---------------------------
-
 this iteration:
-	- 004/005 parsing, server defaults and configuration handling
-	- CHANMODES, PREFIX=(abc)xyz
-	- Proper mode support (struct cmode/umode)
+	- bug, nick 'aaa' shortened to +a with prefix
+		22:04  -- ~ Topic set by blah
+		22:52   > ~ foo has joined ##channel
+		00:11  +a ~ hi
+	- hook up new server/channel/mode/etc implementations
+	- TODO/FIXME cleanups
 
 Continue refactoring:
 	- Move/split components (e.g. server, channel, input, etc):
-		src/components/*.{c,h}
+		src/components/*.{c,h}, src/README.md
 	- Untangle headers
 	- Rewrite input DLL as circular buffer of gap buffers, with copy on repeat,
 		use abstractions in _draw_input
+	- Split net/server code
+	- Error/warning writing from stateless components, e.g.:
+		- mode.c should be able to call err("...") on some passed parameter
+		  and have it written to the appropriate buffer with the appropriate
+		  `from`, etc
+		- this should be easily overridden in testing to assert the right error
+		  messages are being reported (fix current mock newline/newlinef)
+		- this code might live in state.c, should be callable from anywher (e.g. mesg.c)
+		- review stateless components and add any extra errors/warnings that could
+		  be added
+	- more debug information, levels, for various events, a debug pannel as a new channel
+	  type when debug flag is set
 
 RFC compliance:
+	- List required message types and associated error messages
 	- List all message types and error numerics from RFC, mark handled/unhandled
 
-src/README.md
+Testing:
+	- Stateful code integration testing
+	- Coverage (gcov)
+		- link test/foo.c against src/foo.o built with coverage flags
+	- Fuzzing handlers (afl)
+	- Try musl C
+
+TLS/SASL
 
 ----------------------
-	/NICKS
-		print the current nicks to the channel
+	/NICKS, /IGNORE, /UNIGNORE,
+		print the current nicks, ignore list, to the channel
 		^(Also print this implicitly when end of nicks numeric is received)
-		^(Also print server's ignore list for '/ignore' and '/unignore')
-
-	/IGNORE, /UNIGNORE,
-		print the ignore list
+		^(Print as buffer_line type dynamically to fill available terminal space)
 
 	Numerics:
 	221 +<flags> :(null)
@@ -35,6 +54,8 @@ src/README.md
 		 on freenode it sends me 005...
 
 	409 :No origin specified, (eg "/raw PING")
+
+	421 <command> :Unknown command
 
 	435 cannot change nickname while banned
 		(eg unregistered in channel and trying to /nick)
@@ -58,6 +79,8 @@ src/README.md
 	502 :Can't set/get mode for other users
 		 (e.g.: /raw MODE <not my nick> <flag>
 ----------------------
+valgrind reports addrinfo memory lost when cancelling hung connection
+
 show connect eta intead of ping when reconnecting
 
 show disconnected/parted in status bar for channels instead of 0 user count
@@ -75,6 +98,9 @@ e.g.
 
 FIXME:
 ---------------------------
+Empty trailing should be null, e.g.:
+":nick!~user@host PART #channel :" -> "< ~ nick!~user@host has left #channel ()"
+
 when disconnected and reconnected, PING/PONG seems to be out of sync?
 	client continuously goes into timing out, though connection is still established
 

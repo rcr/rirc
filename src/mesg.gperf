@@ -1,0 +1,55 @@
+/* Input file for generating hash functions with GNU gperf, see:
+ *
+ *   https://www.gnu.org/software/gperf/manual/gperf.html
+ *
+ * These functions map command strings to their handler, e.g.:
+ *
+ *   CONNECT -> send_connect()
+ */
+
+%enum
+%readonly-tables
+%struct-type
+/*
+%define word-array-name      send_handlers
+%define hash-function-name   send_handler_hash
+%define lookup-function-name send_handler_lookup
+struct send_handler;
+%%
+CLEAR,      send_clear
+CLOSE,      send_close
+CONNECT,    send_connect
+CTCP,       send_ctcp
+DISCONNECT, send_disconnect
+IGNORE,     send_ignore
+JOIN,       send_join
+ME,         send_me
+MSG,        send_msg
+NICK,       send_nick
+PART,       send_part
+PRIVMSG,    send_privmsg
+QUIT,       send_quit
+RAW,        send_raw
+TOPIC,      send_topic
+UNIGNORE,   send_unignore
+VERSION,    send_version
+*/
+/*
+%define word-array-name      recv_handlers
+%define hash-function-name   recv_handler_hash
+%define lookup-function-name recv_handler_lookup
+struct recv_handler;
+%%
+ERROR,   recv_error
+JOIN,    recv_join
+KICK,    recv_kick
+MODE,    recv_mode
+NICK,    recv_nick
+NOTICE,  recv_notice
+PART,    recv_part
+PING,    recv_ping
+PONG,    recv_pong
+PRIVMSG, recv_privmsg
+QUIT,    recv_quit
+TOPIC,   recv_topic
+*/
