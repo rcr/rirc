@@ -1075,10 +1075,134 @@ recv_mode(char *err, struct parsed_mesg *p, struct server *s)
 static int
 recv_mode_chanmodes(char *err, struct parsed_mesg *p, const struct mode_config *config, struct channel *c)
 {
-	(void)(err);
-	(void)(p);
-	(void)(config);
-	(void)(c);
+	struct mode *chanmodes = &(c->chanmodes);
+	struct user *user;
+
+	char flag, *modestring, *modearg;
+	enum mode_err_t mode_err;
+	enum mode_set_t mode_set;
+
+#define MODE_GETARG(M, P) \
+	(((M) = getarg(&(P)->params, " ")) || ((M) = getarg(&(P)->trailing, " ")))
+
+	if (!MODE_GETARG(modestring, p))
+		fail("MODE: modestring is null");
+
+	do {
+		mode_set = MODE_SET_INVALID;
+		mode_err = MODE_ERR_NONE;
+
+		while ((flag = *modestring++)) {
+
+			if (flag == '+') {
+				mode_set = MODE_SET_ON;
+				continue;
+			}
+
+			if (flag == '-') {
+				mode_set = MODE_SET_OFF;
+				continue;
+			}
+
+			modearg = NULL;
+
+			switch (chanmode_type(config, mode_set, flag)) {
+
+				/* Doesn't consume an argument */
+				case MODE_FLAG_CHANMODE:
+
+					mode_err = mode_chanmode_set(chanmodes, config, flag, mode_set);
+
+					if (mode_err == MODE_ERR_NONE) {
+						newlinef(c, 0, "--", "%s%s%s mode: %c%c",
+								(p->from ? p->from : ""),
+								(p->from ? " set " : ""),
+								(mode_set == MODE_SET_ON ? '+' : '-'),
+								c->name.str,
+								flag);
+					}
+					break;
+
+				/* Consumes an argument */
+				case MODE_FLAG_CHANMODE_PARAM:
+
+					if (!MODE_GETARG(modearg, p)) {
+						newlinef(c, 0, "-!!-", "MODE: flag '%c' expected argument", flag);
+						continue;
+					}
+
+					mode_err = mode_chanmode_set(chanmodes, config, flag, mode_set);
+
+					if (mode_err == MODE_ERR_NONE) {
+						newlinef(c, 0, "--", "%s%schanmode: %c%c %s",
+								(p->from ? p->from : ""),
+								(p->from ? " set " : ""),
+								(mode_set == MODE_SET_ON ? '+' : '-'),
+								flag,
+								modearg);
+					}
+					break;
+
+				/* Consumes an argument and sets a usermode */
+				case MODE_FLAG_PREFIX:
+
+					if (!MODE_GETARG(modearg, p)) {
+						newlinef(c, 0, "-!!-", "MODE: flag '%c' argument is null", flag);
+						continue;
+					}
+
+					if (!(user = user_list_get(&(c->users), modearg, 0))) {
+						newlinef(c, 0, "-!!-", "MODE: flag '%c' user '%s' not found", flag, modearg);
+						continue;
+					}
+
+					mode_prfxmode_set(&(user->prfxmodes), config, flag, mode_set);
+
+					if (mode_err == MODE_ERR_NONE) {
+						newlinef(c, 0, "--", "%s%s user %s mode: %c%c",
+								(p->from ? p->from : ""),
+								(p->from ? " set " : ""),
+								modearg,
+								(mode_set == MODE_SET_ON ? '+' : '-'),
+								flag);
+					}
+					break;
+
+				case MODE_FLAG_INVALID_SET:
+					mode_err = MODE_ERR_INVALID_SET;
+					break;
+
+				case MODE_FLAG_INVALID_FLAG:
+					mode_err = MODE_ERR_INVALID_FLAG;
+					break;
+
+				default:
+					newlinef(c, 0, "-!!-", "MODE: unhandled error, flag '%c', modearg '%s'",
+							flag, (modearg ? modearg : "null"));
+					continue;
+			}
+
+			switch (mode_err) {
+
+				case MODE_ERR_INVALID_FLAG:
+					newlinef(c, 0, "-!!-", "MODE: invalid flag '%c'", flag);
+					break;
+
+				case MODE_ERR_INVALID_SET:
+					newlinef(c, 0, "-!!-", "MODE: missing '+'/'-'");
+					break;
+
+				default:
+					break;
+			}
+		}
+	} while (MODE_GETARG(modestring, p));
+
+#undef MODE_GETARG
+
+	mode_str(&(c->chanmodes), &(c->chanmodes_str));
+	draw_status();
+
 	return 0;
 }
 
@@ -1087,7 +1211,7 @@ recv_mode_usermodes(char *err, struct parsed_mesg *p, const struct mode_config *
 {
 	struct mode *usermodes = &(s->usermodes);
 
-	char c, *modes;
+	char flag, *modes;
 	enum mode_err_t mode_err;
 	enum mode_set_t mode_set;
 
@@ -1100,32 +1224,32 @@ recv_mode_usermodes(char *err, struct parsed_mesg *p, const struct mode_config *
 	do {
 		mode_set = MODE_SET_INVALID;
 
-		while ((c = *modes++)) {
+		while ((flag = *modes++)) {
 
-			if (c == '+') {
+			if (flag == '+') {
 				mode_set = MODE_SET_ON;
 				continue;
 			}
 
-			if (c == '-') {
+			if (flag == '-') {
 				mode_set = MODE_SET_OFF;
 				continue;
 			}
 
-			mode_err = mode_usermode_set(usermodes, config, c, mode_set);
+			mode_err = mode_usermode_set(usermodes, config, flag, mode_set);
 
 			if (mode_err == MODE_ERR_NONE)
 				newlinef(s->channel, 0, "--", "%s%smode: %c%c",
 						(p->from ? p->from : ""),
 						(p->from ? " set " : ""),
 						(mode_set == MODE_SET_ON ? '+' : '-'),
-						c);
+						flag);
 
 			else if (mode_err == MODE_ERR_INVALID_SET)
 				newlinef(s->channel, 0, "-!!-", "MODE: missing '+'/'-'");
 
 			else if (mode_err == MODE_ERR_INVALID_FLAG)
-				newlinef(s->channel, 0, "-!!-", "MODE: invalid flag '%c'", c);
+				newlinef(s->channel, 0, "-!!-", "MODE: invalid flag '%c'", flag);
 		}
 	} while (MODE_GETARG(modes, p));
 

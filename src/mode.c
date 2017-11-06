@@ -683,14 +683,10 @@ mode_config_modes(struct mode_config *config, const char *str)
 enum chanmode_flag_t
 chanmode_type(const struct mode_config *config, enum mode_set_t set, int flag)
 {
-	/* Return the chanmode flag type specified by config where:
-	 *
-	 *  - set  = [+-]
-	 *  - flag = [azAZ]
-	 */
+	/* Return the chanmode flag type specified by config */
 
 	if (!(set == MODE_SET_ON || set == MODE_SET_OFF))
-		return MODE_FLAG_INVALID;
+		return MODE_FLAG_INVALID_SET;
 
 	if (mode_isset(&(config->chanmodes), flag)) {
 
@@ -716,5 +712,5 @@ chanmode_type(const struct mode_config *config, enum mode_set_t set, int flag)
 			return MODE_FLAG_CHANMODE;
 	}
 
-	return MODE_FLAG_INVALID;
+	return MODE_FLAG_INVALID_FLAG;
 }

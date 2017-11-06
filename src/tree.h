@@ -220,7 +220,7 @@ name##_AVL_DEL(struct name *head, struct type *elm)                             
 static struct type*                                                               \
 name##_AVL_DEL_REC(struct type **p, struct type *elm)                             \
 {                                                                                 \
-    struct type *ret, *n = *p;                                                    \
+    struct type *ret = NULL, *n = *p;                                             \
                                                                                   \
     int comp, balance;                                                            \
                                                                                   \
@@ -267,8 +267,10 @@ name##_AVL_DEL_REC(struct type **p, struct type *elm)                           
         else                                                                      \
             *p = NULL;                                                            \
     }                                                                             \
+                                                                                  \
     else if (comp < 0)                                                            \
         ret = name##_AVL_DEL_REC(&TREE_LEFT(n, field), elm);                      \
+                                                                                  \
     else if (comp > 0)                                                            \
         ret = name##_AVL_DEL_REC(&TREE_RIGHT(n, field), elm);                     \
                                                                                   \

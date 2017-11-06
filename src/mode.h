@@ -77,19 +77,10 @@ enum mode_set_t
 	MODE_SET_T_SIZE
 };
 
-/* Mode string printing requirements differs by type */
-enum mode_str_t
-{
-	MODE_STR_UNSET = 0, /* Ensure a mode_str type is explicitly set */
-	MODE_STR_CHANMODE,
-	MODE_STR_USERMODE,
-	MODE_STR_PRFXMODE,
-	MODE_STR_T_SIZE
-};
-
 enum chanmode_flag_t
 {
-	MODE_FLAG_INVALID,
+	MODE_FLAG_INVALID_FLAG,
+	MODE_FLAG_INVALID_SET,
 	MODE_FLAG_CHANMODE,       /* Chanmode flag without parameter */
 	MODE_FLAG_CHANMODE_PARAM, /* Chanmode flag with parameter */
 	MODE_FLAG_PREFIX,         /* Chanmode flag that sets prfxmode */
@@ -125,7 +116,14 @@ struct mode_config
 struct mode_str
 {
 	char str[MODE_STR_LEN + 1];
-	enum mode_str_t type;
+	enum mode_str_t
+	{
+		MODE_STR_UNSET = 0, /* Ensure a mode_str type is explicitly set */
+		MODE_STR_CHANMODE,
+		MODE_STR_USERMODE,
+		MODE_STR_PRFXMODE,
+		MODE_STR_T_SIZE
+	} type;
 };
 
 enum chanmode_flag_t chanmode_type(const struct mode_config*, enum mode_set_t, int);

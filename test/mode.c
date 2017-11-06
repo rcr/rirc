@@ -494,13 +494,13 @@ test_chanmode_type(void)
 		abort_test("Configuration error");
 
 	/* Test invalid '+'/'-' */
-	assert_eq(chanmode_type(&c, MODE_SET_T_SIZE, 'a'), MODE_FLAG_INVALID);
+	assert_eq(chanmode_type(&c, MODE_SET_T_SIZE, 'a'), MODE_FLAG_INVALID_SET);
 
 	/* Test invalid flag */
-	assert_eq(chanmode_type(&c, MODE_SET_ON, '!'), MODE_FLAG_INVALID);
+	assert_eq(chanmode_type(&c, MODE_SET_ON, '!'), MODE_FLAG_INVALID_FLAG);
 
 	/* Test flag not in usermodes, chanmodes */
-	assert_eq(chanmode_type(&c, MODE_SET_ON, 'z'), MODE_FLAG_INVALID);
+	assert_eq(chanmode_type(&c, MODE_SET_ON, 'z'), MODE_FLAG_INVALID_FLAG);
 
 	/* Test chanmode A (always has a parameter) */
 	assert_eq(chanmode_type(&c, MODE_SET_ON,  'b'), MODE_FLAG_CHANMODE_PARAM);
