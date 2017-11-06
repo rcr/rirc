@@ -2,8 +2,6 @@
 
 #include "../src/mode.c"
 
-#define MODE_EMPTY {0}
-
 #define ALL_LOWERS "abcdefghijklmnopqrstuvwxyz"
 #define ALL_UPPERS "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
@@ -29,7 +27,9 @@ test_mode_str(void)
 	/* Test setting mode string */
 
 	struct mode m = MODE_EMPTY;
-	struct mode_str m_str = {0};
+	struct mode_str m_str;
+
+	memset(&m_str, 0, sizeof(struct mode_str));
 
 	/* mode_str type not set */
 	assert_fatal(mode_str(&m, &m_str));
@@ -447,6 +447,82 @@ test_mode_config_prefix(void)
 #undef CHECK
 }
 
+static void
+test_mode_config_modes(void)
+{
+	/* Test configuring MODES */
+
+	struct mode_config c = { .MODES = 3 };
+
+	/* Test empty string */
+	assert_eq(mode_config_modes(&c, ""), MODE_ERR_INVALID_CONFIG);
+	assert_eq(c.MODES, 3);
+
+	/* Test not a number */
+	assert_eq(mode_config_modes(&c, "1abc"), MODE_ERR_INVALID_CONFIG);
+	assert_eq(mode_config_modes(&c, "wxyz"), MODE_ERR_INVALID_CONFIG);
+	assert_eq(c.MODES, 3);
+
+	/* Test invalid number (i.e.: not [1-99]) */
+	assert_eq(mode_config_modes(&c, "0"),   MODE_ERR_INVALID_CONFIG);
+	assert_eq(mode_config_modes(&c, "100"), MODE_ERR_INVALID_CONFIG);
+	assert_eq(c.MODES, 3);
+
+	/* Teset valid numbers */
+	assert_eq(mode_config_modes(&c, "1"),  MODE_ERR_NONE);
+	assert_eq(c.MODES, 1);
+
+	assert_eq(mode_config_modes(&c, "99"), MODE_ERR_NONE);
+	assert_eq(c.MODES, 99);
+}
+
+static void
+test_chanmode_type(void)
+{
+	/* Test retrieving a mode flag type */
+
+	struct mode_config c;
+
+	int config_errs = 0;
+
+	config_errs -= mode_config(&c, "a",       MODE_CONFIG_USERMODES);
+	config_errs -= mode_config(&c, "bcdef",   MODE_CONFIG_CHANMODES);
+	config_errs -= mode_config(&c, "b,c,d,e", MODE_CONFIG_SUBTYPES);
+	config_errs -= mode_config(&c, "(f)@",    MODE_CONFIG_PREFIX);
+
+	if (config_errs != MODE_ERR_NONE)
+		abort_test("Configuration error");
+
+	/* Test invalid '+'/'-' */
+	assert_eq(chanmode_type(&c, MODE_SET_T_SIZE, 'a'), MODE_FLAG_INVALID_SET);
+
+	/* Test invalid flag */
+	assert_eq(chanmode_type(&c, MODE_SET_ON, '!'), MODE_FLAG_INVALID_FLAG);
+
+	/* Test flag not in usermodes, chanmodes */
+	assert_eq(chanmode_type(&c, MODE_SET_ON, 'z'), MODE_FLAG_INVALID_FLAG);
+
+	/* Test chanmode A (always has a parameter) */
+	assert_eq(chanmode_type(&c, MODE_SET_ON,  'b'), MODE_FLAG_CHANMODE_PARAM);
+	assert_eq(chanmode_type(&c, MODE_SET_OFF, 'b'), MODE_FLAG_CHANMODE_PARAM);
+
+	/* Test chanmode B (always has a parameter) */
+	assert_eq(chanmode_type(&c, MODE_SET_ON,  'c'), MODE_FLAG_CHANMODE_PARAM);
+	assert_eq(chanmode_type(&c, MODE_SET_OFF, 'c'), MODE_FLAG_CHANMODE_PARAM);
+
+	/* Test chanmode C (only has a parameter when set) */
+	assert_eq(chanmode_type(&c, MODE_SET_ON,  'd'), MODE_FLAG_CHANMODE_PARAM);
+	assert_eq(chanmode_type(&c, MODE_SET_OFF, 'd'), MODE_FLAG_CHANMODE);
+
+	/* Test chanmode D (never has a parameter) */
+	assert_eq(chanmode_type(&c, MODE_SET_ON,  'e'), MODE_FLAG_CHANMODE);
+	assert_eq(chanmode_type(&c, MODE_SET_OFF, 'e'), MODE_FLAG_CHANMODE);
+
+	/* Test prefix flag */
+	assert_eq(chanmode_type(&c, MODE_SET_ON,  'f'), MODE_FLAG_PREFIX);
+	assert_eq(chanmode_type(&c, MODE_SET_OFF, 'f'), MODE_FLAG_PREFIX);
+}
+
 int
 main(void)
 {
@@ -461,7 +537,9 @@ main(void)
 		TESTCASE(test_mode_config_usermodes),
 		TESTCASE(test_mode_config_chanmodes),
 		TESTCASE(test_mode_config_subtypes),
-		TESTCASE(test_mode_config_prefix)
+		TESTCASE(test_mode_config_prefix),
+		TESTCASE(test_mode_config_modes),
+		TESTCASE(test_chanmode_type)
 	};
 
 	return run_tests(tests);

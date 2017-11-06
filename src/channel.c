@@ -20,10 +20,13 @@ channel(const char *name)
 {
 	struct channel *c;
 
-	if ((c = calloc(1, sizeof(*c))) == NULL)
+	size_t len = strlen(name);
+
+	if ((c = calloc(1, sizeof(*c) + len + 1)) == NULL)
 		fatal("calloc", errno);
 
-	string(&(c->name), name);
+	c->name.len = len;
+	c->name.str = memcpy(c->_, name, len + 1);
 
 	return c;
 }
@@ -31,7 +34,6 @@ channel(const char *name)
 void
 channel_free(struct channel *c)
 {
-	free(c->name.str);
 	free(c);
 }
 
@@ -48,7 +50,7 @@ channel_list_del(struct channel_list *cl, struct channel *c)
 }
 
 struct channel*
-channel_list_get(struct channel_list *cl, char *name)
+channel_list_get(struct channel_list *cl, const char *name)
 {
 	struct channel _chan = { .name = { .str = name } };
 

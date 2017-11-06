@@ -1,7 +1,9 @@
 #ifndef NICKLIST_H
 #define NICKLIST_H
 
+#include "mode.h"
 #include "tree.h"
+#include "utils.h"
 
 enum user_err
 {
@@ -12,11 +14,10 @@ enum user_err
 
 struct user
 {
-	AVL_NODE(user) node;
-	/* TODO: struct mode */
-	char *nick;
-	char prefix;
-	char _[]; /* TODO: can this just be char nick[]?  */
+	AVL_NODE(user) ul;
+	struct mode prfxmodes;
+	struct string nick;
+	char _[];
 };
 
 struct user_list
@@ -25,11 +26,11 @@ struct user_list
 	unsigned int count;
 };
 
-enum user_err user_list_add(struct user_list*, char*);
-enum user_err user_list_del(struct user_list*, char*);
-enum user_err user_list_rpl(struct user_list*, char*, char*);
+enum user_err user_list_add(struct user_list*, const char*, struct mode);
+enum user_err user_list_del(struct user_list*, const char*);
+enum user_err user_list_rpl(struct user_list*, const char*, const char*);
 
-struct user* user_list_get(struct user_list*, char*, size_t);
+struct user* user_list_get(struct user_list*, const char*, size_t);
 
 void user_list_free(struct user_list*);
 

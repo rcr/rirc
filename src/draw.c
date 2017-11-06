@@ -7,6 +7,8 @@
 /* TODO:
  *
  * setvbuf can be used for testing draw routines, pointing to static buffer
+ *
+ * vector io, from draw(), pass pointers to terminal row buffers, draw in a single write
  * */
 
 #include <alloca.h>

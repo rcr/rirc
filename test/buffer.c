@@ -21,7 +21,10 @@ _buffer_newline(struct buffer *b, const char *t)
 {
 	/* Abstract newline with default values */
 
-	buffer_newline(b, BUFFER_LINE_OTHER, "", t, 0, 0);
+	struct string from = { .str = "", .len = 0 };
+	struct string text = { .str = t,  .len = strlen(t) };
+
+	buffer_newline(b, BUFFER_LINE_OTHER, from, text, 0);
 }
 
 static void
@@ -351,6 +354,73 @@ test_buffer_line_rows(void)
 	assert_eq(buffer_line_rows(buffer_head(&b), 1), 1);
 }
 
+static void
+test_buffer_newline_prefix(void)
+{
+	/* Test adding lines to a buffer with prefix */
+
+	struct buffer b = buffer(BUFFER_OTHER);
+	struct buffer_line *line;
+
+	struct string from;
+	struct string text;
+
+	/* Test adding line with prefix */
+	from.str = "testing";
+	from.len = strlen(from.str);
+
+	text.str = "abc";
+	text.len = strlen(text.str);
+
+	buffer_newline(&b, BUFFER_LINE_OTHER, from, text, 0);
+
+	line = buffer_head(&b);
+
+	assert_strcmp(line->text, "abc");
+	assert_strcmp(line->from, "testing");
+	assert_eq((int)line->from_len, (int)strlen("testing"));
+
+	buffer_newline(&b, BUFFER_LINE_OTHER, from, text, '@');
+
+	line = buffer_head(&b);
+
+	assert_strcmp(line->text, "abc");
+	assert_strcmp(line->from, "@testing");
+	assert_eq((int)line->from_len, (int)strlen("@testing"));
+
+	/* Test truncating `from` */
+
+	/* If, FROM_LENGTH_MAX = 100, then:
+	 *
+	 * <---- 'a' ----->  'b' 'c'  0
+	 * |              |   |   |   |
+	 * 0, 1, 2, ..., 97, 98, 99, 100 */
+
+	char _from[FROM_LENGTH_MAX + 1];
+
+	memset(_from, 'a', sizeof(_from));
+
+	_from[FROM_LENGTH_MAX - 2] = 'b';
+	_from[FROM_LENGTH_MAX - 1] = 'c';
+	_from[FROM_LENGTH_MAX]     =   0;
+
+	from.str = _from;
+	from.len = FROM_LENGTH_MAX;
+
+	buffer_newline(&b, BUFFER_LINE_OTHER, from, text, 0);
+
+	line = buffer_head(&b);
+	assert_eq((int)line->from_len, FROM_LENGTH_MAX);
+	assert_eq(line->from[FROM_LENGTH_MAX - 1], 'c');
+
+
+	buffer_newline(&b, BUFFER_LINE_OTHER, from, text, '@');
+
+	line = buffer_head(&b);
+	assert_eq((int)line->from_len, FROM_LENGTH_MAX);
+	assert_eq(line->from[FROM_LENGTH_MAX - 1], 'b');
+}
+
 int
 main(void)
 {
@@ -364,6 +434,7 @@ main(void)
 		TESTCASE(test_buffer_index_overflow),
 		TESTCASE(test_buffer_line_overlength),
 		TESTCASE(test_buffer_line_rows),
+		TESTCASE(test_buffer_newline_prefix),
 	};
 
 	return run_tests(tests);

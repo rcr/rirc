@@ -412,7 +412,7 @@ test_string(void)
 	assert_strcmp(s.str, "abcde");
 	assert_eq((int)s.len, 5);
 
-	free(s.str);
+	free((void*)s.str);
 }
 
 int

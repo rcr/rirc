@@ -20,6 +20,8 @@ struct server
 	char *port;
 	//TODO: this shouldn't persist with the server,
 	// its only relevant on successful connection
+	// when parsing the cli args, add channels to the channel
+	// list, they'll be joined on connect
 	char *join;
 	struct user_list ignore;
 	//TODO channel_list
@@ -39,8 +41,8 @@ struct server
 	void *connecting;
 	//TODO: WIP
 	struct channel_list clist;
-	struct mode usermodes;
-	struct mode_str usermodes_str;
+	struct mode        usermodes;
+	struct mode_str    usermodes_str;
 	struct mode_config mode_config;
 };
 

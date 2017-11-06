@@ -106,6 +106,7 @@ new_server(char *host, char *port, char *join, char *nicks)
 
 	s->channel = new_channel(host, s, NULL, BUFFER_SERVER);
 
+	s->usermodes_str.type = MODE_STR_USERMODE;
 	mode_config(&(s->mode_config), NULL, MODE_CONFIG_DEFAULTS);
 
 	DLL_ADD(server_head, s);
@@ -253,6 +254,7 @@ connected(struct server *s)
 	//or should auto_nick take a server argument and write to a buffer of NICKSIZE length?
 }
 
+/* TODO: on failed connection, initiate rolling backoff reconnection attempt */
 static void*
 threaded_connect(void *arg)
 {

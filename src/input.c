@@ -627,13 +627,13 @@ tab_complete_nick(struct input *inp, char *str, size_t len)
 {
 	/* Nick tab completion */
 
-	char *p;
+	const char *p;
 
 	struct user *u;
 
 	if ((u = user_list_get(&(ccur->users), str, len))) {
 
-		p = u->nick;
+		p = u->nick.str;
 
 		/* Case insensitive matching, delete prefix */
 		while (len--)

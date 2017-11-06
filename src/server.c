@@ -14,9 +14,11 @@ struct opt
 
 static int parse_opt(struct opt*, char **);
 
+/* TODO: CASEMAPPING (ascii, rfc1459, strict-rfc1459, set server fptr) */
 #define HANDLED_005 \
 	X(CHANMODES)    \
-	X(PREFIX)
+	X(PREFIX)       \
+	X(MODES)
 
 #define X(cmd) static int server_set_##cmd(struct server*, char*);
 HANDLED_005
@@ -36,6 +38,7 @@ server(char *host, char *port, char *nicks)
 
 	s->nicks = strdup(nicks);
 
+	s->usermodes_str.type = MODE_STR_USERMODE;
 	mode_config(&(s->mode_config), NULL, MODE_CONFIG_DEFAULTS);
 
 	return s;
@@ -65,7 +68,7 @@ server_set_004(struct server *s, char *str)
 	if (!(chan_modes = getarg(&str, " ")))
 		newline(c, 0, "-!!-", "invalid numeric 004: chan_modes is null");
 
-	enum mode_err err;
+	enum mode_err_t err;
 
 	if (user_modes) {
 
@@ -100,14 +103,6 @@ server_set_005(struct server *s, char *str)
 	struct opt opt;
 
 	while (parse_opt(&opt, &str)) {
-
-#ifdef DEBUG
-		if (opt.val == NULL)
-			newlinef(s->channel, 0, "DEBUG", "Setting numeric 005 %s", opt.arg);
-		else
-			newlinef(s->channel, 0, "DEBUG", "Setting numeric 005 %s: %s", opt.arg, opt.val);
-#endif
-
 		#define X(cmd) \
 		if (!strcmp(opt.arg, #cmd) && server_set_##cmd(s, opt.val)) \
 			newlinef(s->channel, 0, "-!!-", "invalid %s: %s", #cmd, opt.val);
@@ -168,7 +163,11 @@ server_set_CHANMODES(struct server *s, char *val)
 {
 	/* Delegated to mode.c  */
 
-	enum mode_err err;
+#ifdef DEBUG
+			newlinef(s->channel, 0, "DEBUG", "Setting numeric 005 CHANMODES: %s", val);
+#endif
+
+	enum mode_err_t err;
 
 	err = mode_config(&(s->mode_config), val, MODE_CONFIG_SUBTYPES);
 
@@ -180,9 +179,29 @@ server_set_PREFIX(struct server *s, char *val)
 {
 	/* Delegated to mode.c  */
 
-	enum mode_err err;
+#ifdef DEBUG
+			newlinef(s->channel, 0, "DEBUG", "Setting numeric 005 PREFIX: %s", val);
+#endif
+
+	enum mode_err_t err;
 
 	err = mode_config(&(s->mode_config), val, MODE_CONFIG_PREFIX);
+
+	return (err != MODE_ERR_NONE);
+}
+
+static int
+server_set_MODES(struct server *s, char *val)
+{
+	/* Delegated to mode.c */
+
+#ifdef DEBUG
+			newlinef(s->channel, 0, "DEBUG", "Setting numeric 005 MODES: %s", val);
+#endif
+
+	enum mode_err_t err;
+
+	err = mode_config(&(s->mode_config), val, MODE_CONFIG_MODES);
 
 	return (err != MODE_ERR_NONE);
 }

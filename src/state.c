@@ -116,8 +116,12 @@ newline(struct channel *c, enum buffer_line_t type, const char *from, const char
 {
 	/* Default wrapper for _newline because length of message won't be known */
 
-	/* FIXME: mesg can be null */
-	_newline(c, type, from, mesg, strlen(mesg));
+	char errmesg[] = "newline error: mesg is null";
+
+	if (mesg == NULL)
+		_newline(c, type, from, errmesg, strlen(errmesg));
+	else
+		_newline(c, type, from, mesg, strlen(mesg));
 }
 
 void
@@ -129,11 +133,8 @@ newlinef(struct channel *c, enum buffer_line_t type, const char *from, const cha
 	int len;
 	va_list ap;
 
-	/* FIXME: potential overflow here 
-	 *
-	 * These functions should be moved to buffer.c anyways? */
 	va_start(ap, fmt);
-	len = vsnprintf(buff, BUFFSIZE, fmt, ap);
+	len = vsnprintf(buff, BUFFSIZE - 1, fmt, ap);
 	va_end(ap);
 
 	if (len < 0)
@@ -150,7 +151,17 @@ _newline(struct channel *c, enum buffer_line_t type, const char *from, const cha
 	if (c == NULL)
 		fatal("channel is null", 0);
 
-	buffer_newline(&c->buffer, type, from, mesg, strlen(from), mesg_len);
+	struct user *u;
+
+	struct string _from = { .str = from };
+	struct string _text = { .str = mesg, .len = mesg_len };
+
+	if ((u = user_list_get(&(c->users), from, 0)) != NULL)
+		_from.len = u->nick.len;
+	else
+		_from.len = strlen(from);
+
+	buffer_newline(&(c->buffer), type, _from, _text, ((u == NULL) ? 0 : u->prfxmodes.prefix));
 
 	c->activity = MAX(c->activity, ACTIVITY_ACTIVE);
 

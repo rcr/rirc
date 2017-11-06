@@ -11,20 +11,20 @@ static inline int user_ncmp(struct user*, struct user*, size_t);
 
 static inline void user_free(struct user*);
 
-AVL_GENERATE(user_list, user, node, user_cmp, user_ncmp)
+AVL_GENERATE(user_list, user, ul, user_cmp, user_ncmp)
 
 static inline int
 user_cmp(struct user *u1, struct user *u2)
 {
 	/* TODO: CASEMAPPING */
-	return irc_strcmp(u1->nick, u2->nick);
+	return irc_strcmp(u1->nick.str, u2->nick.str);
 }
 
 static inline int
 user_ncmp(struct user *u1, struct user *u2, size_t n)
 {
 	/* TODO: CASEMAPPING */
-	return irc_strncmp(u1->nick, u2->nick, n);
+	return irc_strncmp(u1->nick.str, u2->nick.str, n);
 }
 
 static inline void
@@ -38,48 +38,55 @@ user(const char *nick)
 {
 	struct user *u;
 
-	if ((u = calloc(1, sizeof(*u) + strlen(nick) + 1)) == NULL)
+	size_t len = strlen(nick);
+
+	if ((u = calloc(1, sizeof(*u) + len + 1)) == NULL)
 		fatal("calloc", errno);
 
-	u->nick = strcpy(u->_, nick);
+	u->nick.len = len;
+	u->nick.str = memcpy(u->_, nick, len + 1);
 
 	return u;
 }
 
 enum user_err
-user_list_add(struct user_list *ul, char *nick)
+user_list_add(struct user_list *ul, const char *nick, struct mode prfxmodes)
 {
 	/* Create user and add to userlist */
+
+	struct user *u;
 
 	if (user_list_get(ul, nick, 0) != NULL)
 		return USER_ERR_DUPLICATE;
 
-	AVL_ADD(user_list, ul, user(nick));
+	u = AVL_ADD(user_list, ul, user(nick));
 	ul->count++;
+
+	u->prfxmodes = prfxmodes;
 
 	return USER_ERR_NONE;
 }
 
 enum user_err
-user_list_del(struct user_list *ul, char *nick)
+user_list_del(struct user_list *ul, const char *nick)
 {
 	/* Delete user and remove from userlist */
 
-	struct user *ret;
+	struct user *u;
 
-	if ((ret = user_list_get(ul, nick, 0)) == NULL)
+	if ((u = user_list_get(ul, nick, 0)) == NULL)
 		return USER_ERR_NOT_FOUND;
 
-	AVL_DEL(user_list, ul, ret);
+	AVL_DEL(user_list, ul, u);
 	ul->count--;
 
-	user_free(ret);
+	user_free(u);
 
 	return USER_ERR_NONE;
 }
 
 enum user_err
-user_list_rpl(struct user_list *ul, char *nick_old, char *nick_new)
+user_list_rpl(struct user_list *ul, const char *nick_old, const char *nick_new)
 {
 	/* Replace a user in a list by name, maintaining modes */
 
@@ -96,8 +103,7 @@ user_list_rpl(struct user_list *ul, char *nick_old, char *nick_new)
 	AVL_ADD(user_list, ul, new);
 	AVL_DEL(user_list, ul, old);
 
-	/* TODO: copy all modes */
-	new->prefix = old->prefix;
+	new->prfxmodes = old->prfxmodes;
 
 	user_free(old);
 
@@ -105,9 +111,9 @@ user_list_rpl(struct user_list *ul, char *nick_old, char *nick_new)
 }
 
 struct user*
-user_list_get(struct user_list *ul, char *nick, size_t prefix_len)
+user_list_get(struct user_list *ul, const char *nick, size_t prefix_len)
 {
-	struct user u = { .nick = nick };
+	struct user u = { .nick = { .str = nick } };
 
 	if (prefix_len == 0)
 		return AVL_GET(user_list, ul, &u);
@@ -119,4 +125,6 @@ void
 user_list_free(struct user_list *ul)
 {
 	AVL_FOREACH(user_list, ul, user_free);
+
+	memset(ul, 0, sizeof(*ul));
 }
