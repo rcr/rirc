@@ -1,17 +1,11 @@
 TODO
 ---------------------------
 this iteration:
-	- Proper mode support (struct cmode/umode)
 	- bug, nick 'aaa' shortened to +a with prefix
-	 22:04  -- ~ Topic set by blah
-     22:52   > ~ foo has joined ##channel
-     00:11  +a ~ hi
-
-next iteration:
-	- segfault on reconnect/rejoin?
+		22:04  -- ~ Topic set by blah
+		22:52   > ~ foo has joined ##channel
+		00:11  +a ~ hi
 	- hook up new server/channel/mode/etc implementations
-
-next next iteration:
 	- TODO/FIXME cleanups
 
 Continue refactoring:
