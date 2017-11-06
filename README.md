@@ -52,4 +52,4 @@ Hotkeys:
 ```
 
 ## More info:
-[rcr.io/rirc.html](http://rcr.io/rirc.html)
+[rcr.io/rirc/](http://rcr.io/rirc/)
