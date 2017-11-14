@@ -32,6 +32,7 @@ static enum mode_err_t mode_config_modes(struct mode_config*, const char*);
 /* TODO: check validity of set_t on all mode settings */
 /* TODO: static inline void mode_bit_set(struct mode*, uint32_t); */
 /* TODO: static inline void mode_bit_isset(struct mode*, uint32_t); */
+/* TODO: aggregate errors with logging callback */
 
 static inline int
 mode_isset(const struct mode *m, int flag)
@@ -52,18 +53,16 @@ flag_bit(int c)
 {
 	/* Map input character to [az-AZ] bit flag */
 
-	/* TODO: consider additional bit as lower/upper case indicator */
-
 	static const uint32_t flag_bits[] = {
-		1 << 0,  /* a */ 1 << 1,  /* b */ 1 << 2,  /* c */
-		1 << 3,  /* d */ 1 << 4,  /* e */ 1 << 5,  /* f */
-		1 << 6,  /* g */ 1 << 7,  /* h */ 1 << 8,  /* i */
-		1 << 9,  /* j */ 1 << 10, /* k */ 1 << 11, /* l */
-		1 << 12, /* m */ 1 << 13, /* n */ 1 << 14, /* o */
-		1 << 15, /* p */ 1 << 16, /* q */ 1 << 17, /* r */
-		1 << 18, /* s */ 1 << 19, /* t */ 1 << 20, /* u */
-		1 << 21, /* v */ 1 << 22, /* w */ 1 << 23, /* x */
-		1 << 24, /* y */ 1 << 25, /* z */
+		1U << 0,  /* a */ 1U << 1,  /* b */ 1U << 2,  /* c */
+		1U << 3,  /* d */ 1U << 4,  /* e */ 1U << 5,  /* f */
+		1U << 6,  /* g */ 1U << 7,  /* h */ 1U << 8,  /* i */
+		1U << 9,  /* j */ 1U << 10, /* k */ 1U << 11, /* l */
+		1U << 12, /* m */ 1U << 13, /* n */ 1U << 14, /* o */
+		1U << 15, /* p */ 1U << 16, /* q */ 1U << 17, /* r */
+		1U << 18, /* s */ 1U << 19, /* t */ 1U << 20, /* u */
+		1U << 21, /* v */ 1U << 22, /* w */ 1U << 23, /* x */
+		1U << 24, /* y */ 1U << 25, /* z */
 	};
 
 	if (MODE_ISLOWER(c))
