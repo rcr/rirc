@@ -50,7 +50,7 @@ Testing:
 	/connect -s  <- oper command
 
 
-Summary of rirc RFC2812 compliance:
+Summary of rirc protocol implementation:
 
 	3.1  Connection Registration
 
@@ -242,7 +242,6 @@ Summary of rirc RFC2812 compliance:
 			RPL_STATSSLINE     245
 			RPL_STATSPING      246
 			RPL_STATSBLINE     247
-			RPL_STATSDLINE     250
 			ERR_NOSUCHSERVER   402
 			ERR_NEEDMOREPARAMS 461
 			ERR_NOPRIVILEGES   481
@@ -335,14 +334,16 @@ Summary of rirc RFC2812 compliance:
 		3.7.2  PING <server1> [<server2>]
 			ERR_NOSUCHSERVER 402
 			ERR_NOORIGIN     409
+			:<from> PING <server1> [<server2]
 
 		3.7.3  PONG <server1> [<server2>]
 			ERR_NOSUCHSERVER 402
 			ERR_NOORIGIN     409
+			:<from> PONG <server1> [<server2]
 
 		3.7.4  ERROR
 			---
-			:<from>[!<host>] ERROR <message>
+			:<from> ERROR <message>
 
 	4.  Optional features
 
@@ -389,18 +390,47 @@ Summary of rirc RFC2812 compliance:
 		RPL_HELP              705 -- extension
 		RPL_ENDOFHELP         706 -- extension
 
-	6. IRCv3 features
+	6. CTCP
 
-		6.1 CAP
+		6.1 ACTION <text>
+			... :\x01ACTION <text>\x01
+
+		6.2 CLIENTINFO
+			... :\x01CLIENTINFO 1*<arg>\x01
+
+		6.3 DCC
 			--- NOT IMPLEMENTED ---
 
-		6.2 AUTHENTICATE
+		6.4 FINGER
+			... :\x01FINGER <text>\x01
+
+		6.5 PING 1*<arg>
+			... :\x01PING 1*<arg>\x01
+
+		6.6 SOURCE
+			... :\x01SOURCE <text>\x01
+
+		6.7 TIME
+			... :\x01TIME <text>\x01
+
+		6.7 VERSION
+			... :\x01VERSION <text>\x01
+
+		6.8 USERINFO
+			... :\x01USERINFO <text>\x01
+
+	7. IRCv3 features
+
+		7.1 CAP
 			--- NOT IMPLEMENTED ---
 
-		5.4 TLS
+		7.2 AUTHENTICATE
 			--- NOT IMPLEMENTED ---
 
-		6.4 SASL
+		7.3 TLS
+			--- NOT IMPLEMENTED ---
+
+		7.4 SASL
 			--- NOT IMPLEMENTED ---
 
 

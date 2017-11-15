@@ -3,6 +3,9 @@
  * Colours can be set [0, 255], Any other value (e.g. -1) will set
  * the default terminal foreground/background */
 
+/* Message sent for PART and QUIT by default */
+#define DEFAULT_QUIT_MESG "rirc v" VERSION
+
 #define BUFFER_LINE_HEADER_FG_NEUTRAL 239
 
 #define BUFFER_LINE_HEADER_FG_PINGED  250
