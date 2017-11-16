@@ -1,5 +1,6 @@
 /* TODO: reduce overall size of buffer, implement growable text area with
  * ring of buffer_lines pointing to strings, instantiated with initial size
+ * arena based allocator
  *
  * i.e.            line(n).text            line(n+1).text
  *                           v                         v

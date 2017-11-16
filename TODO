@@ -26,9 +26,11 @@ Continue refactoring:
 		  be added
 	- more debug information, levels, for various events, a debug pannel as a new channel
 	  type when debug flag is set
+	- fix poll/sleep cycle for sockets and input fd, use posix timers when socket timing out?
 
 Testing:
 	- Stateful code integration testing
+	- callgrind profiling
 	- Coverage (gcov)
 		- link test/foo.c against src/foo.o built with coverage flags
 		- ./test/script.sh ?
