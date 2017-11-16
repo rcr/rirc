@@ -32,6 +32,8 @@
 #define SERVER_LATENCY_S 125 /* Latency time at which to begin showing in the status bar */
 #define SERVER_LATENCY_PING_S (SERVER_LATENCY_S - 10) /* Latency time at which to issue a PING before displaying latency */
 
+#define RECONNECT_DELTA 15
+
 #if SERVER_TIMEOUT_S <= SERVER_LATENCY_S
 	#error Server timeout must be greater than latency counting time
 #endif

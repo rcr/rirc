@@ -1,3 +1,7 @@
+# debug -> rirc.debug...
+# detect ricr vs rirc debug and rm/full rebuild
+
+
 CC = cc
 PP = cc -E
 CFLAGS       = -std=c99 -Wall -Wextra -pedantic -O2

@@ -29,6 +29,7 @@ struct server
 	//TODO:
 	struct server *next;
 	struct server *prev;
+
 	//TODO: connection stuff
 	char input[BUFFSIZE];
 	char *iptr;
@@ -39,6 +40,7 @@ struct server
 	time_t reconnect_delta;
 	time_t reconnect_time;
 	void *connecting;
+
 	//TODO: WIP
 	struct channel_list clist;
 	struct mode        usermodes;

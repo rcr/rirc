@@ -3,8 +3,6 @@
 
 #include "server.h"
 
-#define RECONNECT_DELTA 15
-
 /* TODO: refactoring */
 int sendf(char*, struct server*, const char*, ...);
 struct server* get_server_head(void);

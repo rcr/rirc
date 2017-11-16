@@ -245,6 +245,18 @@ irc_strncmp(const char *s1, const char *s2, size_t n)
 /* TODO:
  * - char *[] for args, remove getarg from message handling
  * - analogous function for parsing ctcp messages */
+
+/* FIXME:
+ *
+ * in order to fully implement the protocol, trailing needs to be considered
+ * just another parameter, e.g. receiving
+ *   - `<from> PRIVMSG hi`
+ *   - `<from> PRIVMSG :hi`
+ * are identical, and currently this would break rirc's parsing
+ *
+ * getarg(parsed message) -> return the next arg pointer, or if current
+ * arg pointer is the trailing arg, parse out a token
+ */
 int
 parse_mesg(struct parsed_mesg *pm, char *mesg)
 {
