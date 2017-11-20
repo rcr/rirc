@@ -531,3 +531,48 @@ channel_move_next(void)
 		draw_all();
 	}
 }
+
+void
+net_cb_read_inp(struct server *s)
+{
+	/* TODO */
+	(void)(s);
+}
+
+void
+net_cb_read_soc(struct server *s)
+{
+	/* TODO */
+	(void)(s);
+}
+
+void
+net_cb_cxed(struct server *s, const char *mesg, ...)
+{
+	/* TODO */
+	(void)(s);
+	(void)(mesg);
+}
+
+void
+net_cb_dxed(struct server *s, const char *mesg, ...)
+{
+	/* TODO */
+	(void)(s);
+	(void)(mesg);
+}
+
+void
+net_cb_rxng(struct server *s, const char *mesg, ...)
+{
+	/* TODO */
+	(void)(s);
+	(void)(mesg);
+}
+
+void
+net_cb_ping(struct server *s)
+{
+	/* TODO */
+	(void)(s);
+}

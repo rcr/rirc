@@ -40,6 +40,8 @@
  * and network activity handling which must be implemented elsewhere
  *
  * The connection cycle is implements an exponential backoff routine
+ *   t(n) = 2 * t(n - 1)
+ *   t(0) = 15
  *
  * Network state can be explicitly driven:
  *   (A) net_cx:   enter connection/reconnection cycle
@@ -53,16 +55,17 @@
  *   (G) on network timing out:   net_cb_ping
  *
  * Successful reads on stdin and connected sockets result in callbacks:
- *     from stdin:  net_cb_inp
- *     from socket: net_cb_soc
+ *  - from stdin:  net_cb_inp
+ *  - from socket: net_cb_soc
  */
 
 struct connection;
 
+/* Returns a connection, or NULL if limit is reached */
 struct connection* connection(
-		const char*,  /* host */
-		const char*,  /* port */
-		void const*); /* callback object */
+	const char*,  /* host */
+	const char*,  /* port */
+	const void*); /* callback object */
 
 /* Explicit direction of net state */
 void net_cx  (struct connection*);
@@ -71,8 +74,8 @@ void net_free(struct connection*);
 void net_poll(void);
 
 /* Network callbacks */
-void net_cb_read_inp(void*);
-void net_cb_read_soc(void*);
+void net_cb_read_inp(const char*, ssize_t);
+void net_cb_read_soc(const char*, ssize_t, void*);
 void net_cb_cxed(void*, const char*, ...);
 void net_cb_dxed(void*, const char*, ...);
 void net_cb_rxng(void*, const char*, ...);
