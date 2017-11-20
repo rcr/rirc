@@ -533,16 +533,20 @@ channel_move_next(void)
 }
 
 void
-net_cb_read_inp(struct server *s)
+net_cb_read_inp(const char *buff, size_t count)
 {
+	//newlinef(ccur, 0, "TESTING", "got: %s / %zu", buff, count);
+	//draw_buffer();
 	/* TODO */
-	(void)(s);
+	input(NULL, buff, count);
 }
 
 void
-net_cb_read_soc(struct server *s)
+net_cb_read_soc(const char *buff, size_t count, struct server *s)
 {
 	/* TODO */
+	(void)(buff);
+	(void)(count);
 	(void)(s);
 }
 

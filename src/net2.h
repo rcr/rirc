@@ -74,8 +74,8 @@ void net_free(struct connection*);
 void net_poll(void);
 
 /* Network callbacks */
-void net_cb_read_inp(const char*, ssize_t);
-void net_cb_read_soc(const char*, ssize_t, void*);
+void net_cb_read_inp(const char*, size_t);
+void net_cb_read_soc(const char*, size_t, const void*);
 void net_cb_cxed(void*, const char*, ...);
 void net_cb_dxed(void*, const char*, ...);
 void net_cb_rxng(void*, const char*, ...);

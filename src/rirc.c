@@ -13,6 +13,7 @@
 #include <termios.h>
 
 #include "input.h"
+#include "net2.h"
 #include "state.h"
 #include "utils.h"
 
@@ -245,9 +246,6 @@ main_loop(void)
 {
 	for (;;) {
 
-		/* Check for input on stdin, sleep 200ms */
-		poll_input();
-
 		/* For each server, check connection status, and input */
 		check_servers();
 
@@ -258,5 +256,7 @@ main_loop(void)
 		}
 
 		redraw();
+
+		net_poll();
 	}
 }

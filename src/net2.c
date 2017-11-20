@@ -19,7 +19,7 @@ struct connection {
 };
 
 static void net_poll_inp(int);
-static void net_poll_soc(int);
+static void net_poll_soc(int, const void*);
 
 static int fds_packed;
 static unsigned int num_connections;
@@ -105,7 +105,7 @@ net_poll(void)
 			if (i == STDIN_FILENO)
 				net_poll_inp(fds[i].fd);
 			else
-				net_poll_soc(fds[i].fd);
+				net_poll_soc(fds[i].fd, connections[i]->cb_obj);
 
 			if (--ret == 0)
 				return;
@@ -116,11 +116,24 @@ net_poll(void)
 static void
 net_poll_inp(int fd)
 {
-	(void)fd;
+	ssize_t count;
+	char readbuff[1024];
+
+	while ((count = read(fd, readbuff, sizeof(readbuff))) <= 0) {
+
+		if (count == 0)
+			fatal("stdin closed", 0);
+
+		if (errno != EINTR)
+			fatal("read", errno);
+	}
+
+	net_cb_read_inp(readbuff, (size_t) count);
 }
 
 static void
-net_poll_soc(int fd)
+net_poll_soc(int fd, const void *cb_obj)
 {
 	(void)fd;
+	(void)cb_obj;
 }
