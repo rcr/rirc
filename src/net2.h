@@ -15,22 +15,22 @@
  *
  *     NEW             +----+
  *      |              |    |
- *      |              |   (F)
+ *      |              |   (E)
  *      v              v    |
  *  +------+ --(A)-> +--------+
  *  | dxed |         |  cxng  | <--+
  *  +------+ <-(B)-- +--------+    |
  *    ^  ^             |    ^      |
- *    |  |            (D)   |      |
- *    |  |             |   (E)     |
+ *    |  |            (C)   |      |
+ *    |  |             |   (D)     |
  *    |  |             v    |      |
  *    |  |           +--------+    |
  *    |  +-----(B)-- |  cxed  |    |
  *    |              +--------+    |
  *    |                |    ^      |
- *    |               (G)   |      |
- *    |                |   (D)     |
- *    |                v    |     (E)
+ *    |               (F)   |      |
+ *    |                |   (C)     |
+ *    |                v    |     (D)
  *    |              +--------+    |
  *    +--------(B)-- |  ping  | ---+
  *                   +--------+
@@ -39,22 +39,21 @@
  * state as well declaring callback functions for state transitions
  * and network activity handling which must be implemented elsewhere
  *
- * The connection cycle is implements an exponential backoff routine
- *   t(n) = 2 * t(n - 1)
- *   t(0) = 15
+ * The connection cycle is implements a backoff routine:
+ *   t(n) = t(n - 1) * factor
+ *   t(0) = base
  *
- * Network state can be explicitly driven:
- *   (A) net_cx:   enter connection/reconnection cycle
- *   (B) net_dx:   close network connection
- *   (C) net_free: free network connection
+ * Network state can be explicitly driven, returning network error code:
+ *   (A) net_cx: enter connection/reconnection cycle
+ *   (B) net_dx: close network connection
  *
- * Network state implicit transitions result in callbacks:
- *   (D) on connection success:   net_cb_cxed
- *   (E) on connection loss:      net_cb_dxed
- *   (F) on reconnection attempt: net_cb_rxng
- *   (G) on network timing out:   net_cb_ping
+ * Network state implicit transitions result in informational callbacks:
+ *   (C) on connection success:   net_cb_cxed
+ *   (D) on connection loss:      net_cb_dxed
+ *   (E) on reconnection attempt: net_cb_rxng
+ *   (F) on network timing out:   net_cb_ping
  *
- * Successful reads on stdin and connected sockets result in callbacks:
+ * Successful reads on stdin and connected sockets result in data callbacks:
  *  - from stdin:  net_cb_inp
  *  - from socket: net_cb_soc
  */
@@ -67,18 +66,27 @@ struct connection* connection(
 	const char*,  /* port */
 	const void*); /* callback object */
 
-/* Explicit direction of net state */
-void net_cx  (struct connection*);
-void net_dx  (struct connection*);
 void net_free(struct connection*);
 void net_poll(void);
 
-/* Network callbacks */
+/* Explicit direction of net state */
+int net_cx(struct connection*);
+int net_dx(struct connection*);
+
+/* Formatted write to connection */
+int net_sendf(struct connection*, const char*, ...);
+
+/* Informational network state callbacks */
+void net_cb_cxed(const void*, const char*, ...);
+void net_cb_dxed(const void*, const char*, ...);
+void net_cb_rxng(const void*, const char*, ...);
+void net_cb_ping(const void*, int);
+
+/* Network data callback */
 void net_cb_read_inp(const char*, size_t);
 void net_cb_read_soc(const char*, size_t, const void*);
-void net_cb_cxed(void*, const char*, ...);
-void net_cb_dxed(void*, const char*, ...);
-void net_cb_rxng(void*, const char*, ...);
-void net_cb_ping(void*);
+
+/* Network error code string */
+const char* net_strerr(int);
 
 #endif
