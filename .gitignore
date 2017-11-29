@@ -1,4 +1,6 @@
 *.o
 *.t
+bld
 tags
 rirc
+rirc.debug

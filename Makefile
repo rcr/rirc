@@ -1,62 +1,56 @@
-# debug -> rirc.debug...
-# detect ricr vs rirc debug and rm/full rebuild
-
-
 CC = cc
 PP = cc -E
 CFLAGS       = -std=c99 -Wall -Wextra -pedantic -O2
 CFLAGS_DEBUG = -std=c99 -Wall -Wextra -pedantic -O0 -g -DDEBUG
 LDFLAGS      = -pthread
 
-# If using gcc for debug and sanitization, e.g.:
-#   > make -e CC=gcc debug
-ifeq ($(CC), gcc)
-	CFLAGS_DEBUG += -fsanitize=undefined,address
-	LDFLAGS_DEBUG = -pthread -lasan -lubsan
-endif
+BLDDIR := bld
+SRCDIR := src
 
-SDIR = src
-BDIR = src/bld
+SRC     := $(shell find $(SRCDIR) -iname '*.c')
+SRCDIRS := $(shell find $(SRCDIR) -iname '*.c' -exec dirname {} \; | sort -u)
 
-SDIR_T = test
-BDIR_T = test/bld
+# Relsease build, Debug build
+OBJS_R := $(patsubst %.c, $(BLDDIR)/%.o, $(SRC))
+OBJS_D := $(patsubst %.c, $(BLDDIR)/%.db.o, $(SRC))
+EXE_R  := rirc
+EXE_D  := rirc.debug
 
-# Source and build files
-SRC = $(shell find $(SDIR) -iname '*.c')
-BLD = $(shell echo '$(SRC:.c=.o)' | sed 's|$(SDIR)/|,|g; s|/|.|g; s|,|$(BDIR)/|g')
-
-# Test source and build files
-SRC_T = $(shell find $(SDIR_T) -iname '*.c')
-BLD_T = $(shell echo '$(SRC_T:.c=.t)' | sed 's|$(SDIR_T)/|,|g; s|/|.|g; s|,|$(BDIR_T)/|g')
-
-rirc: $(BLD)
+# Release build exe, objects
+$(EXE_R): $(BLDDIR) $(OBJS_R)
 	@echo cc $@
-	@$(CC) $(LDFLAGS) -o $@ $^
+	@$(CC) $(LDFLAGS) -o $@ $(OBJS_R)
 
-$(BDIR)%.o:
-	$(eval _SRC = $(SDIR)/$(shell echo '$(@F)' | sed 's|\.o$$||; s|\.|/|; s|$$|.c|'))
-	@echo cc $(_SRC)
-	@$(PP) $(CFLAGS) -MM -MP -MT $@ $(_SRC) -MF $(@:.o=.d)
-	@$(CC) $(CFLAGS) -c -o $@ $(_SRC)
+$(BLDDIR)/%.o: %.c
+	@echo "cc $<..."
+	@$(PP) $(CFLAGS) -MM -MP -MT $@ -MF $(@:.o=.d) $<
+	@$(CC) $(CFLAGS) -c -o $@ $<
 
-$(BDIR_T)%.t:
-	$(eval _SRC = $(SDIR_T)/$(shell echo '$(@F)' | sed 's|\.t$$||; s|\.|/|; s|$$|.c|'))
-	@$(PP) $(CFLAGS) -MM -MP -MT $@ $(_SRC) -MF $(@:.t=.d)
-	@$(CC) $(CFLAGS_DEBUG) $(LDFLAGS_DEBUG) -o $@ $(_SRC)
-	-@./$@ || mv $@ $(@:.t=.td)
+# Debug build exe, objects
+$(EXE_D): $(BLDDIR) $(OBJS_D)
+	@echo cc $@
+	@$(CC) $(LDFLAGS) -o $@ $(OBJS_D)
 
--include $(wildcard $(BDIR)/*.d) $(wildcard $(BDIR_T)/*.d)
+$(BLDDIR)/%.db.o: %.c
+	@echo "cc $<..."
+	@$(PP) $(CFLAGS_DEBUG) -MM -MP -MT $@ -MF $(@:.o=.d) $<
+	@$(CC) $(CFLAGS_DEBUG) -c -o $@ $<
+
+-include $(OBJS_R:.o=.d)
+-include $(OBJS_D:.o=.d)
+
+$(BLDDIR):
+	@$(call make-dirs)
 
 clean:
 	@echo cleaning
-	@rm -f rirc $(BDIR)/*{o,d} $(BDIR_T)/*.{t,d,td}
+	@rm -rf $(BLDDIR) $(EXE_R) $(EXE_D)
 
-debug: CFLAGS   = $(CFLAGS_DEBUG)
-debug: LDFLAGS += $(LDFLAGS_DEBUG)
-debug: rirc
+define make-dirs
+	for dir in $(SRCDIRS); do mkdir -p $(BLDDIR)/$$dir; done
+endef
 
-default: rirc
+default: $(EXE_R)
+debug:   $(EXE_D)
 
-test: $(BLD_T)
-
-.PHONY: clean debug default test
+.PHONY: clean debug default
