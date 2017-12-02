@@ -1,7 +1,7 @@
 CC = cc
 PP = cc -E
-CFLAGS       = -std=c99 -Wall -Wextra -pedantic -O2
-CFLAGS_DEBUG = -std=c99 -Wall -Wextra -pedantic -O0 -g -DDEBUG
+CFLAGS       = -I. -std=c99 -Wall -Wextra -pedantic -O2
+CFLAGS_DEBUG = -I. -std=c99 -Wall -Wextra -pedantic -O0 -g -DDEBUG
 LDFLAGS      = -pthread
 
 # Build, source, test source directories

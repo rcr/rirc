@@ -3,11 +3,10 @@
 
 #include <time.h>
 
-#include "rirc.h"
-
-#include "buffer.h"
-#include "channel.h"
-#include "mode.h"
+#include "src/comps/buffer.h"
+#include "src/comps/channel.h"
+#include "src/comps/mode.h"
+#include "src/rirc.h"
 
 struct server
 {

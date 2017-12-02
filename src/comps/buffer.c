@@ -25,7 +25,7 @@
 
 #include <string.h>
 
-#include "buffer.h"
+#include "src/comps/buffer.h"
 
 #if (BUFFER_LINES_MAX & (BUFFER_LINES_MAX - 1)) != 0
 	/* Required for proper masking when indexing */

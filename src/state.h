@@ -1,11 +1,13 @@
 #ifndef STATE_H
 #define STATE_H
 
-#include "draw.h"
-#include "buffer.h"
-#include "server.h"
-#include "mesg.h"
-#include "net.h"
+#include "src/comps/buffer.h"
+#include "src/comps/channel.h"
+#include "src/comps/input.h"
+#include "src/comps/server.h"
+#include "src/draw.h"
+#include "src/mesg.h"
+#include "src/net.h"
 
 /* state.h
  *

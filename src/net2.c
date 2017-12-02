@@ -5,9 +5,9 @@
 #include <time.h>
 #include <unistd.h>
 
-#include "net2.h"
-#include "utils.h"
-#include "../config.h"
+#include "src/net2.h"
+#include "src/utils.h"
+#include "config.h"
 
 #ifndef NET_PING_MIN
 	#define NET_PING_MIN 150

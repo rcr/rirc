@@ -13,10 +13,9 @@
 #include <stdio.h>
 #include <sys/ioctl.h>
 
-#include "draw.h"
-#include "input.h"
-#include "state.h"
-#include "utils.h"
+#include "src/draw.h"
+#include "src/state.h"
+#include "src/utils.h"
 
 /* State of rirc */
 static struct

@@ -5,9 +5,9 @@
 #include <string.h>
 #include <sys/time.h>
 
-#include "draw.h"
-#include "state.h"
-#include "utils.h"
+#include "src/draw.h"
+#include "src/state.h"
+#include "src/utils.h"
 
 //TODO: fail macros copy to an error buffer, and then copy into newline,
 //take destination buffer as parameter

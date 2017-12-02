@@ -4,7 +4,7 @@
 #include <string.h>
 #include <strings.h>
 
-#include "utils.h"
+#include "src/utils.h"
 
 #if !((' ' == 32) && ('!' == 33) && ('"' == 34) && ('#' == 35) \
       && ('%' == 37) && ('&' == 38) && ('\'' == 39) && ('(' == 40) \
