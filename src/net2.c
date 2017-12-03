@@ -190,7 +190,8 @@ net_poll_soc(int fd, const void *cb_obj)
 	ssize_t count;
 	char readbuff[1024];
 
-	while ((count = read(fd, readbuff, sizeof(readbuff)))) {
+	do {
+		count = read(fd, readbuff, sizeof(readbuff));
 
 		if (count == 0) {
 			; /* disconnect */
@@ -199,6 +200,8 @@ net_poll_soc(int fd, const void *cb_obj)
 		if (count < 0) {
 			; /* error, possibly eintr? */
 		}
-	}
+
+	} while ((count = read(fd, readbuff, sizeof(readbuff))));
+
 	net_cb_read_soc(readbuff, (size_t) count, cb_obj);
 }
