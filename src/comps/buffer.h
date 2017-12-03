@@ -3,8 +3,9 @@
 
 #include <time.h>
 
-#include "utils.h"
-#include "../config.h"
+#include "src/utils.h"
+#include "config.h"
+
 
 #define TEXT_LENGTH_MAX 510 /* FIXME: remove max lengths in favour of growable buffer */
 #define FROM_LENGTH_MAX 100

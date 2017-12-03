@@ -38,7 +38,9 @@ struct input
 struct input* new_input(void);
 void action(int(*)(char), const char*, ...);
 void free_input(struct input*);
-void poll_input(void);
 extern char *action_message;
+
+/* TODO: return state altering function */
+int input(struct input*, const char*, size_t);
 
 #endif

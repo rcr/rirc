@@ -5,9 +5,12 @@
 #include <string.h>
 #include <sys/time.h>
 
-#include "draw.h"
-#include "state.h"
-#include "utils.h"
+#include "src/draw.h"
+#include "src/state.h"
+#include "src/utils.h"
+
+//TODO: fail macros copy to an error buffer, and then copy into newline,
+//take destination buffer as parameter
 
 /* Fail macros used in message sending/receiving handlers */
 #define fail(M) \
@@ -100,7 +103,7 @@ enum numeric {
 	RPL_NOTOPIC          = 331,
 	RPL_TOPIC            = 332,
 	RPL_TOPICWHOTIME     = 333,
-	RPL_NAMREPLY         = 353,
+	RPL_NAMEREPLY        = 353,
 	RPL_ENDOFNAMES       = 366,
 	RPL_MOTD             = 372,
 	RPL_MOTDSTART        = 375,
@@ -1177,8 +1180,7 @@ recv_mode_chanmodes(char *err, struct parsed_mesg *p, const struct mode_config *
 					break;
 
 				default:
-					newlinef(c, 0, "-!!-", "MODE: unhandled error, flag '%c', modearg '%s'",
-							flag, (modearg ? modearg : "null"));
+					newlinef(c, 0, "-!!-", "MODE: unhandled error, flag '%c'");
 					continue;
 			}
 
@@ -1469,8 +1471,12 @@ recv_numeric(char *err, struct parsed_mesg *p, struct server *s)
 		break;
 
 
+	// FIXME: this is returned from /names <target>
+	// ... /names returns all names on all channels
+	//
+	// differentiate reply after JOIN or NAMES?
 	/* 353 ("="/"*"/"@") <channel> :*([ "@" / "+" ]<nick>) */
-	case RPL_NAMREPLY:
+	case RPL_NAMEREPLY:
 
 		/* @:secret   *:private   =:public */
 		if (!(type = getarg(&p->params, " ")))

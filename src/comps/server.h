@@ -3,11 +3,10 @@
 
 #include <time.h>
 
-#include "rirc.h"
-
-#include "buffer.h"
-#include "channel.h"
-#include "mode.h"
+#include "src/comps/buffer.h"
+#include "src/comps/channel.h"
+#include "src/comps/mode.h"
+#include "src/rirc.h"
 
 struct server
 {
@@ -29,6 +28,7 @@ struct server
 	//TODO:
 	struct server *next;
 	struct server *prev;
+
 	//TODO: connection stuff
 	char input[BUFFSIZE];
 	char *iptr;
@@ -39,6 +39,7 @@ struct server
 	time_t reconnect_delta;
 	time_t reconnect_time;
 	void *connecting;
+
 	//TODO: WIP
 	struct channel_list clist;
 	struct mode        usermodes;

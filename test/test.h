@@ -17,9 +17,12 @@ typedef struct testcase
 	const char *tc_str;
 } testcase;
 
-/* Fatal errors in functions called by testcases will long jump
- * rather than fatally exit the program */
-static jmp_buf _testcase_jmp_buf_;
+/* Fatal errors normally abort program execution by calling exit().
+ * In the testcases however, fatal errors jump to one of two places:
+ *   - the next line of the testcase if the fatal error was expected
+ *   - the end of the testcase if the fatal error was not expected */
+static jmp_buf _tc_fatal_expected_,
+               _tc_fatal_unexpected_;
 
 static int _assert_fatal_, _failures_, _failures_t_, _failure_printed_;
 static char _tc_errbuf_[512];
@@ -71,22 +74,24 @@ static void _print_testcase_name_(const char*);
 #else
 	#define fatal(M, E) \
 	do { \
-		if (_assert_fatal_) \
-			_assert_fatal_ = 0; \
-		else { \
+		if (_assert_fatal_) { \
+			longjmp(_tc_fatal_expected_, 1); \
+		} else { \
 			snprintf(_tc_errbuf_, sizeof(_tc_errbuf_) - 1, "FATAL in "__FILE__" - %s : '%s'", __func__, M); \
-			longjmp(_testcase_jmp_buf_, 1); \
+			longjmp(_tc_fatal_unexpected_, 1); \
 		} \
 	} while (0)
 #endif
 
 #define assert_fatal(X) \
 	do { \
-		_assert_fatal_ = 1; \
-		(X); \
-		if (_assert_fatal_) \
-			fail_test("'"#X "' should have exited fatally"); \
-		_assert_fatal_ = 0; \
+		if (setjmp(_tc_fatal_expected_)) { \
+			_assert_fatal_ = 1; \
+			(X); \
+			if (_assert_fatal_) \
+				fail_test("'"#X "' should have exited fatally"); \
+			_assert_fatal_ = 0; \
+		} \
 	} while (0)
 
 #define assert_strcmp(X, Y) \
@@ -172,7 +177,7 @@ _run_tests_(const char *filename, testcase testcases[], size_t len)
 		_failures_ = 0;
 		_failure_printed_ = 0;
 
-		if (setjmp(_testcase_jmp_buf_)) {
+		if (setjmp(_tc_fatal_unexpected_)) {
 			_print_testcase_name_(tc->tc_str);
 			printf("    %s - aborting testcase\n", _tc_errbuf_);
 			_failures_++;
@@ -197,7 +202,8 @@ _run_tests_(const char *filename, testcase testcases[], size_t len)
 	((void)(_assert_strcmp));
 	((void)(_assert_fatal_));
 	((void)(_failure_printed_));
-	((void)(_testcase_jmp_buf_));
+	((void)(_tc_fatal_expected_));
+	((void)(_tc_fatal_unexpected_));
 }
 
 /* Macro so the proper filename is printed */

@@ -1,9 +1,7 @@
 #ifndef NET_H
 #define NET_H
 
-#include "server.h"
-
-#define RECONNECT_DELTA 15
+#include "src/comps/server.h"
 
 /* TODO: refactoring */
 int sendf(char*, struct server*, const char*, ...);

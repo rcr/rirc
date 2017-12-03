@@ -13,10 +13,9 @@
 #include <stdio.h>
 #include <sys/ioctl.h>
 
-#include "draw.h"
-#include "input.h"
-#include "state.h"
-#include "utils.h"
+#include "src/draw.h"
+#include "src/state.h"
+#include "src/utils.h"
 
 /* State of rirc */
 static struct
@@ -530,4 +529,53 @@ channel_move_next(void)
 		state.current_channel = c;
 		draw_all();
 	}
+}
+
+void
+net_cb_read_inp(const char *buff, size_t count)
+{
+	//newlinef(ccur, 0, "TESTING", "got: %s / %zu", buff, count);
+	//draw_buffer();
+	/* TODO */
+	input(NULL, buff, count);
+}
+
+void
+net_cb_read_soc(const char *buff, size_t count, struct server *s)
+{
+	/* TODO */
+	(void)(buff);
+	(void)(count);
+	(void)(s);
+}
+
+void
+net_cb_cxed(struct server *s, const char *mesg, ...)
+{
+	/* TODO */
+	(void)(s);
+	(void)(mesg);
+}
+
+void
+net_cb_dxed(struct server *s, const char *mesg, ...)
+{
+	/* TODO */
+	(void)(s);
+	(void)(mesg);
+}
+
+void
+net_cb_rxng(struct server *s, const char *mesg, ...)
+{
+	/* TODO */
+	(void)(s);
+	(void)(mesg);
+}
+
+void
+net_cb_ping(struct server *s)
+{
+	/* TODO */
+	(void)(s);
 }

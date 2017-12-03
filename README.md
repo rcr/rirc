@@ -11,17 +11,17 @@ irc client.
 
 Default build:
 ```
-make clean rirc
+make rirc
 ```
 
 Debug build
 ```
-make clean debug
+make debug
 ```
 
 ## Usage:
 ```
-  rirc [-c server [OPTIONS]]*
+  rirc *[-c server [OPTIONS]]
 
 Help:
   -h, --help             Print this message

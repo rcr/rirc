@@ -17,11 +17,10 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "../config.h"
-
-#include "input.h"
-#include "state.h"
-#include "utils.h"
+#include "config.h"
+#include "src/comps/input.h"
+#include "src/state.h"
+#include "src/utils.h"
 
 #define ESC "\x1b"
 

@@ -1,7 +1,7 @@
-#include "test.h"
-#include "../src/server.c"
-#include "../src/mode.c"    /* mode_config_defaults */
-#include "../src/utils.c"   /* skip_sp */
+#include "test/test.h"
+#include "src/comps/server.c"
+#include "src/comps/mode.c"   /* mode_config_defaults */
+#include "src/utils.c"        /* skip_sp */
 
 void
 newline(struct channel *c, enum buffer_line_t t, const char *f, const char *m)

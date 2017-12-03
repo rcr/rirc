@@ -1,5 +1,6 @@
 /* TODO: reduce overall size of buffer, implement growable text area with
  * ring of buffer_lines pointing to strings, instantiated with initial size
+ * arena based allocator
  *
  * i.e.            line(n).text            line(n+1).text
  *                           v                         v
@@ -8,8 +9,9 @@
  *          line(n).user             line(n+1).user
  *
  * will allow removal of text/from truncation
- *    - line pointers would have to be updated (by offset) to point to the
+ *    - line pointers would have to be updated (by ptrdiff_t) to point to the
  *      newly allocated space if it moves
+ *    - or rather, allocate pages at a time as singly linked list
  *
  * TODO: cache a sensible number of line breaks (2?) against the line width
  * and dynamically calculate the rest, terminal size rarely changes
@@ -17,11 +19,13 @@
  * TODO: buffer_newline should accept the formatting arguments rather than
  * vsnprintf to a temp buffer and pass, e.g.:
  * void buffer_newline(buffer*, buffer_line_t, struct user*, const char*, ...)
+ *
+ * TODO: print time string to buffer space
  * */
 
 #include <string.h>
 
-#include "buffer.h"
+#include "src/comps/buffer.h"
 
 #if (BUFFER_LINES_MAX & (BUFFER_LINES_MAX - 1)) != 0
 	/* Required for proper masking when indexing */
@@ -174,8 +178,8 @@ buffer_newline(
 	line->time = time(NULL);
 	line->type = type;
 
-	if (from.len > b->pad)
-		b->pad = from.len;
+	if (line->from_len > b->pad)
+		b->pad = line->from_len;
 
 	if (text.len > TEXT_LENGTH_MAX) {
 
