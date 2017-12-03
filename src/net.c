@@ -22,11 +22,11 @@
 	#include <netinet/in.h>
 #endif
 
-#include "src/comps/buffer.h"
-#include "src/comps/mode.h"
+#include "src/components/buffer.h"
+#include "src/components/mode.h"
 #include "src/net.h"
 #include "src/state.h"
-#include "src/utils.h"
+#include "src/utils/utils.h"
 
 #define SERVER_TIMEOUT_S 255 /* Latency time at which a server is considered to be timed out and a disconnect is issued */
 #define SERVER_LATENCY_S 125 /* Latency time at which to begin showing in the status bar */

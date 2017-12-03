@@ -2,9 +2,9 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "src/comps/server.h"
+#include "src/components/server.h"
 #include "src/state.h"
-#include "src/utils.h"
+#include "src/utils/utils.h"
 
 struct opt
 {

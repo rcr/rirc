@@ -15,7 +15,7 @@
 
 #include "src/draw.h"
 #include "src/state.h"
-#include "src/utils.h"
+#include "src/utils/utils.h"
 
 /* State of rirc */
 static struct

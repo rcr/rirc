@@ -1,6 +1,6 @@
 #include "test/test.h"
-#include "src/comps/user.c"
-#include "src/utils.c"
+#include "src/components/user.c"
+#include "src/utils/utils.c"
 
 static void
 test_user_list(void)

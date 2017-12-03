@@ -6,7 +6,7 @@
 #include <unistd.h>
 
 #include "src/net2.h"
-#include "src/utils.h"
+#include "src/utils/utils.h"
 #include "config.h"
 
 #ifndef NET_PING_MIN

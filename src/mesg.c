@@ -7,7 +7,7 @@
 
 #include "src/draw.h"
 #include "src/state.h"
-#include "src/utils.h"
+#include "src/utils/utils.h"
 
 //TODO: fail macros copy to an error buffer, and then copy into newline,
 //take destination buffer as parameter

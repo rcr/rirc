@@ -1,6 +1,6 @@
 Stateful component hierarchy
 
-`
+```
   server_list
    |
    |__*server
@@ -41,4 +41,4 @@ Stateful component hierarchy
            |__*user
                |
                |__mode
-`
+```

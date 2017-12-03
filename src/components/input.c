@@ -24,9 +24,9 @@
 #include <string.h>
 #include <unistd.h>
 
-#include "src/comps/input.h"
+#include "src/components/input.h"
 #include "src/state.h"
-#include "src/utils.h"
+#include "src/utils/utils.h"
 
 /* Max length of user action message */
 #define MAX_ACTION_MESG 256

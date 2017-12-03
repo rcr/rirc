@@ -3,9 +3,9 @@
 
 #include <time.h>
 
-#include "src/comps/buffer.h"
-#include "src/comps/channel.h"
-#include "src/comps/mode.h"
+#include "src/components/buffer.h"
+#include "src/components/channel.h"
+#include "src/components/mode.h"
 #include "src/rirc.h"
 
 struct server
