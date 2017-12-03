@@ -14,22 +14,19 @@
 // line->end is not properly set in a lot of cases,
 // should be rewritten with a better thought out design
 //
-// poll_input should be in state and call input()
-//
 // keybind handlers or send_mesg() should be returned from input
 // to be called by the stateful code, for easier testing
 
 #include <ctype.h>
-#include <poll.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 
-#include "input.h"
-#include "state.h"
-#include "utils.h"
+#include "src/comps/input.h"
+#include "src/state.h"
+#include "src/utils.h"
 
 /* Max length of user action message */
 #define MAX_ACTION_MESG 256
@@ -59,8 +56,8 @@ char *action_message;
 
 /* User input handlers */
 static int input_char(char);
-static void input_cchar(char*);
-static void input_action(char*, ssize_t);
+static int input_cchar(const char*, size_t);
+static int input_action(const char*, size_t);
 
 /* Action handling */
 static int (*action_handler)(char);
@@ -143,45 +140,33 @@ new_list_head(struct input *i)
 	i->window = l->text;
 }
 
-void
-poll_input(void)
+int
+input(struct input *inp, const char *buff, size_t count)
 {
-	/* Poll stdin for user input, checking for control character
-	 * or escape sequence. Otherwise copy all characters to the
-	 * input struct of the current context
-	 */
+	/* Handle input, checking for control character or escape
+	 * sequence. Otherwise copy all characters to the input struct
+	 * of the current context */
 
-	int ret, timeout_ms = 200;
+	const char *p;
 
-	char *inp_ptr, inp_buff[MAX_INPUT + 1];
+	if (action_message)
+		return input_action(buff, count);
 
-	struct pollfd stdin_fd[] = {{ .fd = STDIN_FILENO, .events = POLLIN }};
+	if (iscntrl(*buff))
+		return input_cchar(buff, count);
 
-	if ((ret = poll(stdin_fd, 1, timeout_ms)) < 0 && errno != EINTR)
-		fatal("poll", errno);
+	for (p = buff; count--; p++) {
 
-	if (ret > 0) {
-
-		ssize_t count;
-
-		while ((count = read(STDIN_FILENO, inp_buff, MAX_INPUT)) < 0)
-			if (errno != EINTR)
-				fatal("read", errno);
-
-		if (count == 0)
-			fatal("stdin closed", 0);
-
-		*(inp_buff + count) = '\0';
-
-		if (action_message)
-			input_action(inp_buff, count);
-
-		else if (iscntrl(*inp_buff))
-			input_cchar(inp_buff);
-
-		else for (inp_ptr = inp_buff; *inp_ptr && input_char(*inp_ptr); inp_ptr++)
-			;
+		if (!input_char(*p++))
+			break;
 	}
+
+	/* FIXME: by the time control reaches here, the input
+	 * buffer should be know, remove all references to ccur
+	 * in this file */
+	UNUSED(inp);
+
+	return 0;
 }
 
 /*
@@ -204,8 +189,8 @@ input_char(char c)
 	return 1;
 }
 
-static void
-input_cchar(char *c)
+static int
+input_cchar(const char *c, size_t count)
 {
 	/* Input a control character or escape sequence */
 
@@ -215,34 +200,34 @@ input_cchar(char *c)
 		c++;
 
 		if (*c == 0)
-			return;
+			return 0;
 
 		/* arrow up */
-		else if (!strcmp(c, "[A"))
+		else if (!strncmp(c, "[A", count - 1))
 			input_scroll_backwards(ccur->input);
 
 		/* arrow down */
-		else if (!strcmp(c, "[B"))
+		else if (!strncmp(c, "[B", count - 1))
 			input_scroll_forwards(ccur->input);
 
 		/* arrow right */
-		else if (!strcmp(c, "[C"))
+		else if (!strncmp(c, "[C", count - 1))
 			cursor_right(ccur->input);
 
 		/* arrow left */
-		else if (!strcmp(c, "[D"))
+		else if (!strncmp(c, "[D", count - 1))
 			cursor_left(ccur->input);
 
 		/* delete */
-		else if (!strcmp(c, "[3~"))
+		else if (!strncmp(c, "[3~", count - 1))
 			delete_right(ccur->input);
 
 		/* page up */
-		else if (!strcmp(c, "[5~"))
+		else if (!strncmp(c, "[5~", count - 1))
 			buffer_scrollback_back(ccur);
 
 		/* page down */
-		else if (!strcmp(c, "[6~"))
+		else if (!strncmp(c, "[6~", count - 1))
 			buffer_scrollback_forw(ccur);
 
 	} else switch (*c) {
@@ -314,10 +299,12 @@ input_cchar(char *c)
 			buffer_scrollback_forw(ccur);
 			break;
 	}
+
+	return 0;
 }
 
-static void
-input_action(char *input, ssize_t len)
+static int
+input_action(const char *input, size_t len)
 {
 	/* Waiting for user confirmation */
 
@@ -329,6 +316,8 @@ input_action(char *input, ssize_t len)
 
 		draw_input();
 	}
+
+	return 0;
 }
 
 void

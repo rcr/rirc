@@ -1,5 +1,5 @@
-#include "test.h"
-#include "../src/utils.c"
+#include "test/test.h"
+#include "src/utils.c"
 
 void
 test_getarg(void)

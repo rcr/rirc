@@ -56,8 +56,37 @@
  *   12:34   alice ~ hello
  *   12:34     bob ~ is there anybody in there?
  *   12:34 charlie ~ just nod if you can hear me
- * */
+ */
 #define BUFFER_PADDING 1
 
 /* Raise terminal bell when pinged in chat */
 #define BELL_ON_PINGED 1
+
+/* [NETWORK] */
+
+/* Seconds before displaying ping
+ *   Integer, [0, 150, 86400]
+ *   (0: no ping handling) */
+#define NET_PING_MIN 150
+
+/* Seconds between refreshing ping display
+ *   Integer, [0, 5, 86400]
+ *   (0: no ping handling) */
+#define NET_PING_REFRESH 5
+
+/* Seconds before timeout reconnect
+ *   Integer, [0, 300, 86400]
+ *   (0: no ping timeout reconnect) */
+#define NET_PING_MAX 300
+
+/* Reconnect backoff base delay
+ *   Integer, [1, 10, 86400] */
+#define NET_RECONNECT_BACKOFF_BASE 10
+
+/* Reconnect backoff growth factor
+ *   Integer, [1, 2, 32] */
+#define NET_RECONNECT_BACKOFF_FACTOR 2
+
+/* Reconnect backoff maximum
+ *   Integer, [1, 86400, 86400] */
+#define NET_RECONNECT_BACKOFF_MAX 86400

@@ -3,8 +3,8 @@
 #include <ctype.h>
 #include <string.h>
 
-#include "mode.h"
-#include "utils.h"
+#include "src/comps/mode.h"
+#include "src/utils.h"
 
 #define MODE_ISLOWER(X) ((X) >= 'a' && (X) <= 'z')
 #define MODE_ISUPPER(X) ((X) >= 'A' && (X) <= 'Z')

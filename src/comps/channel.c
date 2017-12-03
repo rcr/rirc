@@ -1,8 +1,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "channel.h"
-#include "utils.h"
+#include "src/comps/channel.h"
+#include "src/utils.h"
 
 static inline int channel_cmp(struct channel*, struct channel*);
 

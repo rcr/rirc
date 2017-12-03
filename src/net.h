@@ -1,7 +1,7 @@
 #ifndef NET_H
 #define NET_H
 
-#include "server.h"
+#include "src/comps/server.h"
 
 /* TODO: refactoring */
 int sendf(char*, struct server*, const char*, ...);

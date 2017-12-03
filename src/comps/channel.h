@@ -1,11 +1,10 @@
 #ifndef CHANNEL_H
 #define CHANNEL_H
 
-#include "buffer.h"
-#include "mode.h"
-#include "tree.h"
-#include "user.h"
-#include "utils.h"
+#include "src/comps/buffer.h"
+#include "src/comps/mode.h"
+#include "src/comps/user.h"
+#include "src/tree.h"
 
 /* Channel activity types, in order of precedence */
 enum activity_t

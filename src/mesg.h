@@ -3,8 +3,8 @@
 
 #include <stddef.h>
 
-#include "channel.h"
-#include "server.h"
+#include "src/comps/channel.h"
+#include "src/comps/server.h"
 
 void recv_mesg(char*, int, struct server*);
 void send_mesg(char*, struct channel*);

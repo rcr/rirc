@@ -12,9 +12,9 @@
 #include <stdlib.h>
 #include <termios.h>
 
-#include "input.h"
-#include "state.h"
-#include "utils.h"
+#include "src/net2.h"
+#include "src/state.h"
+#include "src/utils.h"
 
 #define opt_error(MESG) \
 	do { puts((MESG)); exit(EXIT_FAILURE); } while (0);
@@ -245,9 +245,6 @@ main_loop(void)
 {
 	for (;;) {
 
-		/* Check for input on stdin, sleep 200ms */
-		poll_input();
-
 		/* For each server, check connection status, and input */
 		check_servers();
 
@@ -258,5 +255,7 @@ main_loop(void)
 		}
 
 		redraw();
+
+		net_poll();
 	}
 }
