@@ -4,6 +4,7 @@
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
+#include <ctype.h>
 
 #include "src/net2.h"
 #include "src/utils/utils.h"
@@ -55,34 +56,52 @@ enum NET_ERR_T
 };
 
 struct connection {
+	const void *cb_obj;
 	const char *host;
 	const char *port;
-	const void *cb_obj;
 	enum {
+		NET_CONNECTING,
+		NET_RECONNECTING,
 		NET_DISCONNECTED
 	} state;
 	int soc;
+	size_t conn_idx;
+	size_t read_idx;
+	char readbuff[NET_MESG_LEN];
 };
 
 static void net_poll_inp(int);
-static void net_poll_soc(int, const void*);
+static void net_poll_soc(int, struct connection*);
 
 static int fds_packed;
-static unsigned int num_connections;
+static unsigned int n_connections;
 
 static struct connection *connections[MAX_CONNECTIONS];
 
 struct connection*
-connection(const char *host, const char *port, const void *cb_obj)
+connection(const void *cb_obj, const char *host, const char *port)
 {
-	struct connection *c = NULL;
+	/* Instantiate a new connection
+	 *
+	 * Doesn't flag fds for repack, since socket
+	 * enters into disconnected state */
 
-	(void)(host);
-	(void)(port);
-	(void)(cb_obj);
-	/* TODO */
+	struct connection *c;
 
-	fds_packed = 0;
+	if (n_connections == MAX_CONNECTIONS)
+		return NULL;
+
+	if ((c = calloc(1, sizeof(*c))) == NULL)
+		fatal("calloc", errno);
+
+	c->cb_obj = cb_obj;
+	c->host = strdup(host);
+	c->port = strdup(port);
+	c->soc = -1;
+	c->state = NET_DISCONNECTED;
+	c->conn_idx = n_connections++;
+
+	connections[c->conn_idx] = c;
 
 	return c;
 }
@@ -90,64 +109,23 @@ connection(const char *host, const char *port, const void *cb_obj)
 void
 net_free_connection(struct connection *c)
 {
-	/* TODO */
-	(void)(c);
+	if (c->state != NET_DISCONNECTED)
+		fatal("Freeing open connection", 0);
 
-	/* if not in disconnected state, fatal */
+	/* Swap the last connection into this index */
+	connections[c->conn_idx] = connections[--n_connections];
+
+	free((void*)c->host);
+	free((void*)c->port);
+	free(c);
 
 	fds_packed = 0;
 }
 
-void
-net_poll(void)
-{
-	int ret, timeout = 1000;
-
-	static nfds_t i, nfds;
-	static struct pollfd fds[MAX_CONNECTIONS + 1];
-
-	/* Repack only before polling */
-	if (fds_packed == 0) {
-		fds_packed = 1;
-
-		memset(fds, 0, sizeof(fds));
-
-		nfds = 1 + num_connections;
-
-		fds[0].fd = STDIN_FILENO;
-		fds[0].events = POLLIN;
-
-		for (i = 1; i <= num_connections; i++) {
-			fds[i].fd = connections[i]->soc;
-			fds[i].events = POLLIN;
-		}
-	}
-
-	while ((ret = poll(fds, nfds, timeout)) <= 0) {
-
-		if (ret == 0)
-			return;
-
-		if (!(errno == EAGAIN || errno == EINTR))
-			fatal("poll", errno);
-	}
-
-	for (i = 0; i < nfds; i++) {
-
-		if (fds[i].revents & POLLIN) {
-			fds[i].revents = 0;
-
-			if (i == STDIN_FILENO)
-				net_poll_inp(fds[i].fd);
-			else
-				net_poll_soc(fds[i].fd, connections[i]->cb_obj);
-
-			if (--ret == 0)
-				return;
-		}
-	}
-}
-
+/* TODO: here, just check the state of the connection and return error, or
+ * call the internal disconnect function that ignores already disconnected
+ * sockets. this way we can call disconnect twice, e.g. POLLIN callback
+ * or POLLHUP*/
 int
 net_cx(struct connection *c)
 {
@@ -166,42 +144,131 @@ net_dx(struct connection *c)
 	return NET_ERR_NONE;
 }
 
+void
+net_poll(void)
+{
+	int ret, timeout = 1000;
+
+	static nfds_t i, nfds;
+	static struct pollfd fds[MAX_CONNECTIONS + 1];
+
+	/* Repack only before polling */
+	if (fds_packed == 0) {
+		fds_packed = 1;
+
+		memset(fds, 0, sizeof(fds));
+
+		nfds = 1 + n_connections;
+
+		fds[0].fd = STDIN_FILENO;
+		fds[0].events = POLLIN;
+
+		for (i = 1; i <= n_connections; i++) {
+			fds[i].fd = connections[i]->soc;
+			fds[i].events = POLLIN;
+		}
+	}
+
+	while ((ret = poll(fds, nfds, timeout)) < 0) {
+
+		if (!(errno == EAGAIN || errno == EINTR))
+			fatal("poll", errno);
+	}
+
+
+	/* Handle user input */
+	if (fds[0].revents) {
+
+		if (fds[0].revents & (POLLERR | POLLHUP | POLLNVAL))
+			fatal("stdin error", 0);
+
+		if (fds[0].revents & POLLIN)
+			net_poll_inp(fds[i].fd);
+
+		ret--;
+	}
+
+	/* Handle sockets */
+	for (i = 1; ret && i < nfds; i++) {
+
+		if (fds[i].revents == 0)
+			continue;
+
+		/* POLLNVAL results from invalid file descriptor and
+		 * is treated as fatal programming error
+		 *
+		 * POLLERR, POLLHUP, POLLIN can all result in disconnect:
+		 *  - POLLERR: socket error
+		 *  - POLLHUP: remote hangup
+		 *  - POLLIN:  via actions in callback handler
+		 *
+		 * POLLHUP and POLLIN are not mutually exclusive, data
+		 * might still be readable on the socket after hangup
+		 */
+
+		if (fds[i].revents & POLLNVAL)
+			fatal("invalid fd", 0);
+
+		if (fds[i].revents & (POLLERR | POLLHUP)) {
+
+			net_dx(connections[i]);
+
+			if (fds[i].revents & POLLERR)
+				net_cb_dxed(connections[i]->cb_obj, "Disconnected: socket error");
+			else
+				net_cb_dxed(connections[i]->cb_obj, "Disconnected: remote hangup");
+		}
+
+		if (fds[i].revents & POLLIN) {
+			net_poll_soc(fds[i].fd, connections[i]);
+		}
+
+		ret--;
+	}
+}
+
 static void
 net_poll_inp(int fd)
 {
 	ssize_t count;
-	char readbuff[1024];
+	char inp_readbuff[4096];
 
-	while ((count = read(fd, readbuff, sizeof(readbuff))) <= 0) {
+	while ((count = read(fd, inp_readbuff, sizeof(inp_readbuff)))) {
 
-		if (count == 0)
-			fatal("stdin closed", 0);
-
-		if (errno != EINTR)
+		if (count < 0 && errno != EINTR)
 			fatal("read", errno);
-	}
 
-	net_cb_read_inp(readbuff, (size_t) count);
+		net_cb_read_inp(inp_readbuff, (size_t) count);
+	}
 }
 
 static void
-net_poll_soc(int fd, const void *cb_obj)
+net_poll_soc(int fd, struct connection *c)
 {
-	ssize_t count;
-	char readbuff[1024];
+	ssize_t count, i;
+	char soc_readbuff[4096];
 
-	do {
-		count = read(fd, readbuff, sizeof(readbuff));
+	while ((count = read(fd, soc_readbuff, sizeof(soc_readbuff)))) {
 
-		if (count == 0) {
-			; /* disconnect */
+		if (count < 0 && errno != EINTR)
+			fatal("read", errno);
+
+		size_t read_idx = c->read_idx;
+
+		for (i = 0; i < count; i++) {
+
+			if (read_idx == NET_MESG_LEN || soc_readbuff[i] == '\r') {
+				c->readbuff[i] = 0;
+				net_cb_read_soc(c->readbuff, read_idx, c->cb_obj);
+				read_idx = 0;
+
+			}
+
+			/* Filter printable characters and CTCP markup */
+			if (isgraph(soc_readbuff[i]) || soc_readbuff[i] == ' ' || soc_readbuff[i] == 0x01)
+				c->readbuff[read_idx++] = soc_readbuff[i];
 		}
 
-		if (count < 0) {
-			; /* error, possibly eintr? */
-		}
-
-	} while ((count = read(fd, readbuff, sizeof(readbuff))));
-
-	net_cb_read_soc(readbuff, (size_t) count, cb_obj);
+		c->read_idx = read_idx;
+	}
 }

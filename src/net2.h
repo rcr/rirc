@@ -58,13 +58,16 @@
  *  - from socket: net_cb_soc
  */
 
+/* RFC 2812, section 2.3 */
+#define NET_MESG_LEN 510
+
 struct connection;
 
 /* Returns a connection, or NULL if limit is reached */
 struct connection* connection(
+	const void*,  /* callback object */
 	const char*,  /* host */
-	const char*,  /* port */
-	const void*); /* callback object */
+	const char*); /* port */
 
 void net_free(struct connection*);
 void net_poll(void);
@@ -83,8 +86,8 @@ void net_cb_rxng(const void*, const char*, ...);
 void net_cb_ping(const void*, int);
 
 /* Network data callback */
-void net_cb_read_inp(const char*, size_t);
-void net_cb_read_soc(const char*, size_t, const void*);
+void net_cb_read_inp(char*, size_t);
+void net_cb_read_soc(char*, size_t, const void*);
 
 /* Network error code string */
 const char* net_strerr(int);
