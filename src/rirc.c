@@ -176,7 +176,7 @@ startup(int argc, char **argv)
 	struct termios nterm = oterm;
 
 	nterm.c_lflag &= ~(ECHO | ICANON | ISIG);
-	nterm.c_cc[VMIN] = 1;
+	nterm.c_cc[VMIN]  = 0;
 	nterm.c_cc[VTIME] = 0;
 
 	if (tcsetattr(0, TCSADRAIN, &nterm) < 0)

@@ -1,10 +1,15 @@
 #include <errno.h>
+#include <ctype.h>
+#include <fcntl.h>
+#include <netdb.h>
 #include <poll.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
+#include <sys/socket.h>
+#include <sys/types.h>
 #include <time.h>
 #include <unistd.h>
-#include <ctype.h>
 
 #include "src/net2.h"
 #include "src/utils/utils.h"
@@ -230,16 +235,28 @@ net_poll(void)
 static void
 net_poll_inp(int fd)
 {
-	ssize_t count;
-	char inp_readbuff[4096];
+	#define NET_MAX_INPUT_CHARS 4096
+	(void)fd;
 
-	while ((count = read(fd, inp_readbuff, sizeof(inp_readbuff)))) {
+	char input[NET_MAX_INPUT_CHARS];
+	int c, count = 0;
 
-		if (count < 0 && errno != EINTR)
-			fatal("read", errno);
+	flockfile(stdin);
 
-		net_cb_read_inp(inp_readbuff, (size_t) count);
+	while ((c = getc_unlocked(stdin)) != EOF) {
+
+		if (count == NET_MAX_INPUT_CHARS)
+			continue;
+
+		input[count++] = (char) c;
 	}
+
+	net_cb_read_inp(input, count);
+
+	if (ferror(stdin))
+		fatal("stdin error", errno);
+
+	funlockfile(stdin);
 }
 
 static void
