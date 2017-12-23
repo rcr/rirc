@@ -1,5 +1,4 @@
 /* For sigaction */
-#define _POSIX_C_SOURCE 200112L
 #define _DARWIN_C_SOURCE 200112L
 /* For SIGWINCH on FreeBSD */
 #ifndef __BSD_VISIBLE

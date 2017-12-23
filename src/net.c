@@ -4,9 +4,6 @@
  * shouldnt be calling newline, new_channel, auto_nick, etc
  * */
 
-/* For addrinfo, getaddrinfo, getnameinfo */
-#define _POSIX_C_SOURCE 200112L
-
 #include <fcntl.h>
 #include <netdb.h>
 #include <pthread.h>
