@@ -1,3 +1,8 @@
+/* TODO:
+ * Dynamic poll timeout for connecting/pinging connections
+ * Check sanity of config
+ */
+
 #include <errno.h>
 #include <ctype.h>
 #include <fcntl.h>
@@ -51,12 +56,12 @@
 	#error "NET_RECONNECT_BACKOFF_MAX: [0, 86400]"
 #endif
 
-/* TODO: check sanity of config */
-
 #define MAX_CONNECTIONS 15
 
 enum NET_ERR_T
 {
+	NET_ERR_DXED = -2,
+	NET_ERR_CXED = -1,
 	NET_ERR_NONE
 };
 
@@ -65,15 +70,20 @@ struct connection {
 	const char *host;
 	const char *port;
 	enum {
-		NET_CONNECTING,
-		NET_RECONNECTING,
-		NET_DISCONNECTED
-	} state;
+		NET_DXED, /* Socket disconnected, passive */
+		NET_RXNG, /* Socket disconnected, pending reconnect */
+		NET_CXNG, /* Socket connection in progress */
+		NET_CXED, /* Socket connected */
+		NET_PING  /* Socket connected, network state in question */
+	} status;
 	int soc;
 	size_t conn_idx;
 	size_t read_idx;
 	char readbuff[NET_MESG_LEN];
 };
+
+static void _net_cx(struct connection*);
+static void _net_dx(struct connection*);
 
 static void net_poll_inp(int);
 static void net_poll_soc(int, struct connection*);
@@ -103,7 +113,7 @@ connection(const void *cb_obj, const char *host, const char *port)
 	c->host = strdup(host);
 	c->port = strdup(port);
 	c->soc = -1;
-	c->state = NET_DISCONNECTED;
+	c->status = NET_DXED;
 	c->conn_idx = n_connections++;
 
 	connections[c->conn_idx] = c;
@@ -112,9 +122,9 @@ connection(const void *cb_obj, const char *host, const char *port)
 }
 
 void
-net_free_connection(struct connection *c)
+net_free(struct connection *c)
 {
-	if (c->state != NET_DISCONNECTED)
+	if (c->status != NET_DXED)
 		fatal("Freeing open connection", 0);
 
 	/* Swap the last connection into this index */
@@ -127,15 +137,13 @@ net_free_connection(struct connection *c)
 	fds_packed = 0;
 }
 
-/* TODO: here, just check the state of the connection and return error, or
- * call the internal disconnect function that ignores already disconnected
- * sockets. this way we can call disconnect twice, e.g. POLLIN callback
- * or POLLHUP*/
 int
 net_cx(struct connection *c)
 {
-	/* TODO */
-	(void)(c);
+	if (c->status == NET_CXED || c->status == NET_PING)
+		return NET_ERR_CXED;
+
+	_net_cx(c);
 
 	return NET_ERR_NONE;
 }
@@ -143,8 +151,10 @@ net_cx(struct connection *c)
 int
 net_dx(struct connection *c)
 {
-	/* TODO */
-	(void)(c);
+	if (c->status == NET_DXED)
+		return NET_ERR_DXED;
+
+	_net_dx(c);
 
 	return NET_ERR_NONE;
 }
@@ -163,7 +173,7 @@ net_poll(void)
 
 		memset(fds, 0, sizeof(fds));
 
-		nfds = 1 + n_connections;
+		nfds = n_connections + 1;
 
 		fds[0].fd = STDIN_FILENO;
 		fds[0].events = POLLIN;
@@ -199,37 +209,73 @@ net_poll(void)
 		if (fds[i].revents == 0)
 			continue;
 
-		/* POLLNVAL results from invalid file descriptor and
+		/* For sockets in this configuration and polling scheme:
+		 *
+		 * POLLNVAL results from invalid file descriptor and
 		 * is treated as fatal programming error
 		 *
-		 * POLLERR, POLLHUP, POLLIN can all result in disconnect:
+		 * POLLERR superscedes POLLIN, POLLOUT, POLLHUP and
+		 * indicates a fatal error for the device or stream
+		 *
+		 * POLLHUP indicates remote hangup for active connection
+		 *
+		 * POLLOUT indicates success or failure for a socket
+		 * while connecting. It is mutually exclusive with POLLHUP
+		 *
+		 * POLLIN indicates data is readable from this socket
+		 * and is not mutually exclusive with POLLHUP; data
+		 * may be readable on a socket after remote hangup
+		 *
+		 * POLLERR, POLLHUP, POLLIN can all result in disconnect
+		 * for an active connection:
 		 *  - POLLERR: socket error
 		 *  - POLLHUP: remote hangup
 		 *  - POLLIN:  via actions in callback handler
-		 *
-		 * POLLHUP and POLLIN are not mutually exclusive, data
-		 * might still be readable on the socket after hangup
 		 */
 
 		if (fds[i].revents & POLLNVAL)
 			fatal("invalid fd", 0);
 
-		if (fds[i].revents & (POLLERR | POLLHUP)) {
+		if (fds[i].revents & POLLERR) {
+			; /* TODO */
+		}
 
-			net_dx(connections[i]);
+		if (fds[i].revents & POLLHUP) {
+			; /* TODO */
+		}
 
-			if (fds[i].revents & POLLERR)
-				net_cb_dxed(connections[i]->cb_obj, "Disconnected: socket error");
-			else
-				net_cb_dxed(connections[i]->cb_obj, "Disconnected: remote hangup");
+		if (fds[i].revents & POLLOUT) {
+
+			if (0 > getsockopt(fds[i].fd, SOL_SOCKET, SO_ERROR, &optval, &optlen))
+				fatal("getsockopt", errno);
+
+			if (optval == 0) {
+				; /* TODO */
+			} else {
+				; /* TODO */
+			}
 		}
 
 		if (fds[i].revents & POLLIN) {
-			net_poll_soc(fds[i].fd, connections[i]);
+			net_poll_soc(connections[i]);
 		}
 
 		ret--;
 	}
+}
+
+static void
+_net_cx(struct connection *c)
+{
+	/* TODO */
+	(void)c;
+}
+
+static void
+_net_dx(struct connection *c)
+{
+	/* TODO */
+	(void)c;
 }
 
 static void

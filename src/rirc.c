@@ -13,7 +13,6 @@
 
 #include "src/net2.h"
 #include "src/state.h"
-//#include "src/utils.h"
 
 #define opt_error(MESG) \
 	do { puts((MESG)); exit(EXIT_FAILURE); } while (0);

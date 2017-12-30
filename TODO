@@ -29,7 +29,7 @@ Continue refactoring:
 	- fix poll/sleep cycle for sockets and input fd, use posix timers when socket timing out?
 
 Testing:
-	- Stateful code integration testing
+	- Stateful code integration testing (manually drive state with network callbacks)
 	- callgrind profiling
 	- Coverage (gcov)
 		- link test/foo.c against src/foo.o built with coverage flags

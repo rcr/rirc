@@ -577,7 +577,6 @@ net_cb_read_inp(const char *buff, size_t count)
 	input(ccur->input, buff, count);
 
 	/* TODO */
-	draw_buffer();
 	draw_input();
 }
 

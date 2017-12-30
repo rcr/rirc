@@ -12,7 +12,7 @@ struct opt
 	char *val;
 };
 
-static int parse_opt(struct opt*, char **);
+static int parse_opt(struct opt*, char**);
 
 /* TODO: CASEMAPPING (ascii, rfc1459, strict-rfc1459, set server fptr) */
 #define HANDLED_005 \
