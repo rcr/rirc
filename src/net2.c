@@ -3,13 +3,14 @@
  * Check sanity of config
  */
 
-#include <errno.h>
 #include <ctype.h>
+#include <errno.h>
 #include <fcntl.h>
+#include <limits.h>
 #include <netdb.h>
 #include <poll.h>
-#include <stdlib.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
 #include <sys/types.h>
@@ -19,6 +20,8 @@
 #include "src/net2.h"
 #include "src/utils/utils.h"
 #include "config.h"
+
+#define NET_MAX_CONNECTIONS 8
 
 #ifndef NET_PING_MIN
 	#define NET_PING_MIN 150
@@ -56,8 +59,6 @@
 	#error "NET_RECONNECT_BACKOFF_MAX: [0, 86400]"
 #endif
 
-#define MAX_CONNECTIONS 15
-
 enum NET_ERR_T
 {
 	NET_ERR_DXED = -2,
@@ -85,13 +86,19 @@ struct connection {
 static void _net_cx(struct connection*);
 static void _net_dx(struct connection*);
 
-static void net_poll_inp(int);
-static void net_poll_soc(int, struct connection*);
+static void net_cx_failure(struct connection*, int);
+static void net_cx_pollerr(struct connection*, int);
+static void net_cx_pollhup(struct connection*);
+static void net_cx_readsoc(struct connection*);
+static void net_cx_success(struct connection*);
+
+static void net_stdin_read(void);
 
 static int fds_packed;
+
 static unsigned int n_connections;
 
-static struct connection *connections[MAX_CONNECTIONS];
+static struct connection *connections[NET_MAX_CONNECTIONS];
 
 struct connection*
 connection(const void *cb_obj, const char *host, const char *port)
@@ -103,7 +110,7 @@ connection(const void *cb_obj, const char *host, const char *port)
 
 	struct connection *c;
 
-	if (n_connections == MAX_CONNECTIONS)
+	if (n_connections == NET_MAX_CONNECTIONS)
 		return NULL;
 
 	if ((c = calloc(1, sizeof(*c))) == NULL)
@@ -162,26 +169,33 @@ net_dx(struct connection *c)
 void
 net_poll(void)
 {
-	int ret, timeout = 1000;
+	int optval, ret, timeout = 1000;
 
-	static nfds_t i, nfds;
-	static struct pollfd fds[MAX_CONNECTIONS + 1];
+	fprintf(stderr, "%d", _POSIX_OPEN_MAX);
 
-	/* Repack only before polling */
+	socklen_t optlen;
+
+	static nfds_t nfds, i;
+	static struct pollfd fds[NET_MAX_CONNECTIONS + 1];
+
 	if (fds_packed == 0) {
-		fds_packed = 1;
 
 		memset(fds, 0, sizeof(fds));
 
-		nfds = n_connections + 1;
+		for (nfds = 0; nfds < n_connections; nfds++) {
 
-		fds[0].fd = STDIN_FILENO;
-		fds[0].events = POLLIN;
+			if (connections[nfds]->status == NET_CXNG)
+				fds[nfds].events = POLLOUT;
+			else
+				fds[nfds].events = POLLIN;
 
-		for (i = 1; i <= n_connections; i++) {
-			fds[i].fd = connections[i]->soc;
-			fds[i].events = POLLIN;
+			fds[nfds].fd = connections[nfds]->soc;
 		}
+
+		fds[nfds].events = POLLIN;
+		fds[nfds].fd = STDIN_FILENO;
+
+		fds_packed = 1;
 	}
 
 	while ((ret = poll(fds, nfds, timeout)) < 0) {
@@ -191,33 +205,30 @@ net_poll(void)
 	}
 
 
-	/* Handle user input */
-	if (fds[0].revents) {
+	// FIXME: this doesnt work when theres no sockets...
+	//
+	// nfds = 1..?
 
-		if (fds[0].revents & (POLLERR | POLLHUP | POLLNVAL))
+	/* Handle user input */
+	if (fds[nfds].revents) {
+
+		if (fds[nfds].revents & (POLLERR | POLLHUP | POLLNVAL))
 			fatal("stdin error", 0);
 
-		if (fds[0].revents & POLLIN)
-			net_poll_inp(fds[i].fd);
+		if (fds[nfds].revents & POLLIN)
+			net_stdin_read();
 
 		ret--;
 	}
 
 	/* Handle sockets */
-	for (i = 1; ret && i < nfds; i++) {
+	for (i = 0; ret && i < nfds; i++) {
 
-		if (fds[i].revents == 0)
-			continue;
-
-		/* For sockets in this configuration and polling scheme:
-		 *
-		 * POLLNVAL results from invalid file descriptor and
+		/* POLLNVAL results from invalid file descriptor and
 		 * is treated as fatal programming error
 		 *
 		 * POLLERR superscedes POLLIN, POLLOUT, POLLHUP and
 		 * indicates a fatal error for the device or stream
-		 *
-		 * POLLHUP indicates remote hangup for active connection
 		 *
 		 * POLLOUT indicates success or failure for a socket
 		 * while connecting. It is mutually exclusive with POLLHUP
@@ -226,6 +237,8 @@ net_poll(void)
 		 * and is not mutually exclusive with POLLHUP; data
 		 * may be readable on a socket after remote hangup
 		 *
+		 * POLLHUP indicates remote hangup for active connection
+		 *
 		 * POLLERR, POLLHUP, POLLIN can all result in disconnect
 		 * for an active connection:
 		 *  - POLLERR: socket error
@@ -233,31 +246,36 @@ net_poll(void)
 		 *  - POLLIN:  via actions in callback handler
 		 */
 
+		if (fds[i].revents == 0)
+			continue;
+
 		if (fds[i].revents & POLLNVAL)
 			fatal("invalid fd", 0);
 
 		if (fds[i].revents & POLLERR) {
-			; /* TODO */
-		}
 
-		if (fds[i].revents & POLLHUP) {
-			; /* TODO */
-		}
+			if (0 > getsockopt(fds[i].fd, SOL_SOCKET, SO_ERROR, &optval, &optlen))
+				fatal("getsockopt", errno);
+			else
+				net_cx_pollerr(connections[i], optval);
 
-		if (fds[i].revents & POLLOUT) {
+		} else if (fds[i].revents & POLLOUT) {
 
 			if (0 > getsockopt(fds[i].fd, SOL_SOCKET, SO_ERROR, &optval, &optlen))
 				fatal("getsockopt", errno);
 
-			if (optval == 0) {
-				; /* TODO */
-			} else {
-				; /* TODO */
-			}
-		}
+			if (optval == 0)
+				net_cx_success(connections[i]);
+			else
+				net_cx_failure(connections[i], optval);
 
-		if (fds[i].revents & POLLIN) {
-			net_poll_soc(connections[i]);
+		} else {
+
+			if (fds[i].revents & POLLIN)
+				net_cx_readsoc(connections[i]);
+
+			if (fds[i].revents & POLLHUP)
+				net_cx_pollhup(connections[i]);
 		}
 
 		ret--;
@@ -279,39 +297,42 @@ _net_dx(struct connection *c)
 }
 
 static void
-net_poll_inp(int fd)
+net_cx_failure(struct connection *c, int err)
 {
-	#define NET_MAX_INPUT_CHARS 4096
-	(void)fd;
-
-	char input[NET_MAX_INPUT_CHARS];
-	int c, count = 0;
-
-	flockfile(stdin);
-
-	while ((c = getc_unlocked(stdin)) != EOF) {
-
-		if (count == NET_MAX_INPUT_CHARS)
-			continue;
-
-		input[count++] = (char) c;
-	}
-
-	net_cb_read_inp(input, count);
-
-	if (ferror(stdin))
-		fatal("stdin error", errno);
-
-	funlockfile(stdin);
+	/* TODO */
+	(void)err; //strerror(err)
+	(void)c;
 }
 
 static void
-net_poll_soc(int fd, struct connection *c)
+net_cx_pollerr(struct connection *c, int err)
+{
+	/* TODO */
+	(void)err;
+	(void)c;
+}
+
+static void
+net_cx_pollhup(struct connection *c)
+{
+	/* TODO */
+	(void)c;
+}
+
+static void
+net_cx_success(struct connection *c)
+{
+	/* TODO */
+	(void)c;
+}
+
+static void
+net_cx_readsoc(struct connection *c)
 {
 	ssize_t count, i;
 	char soc_readbuff[4096];
 
-	while ((count = read(fd, soc_readbuff, sizeof(soc_readbuff)))) {
+	while ((count = read(c->soc, soc_readbuff, sizeof(soc_readbuff)))) {
 
 		if (count < 0 && errno != EINTR)
 			fatal("read", errno);
@@ -334,4 +355,34 @@ net_poll_soc(int fd, struct connection *c)
 
 		c->read_idx = read_idx;
 	}
+}
+
+static void
+net_stdin_read(void)
+{
+	#define NET_MAX_INPUT_CHARS 4096
+
+
+	fprintf(stderr, "POLL INPUT");
+
+
+	char input[NET_MAX_INPUT_CHARS];
+	int c, count = 0;
+
+	flockfile(stdin);
+
+	while ((c = getc_unlocked(stdin)) != EOF) {
+
+		if (count == NET_MAX_INPUT_CHARS)
+			continue;
+
+		input[count++] = (char) c;
+	}
+
+	net_cb_read_inp(input, count);
+
+	if (ferror(stdin))
+		fatal("stdin error", errno);
+
+	funlockfile(stdin);
 }
