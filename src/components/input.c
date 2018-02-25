@@ -147,19 +147,14 @@ input(struct input *inp, const char *buff, size_t count)
 	 * sequence. Otherwise copy all characters to the input struct
 	 * of the current context */
 
-	const char *p;
-
 	if (action_message)
 		return input_action(buff, count);
 
 	if (iscntrl(*buff))
 		return input_cchar(buff, count);
 
-	for (p = buff; count--; p++) {
-
-		if (!input_char(*p++))
-			break;
-	}
+	while (count-- && input_char(*buff))
+		buff++;
 
 	/* FIXME: by the time control reaches here, the input
 	 * buffer should be know, remove all references to ccur
