@@ -94,11 +94,13 @@ static void net_cx_success(struct connection*);
 
 static void net_stdin_read(void);
 
+
+
 static int fds_packed;
-
 static unsigned int n_connections;
-
 static struct connection *connections[NET_MAX_CONNECTIONS];
+
+
 
 struct connection*
 connection(const void *cb_obj, const char *host, const char *port)
@@ -116,12 +118,12 @@ connection(const void *cb_obj, const char *host, const char *port)
 	if ((c = calloc(1, sizeof(*c))) == NULL)
 		fatal("calloc", errno);
 
-	c->cb_obj = cb_obj;
-	c->host = strdup(host);
-	c->port = strdup(port);
-	c->soc = -1;
-	c->status = NET_DXED;
+	c->cb_obj   = cb_obj;
 	c->conn_idx = n_connections++;
+	c->host     = strdup(host);
+	c->port     = strdup(port);
+	c->soc      = -1;
+	c->status   = NET_DXED;
 
 	connections[c->conn_idx] = c;
 
@@ -169,11 +171,7 @@ net_dx(struct connection *c)
 void
 net_poll(void)
 {
-	int optval, ret, timeout = 1000;
-
-	fprintf(stderr, "%d", _POSIX_OPEN_MAX);
-
-	socklen_t optlen;
+	int ret, timeout = 1000;
 
 	static nfds_t nfds, i;
 	static struct pollfd fds[NET_MAX_CONNECTIONS + 1];
@@ -198,16 +196,17 @@ net_poll(void)
 		fds_packed = 1;
 	}
 
-	while ((ret = poll(fds, nfds, timeout)) < 0) {
+	while ((ret = poll(fds, nfds + 1, timeout)) < 0) {
 
-		if (!(errno == EAGAIN || errno == EINTR))
-			fatal("poll", errno);
+		/* Exit polling loop to handle signal event */
+		if (errno == EINTR)
+			return;
+
+		if (errno == EAGAIN)
+			continue;
+
+		fatal("poll", errno);
 	}
-
-
-	// FIXME: this doesnt work when theres no sockets...
-	//
-	// nfds = 1..?
 
 	/* Handle user input */
 	if (fds[nfds].revents) {
@@ -245,6 +244,9 @@ net_poll(void)
 		 *  - POLLHUP: remote hangup
 		 *  - POLLIN:  via actions in callback handler
 		 */
+
+		int optval;
+		socklen_t optlen;
 
 		if (fds[i].revents == 0)
 			continue;
@@ -361,10 +363,6 @@ static void
 net_stdin_read(void)
 {
 	#define NET_MAX_INPUT_CHARS 4096
-
-
-	fprintf(stderr, "POLL INPUT");
-
 
 	char input[NET_MAX_INPUT_CHARS];
 	int c, count = 0;

@@ -230,6 +230,7 @@ cleanup(void)
 	tcsetattr(0, TCSADRAIN, &oterm);
 }
 
+/* TODO: install sig handlers for cleanly exiting in debug mode */ 
 static void
 signal_sigwinch(int signum)
 {
