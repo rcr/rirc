@@ -1,9 +1,9 @@
 #ifndef NICKLIST_H
 #define NICKLIST_H
 
-#include "src/comps/mode.h"
-#include "src/tree.h"
-#include "src/utils.h"
+#include "src/components/mode.h"
+#include "src/utils/tree.h"
+#include "src/utils/utils.h"
 
 enum user_err
 {

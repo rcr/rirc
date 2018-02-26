@@ -1,10 +1,10 @@
 #ifndef STATE_H
 #define STATE_H
 
-#include "src/comps/buffer.h"
-#include "src/comps/channel.h"
-#include "src/comps/input.h"
-#include "src/comps/server.h"
+#include "src/components/buffer.h"
+#include "src/components/channel.h"
+#include "src/components/input.h"
+#include "src/components/server.h"
 #include "src/draw.h"
 #include "src/mesg.h"
 #include "src/net.h"

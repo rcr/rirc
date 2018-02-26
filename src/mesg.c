@@ -7,7 +7,7 @@
 
 #include "src/draw.h"
 #include "src/state.h"
-#include "src/utils.h"
+#include "src/utils/utils.h"
 
 //TODO: fail macros copy to an error buffer, and then copy into newline,
 //take destination buffer as parameter
@@ -1120,8 +1120,8 @@ recv_mode_chanmodes(char *err, struct parsed_mesg *p, const struct mode_config *
 						newlinef(c, 0, "--", "%s%s%s mode: %c%c",
 								(p->from ? p->from : ""),
 								(p->from ? " set " : ""),
-								(mode_set == MODE_SET_ON ? '+' : '-'),
 								c->name.str,
+								(mode_set == MODE_SET_ON ? '+' : '-'),
 								flag);
 					}
 					break;
@@ -1137,9 +1137,10 @@ recv_mode_chanmodes(char *err, struct parsed_mesg *p, const struct mode_config *
 					mode_err = mode_chanmode_set(chanmodes, config, flag, mode_set);
 
 					if (mode_err == MODE_ERR_NONE) {
-						newlinef(c, 0, "--", "%s%schanmode: %c%c %s",
+						newlinef(c, 0, "--", "%s%s%s mode: %c%c %s",
 								(p->from ? p->from : ""),
 								(p->from ? " set " : ""),
+								c->name.str,
 								(mode_set == MODE_SET_ON ? '+' : '-'),
 								flag,
 								modearg);
@@ -1162,7 +1163,7 @@ recv_mode_chanmodes(char *err, struct parsed_mesg *p, const struct mode_config *
 					mode_prfxmode_set(&(user->prfxmodes), config, flag, mode_set);
 
 					if (mode_err == MODE_ERR_NONE) {
-						newlinef(c, 0, "--", "%s%s user %s mode: %c%c",
+						newlinef(c, 0, "--", "%s%suser %s mode: %c%c",
 								(p->from ? p->from : ""),
 								(p->from ? " set " : ""),
 								modearg,

@@ -1,8 +1,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "src/comps/user.h"
-#include "src/utils.h"
+#include "src/components/user.h"
+#include "src/utils/utils.h"
 
 static struct user* user(const char*);
 
