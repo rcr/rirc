@@ -1,7 +1,15 @@
+.POSIX:
+
+VERSION = 0.1
+
+# Install paths
+EXE_DIR = /usr/local/bin
+MAN_DIR = /usr/local/share/man/man1
+
 CC = cc
 PP = cc -E
-CFLAGS    = -I. -std=c99 -D_POSIX_C_SOURCE=200112L -Wall -Wextra -pedantic -O2
-CFLAGS_D  = -I. -std=c99 -D_POSIX_C_SOURCE=200112L -Wall -Wextra -pedantic -O0 -g -DDEBUG
+CFLAGS    = -I. -std=c99 -DVERSION=\"$(VERSION)\" -D_POSIX_C_SOURCE=200112L -Wall -Wextra -pedantic -O2
+CFLAGS_D  = -I. -std=c99 -DVERSION=\"$(VERSION)\" -D_POSIX_C_SOURCE=200112L -Wall -Wextra -pedantic -O0 -g -DDEBUG
 LDFLAGS   = -pthread -s
 LDFLAGS_D = -pthread
 
@@ -22,8 +30,8 @@ OBJS_D := $(patsubst %.c, $(DIR_B)/%.db.o, $(SRC))
 OBJS_T := $(patsubst %.c, $(DIR_B)/%.t,    $(SRC_T))
 
 # Release build, Debug build
-EXE_R  := rirc
-EXE_D  := rirc.debug
+EXE_R := rirc
+EXE_D := rirc.debug
 
 # Release build executable
 $(EXE_R): $(DIR_B) $(OBJS_R)
@@ -73,4 +81,17 @@ define make-dirs
 	for dir in $(SRCDIRS_T); do mkdir -p $(DIR_B)/$$dir; done
 endef
 
-.PHONY: clean debug default test
+install: $(EXE_R)
+	@echo installing executable to $(EXE_DIR)
+	@echo installing manual page to $(MAN_DIR)
+	@mkdir -p $(EXE_DIR)
+	@mkdir -p $(MAN_DIR)
+	@cp -f rirc $(EXE_DIR)
+	@chmod 755 $(EXE_DIR)/rirc
+	@sed "s/VERSION/$(VERSION)/g" < rirc.1 > $(MAN_DIR)/rirc.1
+
+uninstall:
+	rm -f $(EXE_DIR)/rirc
+	rm -f $(MAN_DIR)/rirc.1
+
+.PHONY: clean default install uninstall test
