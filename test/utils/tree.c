@@ -1,5 +1,5 @@
 #include "test/test.h"
-#include "src/tree.h"
+#include "src/utils/tree.h"
 
 struct test_avl
 {

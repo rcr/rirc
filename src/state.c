@@ -15,7 +15,7 @@
 
 #include "src/draw.h"
 #include "src/state.h"
-#include "src/utils.h"
+#include "src/utils/utils.h"
 
 /* State of rirc */
 static struct
@@ -532,21 +532,11 @@ channel_move_next(void)
 }
 
 void
-net_cb_read_inp(const char *buff, size_t count)
-{
-	//newlinef(ccur, 0, "TESTING", "got: %s / %zu", buff, count);
-	//draw_buffer();
-	/* TODO */
-	input(NULL, buff, count);
-}
-
-void
-net_cb_read_soc(const char *buff, size_t count, struct server *s)
+net_cb_err(struct server *s, const char *err, ...)
 {
 	/* TODO */
-	(void)(buff);
-	(void)(count);
 	(void)(s);
+	(void)(err);
 }
 
 void
@@ -566,7 +556,7 @@ net_cb_dxed(struct server *s, const char *mesg, ...)
 }
 
 void
-net_cb_rxng(struct server *s, const char *mesg, ...)
+net_cb_cxng(struct server *s, const char *mesg, ...)
 {
 	/* TODO */
 	(void)(s);
@@ -574,8 +564,27 @@ net_cb_rxng(struct server *s, const char *mesg, ...)
 }
 
 void
-net_cb_ping(struct server *s)
+net_cb_ping(struct server *s, unsigned int ping)
 {
 	/* TODO */
+	(void)(s);
+	(void)(ping);
+}
+
+void
+net_cb_read_inp(const char *buff, size_t count)
+{
+	input(ccur->input, buff, count);
+
+	/* TODO */
+	draw_input();
+}
+
+void
+net_cb_read_soc(const char *buff, size_t count, struct server *s)
+{
+	/* TODO */
+	(void)(buff);
+	(void)(count);
 	(void)(s);
 }

@@ -1,6 +1,6 @@
 #include "test/test.h"
-#include "src/comps/channel.c"
-#include "src/utils.c"
+#include "src/components/channel.c"
+#include "src/utils/utils.c"
 
 static void
 test_channel_list(void)

@@ -1,5 +1,4 @@
 /* For sigaction */
-#define _POSIX_C_SOURCE 200112L
 #define _DARWIN_C_SOURCE 200112L
 /* For SIGWINCH on FreeBSD */
 #ifndef __BSD_VISIBLE
@@ -14,7 +13,6 @@
 
 #include "src/net2.h"
 #include "src/state.h"
-#include "src/utils.h"
 
 #define opt_error(MESG) \
 	do { puts((MESG)); exit(EXIT_FAILURE); } while (0);
@@ -177,7 +175,7 @@ startup(int argc, char **argv)
 	struct termios nterm = oterm;
 
 	nterm.c_lflag &= ~(ECHO | ICANON | ISIG);
-	nterm.c_cc[VMIN] = 1;
+	nterm.c_cc[VMIN]  = 0;
 	nterm.c_cc[VTIME] = 0;
 
 	if (tcsetattr(0, TCSADRAIN, &nterm) < 0)
@@ -232,6 +230,7 @@ cleanup(void)
 	tcsetattr(0, TCSADRAIN, &oterm);
 }
 
+/* TODO: install sig handlers for cleanly exiting in debug mode */ 
 static void
 signal_sigwinch(int signum)
 {

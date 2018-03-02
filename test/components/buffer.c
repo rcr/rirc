@@ -1,8 +1,8 @@
 #include <limits.h>
 
 #include "test/test.h"
-#include "src/comps/buffer.c"
-#include "src/utils.c"
+#include "src/components/buffer.c"
+#include "src/utils/utils.c"
 
 static char*
 _fmt_int(int i)

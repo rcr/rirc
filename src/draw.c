@@ -18,9 +18,9 @@
 #include <string.h>
 
 #include "config.h"
-#include "src/comps/input.h"
+#include "src/components/input.h"
 #include "src/state.h"
-#include "src/utils.h"
+#include "src/utils/utils.h"
 
 #define ESC "\x1b"
 
