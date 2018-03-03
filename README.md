@@ -21,7 +21,7 @@ make debug
 
 ## Usage:
 ```
-  rirc *[-c server [OPTIONS]]
+  rirc [-vh] [-c server [OPTIONS]]
 
 Help:
   -h, --help             Print this message
