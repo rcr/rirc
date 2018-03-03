@@ -1,8 +1,6 @@
 #ifndef RIRC_H
 #define RIRC_H
 
-#define VERSION "0.1"
-
 #define MAX_SERVERS 32
 
 #define BUFFSIZE 512

@@ -3,6 +3,7 @@
 
 #include <errno.h>
 #include <stddef.h>
+#include <stdlib.h>
 
 /* Parsed IRC message */
 
@@ -53,7 +54,7 @@ extern int fatal_exit;
  *   this define is precluded in test.h to aggregate fatal errors in testcases */
 #ifndef fatal
 #define fatal(M, E) \
-	do { handle_error(E, "ERROR in %s: %s", __func__, M); } while (0)
+	do { handle_error(E, "ERROR in %s: %s", __func__, M); exit(EXIT_FAILURE); } while (0)
 #endif
 
 //TODO: refactor

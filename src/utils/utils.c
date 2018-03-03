@@ -58,8 +58,6 @@ handle_error(int errnum, const char *fmt, ...)
 		fprintf(stderr, "\n");
 
 	fatal_exit = 1;
-
-	exit(EXIT_FAILURE);
 }
 
 char*

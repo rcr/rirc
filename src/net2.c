@@ -92,7 +92,7 @@ static void net_cx_pollhup(struct connection*);
 static void net_cx_readsoc(struct connection*);
 static void net_cx_success(struct connection*);
 
-static void net_stdin_read(void);
+static void net_file_read(FILE*);
 
 
 
@@ -215,7 +215,7 @@ net_poll(void)
 			fatal("stdin error", 0);
 
 		if (fds[nfds].revents & POLLIN)
-			net_stdin_read();
+			net_file_read(stdin);
 
 		ret--;
 	}
@@ -347,7 +347,6 @@ net_cx_readsoc(struct connection *c)
 				c->readbuff[i] = 0;
 				net_cb_read_soc(c->readbuff, read_idx, c->cb_obj);
 				read_idx = 0;
-
 			}
 
 			/* Filter printable characters and CTCP markup */
@@ -360,27 +359,29 @@ net_cx_readsoc(struct connection *c)
 }
 
 static void
-net_stdin_read(void)
+net_file_read(FILE *f)
 {
-	#define NET_MAX_INPUT_CHARS 4096
+	char buff[512];
+	int c;
+	size_t n;
 
-	char input[NET_MAX_INPUT_CHARS];
-	int c, count = 0;
+	flockfile(f);
 
-	flockfile(stdin);
+	for (n = 0; n < sizeof(buff); n++) {
 
-	while ((c = getc_unlocked(stdin)) != EOF) {
+		if (EOF == (c = getc_unlocked(f)))
+			break;
 
-		if (count == NET_MAX_INPUT_CHARS)
-			continue;
-
-		input[count++] = (char) c;
+		buff[n] = (char) c;
 	}
 
-	net_cb_read_inp(input, count);
+	if (ferror(f))
+		fatal("ferrof", errno);
 
-	if (ferror(stdin))
-		fatal("stdin error", errno);
+	if (feof(f))
+		clearerr(f);
 
-	funlockfile(stdin);
+	funlockfile(f);
+
+	net_cb_read_inp(buff, n);
 }

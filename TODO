@@ -28,6 +28,14 @@ Continue refactoring:
 	  type when debug flag is set
 	- fix poll/sleep cycle for sockets and input fd, use posix timers when socket timing out?
 
+
+server passwords, e.g.
+:connect irc.server.tld 6667 password
+	sends PASS during registration if set, stored
+	with the connection object
+
+get termcap strings in draw.c on startup
+
 Testing:
 	- Stateful code integration testing (manually drive state with network callbacks)
 	- callgrind profiling
