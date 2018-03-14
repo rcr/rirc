@@ -56,7 +56,7 @@
  *   from stdin:  net_cb_read_inp
  *   from socket: net_cb_read_soc
  *
- * Failed connection attemps enter a retry cycle with exponential
+ * Failed connection attempts enter a retry cycle with exponential
  * backoff time given by:
  *   t(n) = t(n - 1) * factor
  *   t(0) = base
@@ -82,9 +82,6 @@ int net_sendf(struct connection*, const char*, ...);
 /* Explicit direction of net state */
 int net_cx(struct connection*);
 int net_dx(struct connection*);
-
-/* Network error callback */
-void net_cb_err(const void*, const char*, ...);
 
 /* Informational network state callbacks */
 void net_cb_cxng(const void*, const char*, ...);

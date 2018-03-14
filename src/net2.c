@@ -1,6 +1,7 @@
 /* TODO:
  * Dynamic poll timeout for connecting/pinging connections
  * Check sanity of config
+ *
  */
 
 #include <ctype.h>
@@ -78,13 +79,10 @@ struct connection {
 		NET_PING  /* Socket connected, network state in question */
 	} status;
 	int soc;
-	size_t conn_idx;
-	size_t read_idx;
+	size_t conn_i;
+	size_t read_i;
 	char readbuff[NET_MESG_LEN];
 };
-
-static void _net_cx(struct connection*);
-static void _net_dx(struct connection*);
 
 static void net_cx_failure(struct connection*, int);
 static void net_cx_pollerr(struct connection*, int);
@@ -94,13 +92,12 @@ static void net_cx_success(struct connection*);
 
 static void net_file_read(FILE*);
 
-
+static void _net_cx(struct connection*);
+static void _net_dx(struct connection*);
 
 static int fds_packed;
 static unsigned int n_connections;
 static struct connection *connections[NET_MAX_CONNECTIONS];
-
-
 
 struct connection*
 connection(const void *cb_obj, const char *host, const char *port)
@@ -118,14 +115,14 @@ connection(const void *cb_obj, const char *host, const char *port)
 	if ((c = calloc(1, sizeof(*c))) == NULL)
 		fatal("calloc", errno);
 
-	c->cb_obj   = cb_obj;
-	c->conn_idx = n_connections++;
-	c->host     = strdup(host);
-	c->port     = strdup(port);
-	c->soc      = -1;
-	c->status   = NET_DXED;
+	c->cb_obj = cb_obj;
+	c->conn_i = n_connections++;
+	c->host   = strdup(host);
+	c->port   = strdup(port);
+	c->soc    = -1;
+	c->status = NET_DXED;
 
-	connections[c->conn_idx] = c;
+	connections[c->conn_i] = c;
 
 	return c;
 }
@@ -137,7 +134,7 @@ net_free(struct connection *c)
 		fatal("Freeing open connection", 0);
 
 	/* Swap the last connection into this index */
-	connections[c->conn_idx] = connections[--n_connections];
+	connections[c->conn_i] = connections[--n_connections];
 
 	free((void*)c->host);
 	free((void*)c->port);
@@ -339,22 +336,22 @@ net_cx_readsoc(struct connection *c)
 		if (count < 0 && errno != EINTR)
 			fatal("read", errno);
 
-		size_t read_idx = c->read_idx;
+		size_t read_i = c->read_i;
 
 		for (i = 0; i < count; i++) {
 
-			if (read_idx == NET_MESG_LEN || soc_readbuff[i] == '\r') {
+			if (read_i == NET_MESG_LEN || soc_readbuff[i] == '\r') {
 				c->readbuff[i] = 0;
-				net_cb_read_soc(c->readbuff, read_idx, c->cb_obj);
-				read_idx = 0;
+				net_cb_read_soc(c->readbuff, read_i, c->cb_obj);
+				read_i = 0;
 			}
 
 			/* Filter printable characters and CTCP markup */
 			if (isgraph(soc_readbuff[i]) || soc_readbuff[i] == ' ' || soc_readbuff[i] == 0x01)
-				c->readbuff[read_idx++] = soc_readbuff[i];
+				c->readbuff[read_i++] = soc_readbuff[i];
 		}
 
-		c->read_idx = read_idx;
+		c->read_i = read_i;
 	}
 }
 
@@ -363,24 +360,22 @@ net_file_read(FILE *f)
 {
 	char buff[512];
 	int c;
-	size_t n;
+	size_t n = 0;
 
 	flockfile(f);
 
-	for (n = 0; n < sizeof(buff); n++) {
+	while ((c = getc_unlocked(f)) != EOF) {
 
-		if (EOF == (c = getc_unlocked(f)))
-			break;
+		if (n == sizeof(buff))
+			continue;
 
-		buff[n] = (char) c;
+		buff[n++] = (char) c;
 	}
 
 	if (ferror(f))
 		fatal("ferrof", errno);
 
-	if (feof(f))
-		clearerr(f);
-
+	clearerr(f);
 	funlockfile(f);
 
 	net_cb_read_inp(buff, n);
