@@ -10,8 +10,8 @@ CC = cc
 PP = cc -E
 CFLAGS    = -I. -std=c99 -DVERSION=\"$(VERSION)\" -D_POSIX_C_SOURCE=200112L -Wall -Wextra -pedantic -O2
 CFLAGS_D  = -I. -std=c99 -DVERSION=\"$(VERSION)\" -D_POSIX_C_SOURCE=200112L -Wall -Wextra -pedantic -O0 -g -DDEBUG
-LDFLAGS   = -pthread -s
-LDFLAGS_D = -pthread
+LDFLAGS   = -s
+LDFLAGS_D =
 
 # Build, source, test source directories
 DIR_B := bld

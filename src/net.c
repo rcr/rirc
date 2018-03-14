@@ -1,566 +1,413 @@
 /* TODO:
- * net.c should be stateless,
- * shouldnt include state.h
- * shouldnt be calling newline, new_channel, auto_nick, etc
- * */
+ * Dynamic poll timeout for connecting/pinging connections
+ * Check sanity of config
+ *
+ */
 
+#include <ctype.h>
+#include <errno.h>
 #include <fcntl.h>
+#include <limits.h>
 #include <netdb.h>
-#include <pthread.h>
-#include <stdarg.h>
+#include <poll.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/socket.h>
+#include <sys/types.h>
+#include <time.h>
 #include <unistd.h>
 
-#ifdef __FreeBSD__
-	#include <sys/types.h>
-	#include <sys/socket.h>
-	#include <netinet/in.h>
-#endif
-
-#include "src/components/buffer.h"
-#include "src/components/mode.h"
 #include "src/net.h"
-#include "src/state.h"
 #include "src/utils/utils.h"
+#include "config.h"
 
-#define SERVER_TIMEOUT_S 255 /* Latency time at which a server is considered to be timed out and a disconnect is issued */
-#define SERVER_LATENCY_S 125 /* Latency time at which to begin showing in the status bar */
-#define SERVER_LATENCY_PING_S (SERVER_LATENCY_S - 10) /* Latency time at which to issue a PING before displaying latency */
+void check_servers(void) { }
 
-#define RECONNECT_DELTA 15
-
-#if SERVER_TIMEOUT_S <= SERVER_LATENCY_S
-	#error Server timeout must be greater than latency counting time
-#endif
-
-#if SERVER_LATENCY_PING_S <= 0
-	#error Server latency display time too low
-#endif
-
-/* Connection thread info */
-typedef struct connection_thread {
-	int socket;
-	int socket_tmp;
-	char *host;
-	char *port;
-	char error[MAX_ERROR + 1];
-	char ipstr[INET6_ADDRSTRLEN];
-	pthread_t tid;
-} connection_thread;
-
-/* DLL of current servers */
-static struct server *server_head;
-
-static struct server* new_server(char*, char*, char*, char*);
-static void free_server(struct server*);
-
-static int check_connect(struct server*);
-static int check_latency(struct server*, time_t);
-static int check_reconnect(struct server*, time_t);
-static int check_socket(struct server*, time_t);
-
-static void connected(struct server*);
-
-static void* threaded_connect(void*);
-static void threaded_connect_cleanup(void*);
-
-/* FIXME: reorganize, this is a temporary fix in order to retrieve
- * the first/last channels for drawing purposes. */
-struct server*
-get_server_head(void)
+/* FIXME: refactoring, stubbed until removal */
+int
+sendf(char *a, struct server *b, const char *c, ...)
 {
-	return server_head;
+	(void)a;
+	(void)b;
+	(void)c;
+	return 0;
 }
 
-static struct server*
-new_server(char *host, char *port, char *join, char *nicks)
+void
+server_connect(char *a, char *b, char *c, char *d)
 {
-	/* FIXME: refactor connections out of server, use server constructor
-	 * from server.c*/
+	(void)a;
+	(void)b;
+	(void)c;
+	(void)d;
+}
 
-	struct server *s;
+void
+server_disconnect(struct server *a, int b, int c, char *d)
+{
+	(void)a;
+	(void)b;
+	(void)c;
+	(void)d;
+}
 
-	if ((s = calloc(1, sizeof(*s))) == NULL)
+
+#define NET_MAX_CONNECTIONS 8
+
+#ifndef NET_PING_MIN
+	#define NET_PING_MIN 150
+#elif (NET_PING_MIN < 0 || NET_PING_MIN > 86400)
+	#error "NET_PING_MIN: [0, 86400]"
+#endif
+
+#ifndef NET_PING_REFRESH
+	#define NET_PING_REFRESH 5
+#elif (NET_PING_REFRESH < 0 || NET_PING_REFRESH > 86400)
+	#error "NET_PING_REFRESH: [0, 86400]"
+#endif
+
+#ifndef NET_PING_MAX
+	#define NET_PING_MAX 300
+#elif (NET_PING_MAX < 0 || NET_PING_MAX > 86400)
+	#error "NET_PING_MAX: [0, 86400]"
+#endif
+
+#ifndef NET_RECONNECT_BACKOFF_BASE
+	#define NET_RECONNECT_BACKOFF_BASE 10
+#elif (NET_RECONNECT_BACKOFF_BASE < 1 || NET_RECONNECT_BACKOFF_BASE > 86400)
+	#error "NET_RECONNECT_BACKOFF_BASE: [1, 32]"
+#endif
+
+#ifndef NET_RECONNECT_BACKOFF_FACTOR
+	#define NET_RECONNECT_BACKOFF_FACTOR 2
+#elif (NET_RECONNECT_BACKOFF_FACTOR < 1 || NET_RECONNECT_BACKOFF_FACTOR > 32)
+	#error "NET_RECONNECT_BACKOFF_FACTOR: [1, 32]"
+#endif
+
+#ifndef NET_RECONNECT_BACKOFF_MAX
+	#define NET_RECONNECT_BACKOFF_MAX 86400
+#elif (NET_RECONNECT_BACKOFF_MAX < 1 || NET_RECONNECT_BACKOFF_MAX > 86400)
+	#error "NET_RECONNECT_BACKOFF_MAX: [0, 86400]"
+#endif
+
+enum NET_ERR_T
+{
+	NET_ERR_DXED = -2,
+	NET_ERR_CXED = -1,
+	NET_ERR_NONE
+};
+
+struct connection {
+	const void *cb_obj;
+	const char *host;
+	const char *port;
+	enum {
+		NET_DXED, /* Socket disconnected, passive */
+		NET_RXNG, /* Socket disconnected, pending reconnect */
+		NET_CXNG, /* Socket connection in progress */
+		NET_CXED, /* Socket connected */
+		NET_PING  /* Socket connected, network state in question */
+	} status;
+	int soc;
+	size_t conn_i;
+	size_t read_i;
+	char readbuff[NET_MESG_LEN];
+};
+
+static void net_cx_failure(struct connection*, int);
+static void net_cx_pollerr(struct connection*, int);
+static void net_cx_pollhup(struct connection*);
+static void net_cx_readsoc(struct connection*);
+static void net_cx_success(struct connection*);
+
+static void net_file_read(FILE*);
+
+static void _net_cx(struct connection*);
+static void _net_dx(struct connection*);
+
+static int fds_packed;
+static unsigned int n_connections;
+static struct connection *connections[NET_MAX_CONNECTIONS];
+
+struct connection*
+connection(const void *cb_obj, const char *host, const char *port)
+{
+	/* Instantiate a new connection
+	 *
+	 * Doesn't flag fds for repack, since socket
+	 * enters into disconnected state */
+
+	struct connection *c;
+
+	if (n_connections == NET_MAX_CONNECTIONS)
+		return NULL;
+
+	if ((c = calloc(1, sizeof(*c))) == NULL)
 		fatal("calloc", errno);
 
-	/* Set non-zero default fields */
-	s->soc = -1;
-	s->iptr = s->input;
-	s->host = strdup(host);
-	s->port = strdup(port);
+	c->cb_obj = cb_obj;
+	c->conn_i = n_connections++;
+	c->host   = strdup(host);
+	c->port   = strdup(port);
+	c->soc    = -1;
+	c->status = NET_DXED;
 
-	if (nicks)
-		s->nicks = strdup(nicks);
-	else if (config.default_nick)
-		s->nicks = strdup(config.default_nick);
+	connections[c->conn_i] = c;
 
-	if (join)
-		s->join = strdup(join);
-
-	s->nptr = s->nicks;
-
-	auto_nick(&(s->nptr), s->nick);
-
-	s->channel = new_channel(host, s, NULL, BUFFER_SERVER);
-
-	s->usermodes_str.type = MODE_STR_USERMODE;
-	mode_config(&(s->mode_config), NULL, MODE_CONFIG_DEFAULTS);
-
-	DLL_ADD(server_head, s);
-
-	return s;
+	return c;
 }
 
-static void
-free_server(struct server *s)
+void
+net_free(struct connection *c)
 {
-	struct channel *t, *c = s->channel;
+	if (c->status != NET_DXED)
+		fatal("Freeing open connection", 0);
 
-	do {
-		t = c;
-		c = c->next;
-		free_channel(t);
-	} while (c != s->channel);
+	/* Swap the last connection into this index */
+	connections[c->conn_i] = connections[--n_connections];
 
-	free(s->host);
-	free(s->port);
-	free(s->join);
-	free(s->nicks);
-	free(s);
+	free((void*)c->host);
+	free((void*)c->port);
+	free(c);
+
+	fds_packed = 0;
 }
 
 int
-sendf(char *err, struct server *s, const char *fmt, ...)
+net_cx(struct connection *c)
 {
-	/* Send a formatted message to a server.
-	 *
-	 * Returns non-zero on failure and prints the error message to the buffer pointed
-	 * to by err.
-	 */
+	if (c->status == NET_CXED || c->status == NET_PING)
+		return NET_ERR_CXED;
 
-#define SENDF_ERR(str) \
-	do { if (err) { snprintf(err, MAX_ERROR, "Error: %s", str); }  return 1; } while (0)
+	_net_cx(c);
 
-	char sendbuff[BUFFSIZE];
-	int soc, len;
-	va_list ap;
-
-	if (s == NULL || (soc = s->soc) < 0)
-		SENDF_ERR("Not connected to server");
-
-
-	va_start(ap, fmt);
-	len = vsnprintf(sendbuff, BUFFSIZE-2, fmt, ap);
-	va_end(ap);
-
-	if (len < 0)
-		SENDF_ERR("Invalid message format");
-
-	if (len >= BUFFSIZE-2)
-		SENDF_ERR("Message exceeds maximum length of " STR(BUFFSIZE) " bytes");
-
-#ifdef DEBUG
-	newline(s->channel, 0, "DEBUG >>", sendbuff);
-#endif
-
-	sendbuff[len++] = '\r';
-	sendbuff[len++] = '\n';
-
-	if (send(soc, sendbuff, len, 0) < 0)
-		SENDF_ERR(strerror(errno));
-
-#undef SENDF_ERR
-
-	return 0;
+	return NET_ERR_NONE;
 }
 
-//FIXME: move the stateful stuff to state.c, only the connection relavent stuff should be here
-void
-server_connect(char *host, char *port, char *nicks, char *join)
+int
+net_dx(struct connection *c)
 {
-	connection_thread *ct;
-	struct server *tmp, *s = NULL;
+	if (c->status == NET_DXED)
+		return NET_ERR_DXED;
 
-	/* Check if server matching host:port already exists */
-	if ((tmp = server_head) != NULL) {
-		do {
-			if (!strcmp(tmp->host, host) && !strcmp(tmp->port, port)) {
-				s = tmp;
-				break;
+	_net_dx(c);
+
+	return NET_ERR_NONE;
+}
+
+void
+net_poll(void)
+{
+	int ret, timeout = 1000;
+
+	static nfds_t nfds, i;
+	static struct pollfd fds[NET_MAX_CONNECTIONS + 1];
+
+	if (fds_packed == 0) {
+
+		memset(fds, 0, sizeof(fds));
+
+		for (nfds = 0; nfds < n_connections; nfds++) {
+
+			if (connections[nfds]->status == NET_CXNG)
+				fds[nfds].events = POLLOUT;
+			else
+				fds[nfds].events = POLLIN;
+
+			fds[nfds].fd = connections[nfds]->soc;
+		}
+
+		fds[nfds].events = POLLIN;
+		fds[nfds].fd = STDIN_FILENO;
+
+		fds_packed = 1;
+	}
+
+	while ((ret = poll(fds, nfds + 1, timeout)) < 0) {
+
+		/* Exit polling loop to handle signal event */
+		if (errno == EINTR)
+			return;
+
+		if (errno == EAGAIN)
+			continue;
+
+		fatal("poll", errno);
+	}
+
+	/* Handle user input */
+	if (fds[nfds].revents) {
+
+		if (fds[nfds].revents & (POLLERR | POLLHUP | POLLNVAL))
+			fatal("stdin error", 0);
+
+		if (fds[nfds].revents & POLLIN)
+			net_file_read(stdin);
+
+		ret--;
+	}
+
+	/* Handle sockets */
+	for (i = 0; ret && i < nfds; i++) {
+
+		/* POLLNVAL results from invalid file descriptor and
+		 * is treated as fatal programming error
+		 *
+		 * POLLERR superscedes POLLIN, POLLOUT, POLLHUP and
+		 * indicates a fatal error for the device or stream
+		 *
+		 * POLLOUT indicates success or failure for a socket
+		 * while connecting. It is mutually exclusive with POLLHUP
+		 *
+		 * POLLIN indicates data is readable from this socket
+		 * and is not mutually exclusive with POLLHUP; data
+		 * may be readable on a socket after remote hangup
+		 *
+		 * POLLHUP indicates remote hangup for active connection
+		 *
+		 * POLLERR, POLLHUP, POLLIN can all result in disconnect
+		 * for an active connection:
+		 *  - POLLERR: socket error
+		 *  - POLLHUP: remote hangup
+		 *  - POLLIN:  via actions in callback handler
+		 */
+
+		int optval;
+		socklen_t optlen;
+
+		if (fds[i].revents == 0)
+			continue;
+
+		if (fds[i].revents & POLLNVAL)
+			fatal("invalid fd", 0);
+
+		if (fds[i].revents & POLLERR) {
+
+			if (0 > getsockopt(fds[i].fd, SOL_SOCKET, SO_ERROR, &optval, &optlen))
+				fatal("getsockopt", errno);
+			else
+				net_cx_pollerr(connections[i], optval);
+
+		} else if (fds[i].revents & POLLOUT) {
+
+			if (0 > getsockopt(fds[i].fd, SOL_SOCKET, SO_ERROR, &optval, &optlen))
+				fatal("getsockopt", errno);
+
+			if (optval == 0)
+				net_cx_success(connections[i]);
+			else
+				net_cx_failure(connections[i], optval);
+
+		} else {
+
+			if (fds[i].revents & POLLIN)
+				net_cx_readsoc(connections[i]);
+
+			if (fds[i].revents & POLLHUP)
+				net_cx_pollhup(connections[i]);
+		}
+
+		ret--;
+	}
+}
+
+static void
+_net_cx(struct connection *c)
+{
+	/* TODO */
+	(void)c;
+}
+
+static void
+_net_dx(struct connection *c)
+{
+	/* TODO */
+	(void)c;
+}
+
+static void
+net_cx_failure(struct connection *c, int err)
+{
+	/* TODO */
+	(void)err; //strerror(err)
+	(void)c;
+}
+
+static void
+net_cx_pollerr(struct connection *c, int err)
+{
+	/* TODO */
+	(void)err;
+	(void)c;
+}
+
+static void
+net_cx_pollhup(struct connection *c)
+{
+	/* TODO */
+	(void)c;
+}
+
+static void
+net_cx_success(struct connection *c)
+{
+	/* TODO */
+	(void)c;
+}
+
+static void
+net_cx_readsoc(struct connection *c)
+{
+	ssize_t count, i;
+	char soc_readbuff[4096];
+
+	while ((count = read(c->soc, soc_readbuff, sizeof(soc_readbuff)))) {
+
+		if (count < 0 && errno != EINTR)
+			fatal("read", errno);
+
+		size_t read_i = c->read_i;
+
+		for (i = 0; i < count; i++) {
+
+			if (read_i == NET_MESG_LEN || soc_readbuff[i] == '\r') {
+				c->readbuff[i] = 0;
+				net_cb_read_soc(c->readbuff, read_i, c->cb_obj);
+				read_i = 0;
 			}
-		} while ((tmp = tmp->next) != server_head);
+
+			/* Filter printable characters and CTCP markup */
+			if (isgraph(soc_readbuff[i]) || soc_readbuff[i] == ' ' || soc_readbuff[i] == 0x01)
+				c->readbuff[read_i++] = soc_readbuff[i];
+		}
+
+		c->read_i = read_i;
 	}
-
-	/* Check if server is already connected */
-	if (s && s->soc >= 0) {
-		channel_set_current(s->channel);
-		newlinef(s->channel, 0, "-!!-", "Already connected to %s:%s", host, port);
-		return;
-	}
-
-	if (s == NULL)
-		s = new_server(host, port, join, nicks);
-
-	channel_set_current(s->channel);
-
-	if ((ct = calloc(1, sizeof(*ct))) == NULL)
-		fatal("calloc", errno);
-
-	ct->socket = -1;
-	ct->socket_tmp = -1;
-	ct->host = s->host;
-	ct->port = s->port;
-
-	s->connecting = ct;
-
-	newlinef(s->channel, 0, "--", "Connecting to '%s' port %s", host, port);
-
-	if ((errno = pthread_create(&ct->tid, NULL, threaded_connect, ct)))
-		fatal("pthread_create", errno);
 }
 
 static void
-connected(struct server *s)
+net_file_read(FILE *f)
 {
-	/* Server successfully connected, send IRC init messages */
+	char buff[512];
+	int c;
+	size_t n = 0;
 
-	connection_thread *ct = s->connecting;
+	flockfile(f);
 
-	if ((errno = pthread_join(ct->tid, NULL)))
-		fatal("pthread_join", errno);
+	while ((c = getc_unlocked(f)) != EOF) {
 
-	if (*ct->ipstr)
-		newlinef(s->channel, 0, "--", "Connected to [%s]", ct->ipstr);
-	else
-		newlinef(s->channel, 0, "--", "Error determining server IP: %s", ct->error);
-
-	s->soc = ct->socket;
-
-	/* Set reconnect parameters to 0 in case this was an auto-reconnect */
-	s->reconnect_time = 0;
-	s->reconnect_delta = 0;
-
-	s->latency_time = time(NULL);
-	s->latency_delta = 0;
-
-	//TODO: refactor these to mesg.c
-	sendf(NULL, s, "NICK %s", s->nick);
-	sendf(NULL, s, "USER %s 8 * :%s", config.username, config.realname);
-
-	//FIXME: should the server send nick as is? compare the nick when it's received?
-	//or should auto_nick take a server argument and write to a buffer of NICKSIZE length?
-}
-
-/* TODO: on failed connection, initiate rolling backoff reconnection attempt */
-static void*
-threaded_connect(void *arg)
-{
-	int ret;
-	struct addrinfo hints, *p, *servinfo = NULL;
-
-	/* Thread cleanup on error or external thread cancel */
-	pthread_cleanup_push(threaded_connect_cleanup, &servinfo);
-
-	memset(&hints, 0, sizeof(hints));
-
-	/* IPv4 and/or IPv6 */
-	hints.ai_family = AF_UNSPEC;
-	hints.ai_flags = AI_PASSIVE;
-	hints.ai_socktype = SOCK_STREAM;
-
-	connection_thread *ct = (connection_thread *)arg;
-
-	/* Resolve host */
-	if ((ret = getaddrinfo(ct->host, ct->port, &hints, &servinfo))) {
-		strncpy(ct->error, gai_strerror(ret), MAX_ERROR);
-		pthread_exit(NULL);
-	}
-
-	/* Attempt to connect to all address results */
-	for (p = servinfo; p != NULL; p = p->ai_next) {
-
-		if ((ct->socket_tmp = socket(p->ai_family, p->ai_socktype, p->ai_protocol)) < 0)
+		if (n == sizeof(buff))
 			continue;
 
-		/* Break on success */
-		if (connect(ct->socket_tmp, p->ai_addr, p->ai_addrlen) == 0)
-			break;
-
-		close(ct->socket_tmp);
+		buff[n++] = (char) c;
 	}
 
-	if (p == NULL) {
-		strerror_r(errno, ct->error, MAX_ERROR);
-		pthread_exit(NULL);
-	}
+	if (ferror(f))
+		fatal("ferrof", errno);
 
-	/* Failing to get the numeric IP isn't a fatal connection error */
-	if ((ret = getnameinfo(p->ai_addr, p->ai_addrlen, ct->ipstr,
-					INET6_ADDRSTRLEN, NULL, 0, NI_NUMERICHOST))) {
-		strncpy(ct->error, gai_strerror(ret), MAX_ERROR);
-	}
+	clearerr(f);
+	funlockfile(f);
 
-	/* Set non-blocking */
-	if ((ret = fcntl(ct->socket_tmp, F_SETFL, O_NONBLOCK)) < 0) {
-		strerror_r(errno, ct->error, MAX_ERROR);
-		pthread_exit(NULL);
-	}
-
-	ct->socket = ct->socket_tmp;
-
-	pthread_cleanup_pop(1);
-
-	/* coverity[leaked_storage] No leak here */
-	return NULL;
-}
-
-static void
-threaded_connect_cleanup(void *arg)
-{
-	struct addrinfo *servinfo = *(struct addrinfo **)arg;
-
-	if (servinfo)
-		freeaddrinfo(servinfo);
-}
-
-void
-server_disconnect(struct server *s, int err, int kill, char *mesg)
-{
-	/* When err flag is set:
-	 *   Disconnect initiated by remote host
-	 *
-	 * When kill flag is set:
-	 *   Free the server, update current channel
-	 */
-
-	/* Server connection in progress, cancel the connection attempt */
-	if (s->connecting) {
-
-		connection_thread *ct = s->connecting;
-
-		if ((errno = pthread_cancel(ct->tid)))
-			fatal("pthread_cancel", errno);
-
-		/* There's a chance the thread is canceled with an open socket */
-		if (ct->socket_tmp)
-			close(ct->socket_tmp);
-
-		free(ct);
-		s->connecting = NULL;
-
-		newlinef(s->channel, 0, "--", "Connection to '%s' port %s canceled", s->host, s->port);
-	}
-
-	/* Server is/was connected, close socket, send quit message if non-erroneous disconnect */
-	else if (s->soc >= 0) {
-
-		if (err) {
-			/* If disconnecting due to error, attempt a reconnect */
-
-			newlinef(s->channel, 0, "ERROR", "%s", mesg);
-			newlinef(s->channel, 0, "--", "Attempting reconnect in %ds", RECONNECT_DELTA);
-
-			s->reconnect_time = time(NULL) + RECONNECT_DELTA;
-			s->reconnect_delta = RECONNECT_DELTA;
-		} else if (mesg) {
-			sendf(NULL, s, "QUIT :%s", mesg);
-		}
-
-		close(s->soc);
-
-		/* Set all server attributes back to default */
-		mode_reset(&(s->usermodes), &(s->usermodes_str));
-		s->soc = -1;
-		s->iptr = s->input;
-		s->nptr = s->nicks;
-		s->latency_delta = 0;
-
-
-		/* Reset the nick that reconnects will attempt to register with */
-		auto_nick(&(s->nptr), s->nick);
-
-		/* Print message to all open channels and reset their attributes */
-		struct channel *c = s->channel;
-		do {
-			newline(c, 0, "-!!-", "(disconnected)");
-
-			reset_channel(c);
-
-		} while ((c = c->next) != s->channel);
-	}
-
-	/* Server was waiting to reconnect, cancel future attempt */
-	else if (s->reconnect_time) {
-		newlinef(s->channel, 0, "--", "Auto reconnect attempt canceled");
-
-		s->reconnect_time = 0;
-		s->reconnect_delta = 0;
-	}
-
-	if (kill) {
-		DLL_DEL(server_head, s);
-		free_server(s);
-	}
-}
-
-/*
- * Server polling functions
- * */
-
-void
-check_servers(void)
-{
-	/* For each server, check the following, in order:
-	 *
-	 *  - Connection status. Skip the rest if unresolved
-	 *  - Ping timeout.      Skip the rest detected
-	 *  - Reconnect attempt. Skip the rest if successful
-	 *  - Socket input.      Consume all input
-	 *  */
-
-	/* TODO: there's probably a better order to check these */
-
-	struct server *s;
-
-	if ((s = server_head) == NULL)
-		return;
-
-	time_t t = time(NULL);
-
-	do {
-		if (check_connect(s))
-			continue;
-
-		if (check_latency(s, t))
-			continue;
-
-		if (check_reconnect(s, t))
-			continue;
-
-		check_socket(s, t);
-
-	} while ((s = s->next) != server_head);
-}
-
-static int
-check_connect(struct server *s)
-{
-	/* Check the server's connection thread status for success or failure */
-
-	if (!s->connecting)
-		return 0;
-
-	connection_thread *ct = (connection_thread*)s->connecting;
-
-	/* Connection Success */
-	if (ct->socket >= 0) {
-		connected(s);
-
-	/* Connection failure */
-	} else if (*ct->error) {
-		newline(s->channel, 0, "-!!-", ct->error);
-
-		/* If server was auto-reconnecting, increase the backoff */
-		if (s->reconnect_time) {
-			s->reconnect_delta *= 2;
-			s->reconnect_time += s->reconnect_delta;
-
-			newlinef(s->channel, 0, "--", "Attempting reconnect in %ds", s->reconnect_delta);
-		}
-
-	/* Connection in progress */
-	} else {
-		return 1;
-	}
-
-	free(ct);
-	s->connecting = NULL;
-
-	return 1;
-}
-
-static int
-check_latency(struct server *s, time_t t)
-{
-	/* Check time since last message */
-
-	time_t delta;
-
-	if (s->soc < 0)
-		return 0;
-
-	delta = t - s->latency_time;
-
-	/* Server has timed out */
-	if (delta > SERVER_TIMEOUT_S) {
-		server_disconnect(s, 1, 0, "Ping timeout (" STR(SERVER_TIMEOUT_S) ")");
-		return 1;
-	}
-
-	/* Server might be timing out, attempt to PING */
-	if (delta > SERVER_LATENCY_PING_S && !s->pinging) {
-		sendf(NULL, s, "PING :%s", s->host);
-		s->pinging = 1;
-	}
-
-	/* Server hasn't responded to PING, display latency in status */
-	if (delta > SERVER_LATENCY_S && current_channel()->server == s) {
-		s->latency_delta = delta;
-		draw_status();
-	}
-
-	return 0;
-}
-
-static int
-check_reconnect(struct server *s, time_t t)
-{
-	/* Check if the server is in auto-reconnect mode, and issue a reconnect if needed */
-
-	if (s->reconnect_time && t > s->reconnect_time) {
-		server_connect(s->host, s->port, NULL, NULL);
-		return 1;
-	}
-
-	return 0;
-}
-
-static int
-check_socket(struct server *s, time_t t)
-{
-	/* Check the status of the server's socket */
-
-	ssize_t count;
-	char recv_buff[BUFFSIZE];
-
-	/* Consume all input on the socket */
-	while (s->soc >= 0 && (count = read(s->soc, recv_buff, BUFFSIZE)) >= 0) {
-
-		if (count == 0) {
-			server_disconnect(s, 1, 0, "Remote hangup");
-			break;
-		}
-
-		/* Set time since last message */
-		s->latency_time = t;
-		s->latency_delta = 0;
-
-		recv_mesg(recv_buff, count, s);
-	}
-
-	/* Server received ERROR message or remote hangup */
-	if (s->soc < 0)
-		return 0;
-
-	/* Socket is non-blocking, all other errors cause a disconnect */
-	if (errno != EWOULDBLOCK && errno != EAGAIN) {
-		if (errno)
-			server_disconnect(s, 1, 0, strerror(errno));
-		else
-			server_disconnect(s, 1, 0, "Remote hangup");
-	}
-
-	return 0;
+	net_cb_read_inp(buff, n);
 }

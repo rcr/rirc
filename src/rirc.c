@@ -11,7 +11,7 @@
 #include <stdlib.h>
 #include <termios.h>
 
-#include "src/net2.h"
+#include "src/net.h"
 #include "src/state.h"
 
 #define opt_error(MESG) \

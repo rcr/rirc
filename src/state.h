@@ -7,7 +7,6 @@
 #include "src/components/server.h"
 #include "src/draw.h"
 #include "src/mesg.h"
-#include "src/net.h"
 
 /* state.h
  *

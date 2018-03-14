@@ -5,6 +5,7 @@
  *
  **/
 
+
 #include <ctype.h>
 #include <stdlib.h>
 #include <string.h>
@@ -14,8 +15,19 @@
 #include <sys/ioctl.h>
 
 #include "src/draw.h"
+#include "src/net.h"
 #include "src/state.h"
 #include "src/utils/utils.h"
+
+
+
+/* FIXME refactoring net.c */
+struct server* get_server_head(void)
+{
+	return NULL;
+}
+
+
 
 /* State of rirc */
 static struct
@@ -23,7 +35,6 @@ static struct
 	struct channel *current_channel; /* the current channel being drawn */
 	struct channel *default_channel; /* the default rirc channel at startup */
 
-	//TODO: not used???
 	struct server *server_list;
 
 	unsigned int term_cols;
@@ -213,10 +224,11 @@ channel_clear(struct channel *c)
 	draw_buffer();
 }
 
-/* Confirm closing a server */
 static int
 action_close_server(char c)
 {
+	/* Confirm closing a server */
+
 	if (c == 'n' || c == 'N')
 		return 1;
 
@@ -379,7 +391,7 @@ buffer_scrollback_forw(struct channel *c)
 	/* Scroll a buffer forward one page */
 
 	unsigned int count = 0,
-				 text_w,
+	             text_w,
 	             cols = _term_cols(),
 	             rows = _term_rows() - 4;
 
@@ -531,16 +543,9 @@ channel_move_next(void)
 	}
 }
 
+#if 0
 void
-net_cb_err(struct server *s, const char *err, ...)
-{
-	/* TODO */
-	(void)(s);
-	(void)(err);
-}
-
-void
-net_cb_cxed(struct server *s, const char *mesg, ...)
+net_cb_cxed(const void *cb_obj, const char *mesg, ...)
 {
 	/* TODO */
 	(void)(s);
@@ -548,7 +553,7 @@ net_cb_cxed(struct server *s, const char *mesg, ...)
 }
 
 void
-net_cb_dxed(struct server *s, const char *mesg, ...)
+net_cb_dxed(const void *cb_obj, const char *mesg, ...)
 {
 	/* TODO */
 	(void)(s);
@@ -556,7 +561,7 @@ net_cb_dxed(struct server *s, const char *mesg, ...)
 }
 
 void
-net_cb_cxng(struct server *s, const char *mesg, ...)
+net_cb_cxng(const void *cb_obj, const char *mesg, ...)
 {
 	/* TODO */
 	(void)(s);
@@ -564,15 +569,16 @@ net_cb_cxng(struct server *s, const char *mesg, ...)
 }
 
 void
-net_cb_ping(struct server *s, unsigned int ping)
+net_cb_ping(const void *cb_obj, unsigned int ping)
 {
 	/* TODO */
 	(void)(s);
 	(void)(ping);
 }
+#endif
 
 void
-net_cb_read_inp(const char *buff, size_t count)
+net_cb_read_inp(char *buff, size_t count)
 {
 	input(ccur->input, buff, count);
 
@@ -581,8 +587,10 @@ net_cb_read_inp(const char *buff, size_t count)
 }
 
 void
-net_cb_read_soc(const char *buff, size_t count, struct server *s)
+net_cb_read_soc(char *buff, size_t count, const void *cb_obj)
 {
+	struct server *s = (struct server *)cb_obj;
+
 	/* TODO */
 	(void)(buff);
 	(void)(count);

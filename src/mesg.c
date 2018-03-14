@@ -6,6 +6,7 @@
 #include <sys/time.h>
 
 #include "src/draw.h"
+#include "src/net.h"
 #include "src/state.h"
 #include "src/utils/utils.h"
 
@@ -355,7 +356,7 @@ send_connect(char *err, char *mesg, struct server *s, struct channel *c)
 		/* If no hostname arg is given, attempt to reconnect on the current server */
 
 		if (!s)
-			fail("Error: /connect <host | host:port | host port>");
+			fail("Error: /connect <host [port] | host:port>");
 
 		else if (s->soc >= 0 || s->connecting)
 			fail("Error: Already connected or reconnecting to server");
