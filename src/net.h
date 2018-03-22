@@ -71,8 +71,7 @@ void server_disconnect(struct server*, int, int, char*);
  *   t(0) = base
  */
 
-/* RFC 2812, section 2.3 */
-#define NET_MESG_LEN 510
+#define NET_MAX_CONNECTIONS 8
 
 struct connection;
 

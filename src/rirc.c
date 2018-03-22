@@ -14,11 +14,10 @@
 #include "src/net.h"
 #include "src/state.h"
 
-#define opt_error(MESG) \
-	do { puts((MESG)); exit(EXIT_FAILURE); } while (0);
+#define arg_error(...) \
+	do { fprintf(stderr, __VA_ARGS__); exit(EXIT_FAILURE); } while (0);
 
 static void cleanup(void);
-static void startup(int, char**);
 static void main_loop(void);
 static void usage(void);
 static void signal_sigwinch(int);
@@ -36,16 +35,6 @@ struct config config =
 	.join_part_quit_threshold = 100
 };
 
-int
-main(int argc, char **argv)
-{
-	startup(argc, argv);
-
-	main_loop();
-
-	return EXIT_SUCCESS;
-}
-
 static void
 usage(void)
 {
@@ -54,36 +43,33 @@ usage(void)
 	"rirc version " VERSION " ~ Richard C. Robbins <mail@rcr.io>\n"
 	"\n"
 	"Usage:\n"
-	"  rirc [-c server [OPTIONS]]*\n"
+	"  rirc [-hv] [-s server [-p port] [-w pass] [-n nicks] [-c chans], ...]\n"
 	"\n"
 	"Help:\n"
-	"  -h, --help             Print this message\n"
+	"  -h, --help            Print this message and exit\n"
+	"  -v, --version         Print rirc version and exit\n"
 	"\n"
 	"Options:\n"
-	"  -c, --connect=SERVER   Connect to SERVER\n"
-	"  -p, --port=PORT        Connect using PORT\n"
-	"  -j, --join=CHANNELS    Comma separated list of channels to join\n"
-	"  -n, --nicks=NICKS      Comma and/or space separated list of nicks to use\n"
-	"  -v, --version          Print rirc version and exit\n"
-	"\n"
-	"Examples:\n"
-	"  rirc -c server -j '#chan'\n"
-	"  rirc -c server -j '#chan' -c server2 -j '#chan2'\n"
-	"  rirc -c server -p 1234 -j '#chan1,#chan2' -n 'nick, nick_, nick__'\n"
+	"  -s, --server=SERVER   Connect to SERVER\n"
+	"  -p, --port=PORT       Connect to SERVER using PORT\n"
+	"  -w, --pass=PASS       Connect to SERVER using PASS\n"
+	"  -n, --nicks=NICKS     Comma separated list of nicks to use for SERVER\n"
+	"  -c, --chans=CHANNELS  Comma separated list of channels to join for SERVER\n"
 	);
 }
 
-static void
-startup(int argc, char **argv)
+int
+main(int argc, char **argv)
 {
 	int c, i, opt_i = 0, server_i = -1;
 
 	struct option long_opts[] =
 	{
-		{"connect", required_argument, 0, 'c'},
+		{"server",  required_argument, 0, 's'},
 		{"port",    required_argument, 0, 'p'},
-		{"join",    required_argument, 0, 'j'},
-		{"nick",    required_argument, 0, 'n'},
+		{"pass",    required_argument, 0, 'w'},
+		{"nicks",   required_argument, 0, 'n'},
+		{"chans",   required_argument, 0, 'c'},
 		{"version", no_argument,       0, 'v'},
 		{"help",    no_argument,       0, 'h'},
 		{0, 0, 0, 0}
@@ -92,11 +78,14 @@ startup(int argc, char **argv)
 	struct auto_server {
 		char *host;
 		char *port;
-		char *join;
+		char *pass;
 		char *nicks;
-	} auto_servers[MAX_SERVERS] = {{0, 0, 0, 0}};
+		char *chans;
+		struct server *s;
+	} auto_servers[NET_MAX_CONNECTIONS];
 
-	while ((c = getopt_long(argc, argv, "c:p:n:j:vh", long_opts, &opt_i))) {
+	/* FIXME: getopt_long is a GNU extension */
+	while ((c = getopt_long(argc, argv, "s:p:w:n:c:vh", long_opts, &opt_i))) {
 
 		if (c == -1)
 			break;
@@ -104,47 +93,62 @@ startup(int argc, char **argv)
 		switch (c) {
 
 			/* Connect to server */
-			case 'c':
+			case 's':
 				if (*optarg == '-')
-					opt_error("-c/--connect requires an argument");
+					arg_error("-s/--connect requires an argument");
 
-				if (++server_i == MAX_SERVERS)
-					opt_error("exceeded maximum number of servers (" STR(MAX_SERVERS) ")");
+				if (++server_i == NET_MAX_CONNECTIONS)
+					arg_error("exceeded maximum number of servers (%d)", NET_MAX_CONNECTIONS);
 
 				auto_servers[server_i].host = optarg;
+				auto_servers[server_i].port = "6667",
+				auto_servers[server_i].pass = NULL;
+				auto_servers[server_i].nicks = NULL;
+				auto_servers[server_i].chans = NULL;
 				break;
 
 			/* Connect using port */
 			case 'p':
 				if (*optarg == '-')
-					opt_error("-p/--port requires an argument");
+					arg_error("-p/--port requires an argument");
 
 				if (server_i < 0)
-					opt_error("-p/--port requires a server argument first");
+					arg_error("-p/--port requires a server argument first");
 
 				auto_servers[server_i].port = optarg;
 				break;
 
-			/* Comma and/or space separated list of nicks to use */
-			case 'n':
+			/* Connect using port */
+			case 'w':
 				if (*optarg == '-')
-					opt_error("-n/--nick requires an argument");
+					arg_error("-w/--pass requires an argument");
 
 				if (server_i < 0)
-					opt_error("-n/--nick requires a server argument first");
+					arg_error("-w/--pass requires a server argument first");
+
+				auto_servers[server_i].pass = optarg;
+				break;
+
+			/* Comma separated list of nicks to use */
+			case 'n':
+				if (*optarg == '-')
+					arg_error("-n/--nick requires an argument");
+
+				if (server_i < 0)
+					arg_error("-n/--nick requires a server argument first");
 
 				auto_servers[server_i].nicks = optarg;
 				break;
 
 			/* Comma separated list of channels to join */
-			case 'j':
+			case 'c':
 				if (*optarg == '-')
-					opt_error("-j/--join requires an argument");
+					arg_error("-c/--chans requires an argument");
 
 				if (server_i < 0)
-					opt_error("-j/--join requires a server argument first");
+					arg_error("-c/--chans requires a server argument first");
 
-				auto_servers[server_i].join = optarg;
+				auto_servers[server_i].chans = optarg;
 				break;
 
 			/* Print rirc version and exit */
@@ -198,20 +202,32 @@ startup(int argc, char **argv)
 
 	for (i = 0; i <= server_i; i++) {
 
-		//TODO: - split server.c / net.c
-		//      - 3 passes:
-		//      - add servers to server list
-		//        fail on duplicates
-		//      - add channels per server to server's channel list
-		//        mark ass not-parted for join on connect
-		//      - initiate connection
-		server_connect(
+		struct server *s = server(
 			auto_servers[i].host,
-			auto_servers[i].port ? auto_servers[i].port : "6667",
-			auto_servers[i].nicks,
-			auto_servers[i].join
-		);
+			auto_servers[i].port,
+			auto_servers[i].pass);
+
+		if (s == NULL)
+			arg_error("failed to create: %s:%s", auto_servers[i].host, auto_servers[i].port);
+
+		if (server_list_add(state_server_list(), s))
+			arg_error("duplicate server: %s:%s", auto_servers[i].host, auto_servers[i].port);
+
+		if (!server_set_chans(s, auto_servers[i].chans))
+			arg_error("invalid chans: '%s'", auto_servers[i].chans);
+
+		if (!server_set_nicks(s, auto_servers[i].nicks))
+			arg_error("invalid nicks: '%s'", auto_servers[i].nicks);
+
+		auto_servers[i].s = s;
 	}
+
+	for (i = 0; i <= server_i; i++)
+		net_cx(auto_servers[i].s->connection);
+
+	main_loop();
+
+	return EXIT_SUCCESS;
 }
 
 static void

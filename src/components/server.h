@@ -17,28 +17,24 @@ struct server
 	char *nptr;
 	char *host;
 	char *port;
-	//TODO: this shouldn't persist with the server,
-	// its only relevant on successful connection
-	// when parsing the cli args, add channels to the channel
-	// list, they'll be joined on connect
-	char *join;
+	char *pass;
 	struct user_list ignore;
 	//TODO channel_list
 	struct channel *channel;
-	//TODO:
 	struct server *next;
 	struct server *prev;
 
-	//TODO: connection stuff
+	//TODO: connection stuff to be
+	// removed after net refactor
 	char input[BUFFSIZE];
 	char *iptr;
 	int pinging;
 	int soc;
 	time_t latency_delta;
-	time_t latency_time;
-	time_t reconnect_delta;
 	time_t reconnect_time;
 	void *connecting;
+
+	struct connection *connection;
 
 	//TODO: WIP
 	struct channel_list clist;
@@ -61,6 +57,8 @@ struct server* server_list_del(struct server_list*, struct server*);
 
 void server_set_004(struct server*, char*);
 void server_set_005(struct server*, char*);
+int server_set_chans(struct server*, const char*);
+int server_set_nicks(struct server*, const char*);
 
 void server_free(struct server*);
 

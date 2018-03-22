@@ -52,8 +52,8 @@ server_disconnect(struct server *a, int b, int c, char *d)
 	(void)d;
 }
 
-
-#define NET_MAX_CONNECTIONS 8
+/* RFC 2812, section 2.3 */
+#define NET_MESG_LEN 510
 
 #ifndef NET_PING_MIN
 	#define NET_PING_MIN 150
@@ -274,7 +274,7 @@ net_poll(void)
 		 */
 
 		int optval;
-		socklen_t optlen;
+		socklen_t optlen = sizeof(optval);
 
 		if (fds[i].revents == 0)
 			continue;

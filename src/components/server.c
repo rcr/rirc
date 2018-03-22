@@ -27,7 +27,7 @@ HANDLED_005
 #undef X
 
 struct server*
-server(const char *host, const char *port, const char *nicks)
+server(const char *host, const char *port, const char *pass)
 {
 	struct server *s;
 
@@ -37,8 +37,8 @@ server(const char *host, const char *port, const char *nicks)
 	s->host = strdup(host);
 	s->port = strdup(port);
 
-	if (nicks)
-		s->nicks = strdup(nicks);
+	if (pass)
+		s->pass = strdup(pass);
 
 	s->usermodes_str.type = MODE_STR_USERMODE;
 	mode_config(&(s->mode_config), NULL, MODE_CONFIG_DEFAULTS);
@@ -134,6 +134,9 @@ server_free(struct server *s)
 	free(s);
 }
 
+/* TODO:
+	should return int, 005 as well
+ */
 void
 server_set_004(struct server *s, char *str)
 {
@@ -199,6 +202,28 @@ server_set_005(struct server *s, char *str)
 		HANDLED_005
 		#undef X
 	}
+}
+
+int
+server_set_chans(struct server *s, const char *chans)
+{
+	/* TODO: parse comma seperated list
+	 *       test
+	 */
+	(void)s;
+	(void)chans;
+	return 0;
+}
+
+int
+server_set_nicks(struct server *s, const char *nicks)
+{
+	/* TODO: parse comma seperated list
+	 *       test
+	 */
+	(void)s;
+	(void)nicks;
+	return 0;
 }
 
 static int

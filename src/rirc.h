@@ -1,8 +1,6 @@
 #ifndef RIRC_H
 #define RIRC_H
 
-#define MAX_SERVERS 32
-
 #define BUFFSIZE 512
 
 //TODO: just malloc the current nick

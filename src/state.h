@@ -19,6 +19,8 @@
 struct channel* current_channel(void);
 struct channel* default_channel(void);
 
+struct server_list* state_server_list(void);
+
 //TODO: rename
 unsigned int _term_cols(void);
 unsigned int _term_rows(void);

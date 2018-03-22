@@ -34,7 +34,11 @@ static struct
 	union draw draw;
 } state;
 
-
+struct server_list*
+state_server_list(void)
+{
+	return &state.servers;
+}
 
 static int action_close_server(char);
 
@@ -150,6 +154,11 @@ static void
 _newline(struct channel *c, enum buffer_line_t type, const char *from, const char *mesg, size_t mesg_len)
 {
 	/* Static function for handling inserting new lines into buffers */
+
+	/* FIXME:
+	 * bug occuring where message is marked incorrectly as pinged in this channel
+	 * when it occured correctly in another channel at around the same time
+	 */
 
 	if (c == NULL)
 		fatal("channel is null", 0);
@@ -540,7 +549,11 @@ channel_move_next(void)
 void
 net_cb_cxed(const void *cb_obj, const char *mesg, ...)
 {
-	/* TODO */
+	/* TODO
+	 * send PASS
+	 * send NICK
+	 * send USER
+	 * */
 	(void)(s);
 	(void)(mesg);
 }

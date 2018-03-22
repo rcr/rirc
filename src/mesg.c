@@ -1378,22 +1378,15 @@ recv_numeric(char *err, struct parsed_mesg *p, struct server *s)
 		/* Reset list of auto nicks */
 		s->nptr = s->nicks;
 
-		/* Auto join channels if first time connecting */
-		if (s->join) {
-			ret = sendf(err, s, "JOIN %s", s->join);
-			free(s->join);
-			s->join = NULL;
-			fail_if(ret);
-		} else {
-			/* If reconnecting to server, join any non-parted channels */
-			c = s->channel;
+		c = s->channel;
+
+		/* join any non-parted channels */
+		do {
 			//TODO: channel_list_foreach
-			do {
-				if (c->buffer.type == BUFFER_CHANNEL && !c->parted)
-					fail_if(sendf(err, s, "JOIN %s", c->name.str));
-				c = c->next;
-			} while (c != s->channel);
-		}
+			if (c->buffer.type == BUFFER_CHANNEL && !c->parted)
+				fail_if(sendf(err, s, "JOIN %s", c->name.str));
+			c = c->next;
+		} while (c != s->channel);
 
 		if (p->trailing)
 			newline(s->channel, 0, "--", p->trailing);
