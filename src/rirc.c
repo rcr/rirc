@@ -199,8 +199,11 @@ startup(int argc, char **argv)
 	for (i = 0; i <= server_i; i++) {
 
 		//TODO: - split server.c / net.c
+		//      - 3 passes:
 		//      - add servers to server list
+		//        fail on duplicates
 		//      - add channels per server to server's channel list
+		//        mark ass not-parted for join on connect
 		//      - initiate connection
 		server_connect(
 			auto_servers[i].host,

@@ -49,19 +49,19 @@ struct server
 
 struct server_list
 {
+	/* Circular DLL */
 	struct server *head;
+	struct server *tail;
 };
+
+struct server* server(const char*, const char*, const char*);
+
+struct server* server_list_add(struct server_list*, struct server*);
+struct server* server_list_del(struct server_list*, struct server*);
 
 void server_set_004(struct server*, char*);
 void server_set_005(struct server*, char*);
 
-struct server* server(char*, char*, char*);
-
-struct server* server_add(struct server_list*, struct server*);
-struct server* server_get(struct server_list*, struct server*);
-struct server* server_del(struct server_list*, struct server*);
-
-//TODO
 void server_free(struct server*);
 
 #endif

@@ -6,6 +6,12 @@
 #include "src/state.h"
 #include "src/utils/utils.h"
 
+/* TODO: CASEMAPPING (ascii, rfc1459, strict-rfc1459, set server fptr) */
+#define HANDLED_005 \
+	X(CHANMODES)    \
+	X(PREFIX)       \
+	X(MODES)
+
 struct opt
 {
 	char *arg;
@@ -13,20 +19,15 @@ struct opt
 };
 
 static int parse_opt(struct opt*, char**);
-
-/* TODO: CASEMAPPING (ascii, rfc1459, strict-rfc1459, set server fptr) */
-#define HANDLED_005 \
-	X(CHANMODES)    \
-	X(PREFIX)       \
-	X(MODES)
+static int server_cmp(const struct server*, const struct server*);
+static struct server* server_list_get(struct server_list*, struct server*);
 
 #define X(cmd) static int server_set_##cmd(struct server*, char*);
 HANDLED_005
 #undef X
 
-//TODO: refactor, not currently used
 struct server*
-server(char *host, char *port, char *nicks)
+server(const char *host, const char *port, const char *nicks)
 {
 	struct server *s;
 
@@ -36,12 +37,101 @@ server(char *host, char *port, char *nicks)
 	s->host = strdup(host);
 	s->port = strdup(port);
 
-	s->nicks = strdup(nicks);
+	if (nicks)
+		s->nicks = strdup(nicks);
 
 	s->usermodes_str.type = MODE_STR_USERMODE;
 	mode_config(&(s->mode_config), NULL, MODE_CONFIG_DEFAULTS);
 
 	return s;
+}
+
+static struct server*
+server_list_get(struct server_list *sl, struct server *s)
+{
+	struct server *tmp;
+
+	if ((tmp = sl->head) == NULL)
+		return NULL;
+
+	if (!server_cmp(sl->head, s))
+		return sl->head;
+
+	while ((tmp = tmp->next) != sl->head) {
+
+		if (!server_cmp(tmp, s))
+			return tmp;
+	}
+
+	return NULL;
+}
+
+struct server*
+server_list_add(struct server_list *sl, struct server *s)
+{
+	struct server *tmp;
+
+	if ((tmp = server_list_get(sl, s)) != NULL)
+		return s;
+
+	if (sl->head == NULL) {
+		sl->head = s->next = s;
+		sl->tail = s->prev = s;
+	} else {
+		s->next = sl->tail->next;
+		s->prev = sl->tail;
+		sl->head->prev = s;
+		sl->tail->next = s;
+		sl->tail = s;
+	}
+
+	return NULL;
+}
+
+struct server*
+server_list_del(struct server_list *sl, struct server *s)
+{
+	struct server *tmp_h,
+	              *tmp_t;
+
+	if (sl->head == s &&  sl->tail == s) {
+		/* Removing last server */
+		sl->head = NULL;
+		sl->tail = NULL;
+
+	} else if ((tmp_h = sl->head) == s) {
+		/* Removing head */
+		sl->head = sl->head->next;
+		sl->head->prev = sl->tail;
+
+	} else if ((tmp_t = sl->tail) == s) {
+		/* Removing tail */
+		sl->tail = sl->tail->prev;
+		sl->tail->next = sl->head;
+
+	} else {
+		/* Removing some server (head, tail) */
+		while ((tmp_h = tmp_h->next) != s) {
+			if (tmp_h == tmp_t)
+				return NULL;
+		}
+		s->next->prev = s->prev;
+		s->prev->next = s->next;
+	}
+
+	s->next = NULL;
+	s->prev = NULL;
+
+	return s;
+}
+
+void
+server_free(struct server *s)
+{
+	free(s->host);
+	free(s->port);
+	free(s->nicks);
+	free(s);
 }
 
 void
@@ -109,6 +199,23 @@ server_set_005(struct server *s, char *str)
 		HANDLED_005
 		#undef X
 	}
+}
+
+static int
+server_cmp(const struct server *s1, const struct server *s2)
+{
+	int cmp;
+
+	if (s1 == s2)
+		return 0;
+
+	if ((cmp = strcmp(s1->host, s2->host)))
+		return cmp;
+
+	if ((cmp = strcmp(s1->port, s2->port)))
+		return cmp;
+
+	return 0;
 }
 
 static int

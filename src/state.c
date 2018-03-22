@@ -21,27 +21,20 @@
 
 
 
-/* FIXME refactoring net.c */
-struct server* get_server_head(void)
-{
-	return NULL;
-}
-
-
-
-/* State of rirc */
 static struct
 {
 	struct channel *current_channel; /* the current channel being drawn */
 	struct channel *default_channel; /* the default rirc channel at startup */
 
-	struct server *server_list;
+	struct server_list servers;
 
 	unsigned int term_cols;
 	unsigned int term_rows;
 
 	union draw draw;
 } state;
+
+
 
 static int action_close_server(char);
 
@@ -472,7 +465,7 @@ auto_nick(char **autonick, char *nick)
 struct channel*
 channel_get_first(void)
 {
-	struct server *s = get_server_head();
+	struct server *s = state.servers.head;
 
 	/* First channel of the first server */
 	return !s ? state.default_channel : s->channel;
@@ -481,7 +474,7 @@ channel_get_first(void)
 struct channel*
 channel_get_last(void)
 {
-	struct server *s = get_server_head();
+	struct server *s = state.servers.tail;
 
 	/* Last channel of the last server */
 	return !s ? state.default_channel : s->prev->channel->prev;
