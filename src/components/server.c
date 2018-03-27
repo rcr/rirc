@@ -98,17 +98,14 @@ server_list_del(struct server_list *sl, struct server *s)
 		/* Removing last server */
 		sl->head = NULL;
 		sl->tail = NULL;
-
 	} else if ((tmp_h = sl->head) == s) {
 		/* Removing head */
 		sl->head = sl->head->next;
 		sl->head->prev = sl->tail;
-
 	} else if ((tmp_t = sl->tail) == s) {
 		/* Removing tail */
 		sl->tail = sl->tail->prev;
 		sl->tail->next = sl->head;
-
 	} else {
 		/* Removing some server (head, tail) */
 		while ((tmp_h = tmp_h->next) != s) {
@@ -258,6 +255,29 @@ parse_opt(struct opt *opt, char **str)
 	 * letter    =  ALPHA / DIGIT
 	 * punct     =  %d33-47 / %d58-64 / %d91-96 / %d123-126
 	 * letpun    =  letter / punct
+	 */
+
+	/* FIXME: (see docs)
+	 *
+	 * '-PARAMETER' is valid and negates a previously set parameter to its default
+	 * 'PARAMETER', 'PARAMTER=' are equivalent
+	 *
+	 * The parameter's value may contain sequences of the form "\xHH", where
+	 * HH is a two-digit hexadecimal number.  Each such sequence is
+	 * considered identical to the equivalent octet after parsing of the
+	 * reply into separate tokens has occurred.
+	 *
+	 * [Example: X=A\x20B defines one token, "X", with the value "A B",
+	 * rather than two tokens "X" and "B".]
+	 * [Note: The literal string "\x" must therefore be encoded as
+	 * "\x5Cx".]
+	 *
+	 * If the server has not advertised a CHARSET parameter, it MUST not use
+	 * such sequences with a value outside those permitted by the above ABNF
+	 * grammar, with the exception of "\x20";  if it has advertised CHARSET,
+	 * then it may in addition send any printable character defined in that
+	 * encoding. Characters in multibyte encodings such as UTF-8 should be
+	 * sent as a series of \x sequences.
 	 */
 
 	char *t, *p = *str;

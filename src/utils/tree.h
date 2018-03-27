@@ -34,6 +34,7 @@
         struct type *tree_right; \
     }
 
+/* FIXME: scan-build showing NULL pointer dereferences on add */
 
 #define AVL_GENERATE(name, type, field, cmp, cmp_n)                               \
     static struct type* name##_AVL_ADD(struct name*, struct type*);               \
