@@ -6,7 +6,9 @@
 #include "src/components/buffer.h"
 #include "src/components/channel.h"
 #include "src/components/mode.h"
-#include "src/rirc.h"
+#include "src/net.h"
+
+#include "src/rirc.h" // NICKSIZE
 
 struct server
 {
@@ -15,6 +17,7 @@ struct server
 	//TODO: can be grouped together, autonick
 	char *nicks;
 	char *nptr;
+
 	char *host;
 	char *port;
 	char *pass;

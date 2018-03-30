@@ -368,6 +368,7 @@ send_connect(char *err, char *mesg, struct server *s, struct channel *c)
 		port = "6667";
 	}
 
+	// FIXME:
 	server_connect(host, port, NULL, NULL);
 
 	return 0;

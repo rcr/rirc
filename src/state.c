@@ -19,8 +19,6 @@
 #include "src/state.h"
 #include "src/utils/utils.h"
 
-
-
 static struct
 {
 	struct channel *current_channel; /* the current channel being drawn */
@@ -476,8 +474,15 @@ channel_get_first(void)
 {
 	struct server *s = state.servers.head;
 
+	return s ? s->channel : NULL;
+
+	/* FIXME: */
+#if 0
+	struct server *s = state.servers.head;
+
 	/* First channel of the first server */
 	return !s ? state.default_channel : s->channel;
+#endif
 }
 
 struct channel*
@@ -485,8 +490,15 @@ channel_get_last(void)
 {
 	struct server *s = state.servers.tail;
 
+	return s ? s->channel : NULL;
+
+	/* FIXME: */
+#if 0
+	struct server *s = state.servers.tail;
+
 	/* Last channel of the last server */
-	return !s ? state.default_channel : s->prev->channel->prev;
+	return !s ? state.default_channel : s->channel->prev;
+#endif
 }
 
 struct channel*

@@ -14,10 +14,8 @@
 
 /* state.c */
 /* FIXME: terrible, until i remove references to ccur/rirc */
-#define rirc (default_channel())
 #define ccur (current_channel())
 struct channel* current_channel(void);
-struct channel* default_channel(void);
 
 struct server_list* state_server_list(void);
 
@@ -32,7 +30,6 @@ void free_state(void);
 
 //TODO: move to channel.c, function of server's channel list
 /* Useful state retrieval abstractions */
-struct channel* channel_get(char*, struct server*);
 struct channel* channel_get_first(void);
 struct channel* channel_get_last(void);
 struct channel* channel_get_next(struct channel*);

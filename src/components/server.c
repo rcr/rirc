@@ -6,11 +6,11 @@
 #include "src/state.h"
 #include "src/utils/utils.h"
 
-/* TODO: CASEMAPPING (ascii, rfc1459, strict-rfc1459, set server fptr) */
 #define HANDLED_005 \
+	X(CASEMAPPING)  \
 	X(CHANMODES)    \
-	X(PREFIX)       \
-	X(MODES)
+	X(MODES)        \
+	X(PREFIX)
 
 struct opt
 {
@@ -34,16 +34,26 @@ server(const char *host, const char *port, const char *pass)
 	if ((s = calloc(1, sizeof(*s))) == NULL)
 		fatal("calloc", errno);
 
+	if ((s->connection = connection(s, host, port)) == NULL)
+		goto err;
+
 	s->host = strdup(host);
 	s->port = strdup(port);
-
-	if (pass)
-		s->pass = strdup(pass);
+	s->pass = pass ? strdup(pass) : NULL;
 
 	s->usermodes_str.type = MODE_STR_USERMODE;
+
 	mode_config(&(s->mode_config), NULL, MODE_CONFIG_DEFAULTS);
 
+	s->iptr = s->input;
+
+	s->channel = channel(host, s, NULL, BUFFER_SERVER);
+
 	return s;
+
+err:
+	server_free(s);
+	return NULL;
 }
 
 static struct server*
@@ -131,9 +141,6 @@ server_free(struct server *s)
 	free(s);
 }
 
-/* TODO:
-	should return int, 005 as well
- */
 void
 server_set_004(struct server *s, char *str)
 {
@@ -158,17 +165,13 @@ server_set_004(struct server *s, char *str)
 	if (!(chan_modes = getarg(&str, " ")))
 		newline(c, 0, "-!!-", "invalid numeric 004: chan_modes is null");
 
-	enum mode_err_t err;
-
 	if (user_modes) {
 
 #ifdef DEBUG
 		newlinef(c, 0, "DEBUG", "Setting numeric 004 user_modes: %s", user_modes);
 #endif
 
-		err = mode_config(&(s->mode_config), user_modes, MODE_CONFIG_USERMODES);
-
-		if (err != MODE_ERR_NONE)
+		if (mode_config(&(s->mode_config), user_modes, MODE_CONFIG_USERMODES) != MODE_ERR_NONE)
 			newlinef(c, 0, "-!!-", "invalid numeric 004 user_modes: %s", user_modes);
 	}
 
@@ -178,9 +181,7 @@ server_set_004(struct server *s, char *str)
 		newlinef(c, 0, "DEBUG", "Setting numeric 004 chan_modes: %s", chan_modes);
 #endif
 
-		err = mode_config(&(s->mode_config), chan_modes, MODE_CONFIG_CHANMODES);
-
-		if (err != MODE_ERR_NONE)
+		if (mode_config(&(s->mode_config), chan_modes, MODE_CONFIG_CHANMODES) != MODE_ERR_NONE)
 			newlinef(c, 0, "-!!-", "invalid numeric 004 chan_modes: %s", chan_modes);
 	}
 }
@@ -311,35 +312,25 @@ parse_opt(struct opt *opt, char **str)
 }
 
 static int
+server_set_CASEMAPPING(struct server *s, char *val)
+{
+	/* TODO: sets a function pointer to be used for
+	 * nick/chan string cmps specific to this server */
+	(void)(s);
+	(void)(val);
+	return 0;
+}
+
+static int
 server_set_CHANMODES(struct server *s, char *val)
 {
 	/* Delegated to mode.c  */
 
 #ifdef DEBUG
-			newlinef(s->channel, 0, "DEBUG", "Setting numeric 005 CHANMODES: %s", val);
+	newlinef(s->channel, 0, "DEBUG", "Setting numeric 005 CHANMODES: %s", val);
 #endif
 
-	enum mode_err_t err;
-
-	err = mode_config(&(s->mode_config), val, MODE_CONFIG_SUBTYPES);
-
-	return (err != MODE_ERR_NONE);
-}
-
-static int
-server_set_PREFIX(struct server *s, char *val)
-{
-	/* Delegated to mode.c  */
-
-#ifdef DEBUG
-			newlinef(s->channel, 0, "DEBUG", "Setting numeric 005 PREFIX: %s", val);
-#endif
-
-	enum mode_err_t err;
-
-	err = mode_config(&(s->mode_config), val, MODE_CONFIG_PREFIX);
-
-	return (err != MODE_ERR_NONE);
+	return (mode_config(&(s->mode_config), val, MODE_CONFIG_SUBTYPES) != MODE_ERR_NONE);
 }
 
 static int
@@ -348,12 +339,20 @@ server_set_MODES(struct server *s, char *val)
 	/* Delegated to mode.c */
 
 #ifdef DEBUG
-			newlinef(s->channel, 0, "DEBUG", "Setting numeric 005 MODES: %s", val);
+	newlinef(s->channel, 0, "DEBUG", "Setting numeric 005 MODES: %s", val);
 #endif
 
-	enum mode_err_t err;
+	return (mode_config(&(s->mode_config), val, MODE_CONFIG_MODES) != MODE_ERR_NONE);
+}
 
-	err = mode_config(&(s->mode_config), val, MODE_CONFIG_MODES);
+static int
+server_set_PREFIX(struct server *s, char *val)
+{
+	/* Delegated to mode.c  */
 
-	return (err != MODE_ERR_NONE);
+#ifdef DEBUG
+	newlinef(s->channel, 0, "DEBUG", "Setting numeric 005 PREFIX: %s", val);
+#endif
+
+	return (mode_config(&(s->mode_config), val, MODE_CONFIG_PREFIX) != MODE_ERR_NONE);
 }

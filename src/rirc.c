@@ -192,10 +192,6 @@ main(int argc, char **argv)
 	if (sigaction(SIGWINCH, &sa_sigwinch, NULL) == -1)
 		fatal("sigaction - SIGWINCH", errno);
 
-	/* atexit doesn't set errno */
-	if (atexit(cleanup) != 0)
-		fatal("atexit", 0);
-
 	init_state();
 
 	config.default_nick = getenv("USER");
@@ -213,10 +209,10 @@ main(int argc, char **argv)
 		if (server_list_add(state_server_list(), s))
 			arg_error("duplicate server: %s:%s", auto_servers[i].host, auto_servers[i].port);
 
-		if (!server_set_chans(s, auto_servers[i].chans))
+		if (server_set_chans(s, auto_servers[i].chans))
 			arg_error("invalid chans: '%s'", auto_servers[i].chans);
 
-		if (!server_set_nicks(s, auto_servers[i].nicks))
+		if (server_set_nicks(s, auto_servers[i].nicks))
 			arg_error("invalid nicks: '%s'", auto_servers[i].nicks);
 
 		auto_servers[i].s = s;
@@ -224,6 +220,10 @@ main(int argc, char **argv)
 
 	for (i = 0; i <= server_i; i++)
 		net_cx(auto_servers[i].s->connection);
+
+	/* atexit doesn't set errno */
+	if (atexit(cleanup) != 0)
+		fatal("atexit", 0);
 
 	main_loop();
 

@@ -3,6 +3,15 @@
 #include "src/components/mode.c"   /* mode_config_defaults */
 #include "src/utils/utils.c"       /* skip_sp */
 
+struct connection*
+connection(const void *s, const char *h, const char *p)
+{
+	UNUSED(s);
+	UNUSED(h);
+	UNUSED(p);
+	return (void *)(s);
+}
+
 void
 newline(struct channel *c, enum buffer_line_t t, const char *f, const char *m)
 {
