@@ -221,6 +221,7 @@ main(int argc, char **argv)
 	for (i = 0; i <= server_i; i++)
 		net_cx(auto_servers[i].s->connection);
 
+	/* Set this after the last arg_error so we don't clear */
 	/* atexit doesn't set errno */
 	if (atexit(cleanup) != 0)
 		fatal("atexit", 0);
@@ -262,9 +263,6 @@ static void
 main_loop(void)
 {
 	for (;;) {
-
-		/* For each server, check connection status, and input */
-		check_servers();
 
 		/* Window has changed size */
 		if (flag_sigwinch) {

@@ -22,6 +22,7 @@ enum buffer_line_t
 	BUFFER_LINE_T_SIZE
 };
 
+/* FIXME: Should be channel type, not really relevant to the buffer itself */
 enum buffer_t
 {
 	BUFFER_OTHER,   /* Default/all other buffers */

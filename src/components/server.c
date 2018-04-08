@@ -34,9 +34,6 @@ server(const char *host, const char *port, const char *pass)
 	if ((s = calloc(1, sizeof(*s))) == NULL)
 		fatal("calloc", errno);
 
-	if ((s->connection = connection(s, host, port)) == NULL)
-		goto err;
-
 	s->host = strdup(host);
 	s->port = strdup(port);
 	s->pass = pass ? strdup(pass) : NULL;
@@ -47,7 +44,13 @@ server(const char *host, const char *port, const char *pass)
 
 	s->iptr = s->input;
 
-	s->channel = channel(host, s, NULL, BUFFER_SERVER);
+	// FIXME: channel()
+	s->channel = new_channel(host, s, NULL, BUFFER_SERVER);
+	channel_set_current(s->channel);
+
+	// FIXME:
+	if ((s->connection = connection(s, host, port)) == NULL)
+		goto err;
 
 	return s;
 

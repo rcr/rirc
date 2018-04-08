@@ -1,12 +1,11 @@
 TODO
 ---------------------------
 this iteration
-	- RFC2812 compliance
-	- Fixes for parsing args
+	- hook up new server/channel/mode/etc implementations
 
 next iteration
-	- hook up new server/channel/mode/etc implementations
-	- TODO/FIXME cleanups
+	- RFC2812 compliance
+	- Fixes for parsing args
 
 Continue refactoring:
 	- Move/split components (e.g. server, channel, input, etc):

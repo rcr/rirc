@@ -40,7 +40,7 @@ state_server_list(void)
 
 static int action_close_server(char);
 
-static void _newline(struct channel*, enum buffer_line_t, const char*, const char*, size_t);
+static void _newline(struct channel*, enum buffer_line_t, const char*, const char*, va_list);
 
 struct channel* current_channel(void) { return state.current_channel; }
 struct channel* default_channel(void) { return state.default_channel; }
@@ -119,14 +119,9 @@ free_state(void)
 void
 newline(struct channel *c, enum buffer_line_t type, const char *from, const char *mesg)
 {
-	/* Default wrapper for _newline because length of message won't be known */
+	/* Default wrapper for _newline */
 
-	char errmesg[] = "newline error: mesg is null";
-
-	if (mesg == NULL)
-		_newline(c, type, from, errmesg, strlen(errmesg));
-	else
-		_newline(c, type, from, mesg, strlen(mesg));
+	newlinef(c, type, from, "%s", mesg);
 }
 
 void
@@ -134,42 +129,42 @@ newlinef(struct channel *c, enum buffer_line_t type, const char *from, const cha
 {
 	/* Formating wrapper for _newline */
 
-	char buff[BUFFSIZE]; char errmesg[] = "newlinef error: vsprintf failure";
-	int len;
 	va_list ap;
 
 	va_start(ap, fmt);
-	len = vsnprintf(buff, BUFFSIZE - 1, fmt, ap);
+	_newline(c, type, from, fmt, ap);
 	va_end(ap);
-
-	if (len < 0)
-		_newline(c, 0, "-!!-", errmesg, sizeof(errmesg));
-	else
-		_newline(c, type, from, buff, len);
 }
 
 static void
-_newline(struct channel *c, enum buffer_line_t type, const char *from, const char *mesg, size_t mesg_len)
+_newline(struct channel *c, enum buffer_line_t type, const char *from, const char *fmt, va_list ap)
 {
 	/* Static function for handling inserting new lines into buffers */
 
-	/* FIXME:
-	 * bug occuring where message is marked incorrectly as pinged in this channel
-	 * when it occured correctly in another channel at around the same time
-	 */
+	char buf[BUFFSIZE];
 
-	if (c == NULL)
-		fatal("channel is null", 0);
+	int len;
 
-	struct user *u;
+	struct string _from,
+	              _text;
 
-	struct string _from = { .str = from };
-	struct string _text = { .str = mesg, .len = mesg_len };
+	struct user *u = NULL;
 
-	if ((u = user_list_get(&(c->users), from, 0)) != NULL)
-		_from.len = u->nick.len;
-	else
-		_from.len = strlen(from);
+	if ((len = vsnprintf(buf, BUFFSIZE, fmt, ap)) < 0) {
+		_text.str = "newlinef error: vsprintf failure";
+		_text.len = strlen(_text.str);
+		_from.str = "-!!-";
+		_from.len = strlen(_from.str);
+	} else {
+		_text.str = buf;
+		_text.len = len;
+		_from.str = from;
+
+		if ((u = user_list_get(&(c->users), from, 0)) != NULL)
+			_from.len = u->nick.len;
+		else
+			_from.len = strlen(from);
+	}
 
 	buffer_newline(&(c->buffer), type, _from, _text, ((u == NULL) ? 0 : u->prfxmodes.prefix));
 
@@ -216,6 +211,7 @@ free_channel(struct channel *c)
 	channel_free(c);
 }
 
+/* TODO: buffer_clear */
 void
 channel_clear(struct channel *c)
 {
@@ -251,6 +247,7 @@ action_close_server(char c)
 	return 0;
 }
 
+/* TODO: move to channel.c */
 void
 reset_channel(struct channel *c)
 {
@@ -259,6 +256,7 @@ reset_channel(struct channel *c)
 	user_list_free(&(c->users));
 }
 
+/* TODO: move to channel.c */
 void
 part_channel(struct channel *c)
 {
@@ -557,9 +555,23 @@ channel_move_next(void)
 	}
 }
 
+void
+net_cb_cxng(const void *cb_obj, const char *fmt, ...)
+{
+	va_list ap;
+
+	struct channel *c = ((struct server *)cb_obj)->channel;
+
+	va_start(ap, fmt);
+	_newline(c, 0, "--", fmt, ap);
+	va_end(ap);
+
+	redraw();
+}
+
 #if 0
 void
-net_cb_cxed(const void *cb_obj, const char *mesg, ...)
+net_cb_cxed(const void *cb_obj, const char *fmt, ...)
 {
 	/* TODO
 	 * send PASS
@@ -570,30 +582,23 @@ net_cb_cxed(const void *cb_obj, const char *mesg, ...)
 	(void)(mesg);
 }
 
-void
-net_cb_dxed(const void *cb_obj, const char *mesg, ...)
-{
-	/* TODO */
-	(void)(s);
-	(void)(mesg);
-}
-
-void
-net_cb_cxng(const void *cb_obj, const char *mesg, ...)
-{
-	/* TODO */
-	(void)(s);
-	(void)(mesg);
-}
-
-void
-net_cb_ping(const void *cb_obj, unsigned int ping)
-{
-	/* TODO */
-	(void)(s);
-	(void)(ping);
-}
+void net_cb_lost(const void*, const char*, ...);
+void net_cb_ping(const void*, unsigned int);
 #endif
+
+void
+net_cb_fail(const void *cb_obj, const char *fmt, ...)
+{
+	va_list ap;
+
+	struct channel *c = ((struct server *)cb_obj)->channel;
+
+	va_start(ap, fmt);
+	_newline(c, 0, "-!!-", fmt, ap);
+	va_end(ap);
+
+	redraw();
+}
 
 void
 net_cb_read_inp(char *buff, size_t count)
@@ -609,7 +614,7 @@ net_cb_read_soc(char *buff, size_t count, const void *cb_obj)
 {
 	struct server *s = (struct server *)cb_obj;
 
-	/* TODO */
+	/* TODO parse buff into irc message struct, err / pass to handler */
 	(void)(buff);
 	(void)(count);
 	(void)(s);

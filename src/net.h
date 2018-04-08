@@ -22,29 +22,32 @@ void server_disconnect(struct server*, int, int, char*);
  *  - ping: timing out   ~ Socket connected, network state in question
  *
  *                            +--------+
- *               +------(B)-- |  rxng  |
- *               |            +--------+
- *               |              |    ^
- *               |            (A,C)  |
- *               |              |   (E)
- *               v              v    |
- *         +--------+ --(A)-> +--------+
- * NEW --> |  dxed  |         |  cxng  | <--+
- *         +--------+ <-(B)-- +--------+    |
- *            ^  ^              |    ^     (F)
- *            |  |             (D)   |      |
- *            |  |              |   (F)     |
- *            |  |              v    |      |
- *            |  |            +--------+    |
- *            |  +------(B)-- |  cxed  |    |
- *            |               +--------+    |
- *            |                 |    ^      |
- *            |                (G)   |      |
- *            |                 |   (G)     |
- *            |                 v    |      |
- *            |               +--------+    |
- *            +---------(B)-- |  ping  | ---+
+ *                 +----(B)-- |  rxng  |
+ *                 |          +--------+
+ *  INIT           |           |      ^
+ *    v            |         (A,C)    |
+ *    |            |           |     (E)
+ *    |            v           v      |
+ *    +--> +--------+ --(A)-> +--------+
+ *         |  dxed  |         |  cxng  | <--+
+ *    +--< +--------+ <-(B)-- +--------+    |
+ *    |     ^      ^           |      ^    (F)
+ *    v     |      |          (D)     |     |
+ *  TERM    |      |           |     (F)    |
+ *          |      |           v      |     |
+ *          |      |          +--------+    |
+ *          |      +----(B)-- |  cxed  |    |
+ *          |                 +--------+    |
+ *          |                  |      ^     |
+ *          |                 (G)     |     |
+ *          |                  |     (G)    |
+ *          |                  v      |     |
+ *          |                 +--------+    |
+ *          +-----------(B)-- |  ping  | ---+
  *                            +--------+
+ *                             v      ^
+ *                             |      |
+ *                             +--(G)-+
  *
  * This module exposes functions for explicitly directing network
  * state as well declaring callback functions for state transitions
@@ -58,7 +61,7 @@ void server_disconnect(struct server*, int, int, char*);
  *   (C) on connection attempt: net_cb_cxng
  *   (D) on connection success: net_cb_cxed
  *   (E) on connection failure: net_cb_fail
- *   (F) on connection loss:    net_cb_dxed
+ *   (F) on connection loss:    net_cb_lost
  *   (G) on network ping event: net_cb_ping
  *
  * Successful reads on stdin and connected sockets result in data callbacks:
@@ -95,7 +98,7 @@ int net_dx(struct connection*);
 void net_cb_cxng(const void*, const char*, ...);
 void net_cb_cxed(const void*, const char*, ...);
 void net_cb_fail(const void*, const char*, ...);
-void net_cb_dxed(const void*, const char*, ...);
+void net_cb_lost(const void*, const char*, ...);
 void net_cb_ping(const void*, unsigned int);
 
 /* Network data callback */

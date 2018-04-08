@@ -3,9 +3,29 @@
 #include "src/components/mode.c"   /* mode_config_defaults */
 #include "src/utils/utils.c"       /* skip_sp */
 
+void
+channel_set_current(struct channel *c)
+{
+	UNUSED(c);
+}
+
+struct channel*
+new_channel(char *n, struct server *s, struct channel *l, enum buffer_t t)
+{
+	/* FIXME: mock new_channel until channel() is implemented */
+
+	UNUSED(n);
+	UNUSED(s);
+	UNUSED(l);
+	UNUSED(t);
+	return NULL;
+}
+
 struct connection*
 connection(const void *s, const char *h, const char *p)
 {
+	/* Mock */
+
 	UNUSED(s);
 	UNUSED(h);
 	UNUSED(p);
