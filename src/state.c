@@ -585,10 +585,14 @@ net_cb_cxed(const void *cb_obj, const char *fmt, ...)
 	 * send NICK
 	 * send USER
 	 */
+
+	int ret;
 	char nickbuf[] = "NICK rcr\r\n";
 	char userbuf[] = "USER rcr 8 * :real rcr\r\n";
-	net_sendf(((struct server *)cb_obj)->connection, nickbuf, sizeof(nickbuf)-1, 0);
-	net_sendf(((struct server *)cb_obj)->connection, userbuf, sizeof(userbuf)-1, 0);
+	if (0 != (ret = net_sendf(((struct server *)cb_obj)->connection, nickbuf, sizeof(nickbuf)-1, 0)))
+		newlinef(c, 0, "sendf fail", "%s", net_err(ret));
+	if (0 != (ret = net_sendf(((struct server *)cb_obj)->connection, userbuf, sizeof(userbuf)-1, 0)))
+		newlinef(c, 0, "sendf fail", "%s", net_err(ret));
 
 	redraw();
 }
@@ -617,17 +621,26 @@ net_cb_read_inp(char *buff, size_t count)
 {
 	input(ccur->input, buff, count);
 
-	/* TODO */
+	/* FIXME: */
 	draw_input();
 }
 
 void
 net_cb_read_soc(char *buff, size_t count, const void *cb_obj)
 {
-	struct server *s = (struct server *)cb_obj;
+	struct channel *c = ((struct server *)cb_obj)->channel;
 
-	/* TODO parse buff into irc message struct, err / pass to handler */
-	(void)(buff);
-	(void)(count);
-	(void)(s);
+	/* FIXME: this assumes buff holds a null terminated parseable message */
+
+	/* FIXME: */
+	newlinef(c, 0, "testing", "GOT %zu bytes: %s", count, buff);
+
+	struct parsed_mesg p;
+
+	if (!(parse_mesg(&p, buff)))
+		newlinef(c, 0, "-!!-", "failed to parse message");
+	else
+		newlinef(c, 0, "--", "Got message type: %s", p.command);
+
+	redraw();
 }

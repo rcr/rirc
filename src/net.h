@@ -105,4 +105,7 @@ void net_cb_ping(const void*, unsigned int);
 void net_cb_read_inp(char*, size_t);
 void net_cb_read_soc(char*, size_t, const void*);
 
+/* Get error string */
+const char* net_err(int);
+
 #endif

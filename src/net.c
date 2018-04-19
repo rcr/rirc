@@ -18,6 +18,14 @@
 #include "src/utils/utils.h"
 #include "config.h"
 
+
+/* FIXME: testing: */
+#include "src/components/channel.h"
+#include "src/components/server.h"
+
+
+#define ELEMS(X) (sizeof((X)) / sizeof((X)[0]))
+
 int
 sendf(char *a, struct server *b, const char *c, ...)
 {
@@ -87,12 +95,17 @@ server_disconnect(struct server *a, int b, int c, char *d)
 	#error "NET_RECONNECT_BACKOFF_MAX: [0, 86400]"
 #endif
 
+/* Lock the global state mutex on callback */
+#define CB(X) \
+	pthread_mutex_lock(&cb_mutex); (X); pthread_mutex_unlock(&cb_mutex);
+
 enum net_err_t
 {
-	NET_ERR_TRUNC = -3,
-	NET_ERR_DXED  = -2,
-	NET_ERR_CXED  = -1,
-	NET_ERR_NONE
+	NET_ERR_NONE,
+	NET_ERR_TRUNC,
+	NET_ERR_DXED,
+	NET_ERR_CXNG,
+	NET_ERR_CXED
 };
 
 struct connection {
@@ -116,23 +129,19 @@ struct connection {
 	pthread_t       pt_tid;
 	struct {
 		size_t i;
-		char readbuf[NET_MESG_LEN];
+		char buf[NET_MESG_LEN + 1];
 	} read;
 	volatile enum net_force_state {
 		NET_ST_FORCE_NONE,
 		NET_ST_FORCE_CXNG, /* Asynchronously force connection */
 		NET_ST_FORCE_DXED, /* Asynchronously force disconnect */
 	} force_state;
+	char ipbuf[INET6_ADDRSTRLEN];
 };
 
 static void* net_routine(void*);
 
 static pthread_mutex_t cb_mutex = PTHREAD_MUTEX_INITIALIZER;
-
-#define CB(X) \
-	pthread_mutex_lock(&cb_mutex); \
-	(X);                           \
-	pthread_mutex_unlock(&cb_mutex);
 
 struct connection*
 connection(const void *obj, const char *host, const char *port)
@@ -142,17 +151,16 @@ connection(const void *obj, const char *host, const char *port)
 	if ((c = malloc(sizeof(*c))) == NULL)
 		fatal("malloc", errno);
 
-	c->obj         = obj;
-	c->host        = strdup(host);
-	c->port        = strdup(port);
-	c->state       = NET_ST_INIT;
-	c->force_state = NET_ST_FORCE_NONE;
+	c->obj  = obj;
+	c->host = strdup(host);
+	c->port = strdup(port);
 
 	if (0 != pthread_attr_init(&(c->pt_attr))
 	|| (0 != pthread_attr_setdetachstate(&(c->pt_attr), PTHREAD_CREATE_DETACHED))
 	|| (0 != pthread_cond_init(&(c->pt_state_cond), NULL))
 	|| (0 != pthread_mutex_init(&(c->pt_state_mutex), NULL))
-	|| (0 != pthread_create(&(c->pt_tid), &(c->pt_attr), net_routine, c))) {
+	|| (0 != pthread_create(&(c->pt_tid), &(c->pt_attr), net_routine, c)))
+	{
 		free(c);
 		return NULL;
 	}
@@ -224,12 +232,14 @@ net_cx(struct connection *c)
 			pthread_cond_signal(&(c->pt_state_cond));
 			break;
 		case NET_ST_CXNG:
+			ret = NET_ERR_CXNG;
 			break;
 		case NET_ST_CXED:
 		case NET_ST_PING:
+			ret = NET_ERR_CXED;
 			break;
 		default:
-			ret = NET_ERR_CXED;
+			fatal("Unknown net state", 0);
 	}
 
 	pthread_mutex_unlock(&(c->pt_state_mutex));
@@ -404,13 +414,15 @@ success:
 		goto failure;
 	}
 
+	// FIXME: call with net_cb_cxng? net_cb_info?
 	if ((ret = getnameinfo(p->ai_addr, p->ai_addrlen, ipbuf, INET6_ADDRSTRLEN, NULL, 0, NI_NUMERICHOST))) {
-		net_cb_cxed(c->obj, "Connected to %s [IP lookup failure: %s]", c->host, gai_strerror(ret));
+		// ; net_cb_cxed(c->obj, "Connected to %s [IP lookup failure: %s]", c->host, gai_strerror(ret));
 	} else {
-		net_cb_cxed(c->obj, "Connected to %s [%s]", c->host, ipbuf);
+		// ; net_cb_cxed(c->obj, "Connected to %s [%s]", c->host, ipbuf);
 	}
 
 	freeaddrinfo(res);
+	c->soc = soc;
 
 	return NET_ST_CXED;
 
@@ -437,23 +449,26 @@ net_state_cxed(enum net_state_t o_state, struct connection *c)
 {
 	(void) o_state;
 
+	net_cb_cxed(c->obj, "Connected to %s [TODO: ip]", c->host);
+
 	struct timeval tv = {
-		.tv_sec = 3
+		.tv_sec = 5
 	};
 
+	ssize_t i, ret;
+
 	if (setsockopt(c->soc, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) < 0)
-		{ ; }
+		{ fatal("setsockopt", errno); }
 
-	char recv_buff[512];
-	ssize_t ret;
+	char recvbuf[512];
 
-	if ((ret = recv(c->soc, recv_buff, sizeof(recv_buff), 0)) <= 0) {
+	if ((ret = recv(c->soc, recvbuf, sizeof(recvbuf), 0)) <= 0) {
 
 		if (ret == 0)
-			{ ; } /* orderly shutdown */
+			{ ; }
 
 		if (errno == EAGAIN || errno == EWOULDBLOCK)
-			{ ; } /* timeout, go to ping */
+			{ ; }
 
 		if (errno == ECONNRESET)
 			{ ; } /* forcibly closed by peer */
@@ -464,9 +479,20 @@ net_state_cxed(enum net_state_t o_state, struct connection *c)
 		/* TODO: all other errnos -> socket close */
 	}
 
-	if (ret > 0) {
+	for (i = 0; i < ret; i++) {
 
-		net_cb_cxed(c->obj, "GOT %zu bytes", ret);
+		if (recvbuf[i] == '\n')
+			continue;
+
+		if (recvbuf[i] == '\r') {
+			if (c->read.i && c->read.i <= NET_MESG_LEN) {
+				c->read.buf[c->read.i + 1] = 0;
+				net_cb_read_soc(c->read.buf, c->read.i, c->obj);
+				c->read.i = 0;
+			}
+		} else {
+			c->read.buf[c->read.i++] = recvbuf[i];
+		}
 	}
 
 	return 0;
@@ -599,4 +625,20 @@ net_poll(void)
 			net_cb_read_inp(buff, n);
 		}
 	}
+}
+
+const char*
+net_err(int err)
+{
+	const char *err_strs[] = {
+		[NET_ERR_TRUNC] = "data truncated",
+		[NET_ERR_DXED]  = "socket not connected",
+		[NET_ERR_CXNG]  = "socket connection in progress",
+		[NET_ERR_CXED]  = "socket connected"
+	};
+
+	if (err >= 0 && err <= ELEMS(err_strs))
+		return err_strs[err];
+
+	return NULL;
 }
