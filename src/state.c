@@ -569,19 +569,31 @@ net_cb_cxng(const void *cb_obj, const char *fmt, ...)
 	redraw();
 }
 
-#if 0
 void
 net_cb_cxed(const void *cb_obj, const char *fmt, ...)
 {
+	va_list ap;
+
+	struct channel *c = ((struct server *)cb_obj)->channel;
+
+	va_start(ap, fmt);
+	_newline(c, 0, "--", fmt, ap);
+	va_end(ap);
+
 	/* TODO
 	 * send PASS
 	 * send NICK
 	 * send USER
-	 * */
-	(void)(s);
-	(void)(mesg);
+	 */
+	char nickbuf[] = "NICK rcr\r\n";
+	char userbuf[] = "USER rcr 8 * :real rcr\r\n";
+	net_sendf(((struct server *)cb_obj)->connection, nickbuf, sizeof(nickbuf)-1, 0);
+	net_sendf(((struct server *)cb_obj)->connection, userbuf, sizeof(userbuf)-1, 0);
+
+	redraw();
 }
 
+#if 0
 void net_cb_lost(const void*, const char*, ...);
 void net_cb_ping(const void*, unsigned int);
 #endif

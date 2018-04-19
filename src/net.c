@@ -1,7 +1,5 @@
-#include <ctype.h>
 #include <errno.h>
 #include <fcntl.h>
-#include <limits.h>
 #include <netdb.h>
 #include <poll.h>
 #include <stdio.h>
@@ -11,6 +9,7 @@
 #include <sys/select.h>
 #include <sys/types.h>
 #include <sys/time.h>
+#include <stdarg.h>
 
 #include <unistd.h>
 #include <pthread.h>
@@ -26,6 +25,7 @@ sendf(char *a, struct server *b, const char *c, ...)
 	(void)b;
 	(void)c;
 	fatal("Not implemented", 0);
+	return 0;
 }
 
 void
@@ -89,8 +89,9 @@ server_disconnect(struct server *a, int b, int c, char *d)
 
 enum net_err_t
 {
-	NET_ERR_DXED = -2,
-	NET_ERR_CXED = -1,
+	NET_ERR_TRUNC = -3,
+	NET_ERR_DXED  = -2,
+	NET_ERR_CXED  = -1,
 	NET_ERR_NONE
 };
 
@@ -115,12 +116,12 @@ struct connection {
 	pthread_t       pt_tid;
 	struct {
 		size_t i;
-		char buf[NET_MESG_LEN];
+		char readbuf[NET_MESG_LEN];
 	} read;
 	volatile enum net_force_state {
-		NET_FORCE_ST_NONE,
-		NET_FORCE_ST_CXNG, /* Asynchronously force connection */
-		NET_FORCE_ST_DXED, /* Asynchronously force disconnect */
+		NET_ST_FORCE_NONE,
+		NET_ST_FORCE_CXNG, /* Asynchronously force connection */
+		NET_ST_FORCE_DXED, /* Asynchronously force disconnect */
 	} force_state;
 };
 
@@ -128,7 +129,7 @@ static void* net_routine(void*);
 
 static pthread_mutex_t cb_mutex = PTHREAD_MUTEX_INITIALIZER;
 
-#define CB(X)                      \
+#define CB(X) \
 	pthread_mutex_lock(&cb_mutex); \
 	(X);                           \
 	pthread_mutex_unlock(&cb_mutex);
@@ -138,34 +139,63 @@ connection(const void *obj, const char *host, const char *port)
 {
 	struct connection *c;
 
-	if ((c = calloc(1, sizeof(*c))) == NULL)
-		fatal("calloc", errno);
+	if ((c = malloc(sizeof(*c))) == NULL)
+		fatal("malloc", errno);
 
-	/* TODO: check host and port are valid? */
+	c->obj         = obj;
+	c->host        = strdup(host);
+	c->port        = strdup(port);
+	c->state       = NET_ST_INIT;
+	c->force_state = NET_ST_FORCE_NONE;
 
-	c->obj   = obj;
-	c->host  = strdup(host);
-	c->port  = strdup(port);
-	c->state = NET_ST_INIT;
+	if (0 != pthread_attr_init(&(c->pt_attr))
+	|| (0 != pthread_attr_setdetachstate(&(c->pt_attr), PTHREAD_CREATE_DETACHED))
+	|| (0 != pthread_cond_init(&(c->pt_state_cond), NULL))
+	|| (0 != pthread_mutex_init(&(c->pt_state_mutex), NULL))
+	|| (0 != pthread_create(&(c->pt_tid), &(c->pt_attr), net_routine, c))) {
+		free(c);
+		return NULL;
+	}
 
-	if (0 != pthread_attr_init(&(c->pt_attr)))
-		{ ; }
-
-	if (0 != pthread_attr_setdetachstate(&(c->pt_attr), PTHREAD_CREATE_DETACHED))
-		{ ; }
-
-	if (0 != pthread_cond_init(&(c->pt_state_cond), NULL))
-		{ ; }
-
-	if (0 != pthread_mutex_init(&(c->pt_state_mutex), NULL))
-		{ ; }
-
-	if (0 != pthread_create(&(c->pt_tid), &(c->pt_attr), net_routine, c))
-		{ ; }
-
+	/* Lock until the INIT state */
 	pthread_mutex_lock(&(c->pt_state_mutex));
 
 	return c;
+}
+
+int
+net_sendf(struct connection *c, const char *fmt, ...)
+{
+	char sendbuf[512];
+
+	va_list ap;
+	int ret;
+	size_t len;
+
+	if (c->state != NET_ST_CXED && c->state != NET_ST_PING)
+		return NET_ERR_DXED;
+
+	va_start(ap, fmt);
+	ret = vsnprintf(sendbuf, sizeof(sendbuf) - 2, fmt, ap);
+	va_end(ap);
+
+	if (ret <= 0) {
+		return NET_ERR_NONE; /* TODO handle error */
+	}
+
+	len = ret;
+
+	if (len >= sizeof(sendbuf) - 2)
+		return NET_ERR_TRUNC;
+
+	sendbuf[len++] = '\r';
+	sendbuf[len++] = '\n';
+
+	if (send(c->soc, sendbuf, len, 0) < 0) {
+		return NET_ERR_NONE; /* TODO: handle error */
+	}
+
+	return NET_ERR_NONE;
 }
 
 int
@@ -218,7 +248,7 @@ net_dx(struct connection *c)
 	return 0;
 }
 
-enum net_state_t
+static enum net_state_t
 net_state_init(enum net_state_t o_state, struct connection *c)
 {
 	/* Initial thread state */
@@ -231,7 +261,7 @@ net_state_init(enum net_state_t o_state, struct connection *c)
 	return NET_ST_CXNG;
 }
 
-enum net_state_t
+static enum net_state_t
 net_state_dxed(enum net_state_t o_state, struct connection *c)
 {
 	(void) o_state;
@@ -244,7 +274,7 @@ net_state_dxed(enum net_state_t o_state, struct connection *c)
 	return NET_ST_CXNG;
 }
 
-enum net_state_t
+static enum net_state_t
 net_state_rxng(enum net_state_t o_state, struct connection *c)
 {
 	(void) o_state;
@@ -268,14 +298,15 @@ net_state_rxng(enum net_state_t o_state, struct connection *c)
 	return NET_ST_CXNG;
 }
 
-enum net_state_t
+static enum net_state_t
 net_state_cxng(enum net_state_t o_state, struct connection *c)
 {
 	(void) o_state;
 
-	int ret, soc;
+	int ret, soc, flags;
 
 	char errbuf[512], *errfunc = NULL;
+	char ipbuf[INET6_ADDRSTRLEN];
 
 	CB(net_cb_cxng(c->obj, "Connecting to %s:%s ...", c->host, c->port));
 
@@ -318,14 +349,14 @@ net_state_cxng(enum net_state_t o_state, struct connection *c)
 		FD_ZERO(&w_fds);
 		FD_SET(soc, &w_fds);
 
-		struct timeval tv = { .tv_usec = 5000 };
+		struct timeval tv = { .tv_usec = 500 * 1000 };
 
 		/* Approximate timeout in microseconds */
 		int timeout_us = 30 * 1000 * 1000;
 
 		for (errno = 0;;) {
 
-			if (c->force_state == NET_FORCE_ST_DXED)
+			if (c->force_state == NET_ST_FORCE_DXED)
 				goto canceled;
 
 			if ((ret = select(soc + 1, NULL, &w_fds, NULL, &tv)) < 0 && errno != EINTR) {
@@ -361,49 +392,87 @@ net_state_cxng(enum net_state_t o_state, struct connection *c)
 		goto failure;
 	}
 
-	if ((ret = fcntl(soc, F_SETFL, ~O_NONBLOCK)) < 0) {
+success:
+
+	if ((flags = fcntl(soc, F_GETFL, 0)) < 0) {
+		errfunc = "fcntl F_GETFL";
+		goto failure;
+	}
+
+	if ((ret = fcntl(soc, F_SETFL, (flags & ~O_NONBLOCK))) < 0) {
 		errfunc = "fcntl O_NONBLOCK";
 		goto failure;
 	}
 
+	if ((ret = getnameinfo(p->ai_addr, p->ai_addrlen, ipbuf, INET6_ADDRSTRLEN, NULL, 0, NI_NUMERICHOST))) {
+		net_cb_cxed(c->obj, "Connected to %s [IP lookup failure: %s]", c->host, gai_strerror(ret));
+	} else {
+		net_cb_cxed(c->obj, "Connected to %s [%s]", c->host, ipbuf);
+	}
 
+	freeaddrinfo(res);
+
+	return NET_ST_CXED;
+
+canceled:
+
+	// TODO
+	// close socket
+	// message
 	freeaddrinfo(res);
 
 	return NET_ST_DXED;
 
-	//strerror_r(errno, errbuf, sizeof(errbuf));
-	// cb
-	// freeaddrinfo
-	// close socket if open
-
-canceled:
-	CB(net_cb_cxng(c->obj, "canned"));
-	return NET_ST_DXED;
-
 failure:
-	CB(net_cb_cxng(c->obj, "failed"));
-	return NET_ST_RXNG;
+	net_cb_fail(c->obj, "Connection failure %s, [%s]", errfunc, strerror(errno));
 
-success:
-	/* Failing to get the numeric IP isn't a fatal connection error */
-//	if ((ret = getnameinfo(p->ai_addr, p->ai_addrlen, ct->ipstr,
-//					INET6_ADDRSTRLEN, NULL, 0, NI_NUMERICHOST))) {
-//		strncpy(ct->error, gai_strerror(ret), MAX_ERROR);
-//	}
-	CB(net_cb_cxng(c->obj, "success"));
-	return NET_ST_CXED;
+	// TODO close socket
+	freeaddrinfo(res);
+
+	return NET_ST_RXNG;
 }
 
-enum net_state_t
+static enum net_state_t
 net_state_cxed(enum net_state_t o_state, struct connection *c)
 {
-	/* TODO: SO_RCVTIMEO */
 	(void) o_state;
-	(void) c;
+
+	struct timeval tv = {
+		.tv_sec = 3
+	};
+
+	if (setsockopt(c->soc, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) < 0)
+		{ ; }
+
+	char recv_buff[512];
+	ssize_t ret;
+
+	if ((ret = recv(c->soc, recv_buff, sizeof(recv_buff), 0)) <= 0) {
+
+		if (ret == 0)
+			{ ; } /* orderly shutdown */
+
+		if (errno == EAGAIN || errno == EWOULDBLOCK)
+			{ ; } /* timeout, go to ping */
+
+		if (errno == ECONNRESET)
+			{ ; } /* forcibly closed by peer */
+
+		if (errno == EINTR)
+			{ ; } /* signal, affects ping timeout */
+
+		/* TODO: all other errnos -> socket close */
+	}
+
+	if (ret > 0) {
+
+		net_cb_cxed(c->obj, "GOT %zu bytes", ret);
+	}
+
 	return 0;
 }
 
-enum net_state_t
+static enum net_state_t
 net_state_ping(enum net_state_t o_state, struct connection *c)
 {
 	/* TODO: SO_RCVTIMEO */
@@ -418,6 +487,7 @@ net_routine(void *arg)
 	struct connection *c = arg;
 
 	enum net_state_t n_state;
+
 	do {
 
 		/* TODO:
@@ -439,12 +509,16 @@ net_routine(void *arg)
 				n_state = net_state_rxng(c->state, c);
 				break;
 			case NET_ST_CXED:
+				n_state = net_state_cxed(c->state, c);
+				break;
 			case NET_ST_PING:
+				n_state = net_state_ping(c->state, c);
+				break;
 			case NET_ST_TERM:
 				n_state = NET_ST_TERM; // TODO
 				break;
 			default:
-				n_state = NET_ST_TERM; // TODO
+				fatal("Unknown net state", 0);
 		}
 
 		// TODO: here lock mutext before calling next state
