@@ -42,8 +42,6 @@ server(const char *host, const char *port, const char *pass)
 
 	mode_config(&(s->mode_config), NULL, MODE_CONFIG_DEFAULTS);
 
-	s->iptr = s->input;
-
 	// FIXME: channel()
 	s->channel = new_channel(host, s, NULL, BUFFER_SERVER);
 	channel_set_current(s->channel);

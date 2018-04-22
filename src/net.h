@@ -85,7 +85,7 @@ struct connection* connection(
 	const char*); /* port */
 
 void net_free(struct connection*);
-void net_poll(void);
+void net_loop(void);
 
 /* Formatted write to connection */
 int net_sendf(struct connection*, const char*, ...);

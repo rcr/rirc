@@ -630,17 +630,16 @@ net_cb_read_soc(char *buff, size_t count, const void *cb_obj)
 {
 	struct channel *c = ((struct server *)cb_obj)->channel;
 
-	/* FIXME: this assumes buff holds a null terminated parseable message */
-
-	/* FIXME: */
-	newlinef(c, 0, "testing", "GOT %zu bytes: %s", count, buff);
+#ifdef DEBUG
+	newline(c, 0, "DEBUG <<", buff);
+#endif
 
 	struct parsed_mesg p;
 
 	if (!(parse_mesg(&p, buff)))
 		newlinef(c, 0, "-!!-", "failed to parse message");
 	else
-		newlinef(c, 0, "--", "Got message type: %s", p.command);
+		recv_mesg(&p, (struct server *)cb_obj);
 
 	redraw();
 }

@@ -17,33 +17,21 @@ struct server
 	//TODO: can be grouped together, autonick
 	char *nicks;
 	char *nptr;
-
 	char *host;
 	char *port;
 	char *pass;
-	struct user_list ignore;
 	//TODO channel_list
 	struct channel *channel;
-	struct server *next;
-	struct server *prev;
-
-	//TODO: connection stuff to be
-	// removed after net refactor
-	char input[BUFFSIZE];
-	char *iptr;
-	int pinging;
-	int soc;
-	time_t latency_delta;
-	time_t reconnect_time;
-	void *connecting;
-
-	struct connection *connection;
-
 	//TODO: WIP
 	struct channel_list clist;
+	struct connection *connection;
 	struct mode        usermodes;
 	struct mode_str    usermodes_str;
 	struct mode_config mode_config;
+	struct server *next;
+	struct server *prev;
+	struct user_list ignore;
+	time_t latency_delta;
 };
 
 struct server_list

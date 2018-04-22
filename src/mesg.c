@@ -347,8 +347,13 @@ send_connect(char *err, char *mesg, struct server *s, struct channel *c)
 {
 	/* /connect [(host) | (host:port) | (host port)] */
 
+	// FIXME:
+	UNUSED(err);
+	UNUSED(mesg);
+	UNUSED(s);
 	UNUSED(c);
 
+#if 0
 	char *host, *port;
 
 	if (!(host = getarg(&mesg, " :"))) {
@@ -368,8 +373,8 @@ send_connect(char *err, char *mesg, struct server *s, struct channel *c)
 		port = "6667";
 	}
 
-	// FIXME:
 	server_connect(host, port, NULL, NULL);
+#endif
 
 	return 0;
 }
@@ -405,13 +410,19 @@ send_disconnect(char *err, char *mesg, struct server *s, struct channel *c)
 {
 	/* /disconnect [quit message] */
 
+	// FIXME:
+	UNUSED(err);
+	UNUSED(mesg);
+	UNUSED(s);
 	UNUSED(c);
 
+#if 0
 	/* Server isn't connecting, connected or waiting to connect */
 	if (!s || (!s->connecting && s->soc < 0 && !s->reconnect_time))
 		fail("Error: Not connected to server");
 
 	server_disconnect(s, 0, 0, (*mesg) ? mesg : DEFAULT_QUIT_MESG);
+#endif
 
 	return 0;
 }
@@ -739,54 +750,23 @@ recv_handler_lookup (register const char *str, register size_t len)
 }
 
 void
-recv_mesg(char *inp, int count, struct server *s)
+recv_mesg(struct parsed_mesg *p, struct server *s)
 {
-	/* FIXME Move to connection struct, handle in net. recv_mesg should
-	 * only receive messages ready to parse */
-	char *ptr = s->iptr;
-	char *max = s->input + BUFFSIZE;
+	const struct recv_handler* handler;
 
+	int err = 0;
 	char errbuff[MAX_ERROR];
 
-	while (count--) {
-		if (*inp == '\r') {
+	if (isdigit(*p->command))
+		err = recv_numeric(errbuff, p, s);
+	/* TODO: parsed_mesg can cache the length of command/args/etc */
+	else if ((handler = recv_handler_lookup(p->command, strlen(p->command))))
+		err = handler->func(errbuff, p, s);
+	else
+		newlinef(s->channel, 0, "-!!-", "Message type '%s' unknown", p->command);
 
-			int err = 0;
-
-			*ptr = '\0';
-
-#ifdef DEBUG
-			newline(s->channel, 0, "DEBUG <<", s->input);
-#endif
-			const struct recv_handler* handler;
-
-			struct parsed_mesg p;
-
-			if (!(parse_mesg(&p, s->input)))
-				newlinef(s->channel, 0, "-!!-", "Failed to parse: %s", s->input);
-
-			else if (isdigit(*p.command))
-				err = recv_numeric(errbuff, &p, s);
-
-			else if ((handler = recv_handler_lookup(p.command, strlen(p.command))))
-				err = handler->func(errbuff, &p, s);
-
-			else
-				newlinef(s->channel, 0, "-!!-", "Message type '%s' unknown", p.command);
-
-			if (err)
-				newline(s->channel, 0, "-!!-", errbuff);
-
-			ptr = s->input;
-
-		/* Don't accept unprintable characters unless space or ctcp markup */
-		} else if (ptr < max && (isgraph(*inp) || *inp == ' ' || *inp == 0x01))
-			*ptr++ = *inp;
-
-		inp++;
-	}
-
-	s->iptr = ptr;
+	if (err)
+		newline(s->channel, 0, "-!!-", errbuff);
 }
 
 static int
@@ -1694,13 +1674,18 @@ recv_pong(char *err, struct parsed_mesg *p, struct server *s)
 {
 	/*  PONG <server> [<server2>] */
 
+	// FIXME:
 	UNUSED(err);
+	UNUSED(p);
+	UNUSED(s);
 
+#if 0
 	/*  PING sent explicitly by the user */
 	if (!s->pinging)
 		newlinef(s->channel, 0, "!!", "PONG %s", p->params);
 
 	s->pinging = 0;
+#endif
 
 	return 0;
 }

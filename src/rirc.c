@@ -250,7 +250,7 @@ cleanup(void)
 	tcsetattr(0, TCSADRAIN, &oterm);
 }
 
-/* TODO: install sig handlers for cleanly exiting in debug mode */ 
+/* TODO: install sig handlers for cleanly exiting in debug mode */
 static void
 signal_sigwinch(int signum)
 {
@@ -270,8 +270,11 @@ main_loop(void)
 			resize();
 		}
 
+		// FIXME: start drawing here and then a net callback on `-s localhost` starts drawing
+		// move the redraws to input, alternatively spinlock the draw function to gather all draw
+		// bits and only draw when it can be aquired
 		redraw();
 
-		net_poll();
+		net_loop();
 	}
 }
