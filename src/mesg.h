@@ -6,8 +6,8 @@
 #include "src/components/channel.h"
 #include "src/components/server.h"
 
-void recv_mesg(struct parsed_mesg*, struct server*);
-void send_mesg(char*, struct channel*);
+void recv_mesg(struct server*, struct parsed_mesg*);
+void send_mesg(struct server*, struct channel*, char*);
 
 #if 0
 

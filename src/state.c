@@ -639,7 +639,7 @@ net_cb_read_soc(char *buff, size_t count, const void *cb_obj)
 	if (!(parse_mesg(&p, buff)))
 		newlinef(c, 0, "-!!-", "failed to parse message");
 	else
-		recv_mesg(&p, (struct server *)cb_obj);
+		recv_mesg((struct server *)cb_obj, &p);
 
 	redraw();
 }

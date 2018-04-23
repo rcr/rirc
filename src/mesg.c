@@ -10,6 +10,13 @@
 #include "src/state.h"
 #include "src/utils/utils.h"
 
+
+
+/* TODO:
+ *
+ * fail macros should just call newline directly. the fail_if macro should be removed
+ */
+
 //TODO: fail macros copy to an error buffer, and then copy into newline,
 //take destination buffer as parameter
 
@@ -24,6 +31,9 @@
 /* Conditionally fail */
 #define fail_if(C) \
 	do { if (C) return 1; } while (0)
+
+
+
 
 #define IS_ME(X) !strcmp((X), s->nick)
 
@@ -47,6 +57,7 @@
 	X(unignore) \
 	X(version)
 
+// FIXME: get rid of errbuf here, just call newline from the function on failure
 /* Send handler prototypes */
 #define X(cmd) static int send_##cmd(char*, char*, struct server*, struct channel*);
 SEND_HANDLERS
@@ -251,13 +262,13 @@ send_handler_lookup(register const char *str, register size_t len)
 }
 
 void
-send_mesg(char *mesg, struct channel *chan)
+send_mesg(struct server *s, struct channel *chan, char *mesg)
 {
 	/* Handle the input to a channel, ie:
-	 *	- a default message to the channel
-	 *	- a default message to the channel beginning with '/'
-	 *	- a handled command beginning with '/'
-	 *	- an unhandled command beginning with '/'
+	 *  - a default message to the channel
+	 *  - a default message to the channel beginning with '/'
+	 *  - a handled command beginning with '/'
+	 *  - an unhandled command beginning with '/'
 	 */
 
 	char *p, *cmd_str, errbuff[MAX_ERROR];
@@ -750,7 +761,7 @@ recv_handler_lookup (register const char *str, register size_t len)
 }
 
 void
-recv_mesg(struct parsed_mesg *p, struct server *s)
+recv_mesg(struct server *s, struct parsed_mesg *p)
 {
 	const struct recv_handler* handler;
 

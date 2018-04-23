@@ -5,8 +5,6 @@
 /* FIXME: refactoring, stubbed until removal */
 struct server;
 int sendf(char*, struct server*, const char*, ...);
-void check_servers(void);
-void server_connect(char*, char*, char*, char*);
 void server_disconnect(struct server*, int, int, char*);
 
 
@@ -86,6 +84,9 @@ struct connection* connection(
 
 void net_free(struct connection*);
 void net_loop(void);
+
+//net_stdin
+//net_close
 
 /* Formatted write to connection */
 int net_sendf(struct connection*, const char*, ...);

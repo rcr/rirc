@@ -697,5 +697,5 @@ send_input(void)
 	draw_input();
 
 	/* Send the message last; the channel might be closed as a result of the command */
-	send_mesg(sendbuff, ccur);
+	send_mesg(ccur->server, ccur, sendbuff);
 }
