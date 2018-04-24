@@ -597,10 +597,31 @@ net_cb_cxed(const void *cb_obj, const char *fmt, ...)
 	redraw();
 }
 
-#if 0
-void net_cb_lost(const void*, const char*, ...);
-void net_cb_ping(const void*, unsigned int);
-#endif
+void
+net_cb_lost(const void *cb_obj, const char *fmt, ...)
+{
+	/* TODO */
+
+	va_list ap;
+
+	struct channel *c = ((struct server *)cb_obj)->channel;
+
+	va_start(ap, fmt);
+	_newline(c, 0, "-!!-", fmt, ap);
+	va_end(ap);
+
+	redraw();
+}
+
+void
+net_cb_ping(const void *cb_obj, unsigned int ping)
+{
+	struct channel *c = ((struct server *)cb_obj)->channel;
+
+	/* TODO */
+	newlinef(c, 0, "ping:", "%u", ping);
+	redraw();
+}
 
 void
 net_cb_fail(const void *cb_obj, const char *fmt, ...)
