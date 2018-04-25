@@ -129,7 +129,7 @@ static void* net_thread(void*);
 
 static char* net_strerror(int, char*, size_t);
 
-static void net_close(struct connection*, int*);
+static void net_close(struct connection*);
 static void net_init(void);
 static void net_term(void);
 
@@ -147,15 +147,15 @@ static pthread_mutex_t init_mutex;
 static pthread_once_t init_once = PTHREAD_ONCE_INIT;
 
 static void
-net_close(struct connection *c, int *fd)
+net_close(struct connection *c)
 {
 	/* Lock thread state to prevent ambiguous handling of EINTR on close() */
 
-	if (*fd >= 0) {
+	if (c->soc >= 0) {
 		PT_LK(&(c->pt_state_mutex));
-		PT_CF(close(*fd));
+		PT_CF(close(c->soc));
 		PT_UL(&(c->pt_state_mutex));
-		*fd = -1;
+		c->soc = -1;
 	}
 }
 
@@ -225,6 +225,7 @@ connection(const void *obj, const char *host, const char *port)
 	/* Wait for thread to reach initialized and waiting state */
 	PT_LK(&init_mutex);
 	PT_CF(pthread_create(&(c->pt_tid), &t_attr, net_thread, c));
+	/* TODO: check spurrious wakeups */
 	PT_CF(pthread_cond_wait(&init_cond, &init_mutex));
 	PT_UL(&init_mutex);
 
@@ -349,7 +350,6 @@ net_dx(struct connection *c)
 	return ret;
 }
 
-
 static enum net_state_t
 net_state_init(enum net_state_t o_state, struct connection *c)
 {
@@ -358,7 +358,10 @@ net_state_init(enum net_state_t o_state, struct connection *c)
 	(void) o_state;
 
 	PT_LK(&(c->pt_state_mutex));
+	PT_LK(&init_mutex);
+	PT_UL(&init_mutex);
 	PT_CF(pthread_cond_signal(&init_cond));
+	/* TODO: check spurrious wakeups */
 	PT_CF(pthread_cond_wait(&(c->pt_state_cond), &(c->pt_state_mutex)));
 	PT_UL(&(c->pt_state_mutex));
 
@@ -372,6 +375,7 @@ net_state_dxed(enum net_state_t o_state, struct connection *c)
 
 	PT_LK(&(c->pt_state_mutex));
 	/* TODO: check forced state */
+	/* TODO: check spurrious wakeups */
 	PT_CF(pthread_cond_wait(&(c->pt_state_cond), &(c->pt_state_mutex)));
 	PT_UL(&(c->pt_state_mutex));
 
@@ -399,6 +403,7 @@ net_state_rxng(enum net_state_t o_state, struct connection *c)
 	PT_LK(&(c->pt_state_mutex));
 	/* TODO: check forced state */
 	/* TODO: check non-timeout error */
+	/* TODO: check spurrious wakeups */
 	pthread_cond_timedwait(&(c->pt_state_cond), &(c->pt_state_mutex), &ts);
 	PT_UL(&(c->pt_state_mutex));
 
@@ -441,7 +446,7 @@ net_state_cxng(enum net_state_t o_state, struct connection *c)
 			;
 		} else {
 			/* Connection failed for other reasons */
-			net_close(c, &soc);
+			net_close(c);
 		}
 	}
 
@@ -560,11 +565,12 @@ net_state_ping(enum net_state_t o_state, struct connection *c)
 				if ((ping += 2) >= 10) {
 					// TODO: close the socket, etc
 					PT_CB(net_cb_lost(c->obj, "Connection lost: ping timeout"));
+					net_close(c);
+					return NET_ST_CXNG;
 				} else {
 					PT_CB(net_cb_ping(c->obj, ping));
+					continue;
 				}
-
-				continue;
 			}
 
 			if (errno == EINTR) {
