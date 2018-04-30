@@ -135,7 +135,7 @@ new_list_head(struct input *i)
 
 	/* Gap buffer pointers */
 	i->head = l->text;
-	i->tail = l->text + MAX_INPUT;
+	i->tail = l->text + RIRC_MAX_INPUT;
 
 	i->window = l->text;
 }
@@ -246,7 +246,7 @@ input_cchar(const char *c, size_t count)
 		case 0x03:
 			/* Cancel current input */
 			ccur->input->head = ccur->input->line->text;
-			ccur->input->tail = ccur->input->line->text + MAX_INPUT;
+			ccur->input->tail = ccur->input->line->text + RIRC_MAX_INPUT;
 			ccur->input->window = ccur->input->line->text;
 			draw_input();
 			break;
@@ -356,7 +356,7 @@ cursor_right(struct input *in)
 {
 	/* Move the cursor right */
 
-	if (in->tail < in->line->text + MAX_INPUT)
+	if (in->tail < in->line->text + RIRC_MAX_INPUT)
 		*(in->head++) = *(in->tail++);
 
 	draw_input();
@@ -378,7 +378,7 @@ delete_right(struct input *in)
 {
 	/* Delete the character right of the cursor */
 
-	if (in->tail < in->line->text + MAX_INPUT)
+	if (in->tail < in->line->text + RIRC_MAX_INPUT)
 		in->tail++;
 
 	draw_input();
@@ -431,7 +431,7 @@ reset_line(struct input *in)
 
 	char *h_tmp = in->head, *t_tmp = in->tail;
 
-	while (t_tmp < (in->line->text + MAX_INPUT))
+	while (t_tmp < (in->line->text + RIRC_MAX_INPUT))
 		*h_tmp++ = *t_tmp++;
 
 	*h_tmp = '\0';
@@ -445,7 +445,7 @@ reframe_line(struct input *in)
 	/* Reframe a line's draw window */
 
 	in->head = in->line->end;
-	in->tail = in->line->text + MAX_INPUT;
+	in->tail = in->line->text + RIRC_MAX_INPUT;
 	in->window = in->head - (2 * _term_cols() / 3);
 
 	if (in->window < in->line->text)
@@ -568,7 +568,7 @@ tab_complete(struct input *inp)
 		return;
 
 	/* Don't tab complete if cursor is scrolled left and next character isn't space */
-	if (inp->tail < (inp->line->text + MAX_INPUT) && *inp->tail != ' ')
+	if (inp->tail < (inp->line->text + RIRC_MAX_INPUT) && *inp->tail != ' ')
 		return;
 
 	/* Scan backwards for the point to tab complete from */
@@ -697,5 +697,5 @@ send_input(void)
 	draw_input();
 
 	/* Send the message last; the channel might be closed as a result of the command */
-	send_mesg(sendbuff, ccur);
+	send_mesg(ccur->server, ccur, sendbuff);
 }

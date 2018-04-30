@@ -6,7 +6,6 @@
 #include "src/utils/utils.h"
 #include "config.h"
 
-
 #define TEXT_LENGTH_MAX 510 /* FIXME: remove max lengths in favour of growable buffer */
 #define FROM_LENGTH_MAX 100
 
@@ -23,6 +22,7 @@ enum buffer_line_t
 	BUFFER_LINE_T_SIZE
 };
 
+/* FIXME: Should be channel type, not really relevant to the buffer itself */
 enum buffer_t
 {
 	BUFFER_OTHER,   /* Default/all other buffers */

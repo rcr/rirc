@@ -1,566 +1,754 @@
-/* TODO:
- * net.c should be stateless,
- * shouldnt include state.h
- * shouldnt be calling newline, new_channel, auto_nick, etc
- * */
-
+#include <errno.h>
 #include <fcntl.h>
 #include <netdb.h>
-#include <pthread.h>
+#include <poll.h>
+#include <sched.h>
+#include <signal.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/select.h>
+#include <sys/socket.h>
+#include <sys/time.h>
+#include <sys/types.h>
+
 #include <unistd.h>
+#include <pthread.h>
 
-#ifdef __FreeBSD__
-	#include <sys/types.h>
-	#include <sys/socket.h>
-	#include <netinet/in.h>
-#endif
-
-#include "src/components/buffer.h"
-#include "src/components/mode.h"
 #include "src/net.h"
-#include "src/state.h"
 #include "src/utils/utils.h"
+#include "config.h"
 
-#define SERVER_TIMEOUT_S 255 /* Latency time at which a server is considered to be timed out and a disconnect is issued */
-#define SERVER_LATENCY_S 125 /* Latency time at which to begin showing in the status bar */
-#define SERVER_LATENCY_PING_S (SERVER_LATENCY_S - 10) /* Latency time at which to issue a PING before displaying latency */
+#define ELEMS(X) (sizeof((X)) / sizeof((X)[0]))
 
-#define RECONNECT_DELTA 15
-
-#if SERVER_TIMEOUT_S <= SERVER_LATENCY_S
-	#error Server timeout must be greater than latency counting time
-#endif
-
-#if SERVER_LATENCY_PING_S <= 0
-	#error Server latency display time too low
-#endif
-
-/* Connection thread info */
-typedef struct connection_thread {
-	int socket;
-	int socket_tmp;
-	char *host;
-	char *port;
-	char error[MAX_ERROR + 1];
-	char ipstr[INET6_ADDRSTRLEN];
-	pthread_t tid;
-} connection_thread;
-
-/* DLL of current servers */
-static struct server *server_head;
-
-static struct server* new_server(char*, char*, char*, char*);
-static void free_server(struct server*);
-
-static int check_connect(struct server*);
-static int check_latency(struct server*, time_t);
-static int check_reconnect(struct server*, time_t);
-static int check_socket(struct server*, time_t);
-
-static void connected(struct server*);
-
-static void* threaded_connect(void*);
-static void threaded_connect_cleanup(void*);
-
-/* FIXME: reorganize, this is a temporary fix in order to retrieve
- * the first/last channels for drawing purposes. */
-struct server*
-get_server_head(void)
+int
+sendf(char *a, struct server *b, const char *c, ...)
 {
-	return server_head;
+	(void)a;
+	(void)b;
+	(void)c;
+	fatal("Not implemented", 0);
+	return 0;
 }
 
-static struct server*
-new_server(char *host, char *port, char *join, char *nicks)
+void
+server_disconnect(struct server *a, int b, int c, char *d)
 {
-	/* FIXME: refactor connections out of server, use server constructor
-	 * from server.c*/
+	(void)a;
+	(void)b;
+	(void)c;
+	(void)d;
+	fatal("Not implemented", 0);
+}
 
-	struct server *s;
+/* RFC 2812, section 2.3 */
+#define NET_MESG_LEN 510
 
-	if ((s = calloc(1, sizeof(*s))) == NULL)
-		fatal("calloc", errno);
+#ifndef NET_PING_MIN
+	#define NET_PING_MIN 150
+#elif (NET_PING_MIN < 0 || NET_PING_MIN > 86400)
+	#error "NET_PING_MIN: [0, 86400]"
+#endif
 
-	/* Set non-zero default fields */
-	s->soc = -1;
-	s->iptr = s->input;
-	s->host = strdup(host);
-	s->port = strdup(port);
+#ifndef NET_PING_REFRESH
+	#define NET_PING_REFRESH 5
+#elif (NET_PING_REFRESH < 0 || NET_PING_REFRESH > 86400)
+	#error "NET_PING_REFRESH: [0, 86400]"
+#endif
 
-	if (nicks)
-		s->nicks = strdup(nicks);
-	else if (config.default_nick)
-		s->nicks = strdup(config.default_nick);
+#ifndef NET_PING_MAX
+	#define NET_PING_MAX 300
+#elif (NET_PING_MAX < 0 || NET_PING_MAX > 86400)
+	#error "NET_PING_MAX: [0, 86400]"
+#endif
 
-	if (join)
-		s->join = strdup(join);
+#ifndef NET_RECONNECT_BACKOFF_BASE
+	#define NET_RECONNECT_BACKOFF_BASE 10
+#elif (NET_RECONNECT_BACKOFF_BASE < 1 || NET_RECONNECT_BACKOFF_BASE > 86400)
+	#error "NET_RECONNECT_BACKOFF_BASE: [1, 32]"
+#endif
 
-	s->nptr = s->nicks;
+#ifndef NET_RECONNECT_BACKOFF_FACTOR
+	#define NET_RECONNECT_BACKOFF_FACTOR 2
+#elif (NET_RECONNECT_BACKOFF_FACTOR < 1 || NET_RECONNECT_BACKOFF_FACTOR > 32)
+	#error "NET_RECONNECT_BACKOFF_FACTOR: [1, 32]"
+#endif
 
-	auto_nick(&(s->nptr), s->nick);
+#ifndef NET_RECONNECT_BACKOFF_MAX
+	#define NET_RECONNECT_BACKOFF_MAX 86400
+#elif (NET_RECONNECT_BACKOFF_MAX < 1 || NET_RECONNECT_BACKOFF_MAX > 86400)
+	#error "NET_RECONNECT_BACKOFF_MAX: [0, 86400]"
+#endif
 
-	s->channel = new_channel(host, s, NULL, BUFFER_SERVER);
+#define PT_CF(X) do { int ret; if ((ret = (X)) != 0) fatal((#X), ret); } while (0)
+#define PT_LK(X) PT_CF(pthread_mutex_lock((X)))
+#define PT_UL(X) PT_CF(pthread_mutex_unlock((X)))
+#define PT_CB(X) do { PT_LK(&cb_mutex); (X); PT_UL(&cb_mutex); } while (0)
 
-	s->usermodes_str.type = MODE_STR_USERMODE;
-	mode_config(&(s->mode_config), NULL, MODE_CONFIG_DEFAULTS);
+enum net_err_t
+{
+	NET_ERR_NONE,
+	NET_ERR_TRUNC,
+	NET_ERR_DXED,
+	NET_ERR_CXNG,
+	NET_ERR_CXED
+};
 
-	DLL_ADD(server_head, s);
+struct connection {
+	const void *obj;
+	const char *host;
+	const char *port;
+	enum net_state_t {
+		NET_ST_INIT, /* Initial thread state */
+		NET_ST_DXED, /* Socket disconnected, passive */
+		NET_ST_RXNG, /* Socket disconnected, pending reconnect */
+		NET_ST_CXNG, /* Socket connection in progress */
+		NET_ST_CXED, /* Socket connected */
+		NET_ST_PING, /* Socket connected, network state in question */
+		NET_ST_TERM, /* Terminal thread state */
+		NET_ST_SIZE
+	} state;
+	int soc;
+	pthread_cond_t  pt_state_cond;
+	pthread_mutex_t pt_state_mutex;
+	pthread_t       pt_tid;
+	struct {
+		size_t i;
+		char buf[NET_MESG_LEN + 1];
+	} read;
+	volatile enum net_force_state {
+		NET_ST_FORCE_NONE,
+		NET_ST_FORCE_CXNG, /* Asynchronously force connection */
+		NET_ST_FORCE_DXED, /* Asynchronously force disconnect */
+	} force_state;
+	char ipbuf[INET6_ADDRSTRLEN];
+};
 
-	return s;
+static void* net_thread(void*);
+
+static char* net_strerror(int, char*, size_t);
+
+static void net_close(struct connection*);
+static void net_init(void);
+static void net_term(void);
+
+static enum net_state_t net_state_init(enum net_state_t, struct connection*);
+static enum net_state_t net_state_dxed(enum net_state_t, struct connection*);
+static enum net_state_t net_state_rxng(enum net_state_t, struct connection*);
+static enum net_state_t net_state_cxng(enum net_state_t, struct connection*);
+static enum net_state_t net_state_cxed(enum net_state_t, struct connection*);
+static enum net_state_t net_state_ping(enum net_state_t, struct connection*);
+static void net_state_term(enum net_state_t, struct connection*);
+
+static pthread_cond_t init_cond;
+static pthread_mutex_t cb_mutex;
+static pthread_mutex_t init_mutex;
+static pthread_once_t init_once = PTHREAD_ONCE_INIT;
+
+static void
+net_close(struct connection *c)
+{
+	/* Lock thread state to prevent ambiguous handling of EINTR on close() */
+
+	if (c->soc >= 0) {
+		PT_LK(&(c->pt_state_mutex));
+		PT_CF(close(c->soc));
+		PT_UL(&(c->pt_state_mutex));
+		c->soc = -1;
+	}
+}
+
+static char*
+net_strerror(int errnum, char *buf, size_t buflen)
+{
+	PT_CF(strerror_r(errnum, buf, buflen));
+	return buf;
 }
 
 static void
-free_server(struct server *s)
+net_init(void)
 {
-	struct channel *t, *c = s->channel;
+	pthread_mutexattr_t m_attr;
 
-	do {
-		t = c;
-		c = c->next;
-		free_channel(t);
-	} while (c != s->channel);
+	PT_CF(pthread_mutexattr_init(&m_attr));
+	PT_CF(pthread_mutexattr_settype(&m_attr, PTHREAD_MUTEX_ERRORCHECK));
 
-	free(s->host);
-	free(s->port);
-	free(s->join);
-	free(s->nicks);
-	free(s);
+	PT_CF(pthread_cond_init(&init_cond, NULL));
+	PT_CF(pthread_mutex_init(&cb_mutex, &m_attr));
+	PT_CF(pthread_mutex_init(&init_mutex, &m_attr));
+
+	PT_CF(pthread_mutexattr_destroy(&m_attr));
+
+	if (atexit(net_term) != 0)
+		fatal("atexit", 0);
+}
+
+static void
+net_term(void)
+{
+	// FIXME: at this point the callback mutex might have already been used uninitialized
+	// because the main thread is running...
+	PT_UL(&cb_mutex);
+	PT_CF(pthread_cond_destroy(&init_cond));
+	PT_CF(pthread_mutex_destroy(&cb_mutex));
+	PT_CF(pthread_mutex_destroy(&init_mutex));
+}
+
+struct connection*
+connection(const void *obj, const char *host, const char *port)
+{
+	struct connection *c;
+
+	if ((c = malloc(sizeof(*c))) == NULL)
+		fatal("malloc", errno);
+
+	c->obj   = obj;
+	c->host  = strdup(host);
+	c->port  = strdup(port);
+	c->state = NET_ST_INIT;
+
+	pthread_attr_t      t_attr;
+	pthread_mutexattr_t m_attr;
+
+	PT_CF(pthread_attr_init(&t_attr));
+	PT_CF(pthread_attr_setdetachstate(&t_attr, PTHREAD_CREATE_DETACHED));
+
+	PT_CF(pthread_mutexattr_init(&m_attr));
+	PT_CF(pthread_mutexattr_settype(&m_attr, PTHREAD_MUTEX_ERRORCHECK));
+
+	PT_CF(pthread_cond_init(&(c->pt_state_cond), NULL));
+	PT_CF(pthread_mutex_init(&(c->pt_state_mutex), &m_attr));
+
+	PT_CF(pthread_once(&init_once, net_init));
+
+	/* Wait for thread to reach initialized and waiting state */
+	PT_LK(&init_mutex);
+	PT_CF(pthread_create(&(c->pt_tid), &t_attr, net_thread, c));
+	/* TODO: check spurrious wakeups */
+	PT_CF(pthread_cond_wait(&init_cond, &init_mutex));
+	PT_UL(&init_mutex);
+
+	PT_CF(pthread_attr_destroy(&t_attr));
+	PT_CF(pthread_mutexattr_destroy(&m_attr));
+
+	return c;
 }
 
 int
-sendf(char *err, struct server *s, const char *fmt, ...)
+net_sendf(struct connection *c, const char *fmt, ...)
 {
-	/* Send a formatted message to a server.
-	 *
-	 * Returns non-zero on failure and prints the error message to the buffer pointed
-	 * to by err.
-	 */
+	char sendbuf[512];
 
-#define SENDF_ERR(str) \
-	do { if (err) { snprintf(err, MAX_ERROR, "Error: %s", str); }  return 1; } while (0)
-
-	char sendbuff[BUFFSIZE];
-	int soc, len;
 	va_list ap;
+	int ret;
+	size_t len;
 
-	if (s == NULL || (soc = s->soc) < 0)
-		SENDF_ERR("Not connected to server");
-
+	if (c->state != NET_ST_CXED && c->state != NET_ST_PING)
+		return NET_ERR_DXED;
 
 	va_start(ap, fmt);
-	len = vsnprintf(sendbuff, BUFFSIZE-2, fmt, ap);
+	ret = vsnprintf(sendbuf, sizeof(sendbuf) - 2, fmt, ap);
 	va_end(ap);
 
-	if (len < 0)
-		SENDF_ERR("Invalid message format");
-
-	if (len >= BUFFSIZE-2)
-		SENDF_ERR("Message exceeds maximum length of " STR(BUFFSIZE) " bytes");
-
-#ifdef DEBUG
-	newline(s->channel, 0, "DEBUG >>", sendbuff);
-#endif
-
-	sendbuff[len++] = '\r';
-	sendbuff[len++] = '\n';
-
-	if (send(soc, sendbuff, len, 0) < 0)
-		SENDF_ERR(strerror(errno));
-
-#undef SENDF_ERR
-
-	return 0;
-}
-
-//FIXME: move the stateful stuff to state.c, only the connection relavent stuff should be here
-void
-server_connect(char *host, char *port, char *nicks, char *join)
-{
-	connection_thread *ct;
-	struct server *tmp, *s = NULL;
-
-	/* Check if server matching host:port already exists */
-	if ((tmp = server_head) != NULL) {
-		do {
-			if (!strcmp(tmp->host, host) && !strcmp(tmp->port, port)) {
-				s = tmp;
-				break;
-			}
-		} while ((tmp = tmp->next) != server_head);
+	if (ret <= 0) {
+		return NET_ERR_NONE; /* TODO handle error */
 	}
 
-	/* Check if server is already connected */
-	if (s && s->soc >= 0) {
-		channel_set_current(s->channel);
-		newlinef(s->channel, 0, "-!!-", "Already connected to %s:%s", host, port);
-		return;
+	len = ret;
+
+	if (len >= sizeof(sendbuf) - 2)
+		return NET_ERR_TRUNC;
+
+	sendbuf[len++] = '\r';
+	sendbuf[len++] = '\n';
+
+	if (send(c->soc, sendbuf, len, 0) < 0) {
+		return NET_ERR_NONE; /* TODO: handle error */
 	}
 
-	if (s == NULL)
-		s = new_server(host, port, join, nicks);
-
-	channel_set_current(s->channel);
-
-	if ((ct = calloc(1, sizeof(*ct))) == NULL)
-		fatal("calloc", errno);
-
-	ct->socket = -1;
-	ct->socket_tmp = -1;
-	ct->host = s->host;
-	ct->port = s->port;
-
-	s->connecting = ct;
-
-	newlinef(s->channel, 0, "--", "Connecting to '%s' port %s", host, port);
-
-	if ((errno = pthread_create(&ct->tid, NULL, threaded_connect, ct)))
-		fatal("pthread_create", errno);
+	return NET_ERR_NONE;
 }
 
-static void
-connected(struct server *s)
+int
+net_cx(struct connection *c)
 {
-	/* Server successfully connected, send IRC init messages */
+	/* Force a socket thread into NET_ST_CXNG state
+	 *
+	 * Valid only for states blocked on:
+	 *   - NET_ST_INIT: pthread_cond_wait()
+	 *   - NET_ST_DXED: pthread_cond_wait()
+	 *   - NET_ST_RXNG: pthread_cond_timedwait()
+	 */
 
-	connection_thread *ct = s->connecting;
+	enum net_err_t ret = NET_ERR_NONE;
 
-	if ((errno = pthread_join(ct->tid, NULL)))
-		fatal("pthread_join", errno);
+	PT_LK(&(c->pt_state_mutex));
 
-	if (*ct->ipstr)
-		newlinef(s->channel, 0, "--", "Connected to [%s]", ct->ipstr);
-	else
-		newlinef(s->channel, 0, "--", "Error determining server IP: %s", ct->error);
-
-	s->soc = ct->socket;
-
-	/* Set reconnect parameters to 0 in case this was an auto-reconnect */
-	s->reconnect_time = 0;
-	s->reconnect_delta = 0;
-
-	s->latency_time = time(NULL);
-	s->latency_delta = 0;
-
-	//TODO: refactor these to mesg.c
-	sendf(NULL, s, "NICK %s", s->nick);
-	sendf(NULL, s, "USER %s 8 * :%s", config.username, config.realname);
-
-	//FIXME: should the server send nick as is? compare the nick when it's received?
-	//or should auto_nick take a server argument and write to a buffer of NICKSIZE length?
-}
-
-/* TODO: on failed connection, initiate rolling backoff reconnection attempt */
-static void*
-threaded_connect(void *arg)
-{
-	int ret;
-	struct addrinfo hints, *p, *servinfo = NULL;
-
-	/* Thread cleanup on error or external thread cancel */
-	pthread_cleanup_push(threaded_connect_cleanup, &servinfo);
-
-	memset(&hints, 0, sizeof(hints));
-
-	/* IPv4 and/or IPv6 */
-	hints.ai_family = AF_UNSPEC;
-	hints.ai_flags = AI_PASSIVE;
-	hints.ai_socktype = SOCK_STREAM;
-
-	connection_thread *ct = (connection_thread *)arg;
-
-	/* Resolve host */
-	if ((ret = getaddrinfo(ct->host, ct->port, &hints, &servinfo))) {
-		strncpy(ct->error, gai_strerror(ret), MAX_ERROR);
-		pthread_exit(NULL);
+	switch (c->state) {
+		case NET_ST_INIT:
+		case NET_ST_DXED:
+		case NET_ST_RXNG:
+			PT_CF(pthread_cond_signal(&(c->pt_state_cond)));
+			break;
+		case NET_ST_CXNG:
+			ret = NET_ERR_CXNG;
+			break;
+		case NET_ST_CXED:
+		case NET_ST_PING:
+			ret = NET_ERR_CXED;
+			break;
+		default:
+			fatal("Unknown net state", 0);
 	}
 
-	/* Attempt to connect to all address results */
-	for (p = servinfo; p != NULL; p = p->ai_next) {
+	PT_UL(&(c->pt_state_mutex));
 
-		if ((ct->socket_tmp = socket(p->ai_family, p->ai_socktype, p->ai_protocol)) < 0)
+	return ret;
+}
+
+int
+net_dx(struct connection *c)
+{
+	/* Force a socket thread into NET_ST_DXED state
+	 *
+	 * Valid only for states blocked on:
+	 *   - NET_ST_RXNG: pthread_cond_timedwait()
+	 *   - NET_ST_CXNG: connect()
+	 *   - NET_ST_CXED: recv()
+	 *   - NET_ST_PING: recv()
+	 */
+
+	enum net_err_t ret = NET_ERR_NONE;
+
+	PT_LK(&(c->pt_state_mutex));
+
+	switch (c->state) {
+		case NET_ST_INIT:
+		case NET_ST_DXED:
+			ret = NET_ERR_DXED;
+			break;
+		case NET_ST_RXNG:
+			PT_CF(pthread_cond_signal(&(c->pt_state_cond)));
+			break;
+		case NET_ST_CXNG:
+		case NET_ST_CXED:
+		case NET_ST_PING:
+			do {
+				/* Signal and yield the cpu until the target thread
+				 * is flagged as having reached an EINTR handler */
+				PT_CF(pthread_kill(c->pt_tid, SIGUSR1));
+				PT_CF(sched_yield());
+			} while (0 /* TODO */);
+			break;
+		default:
+			fatal("Unknown net state", 0);
+	}
+
+	PT_UL(&(c->pt_state_mutex));
+
+	return ret;
+}
+
+static enum net_state_t
+net_state_init(enum net_state_t o_state, struct connection *c)
+{
+	/* Initial thread state */
+
+	(void) o_state;
+
+	PT_LK(&(c->pt_state_mutex));
+	PT_LK(&init_mutex);
+	PT_UL(&init_mutex);
+	PT_CF(pthread_cond_signal(&init_cond));
+	/* TODO: check spurrious wakeups */
+	PT_CF(pthread_cond_wait(&(c->pt_state_cond), &(c->pt_state_mutex)));
+	PT_UL(&(c->pt_state_mutex));
+
+	return NET_ST_CXNG;
+}
+
+static enum net_state_t
+net_state_dxed(enum net_state_t o_state, struct connection *c)
+{
+	(void) o_state;
+
+	PT_LK(&(c->pt_state_mutex));
+	/* TODO: check forced state */
+	/* TODO: check spurrious wakeups */
+	PT_CF(pthread_cond_wait(&(c->pt_state_cond), &(c->pt_state_mutex)));
+	PT_UL(&(c->pt_state_mutex));
+
+	return NET_ST_CXNG;
+}
+
+static enum net_state_t
+net_state_rxng(enum net_state_t o_state, struct connection *c)
+{
+	(void) o_state;
+
+	struct timespec ts;
+	struct timeval  tv;
+
+	const int delta_s = 3;
+
+	// FIXME: clock_gettime
+	gettimeofday(&tv, NULL);
+
+	/* TODO: base/backoff */
+	ts.tv_sec  = tv.tv_sec;
+	ts.tv_nsec = tv.tv_usec * 1000;
+	ts.tv_sec += delta_s;
+
+	PT_LK(&(c->pt_state_mutex));
+	/* TODO: check forced state */
+	/* TODO: check non-timeout error */
+	/* TODO: check spurrious wakeups */
+	pthread_cond_timedwait(&(c->pt_state_cond), &(c->pt_state_mutex), &ts);
+	PT_UL(&(c->pt_state_mutex));
+
+	return NET_ST_CXNG;
+}
+
+static enum net_state_t
+net_state_cxng(enum net_state_t o_state, struct connection *c)
+{
+	(void) o_state;
+
+	int ret, soc;
+
+	char errbuf[1024];
+	char ipbuf[INET6_ADDRSTRLEN];
+
+	PT_CB(net_cb_cxng(c->obj, "Connecting to %s:%s ...", c->host, c->port));
+
+	struct addrinfo *p, *res, hints = {
+		.ai_family   = AF_UNSPEC,
+		.ai_flags    = AI_PASSIVE,
+		.ai_socktype = SOCK_STREAM
+	};
+
+	if ((ret = getaddrinfo(c->host, c->port, &hints, &res))) {
+		PT_CB(net_cb_fail(c->obj, "Connection error: %s", gai_strerror(ret)));
+		return NET_ST_RXNG;
+	}
+
+	for (p = res; p != NULL; p = p->ai_next) {
+
+		if ((soc = socket(p->ai_family, p->ai_socktype, p->ai_protocol)) < 0)
 			continue;
 
-		/* Break on success */
-		if (connect(ct->socket_tmp, p->ai_addr, p->ai_addrlen) == 0)
+		if (connect(soc, p->ai_addr, p->ai_addrlen) == 0)
 			break;
 
-		close(ct->socket_tmp);
+		if ((ret = errno) == EINTR) {
+			/* Connection was interrupted  by signal, canceled */
+			;
+		} else {
+			/* Connection failed for other reasons */
+			net_close(c);
+		}
 	}
 
 	if (p == NULL) {
-		strerror_r(errno, ct->error, MAX_ERROR);
-		pthread_exit(NULL);
+		PT_CB(net_cb_fail(c->obj, "Connection failure [%s]", net_strerror(ret, errbuf, sizeof(errbuf))));
+		freeaddrinfo(res);
+		return NET_ST_RXNG;
 	}
 
-	/* Failing to get the numeric IP isn't a fatal connection error */
-	if ((ret = getnameinfo(p->ai_addr, p->ai_addrlen, ct->ipstr,
-					INET6_ADDRSTRLEN, NULL, 0, NI_NUMERICHOST))) {
-		strncpy(ct->error, gai_strerror(ret), MAX_ERROR);
+	// FIXME: calling net_cb_cxed sends pass/user/nick
+	if ((ret = getnameinfo(p->ai_addr, p->ai_addrlen, ipbuf, INET6_ADDRSTRLEN, NULL, 0, NI_NUMERICHOST))) {
+		// ; net_cb_cxed(c->obj, "Connected to %s [IP lookup failure: %s]", c->host, gai_strerror(ret));
+	} else {
+		// ; net_cb_cxed(c->obj, "Connected to %s [%s]", c->host, ipbuf);
 	}
 
-	/* Set non-blocking */
-	if ((ret = fcntl(ct->socket_tmp, F_SETFL, O_NONBLOCK)) < 0) {
-		strerror_r(errno, ct->error, MAX_ERROR);
-		pthread_exit(NULL);
+	freeaddrinfo(res);
+	c->soc = soc;
+
+	return NET_ST_CXED;
+}
+
+static enum net_state_t
+net_state_cxed(enum net_state_t o_state, struct connection *c)
+{
+	(void) o_state;
+
+	PT_CB(net_cb_cxed(c->obj, "Connected to %s [TODO: ip]", c->host));
+
+	struct timeval tv = {
+		.tv_sec = 3
+	};
+
+	ssize_t i, ret;
+
+	if (setsockopt(c->soc, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) < 0)
+		{ fatal("setsockopt", errno); }
+
+	char recvbuf[512];
+
+	for (;;) {
+
+		if ((ret = recv(c->soc, recvbuf, sizeof(recvbuf), 0)) <= 0) {
+
+			if (ret == 0) {
+				PT_CB(net_cb_lost(c->obj, "Connection closed"));
+				return NET_ST_CXNG;
+			}
+
+			if (errno == ECONNRESET) {
+				PT_CB(net_cb_lost(c->obj, "Connection forcibly reset by peer"));
+				return NET_ST_CXNG;
+			}
+
+			if (errno == EAGAIN || errno == EWOULDBLOCK) {
+				PT_CB(net_cb_ping(c->obj, 0));
+				return NET_ST_PING;
+			}
+
+			if (errno == EINTR) {
+				return NET_ST_DXED;
+			}
+
+			fatal("recv", errno);
+		}
+
+		for (i = 0; i < ret; i++) {
+
+			if (recvbuf[i] == '\n')
+				continue;
+
+			if (recvbuf[i] == '\r') {
+				if (c->read.i && c->read.i <= NET_MESG_LEN) {
+					c->read.buf[c->read.i + 1] = 0;
+					PT_CB(net_cb_read_soc(c->read.buf, c->read.i, c->obj));
+					c->read.i = 0;
+				}
+			} else {
+				c->read.buf[c->read.i++] = recvbuf[i];
+			}
+		}
 	}
+}
 
-	ct->socket = ct->socket_tmp;
+static enum net_state_t
+net_state_ping(enum net_state_t o_state, struct connection *c)
+{
+	struct timeval tv = {
+		.tv_sec = 2
+	};
 
-	pthread_cleanup_pop(1);
+	ssize_t i, ret;
 
-	/* coverity[leaked_storage] No leak here */
-	return NULL;
+	if (setsockopt(c->soc, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) < 0)
+		{ fatal("setsockopt", errno); }
+
+	char recvbuf[512];
+
+	unsigned ping = 0;
+
+	for (;;) {
+
+		if ((ret = recv(c->soc, recvbuf, sizeof(recvbuf), 0)) <= 0) {
+
+			if (ret == 0) {
+				PT_CB(net_cb_lost(c->obj, "Connection closed"));
+				return NET_ST_CXNG;
+			}
+
+			if (errno == ECONNRESET) {
+				PT_CB(net_cb_lost(c->obj, "Connection forcibly reset by peer"));
+				return NET_ST_CXNG;
+			}
+
+			if (errno == EAGAIN || errno == EWOULDBLOCK) {
+				if ((ping += 2) >= 10) {
+					// TODO: close the socket, etc
+					PT_CB(net_cb_lost(c->obj, "Connection lost: ping timeout"));
+					net_close(c);
+					return NET_ST_CXNG;
+				} else {
+					PT_CB(net_cb_ping(c->obj, ping));
+					continue;
+				}
+			}
+
+			if (errno == EINTR) {
+				return NET_ST_DXED;
+			}
+
+			fatal("recv", errno);
+		}
+
+		for (i = 0; i < ret; i++) {
+
+			if (recvbuf[i] == '\n')
+				continue;
+
+			if (recvbuf[i] == '\r') {
+				if (c->read.i && c->read.i <= NET_MESG_LEN) {
+					c->read.buf[c->read.i + 1] = 0;
+					PT_CB(net_cb_read_soc(c->read.buf, c->read.i, c->obj));
+					c->read.i = 0;
+				}
+			} else {
+				c->read.buf[c->read.i++] = recvbuf[i];
+			}
+		}
+
+		return NET_ST_CXED;
+	}
 }
 
 static void
-threaded_connect_cleanup(void *arg)
+net_state_term(enum net_state_t o_state, struct connection *c)
 {
-	struct addrinfo *servinfo = *(struct addrinfo **)arg;
+	(void) o_state;
 
-	if (servinfo)
-		freeaddrinfo(servinfo);
+	pthread_cond_destroy(&(c->pt_state_cond));
+	pthread_mutex_destroy(&(c->pt_state_mutex));
+
+	free((void*)c->host);
+	free((void*)c->port);
+	free(c);
+
+	pthread_exit(EXIT_SUCCESS);
+}
+
+static void*
+net_thread(void *arg)
+{
+	struct connection *c = arg;
+
+	enum net_state_t n_state;
+
+	for (;;) {
+
+		/* TODO:
+		 *
+		 * here we know the old state and we know the new state, we can call the informational
+		 * transition callback */
+
+		switch (c->state) {
+			case NET_ST_INIT:
+				n_state = net_state_init(c->state, c);
+				break;
+			case NET_ST_DXED:
+				n_state = net_state_dxed(c->state, c);
+				break;
+			case NET_ST_CXNG:
+				n_state = net_state_cxng(c->state, c);
+				break;
+			case NET_ST_RXNG:
+				n_state = net_state_rxng(c->state, c);
+				break;
+			case NET_ST_CXED:
+				n_state = net_state_cxed(c->state, c);
+				break;
+			case NET_ST_PING:
+				n_state = net_state_ping(c->state, c);
+				break;
+			case NET_ST_TERM:
+				net_state_term(c->state, c);
+				break;
+			default:
+				fatal("Unknown net state", 0);
+		}
+
+		// TODO: here lock mutext before calling next state
+		// and check through volatile pointer if a force state was given
+
+
+		// XXX what happens if returning from rxng, and here, but aren't waiting
+		// on cond anymore, and cond signal is called?
+
+		c->state = n_state;
+	}
+
+	/* Not reached */
+	return NULL;
 }
 
 void
-server_disconnect(struct server *s, int err, int kill, char *mesg)
+net_free(struct connection *c)
 {
-	/* When err flag is set:
-	 *   Disconnect initiated by remote host
-	 *
-	 * When kill flag is set:
-	 *   Free the server, update current channel
-	 */
-
-	/* Server connection in progress, cancel the connection attempt */
-	if (s->connecting) {
-
-		connection_thread *ct = s->connecting;
-
-		if ((errno = pthread_cancel(ct->tid)))
-			fatal("pthread_cancel", errno);
-
-		/* There's a chance the thread is canceled with an open socket */
-		if (ct->socket_tmp)
-			close(ct->socket_tmp);
-
-		free(ct);
-		s->connecting = NULL;
-
-		newlinef(s->channel, 0, "--", "Connection to '%s' port %s canceled", s->host, s->port);
-	}
-
-	/* Server is/was connected, close socket, send quit message if non-erroneous disconnect */
-	else if (s->soc >= 0) {
-
-		if (err) {
-			/* If disconnecting due to error, attempt a reconnect */
-
-			newlinef(s->channel, 0, "ERROR", "%s", mesg);
-			newlinef(s->channel, 0, "--", "Attempting reconnect in %ds", RECONNECT_DELTA);
-
-			s->reconnect_time = time(NULL) + RECONNECT_DELTA;
-			s->reconnect_delta = RECONNECT_DELTA;
-		} else if (mesg) {
-			sendf(NULL, s, "QUIT :%s", mesg);
-		}
-
-		close(s->soc);
-
-		/* Set all server attributes back to default */
-		mode_reset(&(s->usermodes), &(s->usermodes_str));
-		s->soc = -1;
-		s->iptr = s->input;
-		s->nptr = s->nicks;
-		s->latency_delta = 0;
-
-
-		/* Reset the nick that reconnects will attempt to register with */
-		auto_nick(&(s->nptr), s->nick);
-
-		/* Print message to all open channels and reset their attributes */
-		struct channel *c = s->channel;
-		do {
-			newline(c, 0, "-!!-", "(disconnected)");
-
-			reset_channel(c);
-
-		} while ((c = c->next) != s->channel);
-	}
-
-	/* Server was waiting to reconnect, cancel future attempt */
-	else if (s->reconnect_time) {
-		newlinef(s->channel, 0, "--", "Auto reconnect attempt canceled");
-
-		s->reconnect_time = 0;
-		s->reconnect_delta = 0;
-	}
-
-	if (kill) {
-		DLL_DEL(server_head, s);
-		free_server(s);
-	}
+	/* TODO */
+	(void)c;
 }
-
-/*
- * Server polling functions
- * */
 
 void
-check_servers(void)
+net_loop(void)
 {
-	/* For each server, check the following, in order:
-	 *
-	 *  - Connection status. Skip the rest if unresolved
-	 *  - Ping timeout.      Skip the rest detected
-	 *  - Reconnect attempt. Skip the rest if successful
-	 *  - Socket input.      Consume all input
-	 *  */
+	static struct pollfd fds[1];
 
-	/* TODO: there's probably a better order to check these */
+	fds[0].events = POLLIN;
+	fds[0].fd = STDIN_FILENO;
 
-	struct server *s;
+	// TODO: ditch poll, just block on read
 
-	if ((s = server_head) == NULL)
-		return;
+	while (poll(fds, 1, -1) < 0) {
 
-	time_t t = time(NULL);
+		/* Exit polling loop to handle signal event */
+		if (errno == EINTR)
+			/* TODO: ensure that user signal isnt interupting this */
+			return;
 
-	do {
-		if (check_connect(s))
+		if (errno == EAGAIN)
 			continue;
 
-		if (check_latency(s, t))
-			continue;
+		fatal("poll", errno);
+	}
 
-		if (check_reconnect(s, t))
-			continue;
 
-		check_socket(s, t);
 
-	} while ((s = s->next) != server_head);
-}
+	// TODO: rename net_read() or something?
 
-static int
-check_connect(struct server *s)
-{
-	/* Check the server's connection thread status for success or failure */
 
-	if (!s->connecting)
-		return 0;
 
-	connection_thread *ct = (connection_thread*)s->connecting;
+	/* Handle user input */
+	if (fds[0].revents) {
 
-	/* Connection Success */
-	if (ct->socket >= 0) {
-		connected(s);
+		if (fds[0].revents & (POLLERR | POLLHUP | POLLNVAL))
+			fatal("stdin error", 0);
 
-	/* Connection failure */
-	} else if (*ct->error) {
-		newline(s->channel, 0, "-!!-", ct->error);
+		if (fds[0].revents & POLLIN) {
+			char buff[512];
+			int c;
+			size_t n = 0;
 
-		/* If server was auto-reconnecting, increase the backoff */
-		if (s->reconnect_time) {
-			s->reconnect_delta *= 2;
-			s->reconnect_time += s->reconnect_delta;
+			flockfile(stdin);
 
-			newlinef(s->channel, 0, "--", "Attempting reconnect in %ds", s->reconnect_delta);
+			while ((c = getc_unlocked(stdin)) != EOF) {
+
+				if (n == sizeof(buff))
+					continue;
+
+				buff[n++] = (char) c;
+			}
+
+			if (ferror(stdin))
+				fatal("ferrof", errno);
+
+			clearerr(stdin);
+			funlockfile(stdin);
+
+			PT_CB(net_cb_read_inp(buff, n));
 		}
-
-	/* Connection in progress */
-	} else {
-		return 1;
 	}
-
-	free(ct);
-	s->connecting = NULL;
-
-	return 1;
 }
 
-static int
-check_latency(struct server *s, time_t t)
+const char*
+net_err(int err)
 {
-	/* Check time since last message */
+	const char *err_strs[] = {
+		[NET_ERR_TRUNC] = "data truncated",
+		[NET_ERR_DXED]  = "socket not connected",
+		[NET_ERR_CXNG]  = "socket connection in progress",
+		[NET_ERR_CXED]  = "socket connected"
+	};
 
-	time_t delta;
+	if (err >= 0 && (size_t)err < ELEMS(err_strs))
+		return err_strs[err];
 
-	if (s->soc < 0)
-		return 0;
-
-	delta = t - s->latency_time;
-
-	/* Server has timed out */
-	if (delta > SERVER_TIMEOUT_S) {
-		server_disconnect(s, 1, 0, "Ping timeout (" STR(SERVER_TIMEOUT_S) ")");
-		return 1;
-	}
-
-	/* Server might be timing out, attempt to PING */
-	if (delta > SERVER_LATENCY_PING_S && !s->pinging) {
-		sendf(NULL, s, "PING :%s", s->host);
-		s->pinging = 1;
-	}
-
-	/* Server hasn't responded to PING, display latency in status */
-	if (delta > SERVER_LATENCY_S && current_channel()->server == s) {
-		s->latency_delta = delta;
-		draw_status();
-	}
-
-	return 0;
-}
-
-static int
-check_reconnect(struct server *s, time_t t)
-{
-	/* Check if the server is in auto-reconnect mode, and issue a reconnect if needed */
-
-	if (s->reconnect_time && t > s->reconnect_time) {
-		server_connect(s->host, s->port, NULL, NULL);
-		return 1;
-	}
-
-	return 0;
-}
-
-static int
-check_socket(struct server *s, time_t t)
-{
-	/* Check the status of the server's socket */
-
-	ssize_t count;
-	char recv_buff[BUFFSIZE];
-
-	/* Consume all input on the socket */
-	while (s->soc >= 0 && (count = read(s->soc, recv_buff, BUFFSIZE)) >= 0) {
-
-		if (count == 0) {
-			server_disconnect(s, 1, 0, "Remote hangup");
-			break;
-		}
-
-		/* Set time since last message */
-		s->latency_time = t;
-		s->latency_delta = 0;
-
-		recv_mesg(recv_buff, count, s);
-	}
-
-	/* Server received ERROR message or remote hangup */
-	if (s->soc < 0)
-		return 0;
-
-	/* Socket is non-blocking, all other errors cause a disconnect */
-	if (errno != EWOULDBLOCK && errno != EAGAIN) {
-		if (errno)
-			server_disconnect(s, 1, 0, strerror(errno));
-		else
-			server_disconnect(s, 1, 0, "Remote hangup");
-	}
-
-	return 0;
+	return NULL;
 }

@@ -21,22 +21,18 @@ make debug
 
 ## Usage:
 ```
-  rirc [-vh] [-c server [OPTIONS]]
+  rirc [-hv] [-s server [-p port] [-w pass] [-n nicks] [-c chans], ...]
 
 Help:
-  -h, --help             Print this message
+  -h, --help            Print this message and exit
+  -v, --version         Print rirc version and exit
 
 Options:
-  -c, --connect=SERVER   Connect to SERVER
-  -p, --port=PORT        Connect using PORT
-  -j, --join=CHANNELS    Comma separated list of channels to join
-  -n, --nicks=NICKS      Comma and/or space separated list of nicks to use
-  -v, --version          Print rirc version and exit
-
-Examples:
-  rirc -c server -j '#chan'
-  rirc -c server -j '#chan' -c server2 -j '#chan2'
-  rirc -c server -p 1234 -j '#chan1,#chan2' -n 'nick, nick_, nick__'
+  -s, --server=SERVER   Connect to SERVER
+  -p, --port=PORT       Connect to SERVER using PORT
+  -w, --pass=PASS       Connect to SERVER using PASS
+  -n, --nicks=NICKS     Comma separated list of nicks to use for SERVER
+  -c, --chans=CHANNELS  Comma separated list of channels to join for SERVER
 ```
 
 Hotkeys:

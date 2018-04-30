@@ -7,7 +7,6 @@
 #include "src/components/server.h"
 #include "src/draw.h"
 #include "src/mesg.h"
-#include "src/net.h"
 
 /* state.h
  *
@@ -15,10 +14,10 @@
 
 /* state.c */
 /* FIXME: terrible, until i remove references to ccur/rirc */
-#define rirc (default_channel())
 #define ccur (current_channel())
 struct channel* current_channel(void);
-struct channel* default_channel(void);
+
+struct server_list* state_server_list(void);
 
 //TODO: rename
 unsigned int _term_cols(void);
@@ -31,7 +30,6 @@ void free_state(void);
 
 //TODO: move to channel.c, function of server's channel list
 /* Useful state retrieval abstractions */
-struct channel* channel_get(char*, struct server*);
 struct channel* channel_get_first(void);
 struct channel* channel_get_last(void);
 struct channel* channel_get_next(struct channel*);
@@ -52,8 +50,10 @@ void channel_move_next(void);
 void channel_set_current(struct channel*);
 
 void free_channel(struct channel*);
-void newline(struct channel*, enum buffer_line_t, const char*, const char*);
+
 void newlinef(struct channel*, enum buffer_line_t, const char*, const char*, ...);
+void newline(struct channel*, enum buffer_line_t, const char*, const char*);
+
 void part_channel(struct channel*);
 void reset_channel(struct channel*);
 

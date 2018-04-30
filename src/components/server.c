@@ -6,6 +6,12 @@
 #include "src/state.h"
 #include "src/utils/utils.h"
 
+#define HANDLED_005 \
+	X(CASEMAPPING)  \
+	X(CHANMODES)    \
+	X(MODES)        \
+	X(PREFIX)
+
 struct opt
 {
 	char *arg;
@@ -13,20 +19,15 @@ struct opt
 };
 
 static int parse_opt(struct opt*, char**);
-
-/* TODO: CASEMAPPING (ascii, rfc1459, strict-rfc1459, set server fptr) */
-#define HANDLED_005 \
-	X(CHANMODES)    \
-	X(PREFIX)       \
-	X(MODES)
+static int server_cmp(const struct server*, const struct server*);
+static struct server* server_list_get(struct server_list*, struct server*);
 
 #define X(cmd) static int server_set_##cmd(struct server*, char*);
 HANDLED_005
 #undef X
 
-//TODO: refactor, not currently used
 struct server*
-server(char *host, char *port, char *nicks)
+server(const char *host, const char *port, const char *pass)
 {
 	struct server *s;
 
@@ -35,13 +36,110 @@ server(char *host, char *port, char *nicks)
 
 	s->host = strdup(host);
 	s->port = strdup(port);
-
-	s->nicks = strdup(nicks);
+	s->pass = pass ? strdup(pass) : NULL;
 
 	s->usermodes_str.type = MODE_STR_USERMODE;
+
 	mode_config(&(s->mode_config), NULL, MODE_CONFIG_DEFAULTS);
 
+	// FIXME: channel()
+	s->channel = new_channel(host, s, NULL, BUFFER_SERVER);
+	channel_set_current(s->channel);
+
+	// FIXME:
+	if ((s->connection = connection(s, host, port)) == NULL)
+		goto err;
+
 	return s;
+
+err:
+	server_free(s);
+	return NULL;
+}
+
+static struct server*
+server_list_get(struct server_list *sl, struct server *s)
+{
+	struct server *tmp;
+
+	if ((tmp = sl->head) == NULL)
+		return NULL;
+
+	if (!server_cmp(sl->head, s))
+		return sl->head;
+
+	while ((tmp = tmp->next) != sl->head) {
+
+		if (!server_cmp(tmp, s))
+			return tmp;
+	}
+
+	return NULL;
+}
+
+struct server*
+server_list_add(struct server_list *sl, struct server *s)
+{
+	struct server *tmp;
+
+	if ((tmp = server_list_get(sl, s)) != NULL)
+		return s;
+
+	if (sl->head == NULL) {
+		sl->head = s->next = s;
+		sl->tail = s->prev = s;
+	} else {
+		s->next = sl->tail->next;
+		s->prev = sl->tail;
+		sl->head->prev = s;
+		sl->tail->next = s;
+		sl->tail = s;
+	}
+
+	return NULL;
+}
+
+struct server*
+server_list_del(struct server_list *sl, struct server *s)
+{
+	struct server *tmp_h,
+	              *tmp_t;
+
+	if (sl->head == s &&  sl->tail == s) {
+		/* Removing last server */
+		sl->head = NULL;
+		sl->tail = NULL;
+	} else if ((tmp_h = sl->head) == s) {
+		/* Removing head */
+		sl->head = sl->head->next;
+		sl->head->prev = sl->tail;
+	} else if ((tmp_t = sl->tail) == s) {
+		/* Removing tail */
+		sl->tail = sl->tail->prev;
+		sl->tail->next = sl->head;
+	} else {
+		/* Removing some server (head, tail) */
+		while ((tmp_h = tmp_h->next) != s) {
+			if (tmp_h == tmp_t)
+				return NULL;
+		}
+		s->next->prev = s->prev;
+		s->prev->next = s->next;
+	}
+
+	s->next = NULL;
+	s->prev = NULL;
+
+	return s;
+}
+
+void
+server_free(struct server *s)
+{
+	free(s->host);
+	free(s->port);
+	free(s->nicks);
+	free(s);
 }
 
 void
@@ -68,17 +166,13 @@ server_set_004(struct server *s, char *str)
 	if (!(chan_modes = getarg(&str, " ")))
 		newline(c, 0, "-!!-", "invalid numeric 004: chan_modes is null");
 
-	enum mode_err_t err;
-
 	if (user_modes) {
 
 #ifdef DEBUG
 		newlinef(c, 0, "DEBUG", "Setting numeric 004 user_modes: %s", user_modes);
 #endif
 
-		err = mode_config(&(s->mode_config), user_modes, MODE_CONFIG_USERMODES);
-
-		if (err != MODE_ERR_NONE)
+		if (mode_config(&(s->mode_config), user_modes, MODE_CONFIG_USERMODES) != MODE_ERR_NONE)
 			newlinef(c, 0, "-!!-", "invalid numeric 004 user_modes: %s", user_modes);
 	}
 
@@ -88,9 +182,7 @@ server_set_004(struct server *s, char *str)
 		newlinef(c, 0, "DEBUG", "Setting numeric 004 chan_modes: %s", chan_modes);
 #endif
 
-		err = mode_config(&(s->mode_config), chan_modes, MODE_CONFIG_CHANMODES);
-
-		if (err != MODE_ERR_NONE)
+		if (mode_config(&(s->mode_config), chan_modes, MODE_CONFIG_CHANMODES) != MODE_ERR_NONE)
 			newlinef(c, 0, "-!!-", "invalid numeric 004 chan_modes: %s", chan_modes);
 	}
 }
@@ -111,6 +203,45 @@ server_set_005(struct server *s, char *str)
 	}
 }
 
+int
+server_set_chans(struct server *s, const char *chans)
+{
+	/* TODO: parse comma seperated list
+	 *       test
+	 */
+	(void)s;
+	(void)chans;
+	return 0;
+}
+
+int
+server_set_nicks(struct server *s, const char *nicks)
+{
+	/* TODO: parse comma seperated list
+	 *       test
+	 */
+	(void)s;
+	(void)nicks;
+	return 0;
+}
+
+static int
+server_cmp(const struct server *s1, const struct server *s2)
+{
+	int cmp;
+
+	if (s1 == s2)
+		return 0;
+
+	if ((cmp = strcmp(s1->host, s2->host)))
+		return cmp;
+
+	if ((cmp = strcmp(s1->port, s2->port)))
+		return cmp;
+
+	return 0;
+}
+
 static int
 parse_opt(struct opt *opt, char **str)
 {
@@ -126,6 +257,29 @@ parse_opt(struct opt *opt, char **str)
 	 * letter    =  ALPHA / DIGIT
 	 * punct     =  %d33-47 / %d58-64 / %d91-96 / %d123-126
 	 * letpun    =  letter / punct
+	 */
+
+	/* FIXME: (see docs)
+	 *
+	 * '-PARAMETER' is valid and negates a previously set parameter to its default
+	 * 'PARAMETER', 'PARAMTER=' are equivalent
+	 *
+	 * The parameter's value may contain sequences of the form "\xHH", where
+	 * HH is a two-digit hexadecimal number.  Each such sequence is
+	 * considered identical to the equivalent octet after parsing of the
+	 * reply into separate tokens has occurred.
+	 *
+	 * [Example: X=A\x20B defines one token, "X", with the value "A B",
+	 * rather than two tokens "X" and "B".]
+	 * [Note: The literal string "\x" must therefore be encoded as
+	 * "\x5Cx".]
+	 *
+	 * If the server has not advertised a CHARSET parameter, it MUST not use
+	 * such sequences with a value outside those permitted by the above ABNF
+	 * grammar, with the exception of "\x20";  if it has advertised CHARSET,
+	 * then it may in addition send any printable character defined in that
+	 * encoding. Characters in multibyte encodings such as UTF-8 should be
+	 * sent as a series of \x sequences.
 	 */
 
 	char *t, *p = *str;
@@ -159,35 +313,25 @@ parse_opt(struct opt *opt, char **str)
 }
 
 static int
+server_set_CASEMAPPING(struct server *s, char *val)
+{
+	/* TODO: sets a function pointer to be used for
+	 * nick/chan string cmps specific to this server */
+	(void)(s);
+	(void)(val);
+	return 0;
+}
+
+static int
 server_set_CHANMODES(struct server *s, char *val)
 {
 	/* Delegated to mode.c  */
 
 #ifdef DEBUG
-			newlinef(s->channel, 0, "DEBUG", "Setting numeric 005 CHANMODES: %s", val);
+	newlinef(s->channel, 0, "DEBUG", "Setting numeric 005 CHANMODES: %s", val);
 #endif
 
-	enum mode_err_t err;
-
-	err = mode_config(&(s->mode_config), val, MODE_CONFIG_SUBTYPES);
-
-	return (err != MODE_ERR_NONE);
-}
-
-static int
-server_set_PREFIX(struct server *s, char *val)
-{
-	/* Delegated to mode.c  */
-
-#ifdef DEBUG
-			newlinef(s->channel, 0, "DEBUG", "Setting numeric 005 PREFIX: %s", val);
-#endif
-
-	enum mode_err_t err;
-
-	err = mode_config(&(s->mode_config), val, MODE_CONFIG_PREFIX);
-
-	return (err != MODE_ERR_NONE);
+	return (mode_config(&(s->mode_config), val, MODE_CONFIG_SUBTYPES) != MODE_ERR_NONE);
 }
 
 static int
@@ -196,12 +340,20 @@ server_set_MODES(struct server *s, char *val)
 	/* Delegated to mode.c */
 
 #ifdef DEBUG
-			newlinef(s->channel, 0, "DEBUG", "Setting numeric 005 MODES: %s", val);
+	newlinef(s->channel, 0, "DEBUG", "Setting numeric 005 MODES: %s", val);
 #endif
 
-	enum mode_err_t err;
+	return (mode_config(&(s->mode_config), val, MODE_CONFIG_MODES) != MODE_ERR_NONE);
+}
 
-	err = mode_config(&(s->mode_config), val, MODE_CONFIG_MODES);
+static int
+server_set_PREFIX(struct server *s, char *val)
+{
+	/* Delegated to mode.c  */
 
-	return (err != MODE_ERR_NONE);
+#ifdef DEBUG
+	newlinef(s->channel, 0, "DEBUG", "Setting numeric 005 PREFIX: %s", val);
+#endif
+
+	return (mode_config(&(s->mode_config), val, MODE_CONFIG_PREFIX) != MODE_ERR_NONE);
 }

@@ -34,6 +34,7 @@
         struct type *tree_right; \
     }
 
+/* FIXME: scan-build showing NULL pointer dereferences on add */
 
 #define AVL_GENERATE(name, type, field, cmp, cmp_n)                               \
     static struct type* name##_AVL_ADD(struct name*, struct type*);               \
@@ -311,8 +312,6 @@ name##_AVL_DEL_REC(struct type **p, struct type *elm)                           
 #define SPLAY_GET(name, x, y)  name##_SPLAY_GET(x, y)
 #define SPLAY_MAX(name, x)     (TREE_EMPTY(x) ? NULL : name##_SPLAY_MAX(x))
 #define SPLAY_MIN(name, x)     (TREE_EMPTY(x) ? NULL : name##_SPLAY_MIN(x))
-#define SPLAY_NEXT(name, x, y) name##_SPLAY_NEXT(x, y)
-#define SPLAY_PREV(name, x, y) name##_SPLAY_PREV(x, y)
 
 
 #define SPLAY_HEAD(type) \
@@ -367,12 +366,6 @@ name##_AVL_DEL_REC(struct type **p, struct type *elm)                           
     } while (0)
 
 
-#define SPLAY_FOREACH(x, name, head)      \
-    for ((x) = SPLAY_MIN(name, head);     \
-         (x) != NULL;                     \
-         (x) = SPLAY_NEXT(name, head, x))
-
-
 #define SPLAY_GENERATE(name, type, field, cmp)                           \
     struct type* name##_SPLAY_ADD(struct name*, struct type*);           \
     struct type* name##_SPLAY_DEL(struct name*, struct type*);           \
@@ -398,38 +391,6 @@ name##_SPLAY_MAX(struct name *head)                                      \
         x = TREE_RIGHT(x, field);                                        \
                                                                          \
     return x;                                                            \
-}                                                                        \
-                                                                         \
-static inline struct type*                                               \
-name##_SPLAY_NEXT(struct name *head, struct type *elm)                   \
-{                                                                        \
-    name##_SPLAY(head, elm);                                             \
-                                                                         \
-    if (TREE_RIGHT(elm, field) == NULL)                                  \
-        return NULL;                                                     \
-                                                                         \
-    elm = TREE_RIGHT(elm, field);                                        \
-                                                                         \
-    while (TREE_LEFT(elm, field) != NULL)                                \
-        elm = TREE_LEFT(elm, field);                                     \
-                                                                         \
-    return elm;                                                          \
-}                                                                        \
-                                                                         \
-static inline struct type*                                               \
-name##_SPLAY_PREV(struct name *head, struct type *elm)                   \
-{                                                                        \
-    name##_SPLAY(head, elm);                                             \
-                                                                         \
-    if (TREE_LEFT(elm, field) == NULL)                                   \
-        return NULL;                                                     \
-                                                                         \
-    elm = TREE_LEFT(elm, field);                                         \
-                                                                         \
-    while (TREE_RIGHT(elm, field) != NULL)                               \
-        elm = TREE_RIGHT(elm, field);                                    \
-                                                                         \
-    return elm;                                                          \
 }                                                                        \
                                                                          \
 static inline struct type*                                               \
@@ -529,8 +490,6 @@ name##_SPLAY(struct name *head, struct type *elm)                        \
 /* Suppress unused function warnings */                                  \
 void (*name##_SPLAY_DUMMY[])(void) = {                                   \
     (void(*)(void))(name##_SPLAY_MAX),                                   \
-    (void(*)(void))(name##_SPLAY_MIN),                                   \
-    (void(*)(void))(name##_SPLAY_NEXT),                                  \
-    (void(*)(void))(name##_SPLAY_PREV) };
+    (void(*)(void))(name##_SPLAY_MIN) };
 
 #endif

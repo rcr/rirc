@@ -599,7 +599,7 @@ _draw_input(struct input *in, struct coords coords)
 			if (ptr == in->head)
 				ptr = in->tail;
 
-			if (ptr == in->line->text + MAX_INPUT)
+			if (ptr == in->line->text + RIRC_MAX_INPUT)
 				break;
 
 			*input_ptr++ = *ptr++;

@@ -6,8 +6,16 @@
 #include <sys/time.h>
 
 #include "src/draw.h"
+#include "src/net.h"
 #include "src/state.h"
 #include "src/utils/utils.h"
+
+
+
+/* TODO:
+ *
+ * fail macros should just call newline directly. the fail_if macro should be removed
+ */
 
 //TODO: fail macros copy to an error buffer, and then copy into newline,
 //take destination buffer as parameter
@@ -23,6 +31,9 @@
 /* Conditionally fail */
 #define fail_if(C) \
 	do { if (C) return 1; } while (0)
+
+
+
 
 #define IS_ME(X) !strcmp((X), s->nick)
 
@@ -46,6 +57,7 @@
 	X(unignore) \
 	X(version)
 
+// FIXME: get rid of errbuf here, just call newline from the function on failure
 /* Send handler prototypes */
 #define X(cmd) static int send_##cmd(char*, char*, struct server*, struct channel*);
 SEND_HANDLERS
@@ -250,13 +262,13 @@ send_handler_lookup(register const char *str, register size_t len)
 }
 
 void
-send_mesg(char *mesg, struct channel *chan)
+send_mesg(struct server *s, struct channel *chan, char *mesg)
 {
 	/* Handle the input to a channel, ie:
-	 *	- a default message to the channel
-	 *	- a default message to the channel beginning with '/'
-	 *	- a handled command beginning with '/'
-	 *	- an unhandled command beginning with '/'
+	 *  - a default message to the channel
+	 *  - a default message to the channel beginning with '/'
+	 *  - a handled command beginning with '/'
+	 *  - an unhandled command beginning with '/'
 	 */
 
 	char *p, *cmd_str, errbuff[MAX_ERROR];
@@ -346,8 +358,13 @@ send_connect(char *err, char *mesg, struct server *s, struct channel *c)
 {
 	/* /connect [(host) | (host:port) | (host port)] */
 
+	// FIXME:
+	UNUSED(err);
+	UNUSED(mesg);
+	UNUSED(s);
 	UNUSED(c);
 
+#if 0
 	char *host, *port;
 
 	if (!(host = getarg(&mesg, " :"))) {
@@ -355,7 +372,7 @@ send_connect(char *err, char *mesg, struct server *s, struct channel *c)
 		/* If no hostname arg is given, attempt to reconnect on the current server */
 
 		if (!s)
-			fail("Error: /connect <host | host:port | host port>");
+			fail("Error: /connect <host [port] | host:port>");
 
 		else if (s->soc >= 0 || s->connecting)
 			fail("Error: Already connected or reconnecting to server");
@@ -368,6 +385,7 @@ send_connect(char *err, char *mesg, struct server *s, struct channel *c)
 	}
 
 	server_connect(host, port, NULL, NULL);
+#endif
 
 	return 0;
 }
@@ -403,13 +421,19 @@ send_disconnect(char *err, char *mesg, struct server *s, struct channel *c)
 {
 	/* /disconnect [quit message] */
 
+	// FIXME:
+	UNUSED(err);
+	UNUSED(mesg);
+	UNUSED(s);
 	UNUSED(c);
 
+#if 0
 	/* Server isn't connecting, connected or waiting to connect */
 	if (!s || (!s->connecting && s->soc < 0 && !s->reconnect_time))
 		fail("Error: Not connected to server");
 
 	server_disconnect(s, 0, 0, (*mesg) ? mesg : DEFAULT_QUIT_MESG);
+#endif
 
 	return 0;
 }
@@ -737,54 +761,23 @@ recv_handler_lookup (register const char *str, register size_t len)
 }
 
 void
-recv_mesg(char *inp, int count, struct server *s)
+recv_mesg(struct server *s, struct parsed_mesg *p)
 {
-	/* FIXME Move to connection struct, handle in net. recv_mesg should
-	 * only receive messages ready to parse */
-	char *ptr = s->iptr;
-	char *max = s->input + BUFFSIZE;
+	const struct recv_handler* handler;
 
+	int err = 0;
 	char errbuff[MAX_ERROR];
 
-	while (count--) {
-		if (*inp == '\r') {
+	if (isdigit(*p->command))
+		err = recv_numeric(errbuff, p, s);
+	/* TODO: parsed_mesg can cache the length of command/args/etc */
+	else if ((handler = recv_handler_lookup(p->command, strlen(p->command))))
+		err = handler->func(errbuff, p, s);
+	else
+		newlinef(s->channel, 0, "-!!-", "Message type '%s' unknown", p->command);
 
-			int err = 0;
-
-			*ptr = '\0';
-
-#ifdef DEBUG
-			newline(s->channel, 0, "DEBUG <<", s->input);
-#endif
-			const struct recv_handler* handler;
-
-			struct parsed_mesg p;
-
-			if (!(parse_mesg(&p, s->input)))
-				newlinef(s->channel, 0, "-!!-", "Failed to parse: %s", s->input);
-
-			else if (isdigit(*p.command))
-				err = recv_numeric(errbuff, &p, s);
-
-			else if ((handler = recv_handler_lookup(p.command, strlen(p.command))))
-				err = handler->func(errbuff, &p, s);
-
-			else
-				newlinef(s->channel, 0, "-!!-", "Message type '%s' unknown", p.command);
-
-			if (err)
-				newline(s->channel, 0, "-!!-", errbuff);
-
-			ptr = s->input;
-
-		/* Don't accept unprintable characters unless space or ctcp markup */
-		} else if (ptr < max && (isgraph(*inp) || *inp == ' ' || *inp == 0x01))
-			*ptr++ = *inp;
-
-		inp++;
-	}
-
-	s->iptr = ptr;
+	if (err)
+		newline(s->channel, 0, "-!!-", errbuff);
 }
 
 static int
@@ -1377,22 +1370,15 @@ recv_numeric(char *err, struct parsed_mesg *p, struct server *s)
 		/* Reset list of auto nicks */
 		s->nptr = s->nicks;
 
-		/* Auto join channels if first time connecting */
-		if (s->join) {
-			ret = sendf(err, s, "JOIN %s", s->join);
-			free(s->join);
-			s->join = NULL;
-			fail_if(ret);
-		} else {
-			/* If reconnecting to server, join any non-parted channels */
-			c = s->channel;
+		c = s->channel;
+
+		/* join any non-parted channels */
+		do {
 			//TODO: channel_list_foreach
-			do {
-				if (c->buffer.type == BUFFER_CHANNEL && !c->parted)
-					fail_if(sendf(err, s, "JOIN %s", c->name.str));
-				c = c->next;
-			} while (c != s->channel);
-		}
+			if (c->buffer.type == BUFFER_CHANNEL && !c->parted)
+				fail_if(sendf(err, s, "JOIN %s", c->name.str));
+			c = c->next;
+		} while (c != s->channel);
 
 		if (p->trailing)
 			newline(s->channel, 0, "--", p->trailing);
@@ -1699,13 +1685,18 @@ recv_pong(char *err, struct parsed_mesg *p, struct server *s)
 {
 	/*  PONG <server> [<server2>] */
 
+	// FIXME:
 	UNUSED(err);
+	UNUSED(p);
+	UNUSED(s);
 
+#if 0
 	/*  PING sent explicitly by the user */
 	if (!s->pinging)
 		newlinef(s->channel, 0, "!!", "PONG %s", p->params);
 
 	s->pinging = 0;
+#endif
 
 	return 0;
 }
