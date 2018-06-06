@@ -16,7 +16,7 @@
 #include <unistd.h>
 #include <pthread.h>
 
-#include "src/net.h"
+#include "src/io.h"
 #include "src/utils/utils.h"
 #include "config.h"
 
@@ -43,42 +43,42 @@ server_disconnect(struct server *a, int b, int c, char *d)
 }
 
 /* RFC 2812, section 2.3 */
-#define NET_MESG_LEN 510
+#define IO_MESG_LEN 510
 
-#ifndef NET_PING_MIN
-	#define NET_PING_MIN 150
-#elif (NET_PING_MIN < 0 || NET_PING_MIN > 86400)
-	#error "NET_PING_MIN: [0, 86400]"
+#ifndef IO_PING_MIN
+	#define IO_PING_MIN 150
+#elif (IO_PING_MIN < 0 || IO_PING_MIN > 86400)
+	#error "IO_PING_MIN: [0, 86400]"
 #endif
 
-#ifndef NET_PING_REFRESH
-	#define NET_PING_REFRESH 5
-#elif (NET_PING_REFRESH < 0 || NET_PING_REFRESH > 86400)
-	#error "NET_PING_REFRESH: [0, 86400]"
+#ifndef IO_PING_REFRESH
+	#define IO_PING_REFRESH 5
+#elif (IO_PING_REFRESH < 0 || IO_PING_REFRESH > 86400)
+	#error "IO_PING_REFRESH: [0, 86400]"
 #endif
 
-#ifndef NET_PING_MAX
-	#define NET_PING_MAX 300
-#elif (NET_PING_MAX < 0 || NET_PING_MAX > 86400)
-	#error "NET_PING_MAX: [0, 86400]"
+#ifndef IO_PING_MAX
+	#define IO_PING_MAX 300
+#elif (IO_PING_MAX < 0 || IO_PING_MAX > 86400)
+	#error "IO_PING_MAX: [0, 86400]"
 #endif
 
-#ifndef NET_RECONNECT_BACKOFF_BASE
-	#define NET_RECONNECT_BACKOFF_BASE 10
-#elif (NET_RECONNECT_BACKOFF_BASE < 1 || NET_RECONNECT_BACKOFF_BASE > 86400)
-	#error "NET_RECONNECT_BACKOFF_BASE: [1, 32]"
+#ifndef IO_RECONNECT_BACKOFF_BASE
+	#define IO_RECONNECT_BACKOFF_BASE 10
+#elif (IO_RECONNECT_BACKOFF_BASE < 1 || IO_RECONNECT_BACKOFF_BASE > 86400)
+	#error "IO_RECONNECT_BACKOFF_BASE: [1, 32]"
 #endif
 
-#ifndef NET_RECONNECT_BACKOFF_FACTOR
-	#define NET_RECONNECT_BACKOFF_FACTOR 2
-#elif (NET_RECONNECT_BACKOFF_FACTOR < 1 || NET_RECONNECT_BACKOFF_FACTOR > 32)
-	#error "NET_RECONNECT_BACKOFF_FACTOR: [1, 32]"
+#ifndef IO_RECONNECT_BACKOFF_FACTOR
+	#define IO_RECONNECT_BACKOFF_FACTOR 2
+#elif (IO_RECONNECT_BACKOFF_FACTOR < 1 || IO_RECONNECT_BACKOFF_FACTOR > 32)
+	#error "IO_RECONNECT_BACKOFF_FACTOR: [1, 32]"
 #endif
 
-#ifndef NET_RECONNECT_BACKOFF_MAX
-	#define NET_RECONNECT_BACKOFF_MAX 86400
-#elif (NET_RECONNECT_BACKOFF_MAX < 1 || NET_RECONNECT_BACKOFF_MAX > 86400)
-	#error "NET_RECONNECT_BACKOFF_MAX: [0, 86400]"
+#ifndef IO_RECONNECT_BACKOFF_MAX
+	#define IO_RECONNECT_BACKOFF_MAX 86400
+#elif (IO_RECONNECT_BACKOFF_MAX < 1 || IO_RECONNECT_BACKOFF_MAX > 86400)
+	#error "IO_RECONNECT_BACKOFF_MAX: [0, 86400]"
 #endif
 
 #define PT_CF(X) do { int ret; if ((ret = (X)) != 0) fatal((#X), ret); } while (0)
@@ -86,28 +86,28 @@ server_disconnect(struct server *a, int b, int c, char *d)
 #define PT_UL(X) PT_CF(pthread_mutex_unlock((X)))
 #define PT_CB(X) do { PT_LK(&cb_mutex); (X); PT_UL(&cb_mutex); } while (0)
 
-enum net_err_t
+enum io_err_t
 {
-	NET_ERR_NONE,
-	NET_ERR_TRUNC,
-	NET_ERR_DXED,
-	NET_ERR_CXNG,
-	NET_ERR_CXED
+	IO_ERR_NONE,
+	IO_ERR_TRUNC,
+	IO_ERR_DXED,
+	IO_ERR_CXNG,
+	IO_ERR_CXED
 };
 
 struct connection {
 	const void *obj;
 	const char *host;
 	const char *port;
-	enum net_state_t {
-		NET_ST_INIT, /* Initial thread state */
-		NET_ST_DXED, /* Socket disconnected, passive */
-		NET_ST_RXNG, /* Socket disconnected, pending reconnect */
-		NET_ST_CXNG, /* Socket connection in progress */
-		NET_ST_CXED, /* Socket connected */
-		NET_ST_PING, /* Socket connected, network state in question */
-		NET_ST_TERM, /* Terminal thread state */
-		NET_ST_SIZE
+	enum io_state_t {
+		IO_ST_INIT, /* Initial thread state */
+		IO_ST_DXED, /* Socket disconnected, passive */
+		IO_ST_RXNG, /* Socket disconnected, pending reconnect */
+		IO_ST_CXNG, /* Socket connection in progress */
+		IO_ST_CXED, /* Socket connected */
+		IO_ST_PING, /* Socket connected, network state in question */
+		IO_ST_TERM, /* Terminal thread state */
+		IO_ST_SIZE
 	} state;
 	int soc;
 	pthread_cond_t  pt_state_cond;
@@ -115,31 +115,31 @@ struct connection {
 	pthread_t       pt_tid;
 	struct {
 		size_t i;
-		char buf[NET_MESG_LEN + 1];
+		char buf[IO_MESG_LEN + 1];
 	} read;
-	volatile enum net_force_state {
-		NET_ST_FORCE_NONE,
-		NET_ST_FORCE_CXNG, /* Asynchronously force connection */
-		NET_ST_FORCE_DXED, /* Asynchronously force disconnect */
+	volatile enum io_force_state {
+		IO_ST_FORCE_NONE,
+		IO_ST_FORCE_CXNG, /* Asynchronously force connection */
+		IO_ST_FORCE_DXED, /* Asynchronously force disconnect */
 	} force_state;
 	char ipbuf[INET6_ADDRSTRLEN];
 };
 
-static void* net_thread(void*);
+static void* io_thread(void*);
 
-static char* net_strerror(int, char*, size_t);
+static char* io_strerror(int, char*, size_t);
 
-static void net_close(struct connection*);
-static void net_init(void);
-static void net_term(void);
+static void io_close(struct connection*);
+static void io_init(void);
+static void io_term(void);
 
-static enum net_state_t net_state_init(enum net_state_t, struct connection*);
-static enum net_state_t net_state_dxed(enum net_state_t, struct connection*);
-static enum net_state_t net_state_rxng(enum net_state_t, struct connection*);
-static enum net_state_t net_state_cxng(enum net_state_t, struct connection*);
-static enum net_state_t net_state_cxed(enum net_state_t, struct connection*);
-static enum net_state_t net_state_ping(enum net_state_t, struct connection*);
-static void net_state_term(enum net_state_t, struct connection*);
+static enum io_state_t io_state_init(enum io_state_t, struct connection*);
+static enum io_state_t io_state_dxed(enum io_state_t, struct connection*);
+static enum io_state_t io_state_rxng(enum io_state_t, struct connection*);
+static enum io_state_t io_state_cxng(enum io_state_t, struct connection*);
+static enum io_state_t io_state_cxed(enum io_state_t, struct connection*);
+static enum io_state_t io_state_ping(enum io_state_t, struct connection*);
+static void io_state_term(enum io_state_t, struct connection*);
 
 static pthread_cond_t init_cond;
 static pthread_mutex_t cb_mutex;
@@ -147,7 +147,7 @@ static pthread_mutex_t init_mutex;
 static pthread_once_t init_once = PTHREAD_ONCE_INIT;
 
 static void
-net_close(struct connection *c)
+io_close(struct connection *c)
 {
 	/* Lock thread state to prevent ambiguous handling of EINTR on close() */
 
@@ -160,14 +160,14 @@ net_close(struct connection *c)
 }
 
 static char*
-net_strerror(int errnum, char *buf, size_t buflen)
+io_strerror(int errnum, char *buf, size_t buflen)
 {
 	PT_CF(strerror_r(errnum, buf, buflen));
 	return buf;
 }
 
 static void
-net_init(void)
+io_init(void)
 {
 	pthread_mutexattr_t m_attr;
 
@@ -180,12 +180,12 @@ net_init(void)
 
 	PT_CF(pthread_mutexattr_destroy(&m_attr));
 
-	if (atexit(net_term) != 0)
+	if (atexit(io_term) != 0)
 		fatal("atexit", 0);
 }
 
 static void
-net_term(void)
+io_term(void)
 {
 	// FIXME: at this point the callback mutex might have already been used uninitialized
 	// because the main thread is running...
@@ -206,7 +206,7 @@ connection(const void *obj, const char *host, const char *port)
 	c->obj   = obj;
 	c->host  = strdup(host);
 	c->port  = strdup(port);
-	c->state = NET_ST_INIT;
+	c->state = IO_ST_INIT;
 
 	pthread_attr_t      t_attr;
 	pthread_mutexattr_t m_attr;
@@ -220,11 +220,11 @@ connection(const void *obj, const char *host, const char *port)
 	PT_CF(pthread_cond_init(&(c->pt_state_cond), NULL));
 	PT_CF(pthread_mutex_init(&(c->pt_state_mutex), &m_attr));
 
-	PT_CF(pthread_once(&init_once, net_init));
+	PT_CF(pthread_once(&init_once, io_init));
 
 	/* Wait for thread to reach initialized and waiting state */
 	PT_LK(&init_mutex);
-	PT_CF(pthread_create(&(c->pt_tid), &t_attr, net_thread, c));
+	PT_CF(pthread_create(&(c->pt_tid), &t_attr, io_thread, c));
 	/* TODO: check spurrious wakeups */
 	PT_CF(pthread_cond_wait(&init_cond, &init_mutex));
 	PT_UL(&init_mutex);
@@ -236,7 +236,7 @@ connection(const void *obj, const char *host, const char *port)
 }
 
 int
-net_sendf(struct connection *c, const char *fmt, ...)
+io_sendf(struct connection *c, const char *fmt, ...)
 {
 	char sendbuf[512];
 
@@ -244,59 +244,59 @@ net_sendf(struct connection *c, const char *fmt, ...)
 	int ret;
 	size_t len;
 
-	if (c->state != NET_ST_CXED && c->state != NET_ST_PING)
-		return NET_ERR_DXED;
+	if (c->state != IO_ST_CXED && c->state != IO_ST_PING)
+		return IO_ERR_DXED;
 
 	va_start(ap, fmt);
 	ret = vsnprintf(sendbuf, sizeof(sendbuf) - 2, fmt, ap);
 	va_end(ap);
 
 	if (ret <= 0) {
-		return NET_ERR_NONE; /* TODO handle error */
+		return IO_ERR_NONE; /* TODO handle error */
 	}
 
 	len = ret;
 
 	if (len >= sizeof(sendbuf) - 2)
-		return NET_ERR_TRUNC;
+		return IO_ERR_TRUNC;
 
 	sendbuf[len++] = '\r';
 	sendbuf[len++] = '\n';
 
 	if (send(c->soc, sendbuf, len, 0) < 0) {
-		return NET_ERR_NONE; /* TODO: handle error */
+		return IO_ERR_NONE; /* TODO: handle error */
 	}
 
-	return NET_ERR_NONE;
+	return IO_ERR_NONE;
 }
 
 int
-net_cx(struct connection *c)
+io_cx(struct connection *c)
 {
-	/* Force a socket thread into NET_ST_CXNG state
+	/* Force a socket thread into IO_ST_CXNG state
 	 *
 	 * Valid only for states blocked on:
-	 *   - NET_ST_INIT: pthread_cond_wait()
-	 *   - NET_ST_DXED: pthread_cond_wait()
-	 *   - NET_ST_RXNG: pthread_cond_timedwait()
+	 *   - IO_ST_INIT: pthread_cond_wait()
+	 *   - IO_ST_DXED: pthread_cond_wait()
+	 *   - IO_ST_RXNG: pthread_cond_timedwait()
 	 */
 
-	enum net_err_t ret = NET_ERR_NONE;
+	enum io_err_t ret = IO_ERR_NONE;
 
 	PT_LK(&(c->pt_state_mutex));
 
 	switch (c->state) {
-		case NET_ST_INIT:
-		case NET_ST_DXED:
-		case NET_ST_RXNG:
+		case IO_ST_INIT:
+		case IO_ST_DXED:
+		case IO_ST_RXNG:
 			PT_CF(pthread_cond_signal(&(c->pt_state_cond)));
 			break;
-		case NET_ST_CXNG:
-			ret = NET_ERR_CXNG;
+		case IO_ST_CXNG:
+			ret = IO_ERR_CXNG;
 			break;
-		case NET_ST_CXED:
-		case NET_ST_PING:
-			ret = NET_ERR_CXED;
+		case IO_ST_CXED:
+		case IO_ST_PING:
+			ret = IO_ERR_CXED;
 			break;
 		default:
 			fatal("Unknown net state", 0);
@@ -308,32 +308,32 @@ net_cx(struct connection *c)
 }
 
 int
-net_dx(struct connection *c)
+io_dx(struct connection *c)
 {
-	/* Force a socket thread into NET_ST_DXED state
+	/* Force a socket thread into IO_ST_DXED state
 	 *
 	 * Valid only for states blocked on:
-	 *   - NET_ST_RXNG: pthread_cond_timedwait()
-	 *   - NET_ST_CXNG: connect()
-	 *   - NET_ST_CXED: recv()
-	 *   - NET_ST_PING: recv()
+	 *   - IO_ST_RXNG: pthread_cond_timedwait()
+	 *   - IO_ST_CXNG: connect()
+	 *   - IO_ST_CXED: recv()
+	 *   - IO_ST_PING: recv()
 	 */
 
-	enum net_err_t ret = NET_ERR_NONE;
+	enum io_err_t ret = IO_ERR_NONE;
 
 	PT_LK(&(c->pt_state_mutex));
 
 	switch (c->state) {
-		case NET_ST_INIT:
-		case NET_ST_DXED:
-			ret = NET_ERR_DXED;
+		case IO_ST_INIT:
+		case IO_ST_DXED:
+			ret = IO_ERR_DXED;
 			break;
-		case NET_ST_RXNG:
+		case IO_ST_RXNG:
 			PT_CF(pthread_cond_signal(&(c->pt_state_cond)));
 			break;
-		case NET_ST_CXNG:
-		case NET_ST_CXED:
-		case NET_ST_PING:
+		case IO_ST_CXNG:
+		case IO_ST_CXED:
+		case IO_ST_PING:
 			do {
 				/* Signal and yield the cpu until the target thread
 				 * is flagged as having reached an EINTR handler */
@@ -350,8 +350,8 @@ net_dx(struct connection *c)
 	return ret;
 }
 
-static enum net_state_t
-net_state_init(enum net_state_t o_state, struct connection *c)
+static enum io_state_t
+io_state_init(enum io_state_t o_state, struct connection *c)
 {
 	/* Initial thread state */
 
@@ -365,11 +365,11 @@ net_state_init(enum net_state_t o_state, struct connection *c)
 	PT_CF(pthread_cond_wait(&(c->pt_state_cond), &(c->pt_state_mutex)));
 	PT_UL(&(c->pt_state_mutex));
 
-	return NET_ST_CXNG;
+	return IO_ST_CXNG;
 }
 
-static enum net_state_t
-net_state_dxed(enum net_state_t o_state, struct connection *c)
+static enum io_state_t
+io_state_dxed(enum io_state_t o_state, struct connection *c)
 {
 	(void) o_state;
 
@@ -379,11 +379,11 @@ net_state_dxed(enum net_state_t o_state, struct connection *c)
 	PT_CF(pthread_cond_wait(&(c->pt_state_cond), &(c->pt_state_mutex)));
 	PT_UL(&(c->pt_state_mutex));
 
-	return NET_ST_CXNG;
+	return IO_ST_CXNG;
 }
 
-static enum net_state_t
-net_state_rxng(enum net_state_t o_state, struct connection *c)
+static enum io_state_t
+io_state_rxng(enum io_state_t o_state, struct connection *c)
 {
 	(void) o_state;
 
@@ -407,11 +407,11 @@ net_state_rxng(enum net_state_t o_state, struct connection *c)
 	pthread_cond_timedwait(&(c->pt_state_cond), &(c->pt_state_mutex), &ts);
 	PT_UL(&(c->pt_state_mutex));
 
-	return NET_ST_CXNG;
+	return IO_ST_CXNG;
 }
 
-static enum net_state_t
-net_state_cxng(enum net_state_t o_state, struct connection *c)
+static enum io_state_t
+io_state_cxng(enum io_state_t o_state, struct connection *c)
 {
 	(void) o_state;
 
@@ -420,7 +420,7 @@ net_state_cxng(enum net_state_t o_state, struct connection *c)
 	char errbuf[1024];
 	char ipbuf[INET6_ADDRSTRLEN];
 
-	PT_CB(net_cb_cxng(c->obj, "Connecting to %s:%s ...", c->host, c->port));
+	PT_CB(io_cb_cxng(c->obj, "Connecting to %s:%s ...", c->host, c->port));
 
 	struct addrinfo *p, *res, hints = {
 		.ai_family   = AF_UNSPEC,
@@ -429,8 +429,8 @@ net_state_cxng(enum net_state_t o_state, struct connection *c)
 	};
 
 	if ((ret = getaddrinfo(c->host, c->port, &hints, &res))) {
-		PT_CB(net_cb_fail(c->obj, "Connection error: %s", gai_strerror(ret)));
-		return NET_ST_RXNG;
+		PT_CB(io_cb_fail(c->obj, "Connection error: %s", gai_strerror(ret)));
+		return IO_ST_RXNG;
 	}
 
 	for (p = res; p != NULL; p = p->ai_next) {
@@ -446,35 +446,35 @@ net_state_cxng(enum net_state_t o_state, struct connection *c)
 			;
 		} else {
 			/* Connection failed for other reasons */
-			net_close(c);
+			io_close(c);
 		}
 	}
 
 	if (p == NULL) {
-		PT_CB(net_cb_fail(c->obj, "Connection failure [%s]", net_strerror(ret, errbuf, sizeof(errbuf))));
+		PT_CB(io_cb_fail(c->obj, "Connection failure [%s]", io_strerror(ret, errbuf, sizeof(errbuf))));
 		freeaddrinfo(res);
-		return NET_ST_RXNG;
+		return IO_ST_RXNG;
 	}
 
-	// FIXME: calling net_cb_cxed sends pass/user/nick
+	// FIXME: calling io_cb_cxed sends pass/user/nick
 	if ((ret = getnameinfo(p->ai_addr, p->ai_addrlen, ipbuf, INET6_ADDRSTRLEN, NULL, 0, NI_NUMERICHOST))) {
-		// ; net_cb_cxed(c->obj, "Connected to %s [IP lookup failure: %s]", c->host, gai_strerror(ret));
+		// ; io_cb_cxed(c->obj, "Connected to %s [IP lookup failure: %s]", c->host, gai_strerror(ret));
 	} else {
-		// ; net_cb_cxed(c->obj, "Connected to %s [%s]", c->host, ipbuf);
+		// ; io_cb_cxed(c->obj, "Connected to %s [%s]", c->host, ipbuf);
 	}
 
 	freeaddrinfo(res);
 	c->soc = soc;
 
-	return NET_ST_CXED;
+	return IO_ST_CXED;
 }
 
-static enum net_state_t
-net_state_cxed(enum net_state_t o_state, struct connection *c)
+static enum io_state_t
+io_state_cxed(enum io_state_t o_state, struct connection *c)
 {
 	(void) o_state;
 
-	PT_CB(net_cb_cxed(c->obj, "Connected to %s [TODO: ip]", c->host));
+	PT_CB(io_cb_cxed(c->obj, "Connected to %s [TODO: ip]", c->host));
 
 	struct timeval tv = {
 		.tv_sec = 3
@@ -492,22 +492,22 @@ net_state_cxed(enum net_state_t o_state, struct connection *c)
 		if ((ret = recv(c->soc, recvbuf, sizeof(recvbuf), 0)) <= 0) {
 
 			if (ret == 0) {
-				PT_CB(net_cb_lost(c->obj, "Connection closed"));
-				return NET_ST_CXNG;
+				PT_CB(io_cb_lost(c->obj, "Connection closed"));
+				return IO_ST_CXNG;
 			}
 
 			if (errno == ECONNRESET) {
-				PT_CB(net_cb_lost(c->obj, "Connection forcibly reset by peer"));
-				return NET_ST_CXNG;
+				PT_CB(io_cb_lost(c->obj, "Connection forcibly reset by peer"));
+				return IO_ST_CXNG;
 			}
 
 			if (errno == EAGAIN || errno == EWOULDBLOCK) {
-				PT_CB(net_cb_ping(c->obj, 0));
-				return NET_ST_PING;
+				PT_CB(io_cb_ping(c->obj, 0));
+				return IO_ST_PING;
 			}
 
 			if (errno == EINTR) {
-				return NET_ST_DXED;
+				return IO_ST_DXED;
 			}
 
 			fatal("recv", errno);
@@ -519,9 +519,9 @@ net_state_cxed(enum net_state_t o_state, struct connection *c)
 				continue;
 
 			if (recvbuf[i] == '\r') {
-				if (c->read.i && c->read.i <= NET_MESG_LEN) {
+				if (c->read.i && c->read.i <= IO_MESG_LEN) {
 					c->read.buf[c->read.i + 1] = 0;
-					PT_CB(net_cb_read_soc(c->read.buf, c->read.i, c->obj));
+					PT_CB(io_cb_read_soc(c->read.buf, c->read.i, c->obj));
 					c->read.i = 0;
 				}
 			} else {
@@ -531,8 +531,8 @@ net_state_cxed(enum net_state_t o_state, struct connection *c)
 	}
 }
 
-static enum net_state_t
-net_state_ping(enum net_state_t o_state, struct connection *c)
+static enum io_state_t
+io_state_ping(enum io_state_t o_state, struct connection *c)
 {
 	struct timeval tv = {
 		.tv_sec = 2
@@ -552,29 +552,29 @@ net_state_ping(enum net_state_t o_state, struct connection *c)
 		if ((ret = recv(c->soc, recvbuf, sizeof(recvbuf), 0)) <= 0) {
 
 			if (ret == 0) {
-				PT_CB(net_cb_lost(c->obj, "Connection closed"));
-				return NET_ST_CXNG;
+				PT_CB(io_cb_lost(c->obj, "Connection closed"));
+				return IO_ST_CXNG;
 			}
 
 			if (errno == ECONNRESET) {
-				PT_CB(net_cb_lost(c->obj, "Connection forcibly reset by peer"));
-				return NET_ST_CXNG;
+				PT_CB(io_cb_lost(c->obj, "Connection forcibly reset by peer"));
+				return IO_ST_CXNG;
 			}
 
 			if (errno == EAGAIN || errno == EWOULDBLOCK) {
 				if ((ping += 2) >= 10) {
 					// TODO: close the socket, etc
-					PT_CB(net_cb_lost(c->obj, "Connection lost: ping timeout"));
-					net_close(c);
-					return NET_ST_CXNG;
+					PT_CB(io_cb_lost(c->obj, "Connection lost: ping timeout"));
+					io_close(c);
+					return IO_ST_CXNG;
 				} else {
-					PT_CB(net_cb_ping(c->obj, ping));
+					PT_CB(io_cb_ping(c->obj, ping));
 					continue;
 				}
 			}
 
 			if (errno == EINTR) {
-				return NET_ST_DXED;
+				return IO_ST_DXED;
 			}
 
 			fatal("recv", errno);
@@ -586,9 +586,9 @@ net_state_ping(enum net_state_t o_state, struct connection *c)
 				continue;
 
 			if (recvbuf[i] == '\r') {
-				if (c->read.i && c->read.i <= NET_MESG_LEN) {
+				if (c->read.i && c->read.i <= IO_MESG_LEN) {
 					c->read.buf[c->read.i + 1] = 0;
-					PT_CB(net_cb_read_soc(c->read.buf, c->read.i, c->obj));
+					PT_CB(io_cb_read_soc(c->read.buf, c->read.i, c->obj));
 					c->read.i = 0;
 				}
 			} else {
@@ -596,12 +596,12 @@ net_state_ping(enum net_state_t o_state, struct connection *c)
 			}
 		}
 
-		return NET_ST_CXED;
+		return IO_ST_CXED;
 	}
 }
 
 static void
-net_state_term(enum net_state_t o_state, struct connection *c)
+io_state_term(enum io_state_t o_state, struct connection *c)
 {
 	(void) o_state;
 
@@ -616,11 +616,11 @@ net_state_term(enum net_state_t o_state, struct connection *c)
 }
 
 static void*
-net_thread(void *arg)
+io_thread(void *arg)
 {
 	struct connection *c = arg;
 
-	enum net_state_t n_state;
+	enum io_state_t n_state;
 
 	for (;;) {
 
@@ -630,26 +630,26 @@ net_thread(void *arg)
 		 * transition callback */
 
 		switch (c->state) {
-			case NET_ST_INIT:
-				n_state = net_state_init(c->state, c);
+			case IO_ST_INIT:
+				n_state = io_state_init(c->state, c);
 				break;
-			case NET_ST_DXED:
-				n_state = net_state_dxed(c->state, c);
+			case IO_ST_DXED:
+				n_state = io_state_dxed(c->state, c);
 				break;
-			case NET_ST_CXNG:
-				n_state = net_state_cxng(c->state, c);
+			case IO_ST_CXNG:
+				n_state = io_state_cxng(c->state, c);
 				break;
-			case NET_ST_RXNG:
-				n_state = net_state_rxng(c->state, c);
+			case IO_ST_RXNG:
+				n_state = io_state_rxng(c->state, c);
 				break;
-			case NET_ST_CXED:
-				n_state = net_state_cxed(c->state, c);
+			case IO_ST_CXED:
+				n_state = io_state_cxed(c->state, c);
 				break;
-			case NET_ST_PING:
-				n_state = net_state_ping(c->state, c);
+			case IO_ST_PING:
+				n_state = io_state_ping(c->state, c);
 				break;
-			case NET_ST_TERM:
-				net_state_term(c->state, c);
+			case IO_ST_TERM:
+				io_state_term(c->state, c);
 				break;
 			default:
 				fatal("Unknown net state", 0);
@@ -670,14 +670,14 @@ net_thread(void *arg)
 }
 
 void
-net_free(struct connection *c)
+io_free(struct connection *c)
 {
 	/* TODO */
 	(void)c;
 }
 
 void
-net_loop(void)
+io_loop(void)
 {
 	static struct pollfd fds[1];
 
@@ -701,7 +701,7 @@ net_loop(void)
 
 
 
-	// TODO: rename net_read() or something?
+	// TODO: rename io_read() or something?
 
 
 
@@ -732,19 +732,19 @@ net_loop(void)
 			clearerr(stdin);
 			funlockfile(stdin);
 
-			PT_CB(net_cb_read_inp(buff, n));
+			PT_CB(io_cb_read_inp(buff, n));
 		}
 	}
 }
 
 const char*
-net_err(int err)
+io_err(int err)
 {
 	const char *err_strs[] = {
-		[NET_ERR_TRUNC] = "data truncated",
-		[NET_ERR_DXED]  = "socket not connected",
-		[NET_ERR_CXNG]  = "socket connection in progress",
-		[NET_ERR_CXED]  = "socket connected"
+		[IO_ERR_TRUNC] = "data truncated",
+		[IO_ERR_DXED]  = "socket not connected",
+		[IO_ERR_CXNG]  = "socket connection in progress",
+		[IO_ERR_CXED]  = "socket connected"
 	};
 
 	if (err >= 0 && (size_t)err < ELEMS(err_strs))

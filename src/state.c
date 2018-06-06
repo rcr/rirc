@@ -15,7 +15,7 @@
 #include <sys/ioctl.h>
 
 #include "src/draw.h"
-#include "src/net.h"
+#include "src/io.h"
 #include "src/state.h"
 #include "src/utils/utils.h"
 
@@ -556,7 +556,7 @@ channel_move_next(void)
 }
 
 void
-net_cb_cxng(const void *cb_obj, const char *fmt, ...)
+io_cb_cxng(const void *cb_obj, const char *fmt, ...)
 {
 	va_list ap;
 
@@ -570,7 +570,7 @@ net_cb_cxng(const void *cb_obj, const char *fmt, ...)
 }
 
 void
-net_cb_cxed(const void *cb_obj, const char *fmt, ...)
+io_cb_cxed(const void *cb_obj, const char *fmt, ...)
 {
 	va_list ap;
 
@@ -589,16 +589,16 @@ net_cb_cxed(const void *cb_obj, const char *fmt, ...)
 	int ret;
 	char nickbuf[] = "NICK rcr\r\n";
 	char userbuf[] = "USER rcr 8 * :real rcr\r\n";
-	if (0 != (ret = net_sendf(((struct server *)cb_obj)->connection, nickbuf, sizeof(nickbuf)-1, 0)))
-		newlinef(c, 0, "sendf fail", "%s", net_err(ret));
-	if (0 != (ret = net_sendf(((struct server *)cb_obj)->connection, userbuf, sizeof(userbuf)-1, 0)))
-		newlinef(c, 0, "sendf fail", "%s", net_err(ret));
+	if (0 != (ret = io_sendf(((struct server *)cb_obj)->connection, nickbuf, sizeof(nickbuf)-1, 0)))
+		newlinef(c, 0, "sendf fail", "%s", io_err(ret));
+	if (0 != (ret = io_sendf(((struct server *)cb_obj)->connection, userbuf, sizeof(userbuf)-1, 0)))
+		newlinef(c, 0, "sendf fail", "%s", io_err(ret));
 
 	redraw();
 }
 
 void
-net_cb_lost(const void *cb_obj, const char *fmt, ...)
+io_cb_lost(const void *cb_obj, const char *fmt, ...)
 {
 	/* TODO */
 
@@ -614,7 +614,7 @@ net_cb_lost(const void *cb_obj, const char *fmt, ...)
 }
 
 void
-net_cb_ping(const void *cb_obj, unsigned int ping)
+io_cb_ping(const void *cb_obj, unsigned int ping)
 {
 	struct channel *c = ((struct server *)cb_obj)->channel;
 
@@ -624,7 +624,7 @@ net_cb_ping(const void *cb_obj, unsigned int ping)
 }
 
 void
-net_cb_fail(const void *cb_obj, const char *fmt, ...)
+io_cb_fail(const void *cb_obj, const char *fmt, ...)
 {
 	va_list ap;
 
@@ -638,7 +638,7 @@ net_cb_fail(const void *cb_obj, const char *fmt, ...)
 }
 
 void
-net_cb_read_inp(char *buff, size_t count)
+io_cb_read_inp(char *buff, size_t count)
 {
 	input(ccur->input, buff, count);
 
@@ -647,7 +647,7 @@ net_cb_read_inp(char *buff, size_t count)
 }
 
 void
-net_cb_read_soc(char *buff, size_t count, const void *cb_obj)
+io_cb_read_soc(char *buff, size_t count, const void *cb_obj)
 {
 	struct channel *c = ((struct server *)cb_obj)->channel;
 

@@ -11,7 +11,7 @@
 #include <stdlib.h>
 #include <termios.h>
 
-#include "src/net.h"
+#include "src/io.h"
 #include "src/state.h"
 
 #define arg_error(...) \
@@ -82,7 +82,7 @@ main(int argc, char **argv)
 		char *nicks;
 		char *chans;
 		struct server *s;
-	} auto_servers[NET_MAX_CONNECTIONS];
+	} auto_servers[IO_MAX_CONNECTIONS];
 
 	/* FIXME: getopt_long is a GNU extension */
 	while ((c = getopt_long(argc, argv, "s:p:w:n:c:vh", long_opts, &opt_i))) {
@@ -97,8 +97,8 @@ main(int argc, char **argv)
 				if (*optarg == '-')
 					arg_error("-s/--connect requires an argument");
 
-				if (++server_i == NET_MAX_CONNECTIONS)
-					arg_error("exceeded maximum number of servers (%d)", NET_MAX_CONNECTIONS);
+				if (++server_i == IO_MAX_CONNECTIONS)
+					arg_error("exceeded maximum number of servers (%d)", IO_MAX_CONNECTIONS);
 
 				auto_servers[server_i].host = optarg;
 				auto_servers[server_i].port = "6667",
@@ -219,7 +219,7 @@ main(int argc, char **argv)
 	}
 
 	for (i = 0; i <= server_i; i++)
-		net_cx(auto_servers[i].s->connection);
+		io_cx(auto_servers[i].s->connection);
 
 	/* Set this after the last arg_error so we don't clear */
 	/* atexit doesn't set errno */
@@ -275,6 +275,6 @@ main_loop(void)
 		// bits and only draw when it can be aquired
 		redraw();
 
-		net_loop();
+		io_loop();
 	}
 }
