@@ -13,6 +13,7 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <sys/ioctl.h>
+#include <signal.h>
 
 #include "src/draw.h"
 #include "src/io.h"
@@ -663,4 +664,14 @@ io_cb_read_soc(char *buff, size_t count, const void *cb_obj)
 		recv_mesg((struct server *)cb_obj, &p);
 
 	redraw();
+}
+
+void
+io_cb_signal(int sig) {
+	if (sig == SIGWINCH) {
+		resize();
+		redraw();
+	} else {
+		newlinef(state.default_channel, 0, "-!!-", "unhandled signal %d", sig);
+	}
 }

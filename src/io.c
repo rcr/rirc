@@ -12,15 +12,14 @@
 #include <sys/socket.h>
 #include <sys/time.h>
 #include <sys/types.h>
+#include <termios.h>
 
 #include <unistd.h>
 #include <pthread.h>
 
-#include "src/io.h"
-#include "src/utils/utils.h"
 #include "config.h"
-
-#define ELEMS(X) (sizeof((X)) / sizeof((X)[0]))
+#include "src/io.h"
+#include "utils/utils.h"
 
 int
 sendf(char *a, struct server *b, const char *c, ...)
@@ -126,7 +125,6 @@ struct connection {
 };
 
 static void* io_thread(void*);
-
 static char* io_strerror(int, char*, size_t);
 
 static void io_close(struct connection*);
@@ -141,6 +139,12 @@ static enum io_state_t io_state_cxed(enum io_state_t, struct connection*);
 static enum io_state_t io_state_ping(enum io_state_t, struct connection*);
 static void io_state_term(enum io_state_t, struct connection*);
 
+static void io_init_sig(void);
+static void io_init_tty(void);
+static void io_term_sig(void);
+static void io_term_tty(void);
+
+static struct termios term;
 static pthread_cond_t init_cond;
 static pthread_mutex_t cb_mutex;
 static pthread_mutex_t init_mutex;
@@ -676,64 +680,76 @@ io_free(struct connection *c)
 	(void)c;
 }
 
-void
-io_loop(void)
+static void
+io_init_sig(void)
 {
-	static struct pollfd fds[1];
+	// TODO
+}
 
-	fds[0].events = POLLIN;
-	fds[0].fd = STDIN_FILENO;
+static void
+io_init_tty(void)
+{
+	struct termios nterm;
 
-	// TODO: ditch poll, just block on read
+	if (isatty(STDIN_FILENO) == 0)
+		fatal("isatty", errno);
 
-	while (poll(fds, 1, -1) < 0) {
+	if (tcgetattr(STDIN_FILENO, &term) < 0)
+		fatal("tcgetattr", errno);
 
-		/* Exit polling loop to handle signal event */
-		if (errno == EINTR)
-			/* TODO: ensure that user signal isnt interupting this */
-			return;
+	nterm = term;
+	nterm.c_lflag &= ~(ECHO | ICANON | ISIG);
+	nterm.c_cc[VMIN]  = 1;
+	nterm.c_cc[VTIME] = 0;
 
-		if (errno == EAGAIN)
-			continue;
+	if (tcsetattr(STDIN_FILENO, TCSANOW, &nterm) < 0)
+		fatal("tcsetattr", errno);
 
-		fatal("poll", errno);
-	}
+	if (atexit(io_term_tty) < 0)
+		fatal("atexit", errno);
+}
 
+static void
+io_term_sig(void)
+{
 
+}
 
-	// TODO: rename io_read() or something?
+static void
+io_term_tty(void)
+{
+	if (tcsetattr(STDIN_FILENO, TCSADRAIN, &term) < 0)
+		fatal("tcsetattr", errno);
+}
 
+void
+io_loop(void (*io_cb)(void))
+{
+	io_init_sig();
+	io_init_tty();
 
+	for (;;) {
+		char buf[512];
+		ssize_t ret = read(STDIN_FILENO, buf, sizeof(buf));
 
-	/* Handle user input */
-	if (fds[0].revents) {
-
-		if (fds[0].revents & (POLLERR | POLLHUP | POLLNVAL))
-			fatal("stdin error", 0);
-
-		if (fds[0].revents & POLLIN) {
-			char buff[512];
-			int c;
-			size_t n = 0;
-
-			flockfile(stdin);
-
-			while ((c = getc_unlocked(stdin)) != EOF) {
-
-				if (n == sizeof(buff))
-					continue;
-
-				buff[n++] = (char) c;
-			}
-
-			if (ferror(stdin))
-				fatal("ferrof", errno);
-
-			clearerr(stdin);
-			funlockfile(stdin);
-
-			PT_CB(io_cb_read_inp(buff, n));
+		if (ret > 0) {
+			PT_CB(io_cb_read_inp(buf, ret));
 		}
+
+		if (ret <= 0) {
+			if (errno == EINTR) {
+				/* TODO
+				if (flag_sigwinch) {
+					flag_sigwinch = 0;
+					PT_CB(io_cb_signal(SIGWINCH));
+				}
+				 */
+			} else {
+				fatal("read", errno);
+			}
+		}
+
+		io_cb();
 	}
 }
 

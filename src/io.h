@@ -83,7 +83,7 @@ struct connection* connection(
 	const char*); /* port */
 
 void io_free(struct connection*);
-void io_loop(void);
+void io_loop(void (*)(void));
 
 /* Formatted write to connection */
 int io_sendf(struct connection*, const char*, ...);
@@ -98,6 +98,9 @@ void io_cb_cxed(const void*, const char*, ...);
 void io_cb_fail(const void*, const char*, ...);
 void io_cb_lost(const void*, const char*, ...);
 void io_cb_ping(const void*, unsigned int);
+
+/* Signal callback in non-signal handler context */
+void io_cb_signal(int);
 
 /* Network data callback */
 void io_cb_read_inp(char*, size_t);
