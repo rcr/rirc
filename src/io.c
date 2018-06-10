@@ -141,7 +141,6 @@ static void io_state_term(enum io_state_t, struct connection*);
 
 static void io_init_sig(void);
 static void io_init_tty(void);
-static void io_term_sig(void);
 static void io_term_tty(void);
 
 static struct termios term;
@@ -150,11 +149,12 @@ static pthread_mutex_t cb_mutex;
 static pthread_mutex_t init_mutex;
 static pthread_once_t init_once = PTHREAD_ONCE_INIT;
 
+static volatile sig_atomic_t flag_sigwinch;
+
 static void
 io_close(struct connection *c)
 {
 	/* Lock thread state to prevent ambiguous handling of EINTR on close() */
-
 	if (c->soc >= 0) {
 		PT_LK(&(c->pt_state_mutex));
 		PT_CF(close(c->soc));
@@ -191,8 +191,11 @@ io_init(void)
 static void
 io_term(void)
 {
-	// FIXME: at this point the callback mutex might have already been used uninitialized
-	// because the main thread is running...
+	int ret;
+
+	if ((ret = pthread_mutex_trylock(&cb_mutex)) < 0 && ret != EBUSY)
+		fatal("pthread_mutex_trylock", ret);
+
 	PT_UL(&cb_mutex);
 	PT_CF(pthread_cond_destroy(&init_cond));
 	PT_CF(pthread_mutex_destroy(&cb_mutex));
@@ -360,6 +363,11 @@ io_state_init(enum io_state_t o_state, struct connection *c)
 	/* Initial thread state */
 
 	(void) o_state;
+
+	sigset_t set;
+	sigfillset(&set);
+	sigdelset(&set, SIGUSR1);
+	PT_CF(pthread_sigmask(SIG_BLOCK, &set, NULL));
 
 	PT_LK(&(c->pt_state_mutex));
 	PT_LK(&init_mutex);
@@ -681,9 +689,22 @@ io_free(struct connection *c)
 }
 
 static void
+sigaction_sigwinch(int sig)
+{
+	UNUSED(sig);
+	flag_sigwinch = 1;
+}
+
+static void
 io_init_sig(void)
 {
-	// TODO
+	struct sigaction sa;
+
+	sa.sa_handler = sigaction_sigwinch;
+	sigemptyset(&sa.sa_mask);
+
+	if (sigaction(SIGWINCH, &sa, NULL) < 0)
+		fatal("sigaction - SIGWINCH", errno);
 }
 
 static void
@@ -706,13 +727,7 @@ io_init_tty(void)
 		fatal("tcsetattr", errno);
 
 	if (atexit(io_term_tty) < 0)
-		fatal("atexit", errno);
-}
-
-static void
-io_term_sig(void)
-{
-
+		fatal("atexit", 0);
 }
 
 static void
@@ -723,8 +738,10 @@ io_term_tty(void)
 }
 
 void
-io_loop(void (*io_cb)(void))
+io_loop(void (*io_loop_cb)(void))
 {
+	PT_CF(pthread_once(&init_once, io_init));
+
 	io_init_sig();
 	io_init_tty();
 
@@ -732,24 +749,22 @@ io_loop(void (*io_cb)(void))
 		char buf[512];
 		ssize_t ret = read(STDIN_FILENO, buf, sizeof(buf));
 
-		if (ret > 0) {
+		if (ret > 0)
 			PT_CB(io_cb_read_inp(buf, ret));
-		}
 
 		if (ret <= 0) {
 			if (errno == EINTR) {
-				/* TODO
 				if (flag_sigwinch) {
 					flag_sigwinch = 0;
 					PT_CB(io_cb_signal(SIGWINCH));
 				}
-				 */
 			} else {
-				fatal("read", errno);
+				fatal("read", ret ? errno : 0);
 			}
 		}
 
-		io_cb();
+		if (io_loop_cb)
+			io_loop_cb();
 	}
 }
 
@@ -763,8 +778,10 @@ io_err(int err)
 		[IO_ERR_CXED]  = "socket connected"
 	};
 
-	if (err >= 0 && (size_t)err < ELEMS(err_strs))
-		return err_strs[err];
+	const char *err_str = NULL;
 
-	return NULL;
+	if (err >= 0 && (size_t)err < ELEMS(err_strs))
+		err_str = err_strs[err];
+
+	return err_str ? err_str : "unknown error";
 }

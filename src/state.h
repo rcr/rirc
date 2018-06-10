@@ -26,7 +26,6 @@ unsigned int _term_rows(void);
 void resize(void);
 
 void init_state(void);
-void free_state(void);
 
 //TODO: move to channel.c, function of server's channel list
 /* Useful state retrieval abstractions */

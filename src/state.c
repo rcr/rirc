@@ -5,7 +5,6 @@
  *
  **/
 
-
 #include <ctype.h>
 #include <stdlib.h>
 #include <string.h>
@@ -40,6 +39,7 @@ state_server_list(void)
 }
 
 static int action_close_server(char);
+static void term_state(void);
 
 static void _newline(struct channel*, enum buffer_line_t, const char*, const char*, va_list);
 
@@ -87,7 +87,7 @@ void
 init_state(void)
 {
 	/* atexit doesn't set errno */
-	if (atexit(free_state) != 0)
+	if (atexit(term_state) != 0)
 		fatal("atexit", 0);
 
 	state.default_channel = state.current_channel = new_channel("rirc", NULL, NULL, BUFFER_OTHER);
@@ -107,14 +107,25 @@ init_state(void)
 
 	/* Initiate a full redraw */
 	resize();
+	redraw();
 }
 
-void
-free_state(void)
+static void
+term_state(void)
 {
 	/* Exit handler; must return normally */
 
 	free_channel(state.default_channel);
+
+	/* Reset terminal colours */
+	printf("\x1b[38;0;m");
+	printf("\x1b[48;0;m");
+
+#ifndef DEBUG
+	/* Clear screen */
+	if (!fatal_exit)
+		printf("\x1b[H\x1b[J");
+#endif
 }
 
 void
@@ -566,8 +577,6 @@ io_cb_cxng(const void *cb_obj, const char *fmt, ...)
 	va_start(ap, fmt);
 	_newline(c, 0, "--", fmt, ap);
 	va_end(ap);
-
-	redraw();
 }
 
 void
@@ -594,8 +603,6 @@ io_cb_cxed(const void *cb_obj, const char *fmt, ...)
 		newlinef(c, 0, "sendf fail", "%s", io_err(ret));
 	if (0 != (ret = io_sendf(((struct server *)cb_obj)->connection, userbuf, sizeof(userbuf)-1, 0)))
 		newlinef(c, 0, "sendf fail", "%s", io_err(ret));
-
-	redraw();
 }
 
 void
@@ -610,8 +617,6 @@ io_cb_lost(const void *cb_obj, const char *fmt, ...)
 	va_start(ap, fmt);
 	_newline(c, 0, "-!!-", fmt, ap);
 	va_end(ap);
-
-	redraw();
 }
 
 void
@@ -621,7 +626,6 @@ io_cb_ping(const void *cb_obj, unsigned int ping)
 
 	/* TODO */
 	newlinef(c, 0, "ping:", "%u", ping);
-	redraw();
 }
 
 void
@@ -634,8 +638,6 @@ io_cb_fail(const void *cb_obj, const char *fmt, ...)
 	va_start(ap, fmt);
 	_newline(c, 0, "-!!-", fmt, ap);
 	va_end(ap);
-
-	redraw();
 }
 
 void
@@ -662,15 +664,12 @@ io_cb_read_soc(char *buff, size_t count, const void *cb_obj)
 		newlinef(c, 0, "-!!-", "failed to parse message");
 	else
 		recv_mesg((struct server *)cb_obj, &p);
-
-	redraw();
 }
 
 void
 io_cb_signal(int sig) {
 	if (sig == SIGWINCH) {
 		resize();
-		redraw();
 	} else {
 		newlinef(state.default_channel, 0, "-!!-", "unhandled signal %d", sig);
 	}

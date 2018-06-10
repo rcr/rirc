@@ -8,7 +8,6 @@
 #define arg_error(...) \
 	do { fprintf(stderr, __VA_ARGS__); exit(EXIT_FAILURE); } while (0);
 
-static void cleanup(void);
 static void usage(void);
 
 /* Global configuration */
@@ -188,31 +187,7 @@ main(int argc, char **argv)
 	for (i = 0; i <= server_i; i++)
 		io_cx(auto_servers[i].s->connection);
 
-	/* Set this after the last arg_error so we don't clear */
-	/* atexit doesn't set errno */
-	if (atexit(cleanup) != 0)
-		fatal("atexit", 0);
-
-	resize();
-	redraw();
-
 	io_loop(redraw);
 
 	return EXIT_SUCCESS;
-}
-
-static void
-cleanup(void)
-{
-	/* Exit handler; must return normally */
-
-	/* Reset terminal colours */
-	printf("\x1b[38;0;m");
-	printf("\x1b[48;0;m");
-
-#ifndef DEBUG
-	/* Clear screen */
-	if (!fatal_exit)
-		printf("\x1b[H\x1b[J");
-#endif
 }

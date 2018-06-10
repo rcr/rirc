@@ -1,6 +1,5 @@
-#ifndef NET2_H
-#define NET2_H
-
+#ifndef IO_H
+#define IO_H
 
 /* FIXME: refactoring, stubbed until removal */
 struct server;
@@ -8,7 +7,7 @@ int sendf(char*, struct server*, const char*, ...);
 void server_disconnect(struct server*, int, int, char*);
 
 
-/* Network connection handling and state
+/* Handling off all network io, user input and signals
  *
  * The state of a connection at any given time can be
  * described by one of the following:
@@ -66,10 +65,16 @@ void server_disconnect(struct server*, int, int, char*);
  *   from stdin:  io_cb_read_inp
  *   from socket: io_cb_read_soc
  *
+ * Signals registered to be caught result in non-signal handler context callback:
+ *   io_cb_signal
+ *
  * Failed connection attempts enter a retry cycle with exponential
  * backoff time given by:
  *   t(n) = t(n - 1) * factor
  *   t(0) = base
+ *
+ * Calling io_loop starts the io context and never returns, a callback
+ * function can be passed to io_loop which is executed on all input events
  */
 
 #define IO_MAX_CONNECTIONS 8

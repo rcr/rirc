@@ -13,9 +13,6 @@
 #define TO_STR(X) #X
 #define STR(X) TO_STR(X)
 
-/* Suppress 'unused parameter' warnings */
-#define UNUSED(X) ((void)(X))
-
 extern struct config
 {
 	char *username;
