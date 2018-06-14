@@ -73,8 +73,7 @@ debug:   $(EXE_D)
 test:    $(DIR_B) $(OBJS_T)
 
 clean:
-	@echo cleaning
-	@rm -rf $(DIR_B) $(EXE_R) $(EXE_D)
+	rm -rf $(DIR_B) $(EXE_R) $(EXE_D)
 
 define make-dirs
 	for dir in $(SRCDIRS);   do mkdir -p $(DIR_B)/$$dir; done

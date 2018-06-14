@@ -567,6 +567,15 @@ channel_move_next(void)
 	}
 }
 
+
+
+
+
+
+
+
+
+
 void
 io_cb_cxng(const void *cb_obj, const char *fmt, ...)
 {
@@ -667,10 +676,13 @@ io_cb_read_soc(char *buff, size_t count, const void *cb_obj)
 }
 
 void
-io_cb_signal(int sig) {
-	if (sig == SIGWINCH) {
-		resize();
-	} else {
-		newlinef(state.default_channel, 0, "-!!-", "unhandled signal %d", sig);
+io_cb_signal(int sig)
+{
+	switch (sig) {
+		case SIGWINCH:
+			resize();
+			break;
+		default:
+			newlinef(state.default_channel, 0, "-!!-", "unhandled signal %d", sig);
 	}
 }

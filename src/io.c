@@ -1,21 +1,30 @@
+/* TODO:
+ * check spurious wakeup condition for all waits/timedwaits
+ */
+
+#ifndef _DARWIN_C_SOURCE
+#define _DARWIN_C_SOURCE _POSIX_C_SOURCE
+#endif
+
+#ifndef __BSD_VISIBLE
+#define __BSD_VISIBLE 1
+#endif
+
 #include <errno.h>
 #include <fcntl.h>
 #include <netdb.h>
-#include <poll.h>
+#include <pthread.h>
 #include <sched.h>
 #include <signal.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/select.h>
 #include <sys/socket.h>
 #include <sys/time.h>
 #include <sys/types.h>
 #include <termios.h>
-
 #include <unistd.h>
-#include <pthread.h>
 
 #include "config.h"
 #include "src/io.h"
@@ -42,7 +51,8 @@ server_disconnect(struct server *a, int b, int c, char *d)
 }
 
 /* RFC 2812, section 2.3 */
-#define IO_MESG_LEN 510
+#define IO_MESG_SEP "\r\n"
+#define IO_MESG_LEN 512
 
 #ifndef IO_PING_MIN
 	#define IO_PING_MIN 150
@@ -114,7 +124,7 @@ struct connection {
 	pthread_t       pt_tid;
 	struct {
 		size_t i;
-		char buf[IO_MESG_LEN + 1];
+		char buf[IO_MESG_LEN];
 	} read;
 	volatile enum io_force_state {
 		IO_ST_FORCE_NONE,
@@ -124,31 +134,36 @@ struct connection {
 	char ipbuf[INET6_ADDRSTRLEN];
 };
 
-static void* io_thread(void*);
 static char* io_strerror(int, char*, size_t);
-
 static void io_close(struct connection*);
 static void io_init(void);
+static void io_init_sig(void);
+static void io_init_tty(void);
 static void io_term(void);
+static void io_term_tty(void);
+static void* io_thread(void*);
 
+/* TODO: not all of these actually need an o state, ones who dont:
+ * init 
+ * rxng - only ever from a failed connection
+ * cxed - only ever from a successful connection? or when returning from PING
+ *
+ */
 static enum io_state_t io_state_init(enum io_state_t, struct connection*);
 static enum io_state_t io_state_dxed(enum io_state_t, struct connection*);
 static enum io_state_t io_state_rxng(enum io_state_t, struct connection*);
 static enum io_state_t io_state_cxng(enum io_state_t, struct connection*);
 static enum io_state_t io_state_cxed(enum io_state_t, struct connection*);
 static enum io_state_t io_state_ping(enum io_state_t, struct connection*);
+
+// FIXME: probably dont need a terminal state, just pthread cancel and free?
 static void io_state_term(enum io_state_t, struct connection*);
 
-static void io_init_sig(void);
-static void io_init_tty(void);
-static void io_term_tty(void);
-
-static struct termios term;
 static pthread_cond_t init_cond;
 static pthread_mutex_t cb_mutex;
 static pthread_mutex_t init_mutex;
 static pthread_once_t init_once = PTHREAD_ONCE_INIT;
-
+static struct termios term;
 static volatile sig_atomic_t flag_sigwinch;
 
 static void
@@ -179,6 +194,7 @@ io_init(void)
 	PT_CF(pthread_mutexattr_settype(&m_attr, PTHREAD_MUTEX_ERRORCHECK));
 
 	PT_CF(pthread_cond_init(&init_cond, NULL));
+
 	PT_CF(pthread_mutex_init(&cb_mutex, &m_attr));
 	PT_CF(pthread_mutex_init(&init_mutex, &m_attr));
 
@@ -232,7 +248,6 @@ connection(const void *obj, const char *host, const char *port)
 	/* Wait for thread to reach initialized and waiting state */
 	PT_LK(&init_mutex);
 	PT_CF(pthread_create(&(c->pt_tid), &t_attr, io_thread, c));
-	/* TODO: check spurrious wakeups */
 	PT_CF(pthread_cond_wait(&init_cond, &init_mutex));
 	PT_UL(&init_mutex);
 
@@ -373,7 +388,6 @@ io_state_init(enum io_state_t o_state, struct connection *c)
 	PT_LK(&init_mutex);
 	PT_UL(&init_mutex);
 	PT_CF(pthread_cond_signal(&init_cond));
-	/* TODO: check spurrious wakeups */
 	PT_CF(pthread_cond_wait(&(c->pt_state_cond), &(c->pt_state_mutex)));
 	PT_UL(&(c->pt_state_mutex));
 
@@ -387,7 +401,6 @@ io_state_dxed(enum io_state_t o_state, struct connection *c)
 
 	PT_LK(&(c->pt_state_mutex));
 	/* TODO: check forced state */
-	/* TODO: check spurrious wakeups */
 	PT_CF(pthread_cond_wait(&(c->pt_state_cond), &(c->pt_state_mutex)));
 	PT_UL(&(c->pt_state_mutex));
 
@@ -415,7 +428,6 @@ io_state_rxng(enum io_state_t o_state, struct connection *c)
 	PT_LK(&(c->pt_state_mutex));
 	/* TODO: check forced state */
 	/* TODO: check non-timeout error */
-	/* TODO: check spurrious wakeups */
 	pthread_cond_timedwait(&(c->pt_state_cond), &(c->pt_state_mutex), &ts);
 	PT_UL(&(c->pt_state_mutex));
 
@@ -492,14 +504,12 @@ io_state_cxed(enum io_state_t o_state, struct connection *c)
 		.tv_sec = 3
 	};
 
-	ssize_t i, ret;
-
 	if (setsockopt(c->soc, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) < 0)
 		{ fatal("setsockopt", errno); }
 
-	char recvbuf[512];
-
 	for (;;) {
+		char recvbuf[IO_MESG_LEN];
+		ssize_t ret;
 
 		if ((ret = recv(c->soc, recvbuf, sizeof(recvbuf), 0)) <= 0) {
 
@@ -525,6 +535,12 @@ io_state_cxed(enum io_state_t o_state, struct connection *c)
 			fatal("recv", errno);
 		}
 
+		// TODO
+		// io_read(c, buf, red
+	}
+}
+
+#if 0
 		for (i = 0; i < ret; i++) {
 
 			if (recvbuf[i] == '\n')
@@ -540,8 +556,7 @@ io_state_cxed(enum io_state_t o_state, struct connection *c)
 				c->read.buf[c->read.i++] = recvbuf[i];
 			}
 		}
-	}
-}
+#endif
 
 static enum io_state_t
 io_state_ping(enum io_state_t o_state, struct connection *c)
@@ -550,16 +565,14 @@ io_state_ping(enum io_state_t o_state, struct connection *c)
 		.tv_sec = 2
 	};
 
-	ssize_t i, ret;
-
 	if (setsockopt(c->soc, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) < 0)
 		{ fatal("setsockopt", errno); }
 
-	char recvbuf[512];
-
-	unsigned ping = 0;
 
 	for (;;) {
+		char recvbuf[IO_MESG_LEN];
+		ssize_t ret;
+		unsigned ping = 0;
 
 		if ((ret = recv(c->soc, recvbuf, sizeof(recvbuf), 0)) <= 0) {
 
@@ -592,6 +605,14 @@ io_state_ping(enum io_state_t o_state, struct connection *c)
 			fatal("recv", errno);
 		}
 
+		// TODO
+		// io_read(...
+
+		return IO_ST_CXED;
+	}
+}
+
+#if 0
 		for (i = 0; i < ret; i++) {
 
 			if (recvbuf[i] == '\n')
@@ -607,10 +628,7 @@ io_state_ping(enum io_state_t o_state, struct connection *c)
 				c->read.buf[c->read.i++] = recvbuf[i];
 			}
 		}
-
-		return IO_ST_CXED;
-	}
-}
+#endif
 
 static void
 io_state_term(enum io_state_t o_state, struct connection *c)
@@ -633,6 +651,11 @@ io_thread(void *arg)
 	struct connection *c = arg;
 
 	enum io_state_t n_state;
+
+	// TODO:
+	//
+	//
+	// table of callbacks from state->state
 
 	for (;;) {
 
@@ -684,7 +707,7 @@ io_thread(void *arg)
 void
 io_free(struct connection *c)
 {
-	/* TODO */
+	/* TODO  fatal if not disconnected */
 	(void)c;
 }
 
