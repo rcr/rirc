@@ -50,6 +50,10 @@ extern int fatal_exit;
 #define MAX(A, B) ((A) > (B) ? (A) : (B))
 #define MIN(A, B) ((A) > (B) ? (B) : (A))
 
+#define ELEMS(X) (sizeof((X)) / sizeof((X)[0]))
+
+#define UNUSED(X) ((void)(X))
+
 /* Irrecoverable error
  *   this define is precluded in test.h to aggregate fatal errors in testcases */
 #ifndef fatal

@@ -6,7 +6,7 @@
 #include "src/components/buffer.h"
 #include "src/components/channel.h"
 #include "src/components/mode.h"
-#include "src/net.h"
+#include "src/io.h"
 
 #include "src/rirc.h" // NICKSIZE
 

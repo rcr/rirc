@@ -5,7 +5,6 @@
  *
  **/
 
-
 #include <ctype.h>
 #include <stdlib.h>
 #include <string.h>
@@ -13,9 +12,10 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <sys/ioctl.h>
+#include <signal.h>
 
 #include "src/draw.h"
-#include "src/net.h"
+#include "src/io.h"
 #include "src/state.h"
 #include "src/utils/utils.h"
 
@@ -39,6 +39,7 @@ state_server_list(void)
 }
 
 static int action_close_server(char);
+static void term_state(void);
 
 static void _newline(struct channel*, enum buffer_line_t, const char*, const char*, va_list);
 
@@ -86,7 +87,7 @@ void
 init_state(void)
 {
 	/* atexit doesn't set errno */
-	if (atexit(free_state) != 0)
+	if (atexit(term_state) != 0)
 		fatal("atexit", 0);
 
 	state.default_channel = state.current_channel = new_channel("rirc", NULL, NULL, BUFFER_OTHER);
@@ -106,14 +107,25 @@ init_state(void)
 
 	/* Initiate a full redraw */
 	resize();
+	redraw();
 }
 
-void
-free_state(void)
+static void
+term_state(void)
 {
 	/* Exit handler; must return normally */
 
 	free_channel(state.default_channel);
+
+	/* Reset terminal colours */
+	printf("\x1b[38;0;m");
+	printf("\x1b[48;0;m");
+
+#ifndef DEBUG
+	/* Clear screen */
+	if (!fatal_exit)
+		printf("\x1b[H\x1b[J");
+#endif
 }
 
 void
@@ -555,8 +567,17 @@ channel_move_next(void)
 	}
 }
 
+
+
+
+
+
+
+
+
+
 void
-net_cb_cxng(const void *cb_obj, const char *fmt, ...)
+io_cb_cxng(const void *cb_obj, const char *fmt, ...)
 {
 	va_list ap;
 
@@ -565,12 +586,10 @@ net_cb_cxng(const void *cb_obj, const char *fmt, ...)
 	va_start(ap, fmt);
 	_newline(c, 0, "--", fmt, ap);
 	va_end(ap);
-
-	redraw();
 }
 
 void
-net_cb_cxed(const void *cb_obj, const char *fmt, ...)
+io_cb_cxed(const void *cb_obj, const char *fmt, ...)
 {
 	va_list ap;
 
@@ -589,16 +608,14 @@ net_cb_cxed(const void *cb_obj, const char *fmt, ...)
 	int ret;
 	char nickbuf[] = "NICK rcr\r\n";
 	char userbuf[] = "USER rcr 8 * :real rcr\r\n";
-	if (0 != (ret = net_sendf(((struct server *)cb_obj)->connection, nickbuf, sizeof(nickbuf)-1, 0)))
-		newlinef(c, 0, "sendf fail", "%s", net_err(ret));
-	if (0 != (ret = net_sendf(((struct server *)cb_obj)->connection, userbuf, sizeof(userbuf)-1, 0)))
-		newlinef(c, 0, "sendf fail", "%s", net_err(ret));
-
-	redraw();
+	if (0 != (ret = io_sendf(((struct server *)cb_obj)->connection, nickbuf, sizeof(nickbuf)-1, 0)))
+		newlinef(c, 0, "sendf fail", "%s", io_err(ret));
+	if (0 != (ret = io_sendf(((struct server *)cb_obj)->connection, userbuf, sizeof(userbuf)-1, 0)))
+		newlinef(c, 0, "sendf fail", "%s", io_err(ret));
 }
 
 void
-net_cb_lost(const void *cb_obj, const char *fmt, ...)
+io_cb_lost(const void *cb_obj, const char *fmt, ...)
 {
 	/* TODO */
 
@@ -609,22 +626,19 @@ net_cb_lost(const void *cb_obj, const char *fmt, ...)
 	va_start(ap, fmt);
 	_newline(c, 0, "-!!-", fmt, ap);
 	va_end(ap);
-
-	redraw();
 }
 
 void
-net_cb_ping(const void *cb_obj, unsigned int ping)
+io_cb_ping(const void *cb_obj, unsigned int ping)
 {
 	struct channel *c = ((struct server *)cb_obj)->channel;
 
 	/* TODO */
 	newlinef(c, 0, "ping:", "%u", ping);
-	redraw();
 }
 
 void
-net_cb_fail(const void *cb_obj, const char *fmt, ...)
+io_cb_fail(const void *cb_obj, const char *fmt, ...)
 {
 	va_list ap;
 
@@ -633,12 +647,10 @@ net_cb_fail(const void *cb_obj, const char *fmt, ...)
 	va_start(ap, fmt);
 	_newline(c, 0, "-!!-", fmt, ap);
 	va_end(ap);
-
-	redraw();
 }
 
 void
-net_cb_read_inp(char *buff, size_t count)
+io_cb_read_inp(char *buff, size_t count)
 {
 	input(ccur->input, buff, count);
 
@@ -647,7 +659,7 @@ net_cb_read_inp(char *buff, size_t count)
 }
 
 void
-net_cb_read_soc(char *buff, size_t count, const void *cb_obj)
+io_cb_read_soc(char *buff, size_t count, const void *cb_obj)
 {
 	struct channel *c = ((struct server *)cb_obj)->channel;
 
@@ -661,6 +673,16 @@ net_cb_read_soc(char *buff, size_t count, const void *cb_obj)
 		newlinef(c, 0, "-!!-", "failed to parse message");
 	else
 		recv_mesg((struct server *)cb_obj, &p);
+}
 
-	redraw();
+void
+io_cb_signal(int sig)
+{
+	switch (sig) {
+		case SIGWINCH:
+			resize();
+			break;
+		default:
+			newlinef(state.default_channel, 0, "-!!-", "unhandled signal %d", sig);
+	}
 }

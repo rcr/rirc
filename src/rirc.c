@@ -1,31 +1,14 @@
-/* For sigaction */
-#define _DARWIN_C_SOURCE 200112L
-/* For SIGWINCH on FreeBSD */
-#ifndef __BSD_VISIBLE
-#define __BSD_VISIBLE 1
-#endif
-
 #include <getopt.h>
-#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <termios.h>
 
-#include "src/net.h"
+#include "src/io.h"
 #include "src/state.h"
 
 #define arg_error(...) \
 	do { fprintf(stderr, __VA_ARGS__); exit(EXIT_FAILURE); } while (0);
 
-static void cleanup(void);
-static void main_loop(void);
 static void usage(void);
-static void signal_sigwinch(int);
-
-static struct termios oterm;
-static struct sigaction sa_sigwinch;
-
-static volatile sig_atomic_t flag_sigwinch;
 
 /* Global configuration */
 struct config config =
@@ -82,7 +65,7 @@ main(int argc, char **argv)
 		char *nicks;
 		char *chans;
 		struct server *s;
-	} auto_servers[NET_MAX_CONNECTIONS];
+	} auto_servers[IO_MAX_CONNECTIONS];
 
 	/* FIXME: getopt_long is a GNU extension */
 	while ((c = getopt_long(argc, argv, "s:p:w:n:c:vh", long_opts, &opt_i))) {
@@ -97,8 +80,8 @@ main(int argc, char **argv)
 				if (*optarg == '-')
 					arg_error("-s/--connect requires an argument");
 
-				if (++server_i == NET_MAX_CONNECTIONS)
-					arg_error("exceeded maximum number of servers (%d)", NET_MAX_CONNECTIONS);
+				if (++server_i == IO_MAX_CONNECTIONS)
+					arg_error("exceeded maximum number of servers (%d)", IO_MAX_CONNECTIONS);
 
 				auto_servers[server_i].host = optarg;
 				auto_servers[server_i].port = "6667",
@@ -167,30 +150,13 @@ main(int argc, char **argv)
 		}
 	}
 
+	// FIXME: move this out of here
 	/* stdout is fflush()'ed on every redraw */
 	errno = 0; /* "may set errno" */
 	if (setvbuf(stdout, NULL, _IOFBF, 0) != 0)
 		fatal("setvbuf", errno);
 
-	/* Set terminal to raw mode */
-	if (tcgetattr(0, &oterm) < 0)
-		fatal("tcgetattr", errno);
-
-	struct termios nterm = oterm;
-
-	nterm.c_lflag &= ~(ECHO | ICANON | ISIG);
-	nterm.c_cc[VMIN]  = 0;
-	nterm.c_cc[VTIME] = 0;
-
-	if (tcsetattr(0, TCSADRAIN, &nterm) < 0)
-		fatal("tcsetattr", errno);
-
 	srand(time(NULL));
-
-	/* Set up signal handlers */
-	sa_sigwinch.sa_handler = signal_sigwinch;
-	if (sigaction(SIGWINCH, &sa_sigwinch, NULL) == -1)
-		fatal("sigaction - SIGWINCH", errno);
 
 	init_state();
 
@@ -219,62 +185,9 @@ main(int argc, char **argv)
 	}
 
 	for (i = 0; i <= server_i; i++)
-		net_cx(auto_servers[i].s->connection);
+		io_cx(auto_servers[i].s->connection);
 
-	/* Set this after the last arg_error so we don't clear */
-	/* atexit doesn't set errno */
-	if (atexit(cleanup) != 0)
-		fatal("atexit", 0);
-
-	main_loop();
+	io_loop(redraw);
 
 	return EXIT_SUCCESS;
-}
-
-static void
-cleanup(void)
-{
-	/* Exit handler; must return normally */
-
-	/* Reset terminal colours */
-	printf("\x1b[38;0;m");
-	printf("\x1b[48;0;m");
-
-#ifndef DEBUG
-	/* Clear screen */
-	if (!fatal_exit)
-		printf("\x1b[H\x1b[J");
-#endif
-
-	/* Reset terminal modes */
-	tcsetattr(0, TCSADRAIN, &oterm);
-}
-
-/* TODO: install sig handlers for cleanly exiting in debug mode */
-static void
-signal_sigwinch(int signum)
-{
-	UNUSED(signum);
-
-	flag_sigwinch = 1;
-}
-
-static void
-main_loop(void)
-{
-	for (;;) {
-
-		/* Window has changed size */
-		if (flag_sigwinch) {
-			flag_sigwinch = 0;
-			resize();
-		}
-
-		// FIXME: start drawing here and then a net callback on `-s localhost` starts drawing
-		// move the redraws to input, alternatively spinlock the draw function to gather all draw
-		// bits and only draw when it can be aquired
-		redraw();
-
-		net_loop();
-	}
 }

@@ -6,7 +6,7 @@
 #include <sys/time.h>
 
 #include "src/draw.h"
-#include "src/net.h"
+#include "src/io.h"
 #include "src/state.h"
 #include "src/utils/utils.h"
 

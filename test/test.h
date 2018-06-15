@@ -168,6 +168,13 @@ _print_testcase_name_(const char *name)
 static int
 _run_tests_(const char *filename, testcase testcases[], size_t len)
 {
+	/* Silence compiler warnings for test functions/vars that are included but not used */
+	((void)(_assert_strcmp));
+	((void)(_assert_fatal_));
+	((void)(_failure_printed_));
+	((void)(_tc_fatal_expected_));
+	((void)(_tc_fatal_unexpected_));
+
 	printf("%s... ", filename);
 	fflush(stdout);
 
@@ -197,13 +204,6 @@ _run_tests_(const char *filename, testcase testcases[], size_t len)
 		printf(" OK\n");
 		return EXIT_SUCCESS;
 	}
-
-	/* Silence compiler warnings for test functions/vars that are included but not used */
-	((void)(_assert_strcmp));
-	((void)(_assert_fatal_));
-	((void)(_failure_printed_));
-	((void)(_tc_fatal_expected_));
-	((void)(_tc_fatal_unexpected_));
 }
 
 /* Macro so the proper filename is printed */
