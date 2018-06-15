@@ -109,6 +109,7 @@ struct connection {
 	const char *host;
 	const char *port;
 	enum io_state_t {
+		IO_ST_INVALID,
 		IO_ST_INIT, /* Initial thread state */
 		IO_ST_DXED, /* Socket disconnected, passive */
 		IO_ST_RXNG, /* Socket disconnected, pending reconnect */
@@ -155,9 +156,7 @@ static enum io_state_t io_state_rxng(enum io_state_t, struct connection*);
 static enum io_state_t io_state_cxng(enum io_state_t, struct connection*);
 static enum io_state_t io_state_cxed(enum io_state_t, struct connection*);
 static enum io_state_t io_state_ping(enum io_state_t, struct connection*);
-
-// FIXME: probably dont need a terminal state, just pthread cancel and free?
-static void io_state_term(enum io_state_t, struct connection*);
+static enum io_state_t io_state_term(enum io_state_t, struct connection*);
 
 static pthread_cond_t init_cond;
 static pthread_mutex_t cb_mutex;
@@ -166,13 +165,16 @@ static pthread_once_t init_once = PTHREAD_ONCE_INIT;
 static struct termios term;
 static volatile sig_atomic_t flag_sigwinch;
 
+static int io_recv(struct connection*, char*, size_t);
+
 static void
 io_close(struct connection *c)
 {
 	/* Lock thread state to prevent ambiguous handling of EINTR on close() */
 	if (c->soc >= 0) {
 		PT_LK(&(c->pt_state_mutex));
-		PT_CF(close(c->soc));
+		if (close(c->soc) < 0)
+			fatal("close", errno);
 		PT_UL(&(c->pt_state_mutex));
 		c->soc = -1;
 	}
@@ -360,7 +362,8 @@ io_dx(struct connection *c)
 				/* Signal and yield the cpu until the target thread
 				 * is flagged as having reached an EINTR handler */
 				PT_CF(pthread_kill(c->pt_tid, SIGUSR1));
-				PT_CF(sched_yield());
+				if (sched_yield() < 0)
+					fatal("sched_yield", errno);
 			} while (0 /* TODO */);
 			break;
 		default:
@@ -459,10 +462,10 @@ io_state_cxng(enum io_state_t o_state, struct connection *c)
 
 	for (p = res; p != NULL; p = p->ai_next) {
 
-		if ((soc = socket(p->ai_family, p->ai_socktype, p->ai_protocol)) < 0)
+		if ((c->soc = socket(p->ai_family, p->ai_socktype, p->ai_protocol)) < 0)
 			continue;
 
-		if (connect(soc, p->ai_addr, p->ai_addrlen) == 0)
+		if (connect(c->soc, p->ai_addr, p->ai_addrlen) == 0)
 			break;
 
 		if ((ret = errno) == EINTR) {
@@ -533,34 +536,17 @@ io_state_cxed(enum io_state_t o_state, struct connection *c)
 			}
 
 			fatal("recv", errno);
+		} else {
+			io_recv(c, recvbuf, (size_t) ret);
 		}
-
-		// TODO
-		// io_read(c, buf, red
 	}
 }
-
-#if 0
-		for (i = 0; i < ret; i++) {
-
-			if (recvbuf[i] == '\n')
-				continue;
-
-			if (recvbuf[i] == '\r') {
-				if (c->read.i && c->read.i <= IO_MESG_LEN) {
-					c->read.buf[c->read.i + 1] = 0;
-					PT_CB(io_cb_read_soc(c->read.buf, c->read.i, c->obj));
-					c->read.i = 0;
-				}
-			} else {
-				c->read.buf[c->read.i++] = recvbuf[i];
-			}
-		}
-#endif
 
 static enum io_state_t
 io_state_ping(enum io_state_t o_state, struct connection *c)
 {
+	UNUSED(o_state);
+
 	struct timeval tv = {
 		.tv_sec = 2
 	};
@@ -603,34 +589,14 @@ io_state_ping(enum io_state_t o_state, struct connection *c)
 			}
 
 			fatal("recv", errno);
+		} else {
+			io_recv(c, recvbuf, (size_t) ret);
 		}
-
-		// TODO
-		// io_read(...
-
 		return IO_ST_CXED;
 	}
 }
 
-#if 0
-		for (i = 0; i < ret; i++) {
-
-			if (recvbuf[i] == '\n')
-				continue;
-
-			if (recvbuf[i] == '\r') {
-				if (c->read.i && c->read.i <= IO_MESG_LEN) {
-					c->read.buf[c->read.i + 1] = 0;
-					PT_CB(io_cb_read_soc(c->read.buf, c->read.i, c->obj));
-					c->read.i = 0;
-				}
-			} else {
-				c->read.buf[c->read.i++] = recvbuf[i];
-			}
-		}
-#endif
-
-static void
+static enum io_state_t
 io_state_term(enum io_state_t o_state, struct connection *c)
 {
 	(void) o_state;
@@ -643,6 +609,8 @@ io_state_term(enum io_state_t o_state, struct connection *c)
 	free(c);
 
 	pthread_exit(EXIT_SUCCESS);
+
+	return IO_ST_INVALID;
 }
 
 static void*
@@ -693,7 +661,6 @@ io_thread(void *arg)
 		// TODO: here lock mutext before calling next state
 		// and check through volatile pointer if a force state was given
 
-
 		// XXX what happens if returning from rxng, and here, but aren't waiting
 		// on cond anymore, and cond signal is called?
 
@@ -702,6 +669,36 @@ io_thread(void *arg)
 
 	/* Not reached */
 	return NULL;
+}
+
+static int
+io_recv(struct connection *c, char *buf, size_t n)
+{
+	UNUSED(c);
+	UNUSED(buf);
+	UNUSED(n);
+
+#if 0
+	// FIXME: out of bounds write
+
+	for (i = 0; i < ret; i++) {
+
+		if (recvbuf[i] == '\n')
+			continue;
+
+		if (recvbuf[i] == '\r') {
+			if (c->read.i && c->read.i <= IO_MESG_LEN) {
+				c->read.buf[c->read.i + 1] = 0;
+				PT_CB(io_cb_read_soc(c->read.buf, c->read.i, c->obj));
+				c->read.i = 0;
+			}
+		} else {
+			c->read.buf[c->read.i++] = recvbuf[i];
+		}
+	}
+#endif
+
+	return 0;
 }
 
 void
@@ -795,6 +792,7 @@ const char*
 io_err(int err)
 {
 	const char *err_strs[] = {
+		[IO_ERR_NONE]  = "success",
 		[IO_ERR_TRUNC] = "data truncated",
 		[IO_ERR_DXED]  = "socket not connected",
 		[IO_ERR_CXNG]  = "socket connection in progress",
@@ -803,7 +801,7 @@ io_err(int err)
 
 	const char *err_str = NULL;
 
-	if (err >= 0 && (size_t)err < ELEMS(err_strs))
+	if (err >= 0 && (unsigned) err < ELEMS(err_strs))
 		err_str = err_strs[err];
 
 	return err_str ? err_str : "unknown error";

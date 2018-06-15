@@ -1,7 +1,7 @@
 #include "test/test.h"
 #include "src/io.c"
 
-
+/* Stubbed state callbacks */
 void io_cb_cxng(const void *obj, const char *fmt, ...) { UNUSED(obj); UNUSED(fmt); }
 void io_cb_cxed(const void *obj, const char *fmt, ...) { UNUSED(obj); UNUSED(fmt); }
 void io_cb_fail(const void *obj, const char *fmt, ...) { UNUSED(obj); UNUSED(fmt); }
