@@ -165,7 +165,7 @@ static pthread_once_t init_once = PTHREAD_ONCE_INIT;
 static struct termios term;
 static volatile sig_atomic_t flag_sigwinch;
 
-static int io_recv(struct connection*, char*, size_t);
+static void io_recv(struct connection*, char*, size_t);
 
 static void
 io_close(struct connection *c)
@@ -491,7 +491,6 @@ io_state_cxng(enum io_state_t o_state, struct connection *c)
 	}
 
 	freeaddrinfo(res);
-	c->soc = soc;
 
 	return IO_ST_CXED;
 }
@@ -671,7 +670,7 @@ io_thread(void *arg)
 	return NULL;
 }
 
-static int
+static void
 io_recv(struct connection *c, char *buf, size_t n)
 {
 	UNUSED(c);
@@ -697,8 +696,6 @@ io_recv(struct connection *c, char *buf, size_t n)
 		}
 	}
 #endif
-
-	return 0;
 }
 
 void
@@ -721,6 +718,7 @@ io_init_sig(void)
 	struct sigaction sa;
 
 	sa.sa_handler = sigaction_sigwinch;
+	sa.sa_flags = 0;
 	sigemptyset(&sa.sa_mask);
 
 	if (sigaction(SIGWINCH, &sa, NULL) < 0)
