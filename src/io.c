@@ -673,29 +673,19 @@ io_thread(void *arg)
 static void
 io_recv(struct connection *c, char *buf, size_t n)
 {
-	UNUSED(c);
-	UNUSED(buf);
-	UNUSED(n);
+	for (size_t i = 0; i < n; i++) {
 
-#if 0
-	// FIXME: out of bounds write
+		if (buf[i] == '\n' && c->read.i && c->read.buf[c->read.i - 1] == '\r') {
+			c->read.buf[--c->read.i] = 0;
 
-	for (i = 0; i < ret; i++) {
-
-		if (recvbuf[i] == '\n')
-			continue;
-
-		if (recvbuf[i] == '\r') {
-			if (c->read.i && c->read.i <= IO_MESG_LEN) {
-				c->read.buf[c->read.i + 1] = 0;
-				PT_CB(io_cb_read_soc(c->read.buf, c->read.i, c->obj));
+			if (c->read.i) {
+				PT_CB(io_cb_read_soc(c->read.buf, c->read.i - 1, c->obj));
 				c->read.i = 0;
 			}
 		} else {
-			c->read.buf[c->read.i++] = recvbuf[i];
+			c->read.buf[c->read.i++] = buf[i];
 		}
 	}
-#endif
 }
 
 void
