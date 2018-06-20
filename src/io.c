@@ -442,7 +442,7 @@ io_state_cxng(enum io_state_t o_state, struct connection *c)
 {
 	(void) o_state;
 
-	int ret, soc;
+	int ret;
 
 	char errbuf[1024];
 	char ipbuf[INET6_ADDRSTRLEN];
@@ -774,7 +774,7 @@ io_loop(void (*io_loop_cb)(void))
 			if (errno == EINTR) {
 				if (flag_sigwinch) {
 					flag_sigwinch = 0;
-					PT_CB(io_cb_signal(SIGWINCH));
+					PT_CB(io_cb_signal(IO_SIGWINCH));
 				}
 			} else {
 				fatal("read", ret ? errno : 0);

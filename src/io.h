@@ -81,6 +81,13 @@ void server_disconnect(struct server*, int, int, char*);
 
 struct connection;
 
+enum io_sig
+{
+	IO_SIG_INVALID,
+	IO_SIGWINCH,
+	IO_SIG_MAX,
+};
+
 /* Returns a connection, or NULL if limit is reached */
 struct connection* connection(
 	const void*,  /* callback object */
@@ -105,7 +112,7 @@ void io_cb_lost(const void*, const char*, ...);
 void io_cb_ping(const void*, unsigned int);
 
 /* Signal callback in non-signal handler context */
-void io_cb_signal(int);
+void io_cb_signal(enum io_sig);
 
 /* Network data callback */
 void io_cb_read_inp(char*, size_t);

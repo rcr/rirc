@@ -12,7 +12,6 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <sys/ioctl.h>
-#include <signal.h>
 
 #include "src/draw.h"
 #include "src/io.h"
@@ -676,10 +675,10 @@ io_cb_read_soc(char *buff, size_t count, const void *cb_obj)
 }
 
 void
-io_cb_signal(int sig)
+io_cb_signal(enum io_sig sig)
 {
 	switch (sig) {
-		case SIGWINCH:
+		case IO_SIGWINCH:
 			resize();
 			break;
 		default:
