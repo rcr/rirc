@@ -37,7 +37,7 @@ void server_disconnect(struct server*, int, int, char*);
  *          |                 +--------+    |
  *          |                  |      ^     |
  *          |                 (G)     |     |
- *          |                  |     (G)    |
+ *          |                  |     (H)    |
  *          |                  v      |     |
  *          |                 +--------+    |
  *          +-----------(B)-- |  ping  | ---+
@@ -54,19 +54,20 @@ void server_disconnect(struct server*, int, int, char*);
  *   (A) io_cx: establish network connection
  *   (B) io_dx: close network connection
  *
- * Network state implicit transitions result in informational callbacks:
- *   (C) on connection attempt: io_cb_cxng
- *   (D) on connection success: io_cb_cxed
- *   (E) on connection failure: io_cb_fail
- *   (F) on connection loss:    io_cb_lost
- *   (G) on network ping event: io_cb_ping
+ * Network state implicit transitions result in informational callback types:
+ *   (C) on connection attempt:  IO_CB_INFO
+ *   (E) on connection failure:  IO_CB_ERROR
+ *   (D) on connection success:  IO_CB_CXED
+ *   (F) on connection loss:     IO_CB_DXED
+ *   (G) on network ping normal: IO_CB_PING_0
+ *   (H) on network ping rising: IO_CB_PING_N
  *
  * Successful reads on stdin and connected sockets result in data callbacks:
  *   from stdin:  io_cb_read_inp
  *   from socket: io_cb_read_soc
  *
- * Signals registered to be caught result in non-signal handler context callback:
- *   io_cb_signal
+ * Signals registered to be caught result in non-signal handler context
+ * callback with type IO_CB_SIGNAL
  *
  * Failed connection attempts enter a retry cycle with exponential
  * backoff time given by:
@@ -81,11 +82,24 @@ void server_disconnect(struct server*, int, int, char*);
 
 struct connection;
 
-enum io_sig
+enum io_sig_t
 {
 	IO_SIG_INVALID,
 	IO_SIGWINCH,
-	IO_SIG_MAX,
+	IO_SIG_SIZE
+};
+
+enum io_cb_t
+{
+	IO_CB_INVALID,
+	IO_CB_CXED,   /* fmt, [args] */
+	IO_CB_DXED,   /* fmt, [args] */
+	IO_CB_ERROR,  /* fmt, [args] */
+	IO_CB_INFO,   /* fmt, [args] */
+	IO_CB_PING_0, /* ping = 0 */
+	IO_CB_PING_N, /* ping = N */
+	IO_CB_SIGNAL, /* io_sig_t sig */
+	IO_CB_SIZE
 };
 
 /* Returns a connection, or NULL if limit is reached */
@@ -95,6 +109,8 @@ struct connection* connection(
 	const char*); /* port */
 
 void io_free(struct connection*);
+
+/* Start non-returning IO context */
 void io_loop(void (*)(void));
 
 /* Formatted write to connection */
@@ -104,21 +120,14 @@ int io_sendf(struct connection*, const char*, ...);
 int io_cx(struct connection*);
 int io_dx(struct connection*);
 
-/* Informational network state callbacks */
-void io_cb_cxng(const void*, const char*, ...);
-void io_cb_cxed(const void*, const char*, ...);
-void io_cb_fail(const void*, const char*, ...);
-void io_cb_lost(const void*, const char*, ...);
-void io_cb_ping(const void*, unsigned int);
+/* IO state callback */
+void io_cb(enum io_cb_t, const void*, ...);
 
-/* Signal callback in non-signal handler context */
-void io_cb_signal(enum io_sig);
-
-/* Network data callback */
+/* IO data callback */
 void io_cb_read_inp(char*, size_t);
 void io_cb_read_soc(char*, size_t, const void*);
 
-/* Get error string */
+/* IO error string */
 const char* io_err(int);
 
 #endif

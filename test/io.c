@@ -2,12 +2,7 @@
 #include "src/io.c"
 
 /* Stubbed state callbacks */
-void io_cb_cxng(const void *obj, const char *fmt, ...) { UNUSED(obj); UNUSED(fmt); }
-void io_cb_cxed(const void *obj, const char *fmt, ...) { UNUSED(obj); UNUSED(fmt); }
-void io_cb_fail(const void *obj, const char *fmt, ...) { UNUSED(obj); UNUSED(fmt); }
-void io_cb_lost(const void *obj, const char *fmt, ...) { UNUSED(obj); UNUSED(fmt); }
-void io_cb_ping(const void *obj, unsigned int ping) { UNUSED(obj); UNUSED(ping); }
-void io_cb_signal(enum io_sig sig) { UNUSED(sig); }
+void io_cb(enum io_cb_t t, const void *obj, ...) { UNUSED(t); UNUSED(obj); }
 void io_cb_read_inp(char *buf, size_t n) { UNUSED(buf); UNUSED(n); }
 
 static int cb_count;
@@ -67,6 +62,8 @@ test_io_recv(void)
 	IO_RECV("\n");
 	assert_eq((signed) c.read.i, 0);
 	assert_eq(cb_count, 2);
+
+	/* TODO: overrun the buffer */
 }
 
 int

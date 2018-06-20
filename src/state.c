@@ -48,6 +48,10 @@ struct channel* default_channel(void) { return state.default_channel; }
 unsigned int _term_cols(void) { return state.term_cols; }
 unsigned int _term_rows(void) { return state.term_rows; }
 
+static void state_io_cxed(struct server*);
+static void state_io_dxed(struct server*);
+static void state_io_signal(enum io_sig_t);
+
 /* Set draw bits */
 #define X(BIT) void draw_##BIT(void) { state.draw.bits.BIT = 1; }
 DRAW_BITS
@@ -571,80 +575,70 @@ channel_move_next(void)
 
 
 
-
-
-
-
-void
-io_cb_cxng(const void *cb_obj, const char *fmt, ...)
+static void
+state_io_cxed(struct server *s)
 {
-	va_list ap;
-
-	struct channel *c = ((struct server *)cb_obj)->channel;
-
-	va_start(ap, fmt);
-	_newline(c, 0, "--", fmt, ap);
-	va_end(ap);
-}
-
-void
-io_cb_cxed(const void *cb_obj, const char *fmt, ...)
-{
-	va_list ap;
-
-	struct channel *c = ((struct server *)cb_obj)->channel;
-
-	va_start(ap, fmt);
-	_newline(c, 0, "--", fmt, ap);
-	va_end(ap);
-
-	/* TODO
-	 * send PASS
-	 * send NICK
-	 * send USER
-	 */
-
 	int ret;
 	char nickbuf[] = "NICK rcr\r\n";
 	char userbuf[] = "USER rcr 8 * :real rcr\r\n";
-	if (0 != (ret = io_sendf(((struct server *)cb_obj)->connection, nickbuf, sizeof(nickbuf)-1, 0)))
-		newlinef(c, 0, "sendf fail", "%s", io_err(ret));
-	if (0 != (ret = io_sendf(((struct server *)cb_obj)->connection, userbuf, sizeof(userbuf)-1, 0)))
-		newlinef(c, 0, "sendf fail", "%s", io_err(ret));
+	if (0 != (ret = io_sendf(s->connection, nickbuf, sizeof(nickbuf) - 1, 0)))
+		newlinef(s->channel, 0, "sendf fail", "%s", io_err(ret));
+	if (0 != (ret = io_sendf(s->connection, userbuf, sizeof(userbuf) - 1, 0)))
+		newlinef(s->channel, 0, "sendf fail", "%s", io_err(ret));
+}
+
+static void
+state_io_dxed(struct server *s)
+{
+	(void)s;
+}
+
+static void
+state_io_signal(enum io_sig_t sig)
+{
+	switch (sig) {
+		case IO_SIGWINCH:
+			resize();
+			break;
+		default:
+			newlinef(state.default_channel, 0, "-!!-", "unhandled signal %d", sig);
+	}
 }
 
 void
-io_cb_lost(const void *cb_obj, const char *fmt, ...)
+io_cb(enum io_cb_t type, const void *cb_obj, ...)
 {
-	/* TODO */
-
+	struct server *s = (struct server *)cb_obj;
 	va_list ap;
 
-	struct channel *c = ((struct server *)cb_obj)->channel;
+	va_start(ap, cb_obj);
 
-	va_start(ap, fmt);
-	_newline(c, 0, "-!!-", fmt, ap);
-	va_end(ap);
-}
+	switch (type) {
+		case IO_CB_CXED:
+			state_io_cxed(s);
+			_newline(s->channel, 0, "--", va_arg(ap, const char *), ap);
+			break;
+		case IO_CB_DXED:
+			state_io_dxed(s);
+			_newline(s->channel, 0, "-!!-", va_arg(ap, const char *), ap);
+			break;
+		case IO_CB_ERROR:
+			_newline(s->channel, 0, "-!!-", va_arg(ap, const char *), ap);
+			break;
+		case IO_CB_INFO:
+			_newline(s->channel, 0, "--", va_arg(ap, const char *), ap);
+			break;
+		case IO_CB_PING_0:
+		case IO_CB_PING_N:
+			/* TODO */
+			break;
+		case IO_CB_SIGNAL:
+			state_io_signal(va_arg(ap, enum io_sig_t));
+			break;
+		default:
+			fatal("unhandled io_cb_t: %d", type);
+	}
 
-void
-io_cb_ping(const void *cb_obj, unsigned int ping)
-{
-	struct channel *c = ((struct server *)cb_obj)->channel;
-
-	/* TODO */
-	newlinef(c, 0, "ping:", "%u", ping);
-}
-
-void
-io_cb_fail(const void *cb_obj, const char *fmt, ...)
-{
-	va_list ap;
-
-	struct channel *c = ((struct server *)cb_obj)->channel;
-
-	va_start(ap, fmt);
-	_newline(c, 0, "-!!-", fmt, ap);
 	va_end(ap);
 }
 
@@ -672,16 +666,4 @@ io_cb_read_soc(char *buff, size_t count, const void *cb_obj)
 		newlinef(c, 0, "-!!-", "failed to parse message");
 	else
 		recv_mesg((struct server *)cb_obj, &p);
-}
-
-void
-io_cb_signal(enum io_sig sig)
-{
-	switch (sig) {
-		case IO_SIGWINCH:
-			resize();
-			break;
-		default:
-			newlinef(state.default_channel, 0, "-!!-", "unhandled signal %d", sig);
-	}
 }

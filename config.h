@@ -80,8 +80,8 @@
 #define IO_PING_MAX 300
 
 /* Reconnect backoff base delay
- *   Integer, [1, 10, 86400] */
-#define IO_RECONNECT_BACKOFF_BASE 10
+ *   Integer, [1, 4, 86400] */
+#define IO_RECONNECT_BACKOFF_BASE 4
 
 /* Reconnect backoff growth factor
  *   Integer, [1, 2, 32] */

@@ -51,7 +51,6 @@ server_disconnect(struct server *a, int b, int c, char *d)
 }
 
 /* RFC 2812, section 2.3 */
-#define IO_MESG_SEP "\r\n"
 #define IO_MESG_LEN 512
 
 #ifndef IO_PING_MIN
@@ -73,7 +72,7 @@ server_disconnect(struct server *a, int b, int c, char *d)
 #endif
 
 #ifndef IO_RECONNECT_BACKOFF_BASE
-	#define IO_RECONNECT_BACKOFF_BASE 10
+	#define IO_RECONNECT_BACKOFF_BASE 4
 #elif (IO_RECONNECT_BACKOFF_BASE < 1 || IO_RECONNECT_BACKOFF_BASE > 86400)
 	#error "IO_RECONNECT_BACKOFF_BASE: [1, 32]"
 #endif
@@ -225,7 +224,7 @@ connection(const void *obj, const char *host, const char *port)
 {
 	struct connection *c;
 
-	if ((c = malloc(sizeof(*c))) == NULL)
+	if ((c = calloc(1U, sizeof(*c))) == NULL)
 		fatal("malloc", errno);
 
 	c->obj   = obj;
@@ -234,6 +233,7 @@ connection(const void *obj, const char *host, const char *port)
 	c->state = IO_ST_INIT;
 
 	pthread_attr_t      t_attr;
+	pthread_condattr_t  c_attr;
 	pthread_mutexattr_t m_attr;
 
 	PT_CF(pthread_attr_init(&t_attr));
@@ -241,9 +241,11 @@ connection(const void *obj, const char *host, const char *port)
 
 	PT_CF(pthread_mutexattr_init(&m_attr));
 	PT_CF(pthread_mutexattr_settype(&m_attr, PTHREAD_MUTEX_ERRORCHECK));
-
-	PT_CF(pthread_cond_init(&(c->pt_state_cond), NULL));
 	PT_CF(pthread_mutex_init(&(c->pt_state_mutex), &m_attr));
+
+	PT_CF(pthread_condattr_init(&c_attr));
+	PT_CF(pthread_condattr_setclock(&c_attr, CLOCK_MONOTONIC));
+	PT_CF(pthread_cond_init(&(c->pt_state_cond), &c_attr));
 
 	PT_CF(pthread_once(&init_once, io_init));
 
@@ -254,6 +256,7 @@ connection(const void *obj, const char *host, const char *port)
 	PT_UL(&init_mutex);
 
 	PT_CF(pthread_attr_destroy(&t_attr));
+	PT_CF(pthread_condattr_destroy(&c_attr));
 	PT_CF(pthread_mutexattr_destroy(&m_attr));
 
 	return c;
@@ -403,7 +406,6 @@ io_state_dxed(enum io_state_t o_state, struct connection *c)
 	(void) o_state;
 
 	PT_LK(&(c->pt_state_mutex));
-	/* TODO: check forced state */
 	PT_CF(pthread_cond_wait(&(c->pt_state_cond), &(c->pt_state_mutex)));
 	PT_UL(&(c->pt_state_mutex));
 
@@ -415,24 +417,30 @@ io_state_rxng(enum io_state_t o_state, struct connection *c)
 {
 	(void) o_state;
 
-	struct timespec ts;
-	struct timeval  tv;
+	unsigned backoff = IO_RECONNECT_BACKOFF_BASE;
 
-	const int delta_s = 3;
+	for (;;) {
 
-	// FIXME: clock_gettime
-	gettimeofday(&tv, NULL);
+		PT_CB(io_cb(IO_CB_INFO, c->obj, "Attemping reconnect in: %us", backoff));
 
-	/* TODO: base/backoff */
-	ts.tv_sec  = tv.tv_sec;
-	ts.tv_nsec = tv.tv_usec * 1000;
-	ts.tv_sec += delta_s;
+		struct timespec ts;
 
-	PT_LK(&(c->pt_state_mutex));
-	/* TODO: check forced state */
-	/* TODO: check non-timeout error */
-	pthread_cond_timedwait(&(c->pt_state_cond), &(c->pt_state_mutex), &ts);
-	PT_UL(&(c->pt_state_mutex));
+		if (clock_gettime(CLOCK_MONOTONIC, &ts) < 0)
+			fatal("clock_gettime", errno);
+
+		ts.tv_sec += backoff;
+
+		PT_LK(&(c->pt_state_mutex));
+		/* TODO: check non-timeout error */
+		pthread_cond_timedwait(&(c->pt_state_cond), &(c->pt_state_mutex), &ts);
+		PT_UL(&(c->pt_state_mutex));
+
+		if (c->force_state == IO_ST_FORCE_CXNG)
+			break;
+
+		backoff *= IO_RECONNECT_BACKOFF_FACTOR;
+		backoff = MIN(backoff, IO_RECONNECT_BACKOFF_MAX);
+	}
 
 	return IO_ST_CXNG;
 }
@@ -447,7 +455,7 @@ io_state_cxng(enum io_state_t o_state, struct connection *c)
 	char errbuf[1024];
 	char ipbuf[INET6_ADDRSTRLEN];
 
-	PT_CB(io_cb_cxng(c->obj, "Connecting to %s:%s ...", c->host, c->port));
+	PT_CB(io_cb(IO_CB_INFO, c->obj, "Connecting to %s:%s ...", c->host, c->port));
 
 	struct addrinfo *p, *res, hints = {
 		.ai_family   = AF_UNSPEC,
@@ -456,7 +464,7 @@ io_state_cxng(enum io_state_t o_state, struct connection *c)
 	};
 
 	if ((ret = getaddrinfo(c->host, c->port, &hints, &res))) {
-		PT_CB(io_cb_fail(c->obj, "Connection error: %s", gai_strerror(ret)));
+		PT_CB(io_cb(IO_CB_ERROR, c->obj, "Connection error: %s", gai_strerror(ret)));
 		return IO_ST_RXNG;
 	}
 
@@ -478,16 +486,15 @@ io_state_cxng(enum io_state_t o_state, struct connection *c)
 	}
 
 	if (p == NULL) {
-		PT_CB(io_cb_fail(c->obj, "Connection failure [%s]", io_strerror(ret, errbuf, sizeof(errbuf))));
+		PT_CB(io_cb(IO_CB_ERROR, c->obj, "Connection failure [%s]", io_strerror(ret, errbuf, sizeof(errbuf))));
 		freeaddrinfo(res);
 		return IO_ST_RXNG;
 	}
 
-	// FIXME: calling io_cb_cxed sends pass/user/nick
 	if ((ret = getnameinfo(p->ai_addr, p->ai_addrlen, ipbuf, INET6_ADDRSTRLEN, NULL, 0, NI_NUMERICHOST))) {
-		// ; io_cb_cxed(c->obj, "Connected to %s [IP lookup failure: %s]", c->host, gai_strerror(ret));
+		io_cb(IO_CB_ERROR, c->obj, "Connected to %s [IP lookup failure: %s]", c->host, gai_strerror(ret));
 	} else {
-		// ; io_cb_cxed(c->obj, "Connected to %s [%s]", c->host, ipbuf);
+		io_cb(IO_CB_INFO, c->obj, "Connected to %s [%s]", c->host, ipbuf);
 	}
 
 	freeaddrinfo(res);
@@ -500,7 +507,7 @@ io_state_cxed(enum io_state_t o_state, struct connection *c)
 {
 	(void) o_state;
 
-	PT_CB(io_cb_cxed(c->obj, "Connected to %s [TODO: ip]", c->host));
+	PT_CB(io_cb(IO_CB_CXED, c->obj, "Connected to %s [TODO: ip]", c->host));
 
 	struct timeval tv = {
 		.tv_sec = 3
@@ -516,17 +523,16 @@ io_state_cxed(enum io_state_t o_state, struct connection *c)
 		if ((ret = recv(c->soc, recvbuf, sizeof(recvbuf), 0)) <= 0) {
 
 			if (ret == 0) {
-				PT_CB(io_cb_lost(c->obj, "Connection closed"));
+				PT_CB(io_cb(IO_CB_DXED, c->obj, "Connection closed"));
 				return IO_ST_CXNG;
 			}
 
 			if (errno == ECONNRESET) {
-				PT_CB(io_cb_lost(c->obj, "Connection forcibly reset by peer"));
+				PT_CB(io_cb(IO_CB_DXED, c->obj, "Connection forcibly reset by peer"));
 				return IO_ST_CXNG;
 			}
 
 			if (errno == EAGAIN || errno == EWOULDBLOCK) {
-				PT_CB(io_cb_ping(c->obj, 0));
 				return IO_ST_PING;
 			}
 
@@ -547,7 +553,8 @@ io_state_ping(enum io_state_t o_state, struct connection *c)
 	UNUSED(o_state);
 
 	struct timeval tv = {
-		.tv_sec = 2
+		// FIXME: test this
+		.tv_sec = 10
 	};
 
 	if (setsockopt(c->soc, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) < 0)
@@ -562,23 +569,23 @@ io_state_ping(enum io_state_t o_state, struct connection *c)
 		if ((ret = recv(c->soc, recvbuf, sizeof(recvbuf), 0)) <= 0) {
 
 			if (ret == 0) {
-				PT_CB(io_cb_lost(c->obj, "Connection closed"));
+				PT_CB(io_cb(IO_CB_DXED, c->obj, "Connection closed"));
 				return IO_ST_CXNG;
 			}
 
 			if (errno == ECONNRESET) {
-				PT_CB(io_cb_lost(c->obj, "Connection forcibly reset by peer"));
+				PT_CB(io_cb(IO_CB_DXED, c->obj, "Connection forcibly reset by peer"));
 				return IO_ST_CXNG;
 			}
 
 			if (errno == EAGAIN || errno == EWOULDBLOCK) {
 				if ((ping += 2) >= 10) {
 					// TODO: close the socket, etc
-					PT_CB(io_cb_lost(c->obj, "Connection lost: ping timeout"));
+					PT_CB(io_cb(IO_CB_DXED, c->obj, "Connection lost: ping timeout"));
 					io_close(c);
 					return IO_ST_CXNG;
 				} else {
-					PT_CB(io_cb_ping(c->obj, ping));
+					PT_CB(io_cb(IO_CB_PING_N, c->obj, ping));
 					continue;
 				}
 			}
@@ -591,6 +598,8 @@ io_state_ping(enum io_state_t o_state, struct connection *c)
 		} else {
 			io_recv(c, recvbuf, (size_t) ret);
 		}
+
+		PT_CB(io_cb(IO_CB_PING_0, c->obj));
 		return IO_ST_CXED;
 	}
 }
@@ -764,7 +773,7 @@ io_loop(void (*io_loop_cb)(void))
 			if (errno == EINTR) {
 				if (flag_sigwinch) {
 					flag_sigwinch = 0;
-					PT_CB(io_cb_signal(IO_SIGWINCH));
+					PT_CB(io_cb(IO_CB_SIGNAL, NULL, IO_SIGWINCH));
 				}
 			} else {
 				fatal("read", ret ? errno : 0);

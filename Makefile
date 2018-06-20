@@ -9,7 +9,7 @@ MAN_DIR = /usr/local/share/man/man1
 CC = cc
 PP = cc -E
 CFLAGS    = -I. -std=c99 -DVERSION=\"$(VERSION)\" -D_POSIX_C_SOURCE=200812L -Wall -Wextra -pedantic -O2 -flto
-CFLAGS_D  = -I. -std=c99 -DVERSION=\"$(VERSION)\" -D_POSIX_C_SOURCE=200812L -Wall -Wextra -pedantic -O0 -flto -g -DDEBUG
+CFLAGS_D  = -I. -std=c99 -DVERSION=\"$(VERSION)\" -D_POSIX_C_SOURCE=200812L -Wall -Wextra -pedantic -O0 -g -DDEBUG
 LDFLAGS   = -pthread
 LDFLAGS_D = -pthread
 
