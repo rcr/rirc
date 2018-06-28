@@ -629,6 +629,7 @@ io_cb(enum io_cb_t type, const void *cb_obj, ...)
 			_newline(s->channel, 0, "--", va_arg(ap, const char *), ap);
 			break;
 		case IO_CB_PING_0:
+		case IO_CB_PING_1:
 		case IO_CB_PING_N:
 			/* TODO */
 			break;
@@ -640,6 +641,7 @@ io_cb(enum io_cb_t type, const void *cb_obj, ...)
 	}
 
 	va_end(ap);
+	redraw();
 }
 
 void

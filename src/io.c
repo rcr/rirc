@@ -1,7 +1,3 @@
-/* TODO:
- * check spurious wakeup condition for all waits/timedwaits
- */
-
 #ifndef _DARWIN_C_SOURCE
 #define _DARWIN_C_SOURCE _POSIX_C_SOURCE
 #endif
@@ -103,7 +99,15 @@ enum io_err_t
 	IO_ERR_CXED
 };
 
-struct connection {
+struct io_lock
+{
+	pthread_cond_t  cnd;
+	pthread_mutex_t mtx;
+	volatile int predicate;
+};
+
+struct connection
+{
 	const void *obj;
 	const char *host;
 	const char *port;
@@ -119,19 +123,17 @@ struct connection {
 		IO_ST_SIZE
 	} state;
 	int soc;
-	pthread_cond_t  pt_state_cond;
+
+	// FIXME: remove
 	pthread_mutex_t pt_state_mutex;
+
 	pthread_t       pt_tid;
 	struct {
 		size_t i;
 		char buf[IO_MESG_LEN];
 	} read;
-	volatile enum io_force_state {
-		IO_ST_FORCE_NONE,
-		IO_ST_FORCE_CXNG, /* Asynchronously force connection */
-		IO_ST_FORCE_DXED, /* Asynchronously force disconnect */
-	} force_state;
-	char ipbuf[INET6_ADDRSTRLEN];
+	struct io_lock lock;
+	unsigned rx_backoff;
 };
 
 static char* io_strerror(int, char*, size_t);
@@ -143,28 +145,28 @@ static void io_term(void);
 static void io_term_tty(void);
 static void* io_thread(void*);
 
-/* TODO: not all of these actually need an o state, ones who dont:
- * init 
- * rxng - only ever from a failed connection
- * cxed - only ever from a successful connection? or when returning from PING
- *
- */
-static enum io_state_t io_state_init(enum io_state_t, struct connection*);
-static enum io_state_t io_state_dxed(enum io_state_t, struct connection*);
-static enum io_state_t io_state_rxng(enum io_state_t, struct connection*);
-static enum io_state_t io_state_cxng(enum io_state_t, struct connection*);
-static enum io_state_t io_state_cxed(enum io_state_t, struct connection*);
-static enum io_state_t io_state_ping(enum io_state_t, struct connection*);
-static enum io_state_t io_state_term(enum io_state_t, struct connection*);
+static void io_recv(struct connection*, char*, size_t);
 
-static pthread_cond_t init_cond;
+static enum io_state_t io_state_init(struct connection*);
+static enum io_state_t io_state_dxed(struct connection*);
+static enum io_state_t io_state_rxng(struct connection*);
+static enum io_state_t io_state_cxng(struct connection*);
+static enum io_state_t io_state_cxed(struct connection*);
+static enum io_state_t io_state_ping(struct connection*);
+static enum io_state_t io_state_term(struct connection*);
+
+static struct io_lock init_lock;
+
+// TODO
 static pthread_mutex_t cb_mutex;
-static pthread_mutex_t init_mutex;
 static pthread_once_t init_once = PTHREAD_ONCE_INIT;
 static struct termios term;
 static volatile sig_atomic_t flag_sigwinch;
 
-static void io_recv(struct connection*, char*, size_t);
+static void io_lock_init(struct io_lock*);
+static void io_lock_term(struct io_lock*);
+static void io_lock_wake(struct io_lock*);
+static void io_lock_wait(struct io_lock*, struct timespec*);
 
 static void
 io_close(struct connection *c)
@@ -189,15 +191,15 @@ io_strerror(int errnum, char *buf, size_t buflen)
 static void
 io_init(void)
 {
+	// TODO: this is just io_lock_init, no? and io_lock_term?
 	pthread_mutexattr_t m_attr;
 
 	PT_CF(pthread_mutexattr_init(&m_attr));
 	PT_CF(pthread_mutexattr_settype(&m_attr, PTHREAD_MUTEX_ERRORCHECK));
 
-	PT_CF(pthread_cond_init(&init_cond, NULL));
-
+	PT_CF(pthread_cond_init(&init_lock.cnd, NULL));
 	PT_CF(pthread_mutex_init(&cb_mutex, &m_attr));
-	PT_CF(pthread_mutex_init(&init_mutex, &m_attr));
+	PT_CF(pthread_mutex_init(&init_lock.mtx, &m_attr));
 
 	PT_CF(pthread_mutexattr_destroy(&m_attr));
 
@@ -214,9 +216,62 @@ io_term(void)
 		fatal("pthread_mutex_trylock", ret);
 
 	PT_UL(&cb_mutex);
-	PT_CF(pthread_cond_destroy(&init_cond));
+	PT_CF(pthread_cond_destroy(&init_lock.cnd));
 	PT_CF(pthread_mutex_destroy(&cb_mutex));
-	PT_CF(pthread_mutex_destroy(&init_mutex));
+	PT_CF(pthread_mutex_destroy(&init_lock.mtx));
+}
+
+static void
+io_lock_init(struct io_lock *lock)
+{
+	pthread_mutexattr_t m_attr;
+
+	PT_CF(pthread_mutexattr_init(&m_attr));
+	PT_CF(pthread_mutexattr_settype(&m_attr, PTHREAD_MUTEX_ERRORCHECK));
+
+	PT_CF(pthread_cond_init(&(lock->cnd), NULL));
+	PT_CF(pthread_mutex_init(&(lock->mtx), &m_attr));
+
+	PT_CF(pthread_mutexattr_destroy(&m_attr));
+
+	lock->predicate = 0;
+}
+
+static void
+io_lock_term(struct io_lock *lock)
+{
+	PT_CF(pthread_cond_destroy(&(lock->cnd)));
+	PT_CF(pthread_mutex_destroy(&(lock->mtx)));
+}
+
+static void
+io_lock_wait(struct io_lock *lock, struct timespec *timeout)
+{
+	PT_LK(&(lock->mtx));
+
+	int ret = 0;
+
+	while (!lock->predicate && ret == 0) {
+		if (timeout) {
+			ret = pthread_cond_timedwait(&(lock->cnd), &(lock->mtx), timeout);
+		} else {
+			ret = pthread_cond_wait(&(lock->cnd), &(lock->mtx));
+		}
+	}
+
+	if (ret && (!timeout || ret != ETIMEDOUT))
+		fatal("io_lock_wait", ret);
+
+	lock->predicate = 0;
+
+	PT_UL(&(lock->mtx));
+}
+
+static void
+io_lock_wake(struct io_lock *lock)
+{
+	lock->predicate = 1;
+	PT_CF(pthread_cond_signal(&(lock->cnd)));
 }
 
 struct connection*
@@ -231,33 +286,18 @@ connection(const void *obj, const char *host, const char *port)
 	c->host  = strdup(host);
 	c->port  = strdup(port);
 	c->state = IO_ST_INIT;
-
-	pthread_attr_t      t_attr;
-	pthread_condattr_t  c_attr;
-	pthread_mutexattr_t m_attr;
-
-	PT_CF(pthread_attr_init(&t_attr));
-	PT_CF(pthread_attr_setdetachstate(&t_attr, PTHREAD_CREATE_DETACHED));
-
-	PT_CF(pthread_mutexattr_init(&m_attr));
-	PT_CF(pthread_mutexattr_settype(&m_attr, PTHREAD_MUTEX_ERRORCHECK));
-	PT_CF(pthread_mutex_init(&(c->pt_state_mutex), &m_attr));
-
-	PT_CF(pthread_condattr_init(&c_attr));
-	PT_CF(pthread_condattr_setclock(&c_attr, CLOCK_MONOTONIC));
-	PT_CF(pthread_cond_init(&(c->pt_state_cond), &c_attr));
+	io_lock_init(&(c->lock));
 
 	PT_CF(pthread_once(&init_once, io_init));
 
-	/* Wait for thread to reach initialized and waiting state */
-	PT_LK(&init_mutex);
-	PT_CF(pthread_create(&(c->pt_tid), &t_attr, io_thread, c));
-	PT_CF(pthread_cond_wait(&init_cond, &init_mutex));
-	PT_UL(&init_mutex);
+	pthread_attr_t t_attr;
 
+	PT_CF(pthread_attr_init(&t_attr));
+	PT_CF(pthread_attr_setdetachstate(&t_attr, PTHREAD_CREATE_DETACHED));
+	PT_CF(pthread_create(&(c->pt_tid), &t_attr, io_thread, c));
 	PT_CF(pthread_attr_destroy(&t_attr));
-	PT_CF(pthread_condattr_destroy(&c_attr));
-	PT_CF(pthread_mutexattr_destroy(&m_attr));
+
+	io_lock_wait(&init_lock, NULL);
 
 	return c;
 }
@@ -316,7 +356,7 @@ io_cx(struct connection *c)
 		case IO_ST_INIT:
 		case IO_ST_DXED:
 		case IO_ST_RXNG:
-			PT_CF(pthread_cond_signal(&(c->pt_state_cond)));
+			io_lock_wake(&c->lock);
 			break;
 		case IO_ST_CXNG:
 			ret = IO_ERR_CXNG;
@@ -356,7 +396,7 @@ io_dx(struct connection *c)
 			ret = IO_ERR_DXED;
 			break;
 		case IO_ST_RXNG:
-			PT_CF(pthread_cond_signal(&(c->pt_state_cond)));
+			io_lock_wake(&(c->lock));
 			break;
 		case IO_ST_CXNG:
 		case IO_ST_CXED:
@@ -379,77 +419,47 @@ io_dx(struct connection *c)
 }
 
 static enum io_state_t
-io_state_init(enum io_state_t o_state, struct connection *c)
+io_state_init(struct connection *c)
 {
-	/* Initial thread state */
-
-	(void) o_state;
-
-	sigset_t set;
-	sigfillset(&set);
-	sigdelset(&set, SIGUSR1);
-	PT_CF(pthread_sigmask(SIG_BLOCK, &set, NULL));
-
-	PT_LK(&(c->pt_state_mutex));
-	PT_LK(&init_mutex);
-	PT_UL(&init_mutex);
-	PT_CF(pthread_cond_signal(&init_cond));
-	PT_CF(pthread_cond_wait(&(c->pt_state_cond), &(c->pt_state_mutex)));
-	PT_UL(&(c->pt_state_mutex));
-
+	io_lock_wake(&init_lock);
+	io_lock_wait(&c->lock, NULL);
 	return IO_ST_CXNG;
 }
 
 static enum io_state_t
-io_state_dxed(enum io_state_t o_state, struct connection *c)
+io_state_dxed(struct connection *c)
 {
-	(void) o_state;
-
-	PT_LK(&(c->pt_state_mutex));
-	PT_CF(pthread_cond_wait(&(c->pt_state_cond), &(c->pt_state_mutex)));
-	PT_UL(&(c->pt_state_mutex));
-
+	io_lock_wait(&c->lock, NULL);
 	return IO_ST_CXNG;
 }
 
 static enum io_state_t
-io_state_rxng(enum io_state_t o_state, struct connection *c)
+io_state_rxng(struct connection *c)
 {
-	(void) o_state;
+	struct timespec ts;
 
-	unsigned backoff = IO_RECONNECT_BACKOFF_BASE;
-
-	for (;;) {
-
-		PT_CB(io_cb(IO_CB_INFO, c->obj, "Attemping reconnect in: %us", backoff));
-
-		struct timespec ts;
-
-		if (clock_gettime(CLOCK_MONOTONIC, &ts) < 0)
-			fatal("clock_gettime", errno);
-
-		ts.tv_sec += backoff;
-
-		PT_LK(&(c->pt_state_mutex));
-		/* TODO: check non-timeout error */
-		pthread_cond_timedwait(&(c->pt_state_cond), &(c->pt_state_mutex), &ts);
-		PT_UL(&(c->pt_state_mutex));
-
-		if (c->force_state == IO_ST_FORCE_CXNG)
-			break;
-
-		backoff *= IO_RECONNECT_BACKOFF_FACTOR;
-		backoff = MIN(backoff, IO_RECONNECT_BACKOFF_MAX);
+	if (c->rx_backoff == 0) {
+		c->rx_backoff = IO_RECONNECT_BACKOFF_BASE;
+	} else {
+		c->rx_backoff = MIN(
+			IO_RECONNECT_BACKOFF_FACTOR * c->rx_backoff,
+			IO_RECONNECT_BACKOFF_MAX
+		);
 	}
 
+	if (clock_gettime(CLOCK_REALTIME, &ts) < 0)
+		fatal("clock_gettime", errno);
+	ts.tv_sec += c->rx_backoff;
+
+	PT_CB(io_cb(IO_CB_INFO, c->obj, "Attemping reconnect in: %us", c->rx_backoff));
+
+	io_lock_wait(&c->lock, &ts);
 	return IO_ST_CXNG;
 }
 
 static enum io_state_t
-io_state_cxng(enum io_state_t o_state, struct connection *c)
+io_state_cxng(struct connection *c)
 {
-	(void) o_state;
-
 	int ret;
 
 	char errbuf[1024];
@@ -503,10 +513,8 @@ io_state_cxng(enum io_state_t o_state, struct connection *c)
 }
 
 static enum io_state_t
-io_state_cxed(enum io_state_t o_state, struct connection *c)
+io_state_cxed(struct connection *c)
 {
-	(void) o_state;
-
 	PT_CB(io_cb(IO_CB_CXED, c->obj, "Connected to %s [TODO: ip]", c->host));
 
 	struct timeval tv = {
@@ -548,10 +556,8 @@ io_state_cxed(enum io_state_t o_state, struct connection *c)
 }
 
 static enum io_state_t
-io_state_ping(enum io_state_t o_state, struct connection *c)
+io_state_ping(struct connection *c)
 {
-	UNUSED(o_state);
-
 	struct timeval tv = {
 		// FIXME: test this
 		.tv_sec = 10
@@ -581,7 +587,7 @@ io_state_ping(enum io_state_t o_state, struct connection *c)
 			if (errno == EAGAIN || errno == EWOULDBLOCK) {
 				if ((ping += 2) >= 10) {
 					// TODO: close the socket, etc
-					PT_CB(io_cb(IO_CB_DXED, c->obj, "Connection lost: ping timeout"));
+					PT_CB(io_cb(IO_CB_DXED, c->obj, "Connection lost: ping timeout (%u)", IO_PING_MAX));
 					io_close(c);
 					return IO_ST_CXNG;
 				} else {
@@ -605,12 +611,9 @@ io_state_ping(enum io_state_t o_state, struct connection *c)
 }
 
 static enum io_state_t
-io_state_term(enum io_state_t o_state, struct connection *c)
+io_state_term(struct connection *c)
 {
-	(void) o_state;
-
-	pthread_cond_destroy(&(c->pt_state_cond));
-	pthread_mutex_destroy(&(c->pt_state_mutex));
+	io_lock_term(&(c->lock));
 
 	free((void*)c->host);
 	free((void*)c->port);
@@ -618,6 +621,7 @@ io_state_term(enum io_state_t o_state, struct connection *c)
 
 	pthread_exit(EXIT_SUCCESS);
 
+	/* not reached */
 	return IO_ST_INVALID;
 }
 
@@ -626,56 +630,38 @@ io_thread(void *arg)
 {
 	struct connection *c = arg;
 
-	enum io_state_t n_state;
-
-	// TODO:
-	//
-	//
-	// table of callbacks from state->state
-
 	for (;;) {
 
-		/* TODO:
-		 *
-		 * here we know the old state and we know the new state, we can call the informational
-		 * transition callback */
+		enum io_state_t n_state;
 
 		switch (c->state) {
 			case IO_ST_INIT:
-				n_state = io_state_init(c->state, c);
+				n_state = io_state_init(c);
 				break;
 			case IO_ST_DXED:
-				n_state = io_state_dxed(c->state, c);
+				n_state = io_state_dxed(c);
 				break;
 			case IO_ST_CXNG:
-				n_state = io_state_cxng(c->state, c);
+				n_state = io_state_cxng(c);
 				break;
 			case IO_ST_RXNG:
-				n_state = io_state_rxng(c->state, c);
+				n_state = io_state_rxng(c);
 				break;
 			case IO_ST_CXED:
-				n_state = io_state_cxed(c->state, c);
+				n_state = io_state_cxed(c);
 				break;
 			case IO_ST_PING:
-				n_state = io_state_ping(c->state, c);
+				n_state = io_state_ping(c);
 				break;
 			case IO_ST_TERM:
-				io_state_term(c->state, c);
+				io_state_term(c);
 				break;
 			default:
 				fatal("Unknown net state", 0);
 		}
-
-		// TODO: here lock mutext before calling next state
-		// and check through volatile pointer if a force state was given
-
-		// XXX what happens if returning from rxng, and here, but aren't waiting
-		// on cond anymore, and cond signal is called?
-
 		c->state = n_state;
 	}
 
-	/* Not reached */
 	return NULL;
 }
 
@@ -722,6 +708,9 @@ io_init_sig(void)
 
 	if (sigaction(SIGWINCH, &sa, NULL) < 0)
 		fatal("sigaction - SIGWINCH", errno);
+
+	// TODO add sigusr here to block, otherwise created threads are going
+	// to wake on sigwinch
 }
 
 static void
@@ -802,4 +791,18 @@ io_err(int err)
 		err_str = err_strs[err];
 
 	return err_str ? err_str : "unknown error";
+}
+
+unsigned
+io_tty_cols(void)
+{
+	/* TODO */
+	return 0;
+}
+
+unsigned
+io_tty_rows(void)
+{
+	/* TODO */
+	return 0;
 }

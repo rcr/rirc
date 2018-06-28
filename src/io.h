@@ -37,14 +37,14 @@ void server_disconnect(struct server*, int, int, char*);
  *          |                 +--------+    |
  *          |                  |      ^     |
  *          |                 (G)     |     |
- *          |                  |     (H)    |
+ *          |                  |     (I)    |
  *          |                  v      |     |
  *          |                 +--------+    |
  *          +-----------(B)-- |  ping  | ---+
  *                            +--------+
  *                             v      ^
  *                             |      |
- *                             +--(G)-+
+ *                             +--(H)-+
  *
  * This module exposes functions for explicitly directing network
  * state as well declaring callback functions for state transitions
@@ -59,8 +59,9 @@ void server_disconnect(struct server*, int, int, char*);
  *   (E) on connection failure:  IO_CB_ERROR
  *   (D) on connection success:  IO_CB_CXED
  *   (F) on connection loss:     IO_CB_DXED
- *   (G) on network ping normal: IO_CB_PING_0
- *   (H) on network ping rising: IO_CB_PING_N
+ *   (G) on ping timeout start:  IO_CB_PING_1
+ *   (H) on ping timeout update: IO_CB_PING_N
+ *   (I) on ping normal:         IO_CB_PING_0
  *
  * Successful reads on stdin and connected sockets result in data callbacks:
  *   from stdin:  io_cb_read_inp
@@ -92,13 +93,14 @@ enum io_sig_t
 enum io_cb_t
 {
 	IO_CB_INVALID,
-	IO_CB_CXED,   /* fmt, [args] */
-	IO_CB_DXED,   /* fmt, [args] */
-	IO_CB_ERROR,  /* fmt, [args] */
-	IO_CB_INFO,   /* fmt, [args] */
-	IO_CB_PING_0, /* ping = 0 */
-	IO_CB_PING_N, /* ping = N */
-	IO_CB_SIGNAL, /* io_sig_t sig */
+	IO_CB_CXED,   /* <const char *fmt>, [args, ...] */
+	IO_CB_DXED,   /* <const char *fmt>, [args, ...] */
+	IO_CB_ERROR,  /* <const char *fmt>, [args, ...] */
+	IO_CB_INFO,   /* <const char *fmt>, [args, ...] */
+	IO_CB_PING_0,
+	IO_CB_PING_1, /* <unsigned ping> */
+	IO_CB_PING_N, /* <unsigned ping> */
+	IO_CB_SIGNAL, /* <io_sig_t sig> */
 	IO_CB_SIZE
 };
 
@@ -110,15 +112,12 @@ struct connection* connection(
 
 void io_free(struct connection*);
 
-/* Start non-returning IO context */
-void io_loop(void (*)(void));
-
-/* Formatted write to connection */
-int io_sendf(struct connection*, const char*, ...);
-
 /* Explicit direction of net state */
 int io_cx(struct connection*);
 int io_dx(struct connection*);
+
+/* Formatted write to connection */
+int io_sendf(struct connection*, const char*, ...);
 
 /* IO state callback */
 void io_cb(enum io_cb_t, const void*, ...);
@@ -126,6 +125,13 @@ void io_cb(enum io_cb_t, const void*, ...);
 /* IO data callback */
 void io_cb_read_inp(char*, size_t);
 void io_cb_read_soc(char*, size_t, const void*);
+
+/* Start non-returning IO context */
+void io_loop(void (*)(void));
+
+/* Get tty dimensions */
+unsigned io_tty_cols(void);
+unsigned io_tty_rows(void);
 
 /* IO error string */
 const char* io_err(int);
