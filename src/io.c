@@ -1,5 +1,5 @@
 #ifndef _DARWIN_C_SOURCE
-#define _DARWIN_C_SOURCE _POSIX_C_SOURCE
+#define _DARWIN_C_SOURCE 200112L
 #endif
 
 #ifndef __BSD_VISIBLE
@@ -153,7 +153,6 @@ static enum io_state_t io_state_rxng(struct connection*);
 static enum io_state_t io_state_cxng(struct connection*);
 static enum io_state_t io_state_cxed(struct connection*);
 static enum io_state_t io_state_ping(struct connection*);
-static enum io_state_t io_state_term(struct connection*);
 
 static struct io_lock init_lock;
 
@@ -422,6 +421,13 @@ io_dx(struct connection *c)
 	return ret;
 }
 
+void
+io_free(struct connection *c)
+{
+	io_dx(c);
+	/* TODO: set state to term */
+}
+
 static enum io_state_t
 io_state_init(struct connection *c)
 {
@@ -523,11 +529,11 @@ static enum io_state_t
 io_state_cxed(struct connection *c)
 {
 	struct timeval tv = {
-		.tv_sec = 3
+		.tv_sec = IO_PING_MIN
 	};
 
 	if (setsockopt(c->soc, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) < 0)
-		{ fatal("setsockopt", errno); }
+		fatal("setsockopt", errno);
 
 	for (;;) {
 		char recvbuf[IO_MESG_LEN];
@@ -564,12 +570,11 @@ static enum io_state_t
 io_state_ping(struct connection *c)
 {
 	struct timeval tv = {
-		// FIXME: test this
-		.tv_sec = 10
+		.tv_sec = IO_PING_REFRESH
 	};
 
 	if (setsockopt(c->soc, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) < 0)
-		{ fatal("setsockopt", errno); }
+		fatal("setsockopt", errno);
 
 
 	for (;;) {
@@ -581,17 +586,18 @@ io_state_ping(struct connection *c)
 
 			if (ret == 0) {
 				PT_CB(io_cb(IO_CB_DXED, c->obj, "Connection closed"));
+				io_close(c);
 				return IO_ST_CXNG;
 			}
 
 			if (errno == ECONNRESET) {
 				PT_CB(io_cb(IO_CB_DXED, c->obj, "Connection forcibly reset by peer"));
+				io_close(c);
 				return IO_ST_CXNG;
 			}
 
 			if (errno == EAGAIN || errno == EWOULDBLOCK) {
-				if ((ping += 2) >= 10) {
-					// TODO: close the socket, etc
+				if ((ping += IO_PING_REFRESH) >= IO_PING_MAX) {
 					PT_CB(io_cb(IO_CB_DXED, c->obj, "Connection lost: ping timeout (%u)", IO_PING_MAX));
 					io_close(c);
 					return IO_ST_CXNG;
@@ -603,31 +609,16 @@ io_state_ping(struct connection *c)
 
 			if (errno == EINTR) {
 				return IO_ST_DXED;
+			} else {
+				fatal("recv", errno);
 			}
 
-			fatal("recv", errno);
 		} else {
 			io_recv(c, recvbuf, (size_t) ret);
 		}
 
-		PT_CB(io_cb(IO_CB_PING_0, c->obj));
 		return IO_ST_CXED;
 	}
-}
-
-static enum io_state_t
-io_state_term(struct connection *c)
-{
-	io_lock_term(&(c->lock));
-
-	free((void*)c->host);
-	free((void*)c->port);
-	free(c);
-
-	pthread_exit(EXIT_SUCCESS);
-
-	/* not reached */
-	return IO_ST_INVALID;
 }
 
 static void*
@@ -636,7 +627,6 @@ io_thread(void *arg)
 	struct connection *c = arg;
 
 	for (;;) {
-
 		enum io_state_t o_state,
 		                n_state;
 
@@ -660,19 +650,34 @@ io_thread(void *arg)
 				n_state = io_state_ping(c);
 				break;
 			case IO_ST_TERM:
-				io_state_term(c);
-				break;
+				goto end_thread;
 			default:
 				fatal("Unknown net state", 0);
 		}
 
 		c->state = n_state;
 
-		/* TODO: when returning from PING states to IO_ST_CXED: PING_0
-		 * and other state transition callbacks */
+		/* TODO: state table here */
+
+		if (o_state == IO_ST_PING && n_state == IO_ST_CXED)
+			PT_CB(io_cb(IO_CB_PING_0, c->obj));
+
 		if (o_state == IO_ST_CXNG && n_state == IO_ST_CXED)
 			PT_CB(io_cb(IO_CB_CXED, c->obj, "Connected to %s [%s]", c->host, c->ip_str));
+
+		if (o_state == IO_ST_CXED && n_state == IO_ST_PING)
+			PT_CB(io_cb(IO_CB_PING_1, c->obj, IO_PING_MIN));
+
+		if (n_state == IO_ST_DXED || (o_state == IO_ST_CXNG && n_state == IO_ST_CXED))
+			c->rx_backoff = 0;
 	}
+
+end_thread:
+	io_lock_term(&(c->lock));
+
+	free((void*)c->host);
+	free((void*)c->port);
+	free(c);
 
 	return NULL;
 }
@@ -696,13 +701,6 @@ io_recv(struct connection *c, char *buf, size_t n)
 			c->read.buf[c->read.i++] = buf[i];
 		}
 	}
-}
-
-void
-io_free(struct connection *c)
-{
-	/* TODO  fatal if not disconnected */
-	(void)c;
 }
 
 static void
