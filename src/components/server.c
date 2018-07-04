@@ -327,6 +327,8 @@ server_set_CHANMODES(struct server *s, char *val)
 {
 	/* Delegated to mode.c  */
 
+	// TODO: replace this with DEBUG() macro that fprintfs to stderr, here
+	// and everywhere
 #ifdef DEBUG
 	newlinef(s->channel, 0, "DEBUG", "Setting numeric 005 CHANMODES: %s", val);
 #endif

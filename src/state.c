@@ -307,9 +307,12 @@ channel_close(struct channel *c)
 			action(action_close_server, "Close server '%s'?   [y/n]", c->server->host);
 	} else {
 		/* Closing a channel */
-
-		if (c->buffer.type == BUFFER_CHANNEL && !c->parted)
-			sendf(NULL, c->server, "PART %s", c->name.str);
+		if (c->buffer.type == BUFFER_CHANNEL && !c->parted) {
+			int ret;
+			if (0 != (ret = io_sendf(c->server->connection, "PART %s", c->name.str))) {
+				newlinef(c->server->channel, 0, "sendf fail", "%s", io_err(ret));
+			}
+		}
 
 		/* If closing the current channel, update state to a new channel */
 		if (c == ccur) {
@@ -579,12 +582,12 @@ static void
 state_io_cxed(struct server *s)
 {
 	int ret;
-	char nickbuf[] = "NICK rirc";
-	char userbuf[] = "USER rirc 8 * :rirc";
-	if (0 != (ret = io_sendf(s->connection, nickbuf, sizeof(nickbuf) - 1, 0)))
-		newlinef(s->channel, 0, "sendf fail", "%s", io_err(ret));
-	if (0 != (ret = io_sendf(s->connection, userbuf, sizeof(userbuf) - 1, 0)))
-		newlinef(s->channel, 0, "sendf fail", "%s", io_err(ret));
+
+	if ((ret = io_sendf(s->connection, "%s", "NICK rirc")))
+		newlinef(s->channel, 0, "-!!-", "sendf fail: %s", io_err(ret));
+
+	if ((ret = io_sendf(s->connection, "%s", "USER rirc 8 * :rirc")))
+		newlinef(s->channel, 0, "-!!-", "sendf fail: %s", io_err(ret));
 }
 
 static void
@@ -631,7 +634,9 @@ io_cb(enum io_cb_t type, const void *cb_obj, ...)
 		case IO_CB_PING_0:
 		case IO_CB_PING_1:
 		case IO_CB_PING_N:
-			/* TODO */
+			/* TODO  0: clear ping, draw
+			 *       1: send ping message
+			 *       N: set ping, draw */
 			break;
 		case IO_CB_SIGNAL:
 			state_io_signal(va_arg(ap, enum io_sig_t));

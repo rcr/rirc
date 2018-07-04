@@ -1,3 +1,7 @@
+#ifndef _POSIX_C_SOURCE
+#define _POSIX_C_SOURCE 200112L
+#endif
+
 #ifndef _DARWIN_C_SOURCE
 #define _DARWIN_C_SOURCE 200112L
 #endif

@@ -3,7 +3,6 @@
 
 /* FIXME: refactoring, stubbed until removal */
 struct server;
-int sendf(char*, struct server*, const char*, ...);
 void server_disconnect(struct server*, int, int, char*);
 
 
