@@ -75,8 +75,7 @@ void server_disconnect(struct server*, int, int, char*);
  *   t(n) = t(n - 1) * factor
  *   t(0) = base
  *
- * Calling io_loop starts the io context and never returns, a callback
- * function can be passed to io_loop which is executed on all input events
+ * Calling io_loop starts the io context and never returns
  */
 
 #define IO_MAX_CONNECTIONS 8
@@ -127,7 +126,7 @@ void io_cb_read_inp(char*, size_t);
 void io_cb_read_soc(char*, size_t, const void*);
 
 /* Start non-returning IO context */
-void io_loop(void (*)(void));
+void io_loop(void);
 
 /* Get tty dimensions */
 unsigned io_tty_cols(void);

@@ -123,17 +123,17 @@ struct connection
 		IO_ST_SIZE
 	} state;
 	int soc;
-
+	char ip_str[INET6_ADDRSTRLEN];
 	// FIXME: remove
 	pthread_mutex_t pt_state_mutex;
 
-	pthread_t       pt_tid;
+	pthread_t pt_tid;
 	struct {
 		size_t i;
 		char buf[IO_MESG_LEN];
 	} read;
 	struct io_lock lock;
-	unsigned rx_backoff;
+	time_t rx_backoff;
 };
 
 static char* io_strerror(int, char*, size_t);
@@ -251,7 +251,7 @@ io_lock_wait(struct io_lock *lock, struct timespec *timeout)
 
 	int ret = 0;
 
-	while (!lock->predicate && ret == 0) {
+	while (lock->predicate == 0 && ret == 0) {
 		if (timeout) {
 			ret = pthread_cond_timedwait(&(lock->cnd), &(lock->mtx), timeout);
 		} else {
@@ -259,7 +259,7 @@ io_lock_wait(struct io_lock *lock, struct timespec *timeout)
 		}
 	}
 
-	if (ret && (!timeout || ret != ETIMEDOUT))
+	if (ret && (timeout == NULL || ret != ETIMEDOUT))
 		fatal("io_lock_wait", ret);
 
 	lock->predicate = 0;
@@ -326,6 +326,10 @@ io_sendf(struct connection *c, const char *fmt, ...)
 
 	if (len >= sizeof(sendbuf) - 2)
 		return IO_ERR_TRUNC;
+
+#ifdef DEBUG
+	fprintf(stderr, ">>\t%s\n", sendbuf);
+#endif
 
 	sendbuf[len++] = '\r';
 	sendbuf[len++] = '\n';
@@ -449,6 +453,7 @@ io_state_rxng(struct connection *c)
 
 	if (clock_gettime(CLOCK_REALTIME, &ts) < 0)
 		fatal("clock_gettime", errno);
+
 	ts.tv_sec += c->rx_backoff;
 
 	PT_CB(io_cb(IO_CB_INFO, c->obj, "Attemping reconnect in: %us", c->rx_backoff));
@@ -461,21 +466,26 @@ static enum io_state_t
 io_state_cxng(struct connection *c)
 {
 	int ret;
-
 	char errbuf[1024];
-	char ipbuf[INET6_ADDRSTRLEN];
-
-	PT_CB(io_cb(IO_CB_INFO, c->obj, "Connecting to %s:%s ...", c->host, c->port));
-
 	struct addrinfo *p, *res, hints = {
 		.ai_family   = AF_UNSPEC,
 		.ai_flags    = AI_PASSIVE,
 		.ai_socktype = SOCK_STREAM
 	};
 
+	PT_CB(io_cb(IO_CB_INFO, c->obj, "Connecting to %s:%s ...", c->host, c->port));
+
 	if ((ret = getaddrinfo(c->host, c->port, &hints, &res))) {
-		PT_CB(io_cb(IO_CB_ERROR, c->obj, "Connection error: %s", gai_strerror(ret)));
-		return IO_ST_RXNG;
+		if (ret != EAI_SYSTEM) {
+			PT_CB(io_cb(IO_CB_ERROR, c->obj, "Connection error (getaddrinfo): %s", gai_strerror(ret)));
+			return IO_ST_RXNG;
+		} else if (errno == EINTR) {
+			PT_CB(io_cb(IO_CB_ERROR, c->obj, "Connection error (getaddrinfo): %s", io_strerror(errno, errbuf, sizeof(errbuf))));
+			return IO_ST_RXNG;
+		} else {
+			PT_CB(io_cb(IO_CB_INFO, c->obj, "Connection attempt canceled"));
+			return IO_ST_DXED;
+		}
 	}
 
 	for (p = res; p != NULL; p = p->ai_next) {
@@ -487,36 +497,31 @@ io_state_cxng(struct connection *c)
 			break;
 
 		if ((ret = errno) == EINTR) {
-			/* Connection was interrupted  by signal, canceled */
-			;
-		} else {
-			/* Connection failed for other reasons */
+			PT_CB(io_cb(IO_CB_INFO, c->obj, "Connection attempt canceled"));
 			io_close(c);
+			freeaddrinfo(res);
+			return IO_ST_DXED;
 		}
+
+		io_close(c);
 	}
 
 	if (p == NULL) {
-		PT_CB(io_cb(IO_CB_ERROR, c->obj, "Connection failure [%s]", io_strerror(ret, errbuf, sizeof(errbuf))));
+		PT_CB(io_cb(IO_CB_ERROR, c->obj, "Connection failure [%s]", io_strerror(errno, errbuf, sizeof(errbuf))));
 		freeaddrinfo(res);
 		return IO_ST_RXNG;
 	}
 
-	if ((ret = getnameinfo(p->ai_addr, p->ai_addrlen, ipbuf, INET6_ADDRSTRLEN, NULL, 0, NI_NUMERICHOST))) {
-		io_cb(IO_CB_ERROR, c->obj, "Connected to %s [IP lookup failure: %s]", c->host, gai_strerror(ret));
-	} else {
-		io_cb(IO_CB_INFO, c->obj, "Connected to %s [%s]", c->host, ipbuf);
-	}
+	if ((ret = getnameinfo(p->ai_addr, p->ai_addrlen, c->ip_str, sizeof(c->ip_str), NULL, 0, NI_NUMERICHOST)))
+		snprintf(c->ip_str, sizeof(c->ip_str), "IP loopup failure: %s", gai_strerror(ret));
 
 	freeaddrinfo(res);
-
 	return IO_ST_CXED;
 }
 
 static enum io_state_t
 io_state_cxed(struct connection *c)
 {
-	PT_CB(io_cb(IO_CB_CXED, c->obj, "Connected to %s [TODO: ip]", c->host));
-
 	struct timeval tv = {
 		.tv_sec = 3
 	};
@@ -632,9 +637,10 @@ io_thread(void *arg)
 
 	for (;;) {
 
-		enum io_state_t n_state;
+		enum io_state_t o_state,
+		                n_state;
 
-		switch (c->state) {
+		switch ((o_state = c->state)) {
 			case IO_ST_INIT:
 				n_state = io_state_init(c);
 				break;
@@ -659,7 +665,13 @@ io_thread(void *arg)
 			default:
 				fatal("Unknown net state", 0);
 		}
+
 		c->state = n_state;
+
+		/* TODO: when returning from PING states to IO_ST_CXED: PING_0
+		 * and other state transition callbacks */
+		if (o_state == IO_ST_CXNG && n_state == IO_ST_CXED)
+			PT_CB(io_cb(IO_CB_CXED, c->obj, "Connected to %s [%s]", c->host, c->ip_str));
 	}
 
 	return NULL;
@@ -674,6 +686,9 @@ io_recv(struct connection *c, char *buf, size_t n)
 			c->read.buf[--c->read.i] = 0;
 
 			if (c->read.i) {
+#ifdef DEBUG
+				fprintf(stderr, "<<\t%s\n", c->read.buf);
+#endif
 				PT_CB(io_cb_read_soc(c->read.buf, c->read.i - 1, c->obj));
 				c->read.i = 0;
 			}
@@ -744,7 +759,7 @@ io_term_tty(void)
 }
 
 void
-io_loop(void (*io_loop_cb)(void))
+io_loop(void)
 {
 	PT_CF(pthread_once(&init_once, io_init));
 
@@ -768,9 +783,6 @@ io_loop(void (*io_loop_cb)(void))
 				fatal("read", ret ? errno : 0);
 			}
 		}
-
-		if (io_loop_cb)
-			io_loop_cb();
 	}
 }
 

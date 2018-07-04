@@ -187,7 +187,7 @@ main(int argc, char **argv)
 	for (i = 0; i <= server_i; i++)
 		io_cx(auto_servers[i].s->connection);
 
-	io_loop(redraw);
+	io_loop();
 
 	return EXIT_SUCCESS;
 }

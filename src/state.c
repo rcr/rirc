@@ -579,8 +579,8 @@ static void
 state_io_cxed(struct server *s)
 {
 	int ret;
-	char nickbuf[] = "NICK rcr\r\n";
-	char userbuf[] = "USER rcr 8 * :real rcr\r\n";
+	char nickbuf[] = "NICK rirc";
+	char userbuf[] = "USER rirc 8 * :rirc";
 	if (0 != (ret = io_sendf(s->connection, nickbuf, sizeof(nickbuf) - 1, 0)))
 		newlinef(s->channel, 0, "sendf fail", "%s", io_err(ret));
 	if (0 != (ret = io_sendf(s->connection, userbuf, sizeof(userbuf) - 1, 0)))
@@ -641,6 +641,7 @@ io_cb(enum io_cb_t type, const void *cb_obj, ...)
 	}
 
 	va_end(ap);
+
 	redraw();
 }
 
@@ -651,6 +652,7 @@ io_cb_read_inp(char *buff, size_t count)
 
 	/* FIXME: */
 	draw_input();
+	redraw();
 }
 
 void
@@ -658,14 +660,12 @@ io_cb_read_soc(char *buff, size_t count, const void *cb_obj)
 {
 	struct channel *c = ((struct server *)cb_obj)->channel;
 
-#ifdef DEBUG
-	newline(c, 0, "DEBUG <<", buff);
-#endif
-
 	struct parsed_mesg p;
 
 	if (!(parse_mesg(&p, buff)))
 		newlinef(c, 0, "-!!-", "failed to parse message");
 	else
 		recv_mesg((struct server *)cb_obj, &p);
+
+	redraw();
 }
