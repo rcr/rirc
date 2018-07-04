@@ -1,6 +1,8 @@
 #ifndef TEST_H
 #define TEST_H
 
+#define TESTING
+
 /* TODO: list the test types at the top of file with usage */
 
 #include <inttypes.h>

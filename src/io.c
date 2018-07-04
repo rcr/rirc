@@ -327,7 +327,7 @@ io_sendf(struct connection *c, const char *fmt, ...)
 	if (len >= sizeof(sendbuf) - 2)
 		return IO_ERR_TRUNC;
 
-#ifdef DEBUG
+#if defined DEBUG && !defined TESTING
 	fprintf(stderr, ">>\t%s\n", sendbuf);
 #endif
 
@@ -686,7 +686,7 @@ io_recv(struct connection *c, char *buf, size_t n)
 			c->read.buf[--c->read.i] = 0;
 
 			if (c->read.i) {
-#ifdef DEBUG
+#if defined DEBUG && !defined TESTING
 				fprintf(stderr, "<<\t%s\n", c->read.buf);
 #endif
 				PT_CB(io_cb_read_soc(c->read.buf, c->read.i - 1, c->obj));

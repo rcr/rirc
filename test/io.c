@@ -19,7 +19,8 @@ void io_cb_read_soc(char *buf, size_t n, const void *obj)
 static void
 test_io_recv(void)
 {
-	struct connection c = {0};
+	struct connection c;
+	memset(&c, 0, sizeof(c));
 
 #define IO_RECV(S) \
 	io_recv(&c, (S), sizeof((S))-1);
