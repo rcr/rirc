@@ -70,6 +70,8 @@ test_io_recv(void)
 int
 main(void)
 {
+	PT_CF(pthread_once(&init_once, io_init));
+
 	testcase tests[] = {
 		TESTCASE(test_io_recv),
 	};

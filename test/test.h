@@ -79,7 +79,7 @@ static void _print_testcase_name_(const char*);
 		if (_assert_fatal_) { \
 			longjmp(_tc_fatal_expected_, 1); \
 		} else { \
-			snprintf(_tc_errbuf_, sizeof(_tc_errbuf_) - 1, "FATAL in "__FILE__" - %s : '%s'", __func__, M); \
+			snprintf(_tc_errbuf_, sizeof(_tc_errbuf_) - 1, "FATAL in "__FILE__":%d - %s : '%s'", __LINE__, __func__, M); \
 			longjmp(_tc_fatal_unexpected_, 1); \
 		} \
 	} while (0)

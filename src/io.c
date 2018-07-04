@@ -1,15 +1,3 @@
-#ifndef _POSIX_C_SOURCE
-#define _POSIX_C_SOURCE 200112L
-#endif
-
-#ifndef _DARWIN_C_SOURCE
-#define _DARWIN_C_SOURCE 200112L
-#endif
-
-#ifndef __BSD_VISIBLE
-#define __BSD_VISIBLE 1
-#endif
-
 #include <errno.h>
 #include <fcntl.h>
 #include <netdb.h>
