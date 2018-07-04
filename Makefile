@@ -7,8 +7,8 @@ EXE_DIR = /usr/local/bin
 MAN_DIR = /usr/local/share/man/man1
 
 STANDARDS = -std=c99 \
- -D_POSIX_C_SOURCE=200112L \
- -D_DARWIN_C_SOURCE=200112L \
+ -D_POSIX_C_SOURCE=200812L \
+ -D_DARWIN_C_SOURCE=200812L \
  -D_BSD_VISIBLE=1
 
 CC = cc
