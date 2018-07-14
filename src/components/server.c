@@ -168,9 +168,7 @@ server_set_004(struct server *s, char *str)
 
 	if (user_modes) {
 
-#ifdef DEBUG
-		newlinef(c, 0, "DEBUG", "Setting numeric 004 user_modes: %s", user_modes);
-#endif
+		DEBUG_MSG("Setting numeric 004 user_modes: %s", user_modes);
 
 		if (mode_config(&(s->mode_config), user_modes, MODE_CONFIG_USERMODES) != MODE_ERR_NONE)
 			newlinef(c, 0, "-!!-", "invalid numeric 004 user_modes: %s", user_modes);
@@ -178,9 +176,7 @@ server_set_004(struct server *s, char *str)
 
 	if (chan_modes) {
 
-#ifdef DEBUG
-		newlinef(c, 0, "DEBUG", "Setting numeric 004 chan_modes: %s", chan_modes);
-#endif
+		DEBUG_MSG("Setting numeric 004 chan_modes: %s", chan_modes);
 
 		if (mode_config(&(s->mode_config), chan_modes, MODE_CONFIG_CHANMODES) != MODE_ERR_NONE)
 			newlinef(c, 0, "-!!-", "invalid numeric 004 chan_modes: %s", chan_modes);
@@ -327,11 +323,7 @@ server_set_CHANMODES(struct server *s, char *val)
 {
 	/* Delegated to mode.c  */
 
-	// TODO: replace this with DEBUG() macro that fprintfs to stderr, here
-	// and everywhere
-#ifdef DEBUG
-	newlinef(s->channel, 0, "DEBUG", "Setting numeric 005 CHANMODES: %s", val);
-#endif
+	DEBUG_MSG("Setting numeric 005 CHANMODES: %s", val);
 
 	return (mode_config(&(s->mode_config), val, MODE_CONFIG_SUBTYPES) != MODE_ERR_NONE);
 }
@@ -341,9 +333,7 @@ server_set_MODES(struct server *s, char *val)
 {
 	/* Delegated to mode.c */
 
-#ifdef DEBUG
-	newlinef(s->channel, 0, "DEBUG", "Setting numeric 005 MODES: %s", val);
-#endif
+	DEBUG_MSG("Setting numeric 005 MODES: %s", val);
 
 	return (mode_config(&(s->mode_config), val, MODE_CONFIG_MODES) != MODE_ERR_NONE);
 }
@@ -353,9 +343,7 @@ server_set_PREFIX(struct server *s, char *val)
 {
 	/* Delegated to mode.c  */
 
-#ifdef DEBUG
-	newlinef(s->channel, 0, "DEBUG", "Setting numeric 005 PREFIX: %s", val);
-#endif
+	DEBUG_MSG("Setting numeric 005 PREFIX: %s", val);
 
 	return (mode_config(&(s->mode_config), val, MODE_CONFIG_PREFIX) != MODE_ERR_NONE);
 }

@@ -365,7 +365,7 @@ buffer_scrollback_back(struct channel *c)
 
 	unsigned int buffer_i = b->scrollback,
 	             count = 0,
-				 text_w,
+	             text_w,
 	             cols = _term_cols(),
 	             rows = _term_rows() - 4;
 

@@ -54,6 +54,14 @@ extern int fatal_exit;
 
 #define UNUSED(X) ((void)(X))
 
+#ifndef DEBUG
+#define DEBUG_MSG(M, ...) \
+	do { } while (0)
+#else
+#define DEBUG_MSG(M, ...) \
+	do { fprintf(stderr, (M)"\n", __VA_ARGS__); } while (0)
+#endif
+
 /* Irrecoverable error
  *   this define is precluded in test.h to aggregate fatal errors in testcases */
 #ifndef fatal

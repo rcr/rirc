@@ -203,8 +203,6 @@ mode_chanmode_set(struct mode *m, const struct mode_config *config, int flag, en
 	 * (mentioned in the "IRC Server Protocol" document [IRC-SERVER]).
 	 */
 
-	uint32_t bit;
-
 	if (!(set_t == MODE_SET_ON || set_t == MODE_SET_OFF))
 		return MODE_ERR_INVALID_SET;
 
@@ -217,7 +215,7 @@ mode_chanmode_set(struct mode *m, const struct mode_config *config, int flag, en
 
 	if (flag != 's' && flag != 'p') {
 
-		bit = flag_bit(flag);
+		uint32_t bit = flag_bit(flag);
 
 		if (MODE_ISLOWER(flag))
 			MODE_SET(m->lower, bit, set_t);
@@ -258,7 +256,6 @@ mode_chanmode_set(struct mode *m, const struct mode_config *config, int flag, en
 			MODE_SET(m->lower, flag_bit('p'), MODE_SET_OFF);
 
 			m->prefix = MODE_CHANMODE_PREFIX_SECRET;
-
 		}
 	}
 
@@ -462,14 +459,14 @@ mode_config_chanmodes(struct mode_config *config, const char *str)
 	/* Parse and configure chanmodes string */
 
 	char c;
-	uint32_t bit;
-
 	struct mode *chanmodes = &(config->chanmodes);
 
 	chanmodes->lower = 0;
 	chanmodes->upper = 0;
 
 	while ((c = *str++)) {
+
+		uint32_t bit;
 
 		if ((bit = flag_bit(c)) == 0)
 			continue; /* TODO: aggregate warnings, invalid flag */
@@ -492,14 +489,14 @@ mode_config_usermodes(struct mode_config *config, const char *str)
 	/* Parse and configure usermodes string */
 
 	char c;
-	uint32_t bit;
-
 	struct mode *usermodes = &(config->usermodes);
 
 	usermodes->lower = 0;
 	usermodes->upper = 0;
 
 	while ((c = *str++)) {
+
+		uint32_t bit;
 
 		if ((bit = flag_bit(c)) == 0)
 			continue; /* TODO: aggregate warnings, invalid flag */
@@ -545,7 +542,7 @@ mode_config_subtypes(struct mode_config *config, const char *str)
 	memset(&(config->CHANMODES.D), 0, sizeof (struct mode));
 	memset(&duplicates, 0, sizeof (struct mode));
 
-	uint32_t bit, commas = 0;
+	uint32_t commas = 0;
 
 	while ((c = *str++)) {
 
@@ -561,6 +558,8 @@ mode_config_subtypes(struct mode_config *config, const char *str)
 			}
 			continue;
 		}
+
+		uint32_t bit;
 
 		if ((bit = flag_bit(c)) == 0)
 			continue; /* TODO: aggregate warnings, invalid flag */
@@ -594,15 +593,13 @@ mode_config_prefix(struct mode_config *config, const char *str)
 
 	char *str_f, cf,
 	     *str_t, ct,
-		 *config_f = config->PREFIX.F,
-		 *config_t = config->PREFIX.T,
+	     *config_f = config->PREFIX.F,
+	     *config_t = config->PREFIX.T,
 	     _str[strlen(str) + 1];
 
 	struct mode duplicates;
 
-	uint32_t bit;
-
-	strcpy(_str, str);
+	memcpy(_str, str, sizeof(str));
 
 	if (*(str_f = _str) != '(')
 		goto error;
@@ -619,6 +616,8 @@ mode_config_prefix(struct mode_config *config, const char *str)
 	memset(&duplicates, 0, sizeof duplicates);
 
 	while (*str_f) {
+
+		uint32_t bit;
 
 		cf = *str_f++;
 		ct = *str_t++;

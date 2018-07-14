@@ -441,4 +441,3 @@ word_wrap(int n, char **str, char *end)
 
 	return ret;
 }
-

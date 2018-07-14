@@ -18,16 +18,6 @@
 #include "src/io.h"
 #include "utils/utils.h"
 
-int
-sendf(char *a, struct server *b, const char *c, ...)
-{
-	(void)a;
-	(void)b;
-	(void)c;
-	fatal("Not implemented", 0);
-	return 0;
-}
-
 void
 server_disconnect(struct server *a, int b, int c, char *d)
 {
@@ -318,9 +308,7 @@ io_sendf(struct connection *c, const char *fmt, ...)
 	if (len >= sizeof(sendbuf) - 2)
 		return IO_ERR_TRUNC;
 
-#if defined DEBUG && !defined TESTING
-	fprintf(stderr, ">>\t%s\n", sendbuf);
-#endif
+	DEBUG_MSG(" >> %s", sendbuf);
 
 	sendbuf[len++] = '\r';
 	sendbuf[len++] = '\n';
@@ -683,9 +671,8 @@ io_recv(struct connection *c, char *buf, size_t n)
 			c->read.buf[--c->read.i] = 0;
 
 			if (c->read.i) {
-#if defined DEBUG && !defined TESTING
-				fprintf(stderr, "<<\t%s\n", c->read.buf);
-#endif
+				DEBUG_MSG(" << %s", c->read.buf);
+
 				PT_CB(io_cb_read_soc(c->read.buf, c->read.i - 1, c->obj));
 				c->read.i = 0;
 			}
