@@ -599,7 +599,7 @@ mode_config_prefix(struct mode_config *config, const char *str)
 
 	struct mode duplicates;
 
-	memcpy(_str, str, sizeof(str));
+	memcpy(_str, str, sizeof(_str));
 
 	if (*(str_f = _str) != '(')
 		goto error;
