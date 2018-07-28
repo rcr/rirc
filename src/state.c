@@ -25,6 +25,7 @@ static struct
 
 	struct server_list servers;
 
+	// TODO: remove, use io.c
 	unsigned int term_cols;
 	unsigned int term_rows;
 

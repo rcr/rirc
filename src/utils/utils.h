@@ -3,6 +3,7 @@
 
 #include <errno.h>
 #include <stddef.h>
+#include <stdio.h>
 #include <stdlib.h>
 
 /* Parsed IRC message */
@@ -59,7 +60,7 @@ extern int fatal_exit;
 	do { } while (0)
 #else
 #define DEBUG_MSG(M, ...) \
-	do { fprintf(stderr, (M)"\n", __VA_ARGS__); } while (0)
+	do { fprintf(stderr, M "\n", __VA_ARGS__); } while (0)
 #endif
 
 /* Irrecoverable error
