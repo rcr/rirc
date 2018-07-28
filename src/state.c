@@ -193,7 +193,7 @@ _newline(struct channel *c, enum buffer_line_t type, const char *from, const cha
 }
 
 struct channel*
-new_channel(char *name, struct server *s, struct channel *chanlist, enum buffer_t type)
+new_channel(const char *name, struct server *s, struct channel *chanlist, enum buffer_t type)
 {
 	struct channel *c = channel(name);
 
@@ -329,30 +329,6 @@ channel_close(struct channel *c)
 
 		free_channel(c);
 	}
-}
-
-/* Get a channel's next/previous, taking into account server wraparound */
-struct channel*
-channel_switch(struct channel *c, int next)
-{
-	struct channel *ret;
-
-	/* c in this case is the main buffer */
-	if (c->server == NULL)
-		return c;
-
-	if (next)
-		/* If wrapping around forwards, get next server's first channel */
-		ret = !(c->next == c->server->channel) ?
-			c->next : c->server->next->channel;
-	else
-		/* If wrapping around backwards, get previous server's last channel */
-		ret = !(c == c->server->channel) ?
-			c->prev : c->server->prev->channel->prev;
-
-	draw_all();
-
-	return ret;
 }
 
 //TODO:
@@ -584,10 +560,10 @@ state_io_cxed(struct server *s)
 {
 	int ret;
 
-	if ((ret = io_sendf(s->connection, "%s", "NICK rirc")))
+	if ((ret = io_sendf(s->connection, "NICK %s", s->nick)))
 		newlinef(s->channel, 0, "-!!-", "sendf fail: %s", io_err(ret));
 
-	if ((ret = io_sendf(s->connection, "%s", "USER rirc 8 * :rirc")))
+	if ((ret = io_sendf(s->connection, "USER %s 8 * :%s", s->username, s->realname)))
 		newlinef(s->channel, 0, "-!!-", "sendf fail: %s", io_err(ret));
 }
 
@@ -664,6 +640,7 @@ io_cb_read_inp(char *buff, size_t count)
 void
 io_cb_read_soc(char *buff, size_t count, const void *cb_obj)
 {
+	(void)(count);
 	struct channel *c = ((struct server *)cb_obj)->channel;
 
 	struct parsed_mesg p;

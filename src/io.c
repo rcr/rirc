@@ -410,6 +410,7 @@ io_free(struct connection *c)
 	/* TODO: this should basically be the
 	 * same as io_cx in the syn/ack sence, but just
 	 * set the new state to TERM, as iocx/dx set to CXNG/DXED */
+	(void)(c); /* TODO */
 }
 
 static enum io_state_t

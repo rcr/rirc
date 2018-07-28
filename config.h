@@ -3,6 +3,18 @@
  * Colours can be set [0, 255], Any other value (e.g. -1) will set
  * the default terminal foreground/background */
 
+/* Username and Realname sent during connection
+ *   String
+ *   ("": defaults to effective user id name)
+ */
+#define DEFAULT_USERNAME ""
+#define DEFAULT_REALNAME ""
+
+/* User count in channel before filtering JOIN/PART/QUIT messages
+ *   Integer
+ *   (0: no filtering) */
+#define JPQ_THRESHOLD 0
+
 /* Message sent for PART and QUIT by default */
 #define DEFAULT_QUIT_MESG "rirc v" VERSION
 

@@ -27,7 +27,7 @@ HANDLED_005
 #undef X
 
 struct server*
-server(const char *host, const char *port, const char *pass)
+server(const char *host, const char *port, const char *pass, const char *user, const char *real)
 {
 	struct server *s;
 
@@ -37,6 +37,8 @@ server(const char *host, const char *port, const char *pass)
 	s->host = strdup(host);
 	s->port = strdup(port);
 	s->pass = pass ? strdup(pass) : NULL;
+	s->username = strdup(user);
+	s->realname = strdup(real);
 
 	s->usermodes_str.type = MODE_STR_USERMODE;
 
@@ -136,9 +138,12 @@ server_list_del(struct server_list *sl, struct server *s)
 void
 server_free(struct server *s)
 {
-	free(s->host);
-	free(s->port);
-	free(s->nicks);
+	free((void *)s->host);
+	free((void *)s->port);
+	free((void *)s->pass);
+	free((void *)s->nicks);
+	free((void *)s->username);
+	free((void *)s->realname);
 	free(s);
 }
 

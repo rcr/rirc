@@ -48,6 +48,9 @@ void handle_error(int, const char*, ...);
 
 extern int fatal_exit;
 
+#define TO_STR(X) #X
+#define STR(X) TO_STR(X)
+
 #define MAX(A, B) ((A) > (B) ? (A) : (B))
 #define MIN(A, B) ((A) > (B) ? (B) : (A))
 

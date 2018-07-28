@@ -21,21 +21,23 @@ make debug
 
 ## Usage:
 ```
-  rirc [-hv] [-s server [-p port] [-w pass] [-n nicks] [-c chans], ...]
+  rirc [-hv] [-s server [-p port] [-w pass] [-n nicks] [-c chans] [-u user] [-r real]], ...]\n"
 
 Help:
   -h, --help            Print this message and exit
   -v, --version         Print rirc version and exit
 
 Options:
-  -s, --server=SERVER   Connect to SERVER
-  -p, --port=PORT       Connect to SERVER using PORT
-  -w, --pass=PASS       Connect to SERVER using PASS
-  -n, --nicks=NICKS     Comma separated list of nicks to use for SERVER
-  -c, --chans=CHANNELS  Comma separated list of channels to join for SERVER
+  -s, --server=SERVER      Connect to SERVER\n"
+  -p, --port=PORT          Connect to SERVER using PORT\n"
+  -w, --pass=PASS          Connect to SERVER using PASS\n"
+  -u, --username=USERNAME  Connect to SERVER using USERNAME\n"
+  -r, --realname=REALNAME  Connect to SERVER using REALNAME\n"
+  -n, --nicks=NICKS        Comma separated list of nicks to use for SERVER\n"
+  -c, --chans=CHANNELS     Comma separated list of channels to join for SERVER\n"
 ```
 
-Hotkeys:
+Keys:
 ```
   ^N : go to next channel
   ^P : go to previous channel

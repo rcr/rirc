@@ -14,7 +14,11 @@ rirc \- a minimalistic irc client written in C
 .RB [ -n
 .IR nicks ]
 .RB [ -c
-.IR chans "], ...]"
+.IR chans "]
+.RB [ -u
+.IR username "]
+.RB [ -r
+.IR realname "]], ...]"
 .SH DESCRIPTION
 .P
 rirc is a lightweight Internet Relay Chat client.
@@ -45,6 +49,18 @@ Connect to
 .I server
 using
 .I pass
+.TP
+.BI "-u, --username=" username
+Connect to
+.I server
+using
+.I username
+.TP
+.BI "-r, --realname=" realname
+Connect to
+.I server
+using
+.I realname
 .TP
 .BI "-n, --nicks=" nicks
 Comma separated list of

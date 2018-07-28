@@ -1,147 +1,163 @@
 #include <getopt.h>
-#include <stdio.h>
-#include <stdlib.h>
+#include <pwd.h>
+#include <unistd.h>
 
+#include "config.h"
 #include "src/io.h"
 #include "src/state.h"
 
 #define arg_error(...) \
 	do { fprintf(stderr, __VA_ARGS__); exit(EXIT_FAILURE); } while (0);
 
-static void usage(void);
+#ifndef DEFAULT_USERNAME
+const char *default_username = DEFAULT_USERNAME;
+#else
+const char *default_username;
+#endif
 
-/* Global configuration */
-struct config config =
+#ifndef DEFAULT_REALNAME
+const char *default_realname = DEFAULT_REALNAME;
+#else
+const char *default_realname;
+#endif
+
+static const char* getpwuid_pwname(struct passwd *passwd);
+static void rirc_usage(void);
+
+static const char*
+getpwuid_pwname(struct passwd *passwd)
 {
-	.username = "rirc_v" VERSION,
-	.realname = "rirc v" VERSION,
-	.join_part_quit_threshold = 100
-};
+	if (!(passwd = getpwuid(geteuid())))
+		fatal("getpwuid", (errno ? errno : ENOENT));
+
+	return passwd->pw_name;
+}
 
 static void
-usage(void)
+rirc_usage(void)
 {
 	puts(
 	"\n"
-	"rirc version " VERSION " ~ Richard C. Robbins <mail@rcr.io>\n"
+	"rirc version "VERSION" ~ Richard C. Robbins <mail@rcr.io>\n"
 	"\n"
 	"Usage:\n"
-	"  rirc [-hv] [-s server [-p port] [-w pass] [-n nicks] [-c chans], ...]\n"
+	"  rirc [-hv] [-s server [-p port] [-w pass] [-n nicks] [-c chans] [-u user] [-r real]], ...]\n"
 	"\n"
 	"Help:\n"
 	"  -h, --help            Print this message and exit\n"
 	"  -v, --version         Print rirc version and exit\n"
 	"\n"
 	"Options:\n"
-	"  -s, --server=SERVER   Connect to SERVER\n"
-	"  -p, --port=PORT       Connect to SERVER using PORT\n"
-	"  -w, --pass=PASS       Connect to SERVER using PASS\n"
-	"  -n, --nicks=NICKS     Comma separated list of nicks to use for SERVER\n"
-	"  -c, --chans=CHANNELS  Comma separated list of channels to join for SERVER\n"
+	"  -s, --server=SERVER      Connect to SERVER\n"
+	"  -p, --port=PORT          Connect to SERVER using PORT\n"
+	"  -w, --pass=PASS          Connect to SERVER using PASS\n"
+	"  -r, --realname=REALNAME  Connect to SERVER using REALNAME\n"
+	"  -u, --username=USERNAME  Connect to SERVER using USERNAME\n"
+	"  -n, --nicks=NICKS        Comma separated list of nicks to use for SERVER\n"
+	"  -c, --chans=CHANNELS     Comma separated list of channels to join for SERVER\n"
 	);
 }
 
 int
 main(int argc, char **argv)
 {
-	int c, i, opt_i = 0, server_i = -1;
+	srand(time(NULL));
 
-	struct option long_opts[] =
-	{
-		{"server",  required_argument, 0, 's'},
-		{"port",    required_argument, 0, 'p'},
-		{"pass",    required_argument, 0, 'w'},
-		{"nicks",   required_argument, 0, 'n'},
-		{"chans",   required_argument, 0, 'c'},
-		{"version", no_argument,       0, 'v'},
-		{"help",    no_argument,       0, 'h'},
+	int opt_c = 0,
+	    opt_i = 0;
+
+	size_t n_servers = 0;
+
+	struct option long_opts[] = {
+		{"server",   required_argument, 0, 's'},
+		{"port",     required_argument, 0, 'p'},
+		{"pass",     required_argument, 0, 'w'},
+		{"nicks",    required_argument, 0, 'n'},
+		{"chans",    required_argument, 0, 'c'},
+		{"username", required_argument, 0, 'u'},
+		{"realname", required_argument, 0, 'r'},
+		{"version",  no_argument,       0, 'v'},
+		{"help",     no_argument,       0, 'h'},
 		{0, 0, 0, 0}
 	};
 
 	struct auto_server {
-		char *host;
-		char *port;
-		char *pass;
-		char *nicks;
-		char *chans;
+		const char *host;
+		const char *port;
+		const char *pass;
+		const char *nicks;
+		const char *chans;
+		const char *username;
+		const char *realname;
 		struct server *s;
 	} auto_servers[IO_MAX_CONNECTIONS];
 
 	/* FIXME: getopt_long is a GNU extension */
-	while ((c = getopt_long(argc, argv, "s:p:w:n:c:vh", long_opts, &opt_i))) {
+	while (0 < (opt_c = getopt_long(argc, argv, "s:p:w:n:c:r:u:vh", long_opts, &opt_i))) {
 
-		if (c == -1)
-			break;
+		switch (opt_c) {
 
-		switch (c) {
+			case 's': /* Connect to server */
 
-			/* Connect to server */
-			case 's':
 				if (*optarg == '-')
 					arg_error("-s/--connect requires an argument");
 
-				if (++server_i == IO_MAX_CONNECTIONS)
+				if (++n_servers == IO_MAX_CONNECTIONS)
 					arg_error("exceeded maximum number of servers (%d)", IO_MAX_CONNECTIONS);
 
-				auto_servers[server_i].host = optarg;
-				auto_servers[server_i].port = "6667",
-				auto_servers[server_i].pass = NULL;
-				auto_servers[server_i].nicks = NULL;
-				auto_servers[server_i].chans = NULL;
+				auto_servers[n_servers - 1].host = optarg;
+				auto_servers[n_servers - 1].port = "6667";
+				auto_servers[n_servers - 1].pass = NULL;
+				auto_servers[n_servers - 1].nicks = NULL;
+				auto_servers[n_servers - 1].chans = NULL;
+				auto_servers[n_servers - 1].username = NULL;
+				auto_servers[n_servers - 1].realname = NULL;
 				break;
 
-			/* Connect using port */
-			case 'p':
-				if (*optarg == '-')
-					arg_error("-p/--port requires an argument");
+			#define CHECK_SERVER_OPTARG(STR) \
+				if (*optarg == '-') \
+					arg_error(STR " requires an argument"); \
+				if (n_servers == 0) \
+					arg_error(STR " requires a server argument first");
 
-				if (server_i < 0)
-					arg_error("-p/--port requires a server argument first");
-
-				auto_servers[server_i].port = optarg;
+			case 'p': /* Connect using port */
+				CHECK_SERVER_OPTARG("-p/--port");
+				auto_servers[n_servers - 1].port = optarg;
 				break;
 
-			/* Connect using port */
-			case 'w':
-				if (*optarg == '-')
-					arg_error("-w/--pass requires an argument");
-
-				if (server_i < 0)
-					arg_error("-w/--pass requires a server argument first");
-
-				auto_servers[server_i].pass = optarg;
+			case 'w': /* Connect using port */
+				CHECK_SERVER_OPTARG("-w/--pass");
+				auto_servers[n_servers - 1].pass = optarg;
 				break;
 
-			/* Comma separated list of nicks to use */
-			case 'n':
-				if (*optarg == '-')
-					arg_error("-n/--nick requires an argument");
-
-				if (server_i < 0)
-					arg_error("-n/--nick requires a server argument first");
-
-				auto_servers[server_i].nicks = optarg;
+			case 'n': /* Comma separated list of nicks to use */
+				CHECK_SERVER_OPTARG("-n/--nick");
+				auto_servers[n_servers - 1].nicks = optarg;
 				break;
 
-			/* Comma separated list of channels to join */
-			case 'c':
-				if (*optarg == '-')
-					arg_error("-c/--chans requires an argument");
-
-				if (server_i < 0)
-					arg_error("-c/--chans requires a server argument first");
-
-				auto_servers[server_i].chans = optarg;
+			case 'c': /* Comma separated list of channels to join */
+				CHECK_SERVER_OPTARG("-c/--chans");
+				auto_servers[n_servers - 1].chans = optarg;
 				break;
 
-			/* Print rirc version and exit */
-			case 'v':
+			case 'u': /* Connect using username */
+				CHECK_SERVER_OPTARG("-u/--username");
+				auto_servers[n_servers - 1].username = optarg;
+				break;
+
+			case 'r': /* Connect using realname */
+				CHECK_SERVER_OPTARG("-r/--realname");
+				auto_servers[n_servers - 1].realname = optarg;
+				break;
+
+			#undef CHECK_SERVER_OPTARG
+
+			case 'v': /* Print rirc version and exit */
 				puts("rirc version " VERSION);
 				exit(EXIT_SUCCESS);
 
-			/* Print rirc usage and exit */
-			case 'h':
-				usage();
+			case 'h': /* Print rirc usage and exit */
+				rirc_usage();
 				exit(EXIT_SUCCESS);
 
 			default:
@@ -150,26 +166,28 @@ main(int argc, char **argv)
 		}
 	}
 
-	// FIXME: move this out of here
-	/* stdout is fflush()'ed on every redraw */
-	errno = 0; /* "may set errno" */
-	if (setvbuf(stdout, NULL, _IOFBF, 0) != 0)
-		fatal("setvbuf", errno);
-
-	srand(time(NULL));
-
+	// FIXME:
 	init_state();
 
-	config.default_nick = getenv("USER");
+	struct passwd passwd;
 
-	for (i = 0; i <= server_i; i++) {
+	if (!default_username || !default_username[0])
+		default_username = getpwuid_pwname(&passwd);
+
+	if (!default_realname || !default_realname[0])
+		default_realname = getpwuid_pwname(&passwd);
+
+	for (size_t i = 0; i < n_servers; i++) {
 
 		struct server *s = server(
 			auto_servers[i].host,
 			auto_servers[i].port,
-			auto_servers[i].pass);
+			auto_servers[i].pass,
+			(auto_servers[i].username ?  auto_servers[i].username : default_username),
+			(auto_servers[i].realname ?  auto_servers[i].realname : default_realname)
+		);
 
-		if (s == NULL)
+		if (!s)
 			arg_error("failed to create: %s:%s", auto_servers[i].host, auto_servers[i].port);
 
 		if (server_list_add(state_server_list(), s))
@@ -184,7 +202,7 @@ main(int argc, char **argv)
 		auto_servers[i].s = s;
 	}
 
-	for (i = 0; i <= server_i; i++)
+	for (size_t i = 0; i < n_servers; i++)
 		io_cx(auto_servers[i].s->connection);
 
 	io_loop();

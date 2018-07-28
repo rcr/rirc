@@ -10,16 +10,21 @@
 
 #include "src/rirc.h" // NICKSIZE
 
+//TODO: just malloc the current nick
+#define NICKSIZE 255
+
 struct server
 {
 	//TODO: struct string. Remove arbitrary NICKSIZE
 	char nick[NICKSIZE + 1];
 	//TODO: can be grouped together, autonick
-	char *nicks;
 	char *nptr;
-	char *host;
-	char *port;
-	char *pass;
+	const char *host;
+	const char *port;
+	const char *pass;
+	const char *nicks;
+	const char *username;
+	const char *realname;
 	//TODO channel_list
 	struct channel *channel;
 	//TODO: WIP
@@ -41,7 +46,12 @@ struct server_list
 	struct server *tail;
 };
 
-struct server* server(const char*, const char*, const char*);
+struct server* server(
+	const char*,  /* host */
+	const char*,  /* port */
+	const char*,  /* pass */
+	const char*,  /* username */
+	const char*); /* realname */
 
 struct server* server_list_add(struct server_list*, struct server*);
 struct server* server_list_del(struct server_list*, struct server*);
