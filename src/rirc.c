@@ -51,8 +51,8 @@ rirc_usage(void)
 	"  -s, --server=SERVER      Connect to SERVER\n"
 	"  -p, --port=PORT          Connect to SERVER using PORT\n"
 	"  -w, --pass=PASS          Connect to SERVER using PASS\n"
-	"  -r, --realname=REALNAME  Connect to SERVER using REALNAME\n"
 	"  -u, --username=USERNAME  Connect to SERVER using USERNAME\n"
+	"  -r, --realname=REALNAME  Connect to SERVER using REALNAME\n"
 	"  -n, --nicks=NICKS        Comma separated list of nicks to use for SERVER\n"
 	"  -c, --chans=CHANNELS     Comma separated list of channels to join for SERVER\n"
 	);
