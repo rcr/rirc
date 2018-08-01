@@ -176,6 +176,7 @@ _newline(struct channel *c, enum buffer_line_t type, const char *from, const cha
 		_text.len = len;
 		_from.str = from;
 
+		// FIXME: don't need to get user for many non-user message types
 		if ((u = user_list_get(&(c->users), from, 0)) != NULL)
 			_from.len = u->nick.len;
 		else
@@ -560,11 +561,15 @@ state_io_cxed(struct server *s)
 {
 	int ret;
 
+	// TODO: reset/set server nick
+
 	if ((ret = io_sendf(s->connection, "NICK %s", s->nick)))
 		newlinef(s->channel, 0, "-!!-", "sendf fail: %s", io_err(ret));
 
 	if ((ret = io_sendf(s->connection, "USER %s 8 * :%s", s->username, s->realname)))
 		newlinef(s->channel, 0, "-!!-", "sendf fail: %s", io_err(ret));
+
+	// TODO: send PASS if set
 }
 
 static void

@@ -542,7 +542,7 @@ mode_config_subtypes(struct mode_config *config, const char *str)
 	memset(&(config->CHANMODES.D), 0, sizeof (struct mode));
 	memset(&duplicates, 0, sizeof (struct mode));
 
-	uint32_t commas = 0;
+	unsigned commas = 0;
 
 	while ((c = *str++)) {
 

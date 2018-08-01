@@ -603,7 +603,6 @@ io_thread(void *arg)
 	struct connection *c = arg;
 
 	io_lock_wake(&init_lock);
-	io_lock_wait(&c->lock, NULL);
 
 	while (c->state != IO_ST_TERM) {
 
@@ -678,7 +677,6 @@ io_recv(struct connection *c, char *buf, size_t n)
 
 			if (c->read.i) {
 				DEBUG_MSG(" << %s", c->read.buf);
-
 				PT_CB(io_cb_read_soc(c->read.buf, c->read.i - 1, c->obj));
 				c->read.i = 0;
 			}
@@ -811,7 +809,7 @@ io_err(int err)
 
 	const char *err_str = NULL;
 
-	if (err >= 0 && (unsigned) err < ELEMS(err_strs))
+	if (err >= 0 && (size_t) err < ELEMS(err_strs))
 		err_str = err_strs[err];
 
 	return err_str ? err_str : "unknown error";

@@ -21,11 +21,11 @@ const char *default_realname = DEFAULT_REALNAME;
 const char *default_realname;
 #endif
 
-static const char* getpwuid_pwname(struct passwd *passwd);
+static const char* getpwuid_pw_name(struct passwd *passwd);
 static void rirc_usage(void);
 
 static const char*
-getpwuid_pwname(struct passwd *passwd)
+getpwuid_pw_name(struct passwd *passwd)
 {
 	if (!(passwd = getpwuid(geteuid())))
 		fatal("getpwuid", (errno ? errno : ENOENT));
@@ -172,10 +172,10 @@ main(int argc, char **argv)
 	struct passwd passwd;
 
 	if (!default_username || !default_username[0])
-		default_username = getpwuid_pwname(&passwd);
+		default_username = getpwuid_pw_name(&passwd);
 
 	if (!default_realname || !default_realname[0])
-		default_realname = getpwuid_pwname(&passwd);
+		default_realname = getpwuid_pw_name(&passwd);
 
 	for (size_t i = 0; i < n_servers; i++) {
 
@@ -183,8 +183,8 @@ main(int argc, char **argv)
 			auto_servers[i].host,
 			auto_servers[i].port,
 			auto_servers[i].pass,
-			(auto_servers[i].username ?  auto_servers[i].username : default_username),
-			(auto_servers[i].realname ?  auto_servers[i].realname : default_realname)
+			(auto_servers[i].username ? auto_servers[i].username : default_username),
+			(auto_servers[i].realname ? auto_servers[i].realname : default_realname)
 		);
 
 		if (!s)
