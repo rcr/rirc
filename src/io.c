@@ -609,6 +609,7 @@ io_thread(void *arg)
 		enum io_state_t o_state,
 		                n_state;
 
+#if 0
 		enum io_state_t (*const io_state_fns[])(struct connection*) = {
 			[IO_ST_DXED] = io_state_dxed,
 			[IO_ST_CXNG] = io_state_cxng,
@@ -616,6 +617,7 @@ io_thread(void *arg)
 			[IO_ST_CXED] = io_state_cxed,
 			[IO_ST_PING] = io_state_ping,
 		};
+#endif
 
 		switch ((o_state = c->state)) {
 			case IO_ST_DXED:

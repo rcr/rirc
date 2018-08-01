@@ -371,9 +371,9 @@ server_nicks_next(struct server *s)
 		/* Default to random nick, length 9 (RFC2912, section 1.2.1) */
 
 		char nick_cset[] = "0123456789ABCDEF";
-		char nick_rand[] = "rirc00000";
+		char nick_rand[] = "rirc*****";
 
-		for (char *p = strchr(nick_rand, '0'); *p; p++) {
+		for (char *p = strchr(nick_rand, '*'); p && *p; p++) {
 			/* coverity[dont_call] Acceptable use of insecure rand() function */
 			*p = nick_cset[rand() % strlen(nick_cset)];
 		}
