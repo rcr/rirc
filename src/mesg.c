@@ -994,7 +994,7 @@ recv_join(struct parsed_mesg *p, struct server *s)
 		if (user_list_add(&(c->users), p->from, MODE_EMPTY) == USER_ERR_DUPLICATE)
 			failf(s->channel, "Error: user '%s' alread on channel '%s'", p->from, c->name.str);
 
-		if (c->users.count =< jpq_threshold)
+		if (c->users.count <= jpq_threshold)
 			newlinef(c, 0, ">", "%s!%s has joined %s", p->from, p->host, chan);
 
 		draw_status();
@@ -1687,7 +1687,7 @@ recv_part(struct parsed_mesg *p, struct server *s)
 	if (user_list_del(&(c->users), p->from) == USER_ERR_NOT_FOUND)
 		failf(s->channel, "PART: nick '%s' not found in '%s'", p->from, targ);
 
-	if (c->users.count =< jpq_threshold) {
+	if (c->users.count <= jpq_threshold) {
 		if (p->trailing)
 			newlinef(c, 0, "<", "%s!%s has left %s (%s)", p->from, p->host, targ, p->trailing);
 		else
@@ -1802,7 +1802,7 @@ recv_quit(struct parsed_mesg *p, struct server *s)
 	//TODO: channel_list_foreach
 	do {
 		if (user_list_del(&(c->users), p->from) == USER_ERR_NONE) {
-			if (c->users.count =< jpq_threshold) {
+			if (c->users.count <= jpq_threshold) {
 				if (p->trailing)
 					newlinef(c, 0, "<", "%s!%s has quit (%s)", p->from, p->host, p->trailing);
 				else
