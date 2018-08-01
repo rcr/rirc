@@ -1300,7 +1300,7 @@ recv_nick(struct parsed_mesg *p, struct server *s)
 		fail(s->channel, "NICK: new nick is null");
 
 	if (IS_ME(p->from)) {
-		strncpy(s->nick, nick, NICKSIZE);
+		server_nick_set(s, nick);
 		newlinef(s->channel, 0, "--", "You are now known as %s", nick);
 	}
 
@@ -1390,14 +1390,9 @@ recv_numeric(struct parsed_mesg *p, struct server *s)
 
 	/* 001 :<Welcome message> */
 	case RPL_WELCOME:
-		/* Establishing new connection with a server, set initial nick,
+
+		/* Establishing new connection with a server,
 		 * handle any channel auto-join or rejoins */
-
-		strncpy(s->nick, targ, NICKSIZE);
-
-		/* Reset list of auto nicks */
-		/* FIXME: casting from const, should copy from s->nicks into s->nick */
-		s->nptr = (char *) s->nicks;
 
 		c = s->channel;
 
@@ -1622,7 +1617,8 @@ recv_numeric(struct parsed_mesg *p, struct server *s)
 		newlinef(s->channel, 0, "-!!-", "Nick '%s' in use", nick);
 
 		if (IS_ME(nick)) {
-			auto_nick(&(s->nptr), s->nick);
+
+			server_nicks_next(s);
 
 			newlinef(s->channel, 0, "-!!-", "Trying again with '%s'", s->nick);
 

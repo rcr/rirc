@@ -58,15 +58,15 @@ extern int fatal_exit;
 
 #define UNUSED(X) ((void)(X))
 
-#ifndef DEBUG
-#define DEBUG_MSG(...)
-#else
+#if (defined DEBUG) && !(defined TESTING)
 #define DEBUG_MSG(...) \
 	do { \
 		fprintf(stderr, "%s:%d:%-12s\t", __FILE__, __LINE__, __func__); \
 		fprintf(stderr, __VA_ARGS__); \
 		fprintf(stderr, "\n"); \
 	} while (0)
+#else
+#define DEBUG_MSG(...)
 #endif
 
 /* Irrecoverable error

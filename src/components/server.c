@@ -138,12 +138,16 @@ server_list_del(struct server_list *sl, struct server *s)
 void
 server_free(struct server *s)
 {
+	server_nicks_reset(s);
+
 	free((void *)s->host);
 	free((void *)s->port);
 	free((void *)s->pass);
-	free((void *)s->nicks);
 	free((void *)s->username);
 	free((void *)s->realname);
+	free((void *)s->nick);
+	free((void *)s->nick_set.next);
+	free((void *)s->nick_set.set);
 	free(s);
 }
 
@@ -326,8 +330,6 @@ server_set_CASEMAPPING(struct server *s, char *val)
 static int
 server_set_CHANMODES(struct server *s, char *val)
 {
-	/* Delegated to mode.c  */
-
 	DEBUG_MSG("Setting numeric 005 CHANMODES: %s", val);
 
 	return (mode_config(&(s->mode_config), val, MODE_CONFIG_SUBTYPES) != MODE_ERR_NONE);
@@ -336,8 +338,6 @@ server_set_CHANMODES(struct server *s, char *val)
 static int
 server_set_MODES(struct server *s, char *val)
 {
-	/* Delegated to mode.c */
-
 	DEBUG_MSG("Setting numeric 005 MODES: %s", val);
 
 	return (mode_config(&(s->mode_config), val, MODE_CONFIG_MODES) != MODE_ERR_NONE);
@@ -346,9 +346,45 @@ server_set_MODES(struct server *s, char *val)
 static int
 server_set_PREFIX(struct server *s, char *val)
 {
-	/* Delegated to mode.c  */
-
 	DEBUG_MSG("Setting numeric 005 PREFIX: %s", val);
 
 	return (mode_config(&(s->mode_config), val, MODE_CONFIG_PREFIX) != MODE_ERR_NONE);
+}
+
+void
+server_nick_set(struct server *s, const char *nick)
+{
+	DEBUG_MSG("Setting server nick: %s", nick);
+
+	if (s->nick)
+		free((void *)s->nick);
+
+	s->nick = strdup(nick);
+}
+
+void
+server_nicks_next(struct server *s)
+{
+	if (s->nick_set.set && s->nick_set.next) {
+		server_nick_set(s, s->nick_set.next++);
+	} else {
+		/* Default to random nick, length 9 (RFC2912, section 1.2.1) */
+
+		char nick_cset[] = "0123456789ABCDEF";
+		char nick_rand[] = "rirc00000";
+
+		for (char *p = strchr(nick_rand, '0'); *p; p++) {
+			/* coverity[dont_call] Acceptable use of insecure rand() function */
+			*p = nick_cset[rand() % strlen(nick_cset)];
+		}
+
+		server_nick_set(s, nick_rand);
+	}
+}
+
+void
+server_nicks_reset(struct server *s)
+{
+	if (s->nick_set.set)
+		s->nick_set.next = *s->nick_set.set;
 }

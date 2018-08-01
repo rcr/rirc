@@ -9,6 +9,12 @@
 #define arg_error(...) \
 	do { fprintf(stderr, __VA_ARGS__); exit(EXIT_FAILURE); } while (0);
 
+#ifndef DEFAULT_NICK_SET
+const char *default_nick_set = DEFAULT_NICK_SET;
+#else
+const char *default_nick_set;
+#endif
+
 #ifndef DEFAULT_USERNAME
 const char *default_username = DEFAULT_USERNAME;
 #else
@@ -81,7 +87,7 @@ main(int argc, char **argv)
 		{0, 0, 0, 0}
 	};
 
-	struct auto_server {
+	struct cli_server {
 		const char *host;
 		const char *port;
 		const char *pass;
@@ -90,7 +96,7 @@ main(int argc, char **argv)
 		const char *username;
 		const char *realname;
 		struct server *s;
-	} auto_servers[IO_MAX_CONNECTIONS];
+	} cli_servers[IO_MAX_CONNECTIONS];
 
 	/* FIXME: getopt_long is a GNU extension */
 	while (0 < (opt_c = getopt_long(argc, argv, "s:p:w:n:c:r:u:vh", long_opts, &opt_i))) {
@@ -105,13 +111,13 @@ main(int argc, char **argv)
 				if (++n_servers == IO_MAX_CONNECTIONS)
 					arg_error("exceeded maximum number of servers (%d)", IO_MAX_CONNECTIONS);
 
-				auto_servers[n_servers - 1].host = optarg;
-				auto_servers[n_servers - 1].port = "6667";
-				auto_servers[n_servers - 1].pass = NULL;
-				auto_servers[n_servers - 1].nicks = NULL;
-				auto_servers[n_servers - 1].chans = NULL;
-				auto_servers[n_servers - 1].username = NULL;
-				auto_servers[n_servers - 1].realname = NULL;
+				cli_servers[n_servers - 1].host = optarg;
+				cli_servers[n_servers - 1].port = "6667";
+				cli_servers[n_servers - 1].pass = NULL;
+				cli_servers[n_servers - 1].nicks = NULL;
+				cli_servers[n_servers - 1].chans = NULL;
+				cli_servers[n_servers - 1].username = NULL;
+				cli_servers[n_servers - 1].realname = NULL;
 				break;
 
 			#define CHECK_SERVER_OPTARG(STR) \
@@ -122,32 +128,32 @@ main(int argc, char **argv)
 
 			case 'p': /* Connect using port */
 				CHECK_SERVER_OPTARG("-p/--port");
-				auto_servers[n_servers - 1].port = optarg;
+				cli_servers[n_servers - 1].port = optarg;
 				break;
 
 			case 'w': /* Connect using port */
 				CHECK_SERVER_OPTARG("-w/--pass");
-				auto_servers[n_servers - 1].pass = optarg;
+				cli_servers[n_servers - 1].pass = optarg;
 				break;
 
 			case 'n': /* Comma separated list of nicks to use */
 				CHECK_SERVER_OPTARG("-n/--nick");
-				auto_servers[n_servers - 1].nicks = optarg;
+				cli_servers[n_servers - 1].nicks = optarg;
 				break;
 
 			case 'c': /* Comma separated list of channels to join */
 				CHECK_SERVER_OPTARG("-c/--chans");
-				auto_servers[n_servers - 1].chans = optarg;
+				cli_servers[n_servers - 1].chans = optarg;
 				break;
 
 			case 'u': /* Connect using username */
 				CHECK_SERVER_OPTARG("-u/--username");
-				auto_servers[n_servers - 1].username = optarg;
+				cli_servers[n_servers - 1].username = optarg;
 				break;
 
 			case 'r': /* Connect using realname */
 				CHECK_SERVER_OPTARG("-r/--realname");
-				auto_servers[n_servers - 1].realname = optarg;
+				cli_servers[n_servers - 1].realname = optarg;
 				break;
 
 			#undef CHECK_SERVER_OPTARG
@@ -171,6 +177,9 @@ main(int argc, char **argv)
 
 	struct passwd passwd;
 
+	if (!default_nick_set || !default_nick_set[0])
+		default_nick_set = getpwuid_pw_name(&passwd);
+
 	if (!default_username || !default_username[0])
 		default_username = getpwuid_pw_name(&passwd);
 
@@ -179,31 +188,34 @@ main(int argc, char **argv)
 
 	for (size_t i = 0; i < n_servers; i++) {
 
+		if (cli_servers[i].nicks == NULL)
+			cli_servers[i].nicks = default_nick_set;
+
 		struct server *s = server(
-			auto_servers[i].host,
-			auto_servers[i].port,
-			auto_servers[i].pass,
-			(auto_servers[i].username ? auto_servers[i].username : default_username),
-			(auto_servers[i].realname ? auto_servers[i].realname : default_realname)
+			cli_servers[i].host,
+			cli_servers[i].port,
+			cli_servers[i].pass,
+			(cli_servers[i].username ? cli_servers[i].username : default_username),
+			(cli_servers[i].realname ? cli_servers[i].realname : default_realname)
 		);
 
-		if (!s)
-			arg_error("failed to create: %s:%s", auto_servers[i].host, auto_servers[i].port);
+		if (s == NULL)
+			arg_error("failed to create: %s:%s", cli_servers[i].host, cli_servers[i].port);
 
 		if (server_list_add(state_server_list(), s))
-			arg_error("duplicate server: %s:%s", auto_servers[i].host, auto_servers[i].port);
+			arg_error("duplicate server: %s:%s", cli_servers[i].host, cli_servers[i].port);
 
-		if (server_set_chans(s, auto_servers[i].chans))
-			arg_error("invalid chans: '%s'", auto_servers[i].chans);
+		if (server_set_chans(s, cli_servers[i].chans))
+			arg_error("invalid chans: '%s'", cli_servers[i].chans);
 
-		if (server_set_nicks(s, auto_servers[i].nicks))
-			arg_error("invalid nicks: '%s'", auto_servers[i].nicks);
+		if (server_set_nicks(s, cli_servers[i].nicks))
+			arg_error("invalid nicks: '%s'", cli_servers[i].nicks);
 
-		auto_servers[i].s = s;
+		cli_servers[i].s = s;
 	}
 
 	for (size_t i = 0; i < n_servers; i++)
-		io_cx(auto_servers[i].s->connection);
+		io_cx(cli_servers[i].s->connection);
 
 	io_loop();
 

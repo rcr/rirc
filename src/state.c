@@ -421,46 +421,6 @@ buffer_scrollback_forw(struct channel *c)
 	draw_status();
 }
 
-void
-auto_nick(char **autonick, char *nick)
-{
-	/* Copy the next choice in a server's nicks to it's nick pointer, e.g.:
-	 *   "nick, nick_, nick__"
-	 *
-	 * If the server's options are exhausted (or NULL) set a randomized default */
-
-	char *p = *autonick;
-	int i;
-
-	while (p && (*p == ' ' || *p == ','))
-		p++;
-
-	if (p && *p != '\0') {
-		/* Copy the next choice into nick */
-
-		for (i = 0; i < NICKSIZE && *p && *p != ' ' && *p != ','; i++)
-			*nick++ = *p++;
-
-		*autonick = p;
-	} else {
-		/* Autonicks exhausted, generate a random nick */
-
-		char *base = "rirc_";
-		char *cset = "0123456789ABCDEF";
-
-		strcpy(nick, base);
-		nick += strlen(base);
-
-		size_t len = strlen(cset);
-
-		for (i = 0; i < 4; i++)
-			/* coverity[dont_call] Acceptable use of insecure rand() function */
-			*nick++ = cset[rand() % len];
-	}
-
-	*nick = '\0';
-}
-
 /* Usefull server/channel structure abstractions for drawing */
 
 struct channel*
@@ -561,7 +521,8 @@ state_io_cxed(struct server *s)
 {
 	int ret;
 
-	// TODO: reset/set server nick
+	server_nicks_reset(s);
+	server_nicks_next(s);
 
 	if ((ret = io_sendf(s->connection, "NICK %s", s->nick)))
 		newlinef(s->channel, 0, "-!!-", "sendf fail: %s", io_err(ret));
