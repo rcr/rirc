@@ -3,7 +3,6 @@
 
 /* FIXME: refactoring, stubbed until removal */
 struct server;
-int sendf(char*, struct server*, const char*, ...);
 void server_disconnect(struct server*, int, int, char*);
 
 
@@ -37,14 +36,14 @@ void server_disconnect(struct server*, int, int, char*);
  *          |                 +--------+    |
  *          |                  |      ^     |
  *          |                 (G)     |     |
- *          |                  |     (G)    |
+ *          |                  |     (I)    |
  *          |                  v      |     |
  *          |                 +--------+    |
  *          +-----------(B)-- |  ping  | ---+
  *                            +--------+
  *                             v      ^
  *                             |      |
- *                             +--(G)-+
+ *                             +--(H)-+
  *
  * This module exposes functions for explicitly directing network
  * state as well declaring callback functions for state transitions
@@ -54,32 +53,54 @@ void server_disconnect(struct server*, int, int, char*);
  *   (A) io_cx: establish network connection
  *   (B) io_dx: close network connection
  *
- * Network state implicit transitions result in informational callbacks:
- *   (C) on connection attempt: io_cb_cxng
- *   (D) on connection success: io_cb_cxed
- *   (E) on connection failure: io_cb_fail
- *   (F) on connection loss:    io_cb_lost
- *   (G) on network ping event: io_cb_ping
+ * Network state implicit transitions result in informational callback types:
+ *   (C) on connection attempt:  IO_CB_INFO
+ *   (E) on connection failure:  IO_CB_ERROR
+ *   (D) on connection success:  IO_CB_CXED
+ *   (F) on connection loss:     IO_CB_DXED
+ *   (G) on ping timeout start:  IO_CB_PING_1
+ *   (H) on ping timeout update: IO_CB_PING_N
+ *   (I) on ping normal:         IO_CB_PING_0
  *
  * Successful reads on stdin and connected sockets result in data callbacks:
  *   from stdin:  io_cb_read_inp
  *   from socket: io_cb_read_soc
  *
- * Signals registered to be caught result in non-signal handler context callback:
- *   io_cb_signal
+ * Signals registered to be caught result in non-signal handler context
+ * callback with type IO_CB_SIGNAL
  *
  * Failed connection attempts enter a retry cycle with exponential
  * backoff time given by:
  *   t(n) = t(n - 1) * factor
  *   t(0) = base
  *
- * Calling io_loop starts the io context and never returns, a callback
- * function can be passed to io_loop which is executed on all input events
+ * Calling io_loop starts the io context and never returns
  */
 
 #define IO_MAX_CONNECTIONS 8
 
 struct connection;
+
+enum io_sig_t
+{
+	IO_SIG_INVALID,
+	IO_SIGWINCH,
+	IO_SIG_SIZE
+};
+
+enum io_cb_t
+{
+	IO_CB_INVALID,
+	IO_CB_CXED,   /* <const char *fmt>, [args, ...] */
+	IO_CB_DXED,   /* <const char *fmt>, [args, ...] */
+	IO_CB_ERROR,  /* <const char *fmt>, [args, ...] */
+	IO_CB_INFO,   /* <const char *fmt>, [args, ...] */
+	IO_CB_PING_0,
+	IO_CB_PING_1, /* <unsigned ping> */
+	IO_CB_PING_N, /* <unsigned ping> */
+	IO_CB_SIGNAL, /* <io_sig_t sig> */
+	IO_CB_SIZE
+};
 
 /* Returns a connection, or NULL if limit is reached */
 struct connection* connection(
@@ -88,30 +109,29 @@ struct connection* connection(
 	const char*); /* port */
 
 void io_free(struct connection*);
-void io_loop(void (*)(void));
-
-/* Formatted write to connection */
-int io_sendf(struct connection*, const char*, ...);
 
 /* Explicit direction of net state */
 int io_cx(struct connection*);
 int io_dx(struct connection*);
 
-/* Informational network state callbacks */
-void io_cb_cxng(const void*, const char*, ...);
-void io_cb_cxed(const void*, const char*, ...);
-void io_cb_fail(const void*, const char*, ...);
-void io_cb_lost(const void*, const char*, ...);
-void io_cb_ping(const void*, unsigned int);
+/* Formatted write to connection */
+int io_sendf(struct connection*, const char*, ...);
 
-/* Signal callback in non-signal handler context */
-void io_cb_signal(int);
+/* IO state callback */
+void io_cb(enum io_cb_t, const void*, ...);
 
-/* Network data callback */
+/* IO data callback */
 void io_cb_read_inp(char*, size_t);
 void io_cb_read_soc(char*, size_t, const void*);
 
-/* Get error string */
+/* Start non-returning IO context */
+void io_loop(void);
+
+/* Get tty dimensions */
+unsigned io_tty_cols(void);
+unsigned io_tty_rows(void);
+
+/* IO error string */
 const char* io_err(int);
 
 #endif

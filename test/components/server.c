@@ -10,7 +10,7 @@ channel_set_current(struct channel *c)
 }
 
 struct channel*
-new_channel(char *n, struct server *s, struct channel *l, enum buffer_t t)
+new_channel(const char *n, struct server *s, struct channel *l, enum buffer_t t)
 {
 	/* FIXME: mock new_channel until channel() is implemented */
 
@@ -70,13 +70,13 @@ test_server_list(void)
 
 	memset(&servers, 0, sizeof(servers));
 
-	s1 = server("host1", "port1", NULL);
-	s2 = server("host1", "port1", "foo1"); /* duplicate host, port (s1) */
-	s3 = server("host1", "port2", "foo2"); /* duplicate host (s1), different port */
-	s4 = server("host2", "port1", "foo3"); /* duplicate port (s1), different host */
-	s5 = server("host2", "port2", NULL);   /* duplicate host (s4), duplicate port (s3) */
-	s6 = server("host1", "port2", NULL);   /* duplicate host, port (s4) */
-	s7 = server("host2", "port1", NULL);   /* duplicate host, port (s5) */
+	s1 = server("host1", "port1", NULL, "", "");
+	s2 = server("host1", "port1", "foo1", "", ""); /* duplicate host, port (s1) */
+	s3 = server("host1", "port2", "foo2", "", ""); /* duplicate host (s1), different port */
+	s4 = server("host2", "port1", "foo3", "", ""); /* duplicate port (s1), different host */
+	s5 = server("host2", "port2", NULL, "", "");   /* duplicate host (s4), duplicate port (s3) */
+	s6 = server("host1", "port2", NULL, "", "");   /* duplicate host, port (s4) */
+	s7 = server("host2", "port1", NULL, "", "");   /* duplicate host, port (s5) */
 
 	/* Test add */
 	assert_ptrequals(server_list_add(&servers, s1), NULL);

@@ -35,8 +35,7 @@ struct channel* channel_get_next(struct channel*);
 struct channel* channel_get_prev(struct channel*);
 
 /* State altering interface */
-struct channel* new_channel(char*, struct server*, struct channel*, enum buffer_t);
-void auto_nick(char**, char*);
+struct channel* new_channel(const char*, struct server*, struct channel*, enum buffer_t);
 
 /* FIXME: */
 void buffer_scrollback_back(struct channel*);

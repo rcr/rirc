@@ -6,10 +6,15 @@ VERSION = 0.1
 EXE_DIR = /usr/local/bin
 MAN_DIR = /usr/local/share/man/man1
 
+STANDARDS = -std=c99 \
+ -D_POSIX_C_SOURCE=200812L \
+ -D_DARWIN_C_SOURCE=200812L \
+ -D_BSD_VISIBLE=1
+
 CC = cc
 PP = cc -E
-CFLAGS    = -I. -std=c99 -DVERSION=\"$(VERSION)\" -D_POSIX_C_SOURCE=200812L -Wall -Wextra -pedantic -O2 -flto
-CFLAGS_D  = -I. -std=c99 -DVERSION=\"$(VERSION)\" -D_POSIX_C_SOURCE=200812L -Wall -Wextra -pedantic -O0 -flto -g -DDEBUG
+CFLAGS    = -I. $(STANDARDS) -DVERSION=\"$(VERSION)\" -Wall -Wextra -pedantic -O2 -flto
+CFLAGS_D  = -I. $(STANDARDS) -DVERSION=\"$(VERSION)\" -Wall -Wextra -pedantic -O0 -g -DDEBUG
 LDFLAGS   = -pthread
 LDFLAGS_D = -pthread
 

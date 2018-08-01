@@ -10,30 +10,13 @@
 #include "src/state.h"
 #include "src/utils/utils.h"
 
-
-
-/* TODO:
- *
- * fail macros should just call newline directly. the fail_if macro should be removed
- */
-
-//TODO: fail macros copy to an error buffer, and then copy into newline,
-//take destination buffer as parameter
-
 /* Fail macros used in message sending/receiving handlers */
-#define fail(M) \
-	do { if (err) { strncpy(err, M, MAX_ERROR); } return 1; } while (0)
+#define fail(C, M) \
+	do { newline((C), 0, "-!!-", (M)); return 0; } while (0)
 
 /* Fail with formatted message */
-#define failf(...) \
-	do { if (err) { snprintf(err, MAX_ERROR, __VA_ARGS__); } return 1; } while (0)
-
-/* Conditionally fail */
-#define fail_if(C) \
-	do { if (C) return 1; } while (0)
-
-
-
+#define failf(C, M, ...) \
+	do { newlinef((C), 0, "-!!-", (M), __VA_ARGS__); return 0; } while (0)
 
 #define IS_ME(X) !strcmp((X), s->nick)
 
@@ -57,9 +40,8 @@
 	X(unignore) \
 	X(version)
 
-// FIXME: get rid of errbuf here, just call newline from the function on failure
 /* Send handler prototypes */
-#define X(cmd) static int send_##cmd(char*, char*, struct server*, struct channel*);
+#define X(cmd) static int send_##cmd(char*, struct server*, struct channel*);
 SEND_HANDLERS
 #undef X
 
@@ -79,22 +61,28 @@ SEND_HANDLERS
 	X(topic)
 
 /* Recv handler prototypes */
-#define X(cmd) static int recv_##cmd(char*, struct parsed_mesg*, struct server*);
+#define X(cmd) static int recv_##cmd(struct parsed_mesg*, struct server*);
 RECV_HANDLERS
 #undef X
 
+#ifdef JPQ_THRESHOLD
+static const unsigned int jpq_threshold = JPQ_THRESHOLD;
+#else
+static const unsigned int jpq_threshold = 0;
+#endif
+
 /* Special cases handlers, CTCP messages are embedded in PRIVMSG */
-static int recv_ctcp_req(char*, struct parsed_mesg*, struct server*);
-static int recv_ctcp_rpl(char*, struct parsed_mesg*, struct server*);
+static int recv_ctcp_req(struct parsed_mesg*, struct server*);
+static int recv_ctcp_rpl(struct parsed_mesg*, struct server*);
 
 /* Special case handler for numeric replies */
-static int recv_numeric(char*, struct parsed_mesg*, struct server*);
+static int recv_numeric(struct parsed_mesg*, struct server*);
 
 /* Handler for errors deemed fatal to a server's state */
 static void server_fatal(struct server*, char*, ...);
 
-static int recv_mode_chanmodes(char*, struct parsed_mesg*, const struct mode_config*, struct channel*);
-static int recv_mode_usermodes(char*, struct parsed_mesg*, const struct mode_config*, struct server*);
+static int recv_mode_chanmodes(struct parsed_mesg*, const struct mode_config*, struct channel*);
+static int recv_mode_usermodes(struct parsed_mesg*, const struct mode_config*, struct server*);
 
 /* Numeric Reply Codes */
 enum numeric {
@@ -130,18 +118,20 @@ enum numeric {
 	ERR_NOCHANMODES      = 477
 };
 
+
+/* TODO: remove this, call fail */
 static void
 server_fatal(struct server *s, char *fmt, ...)
 {
 	/* Encountered an error fatal to a server, disconnect and begin a reconnect */
-	char errbuff[MAX_ERROR];
+	char errbuf[512];
 	va_list ap;
 
 	va_start(ap, fmt);
-	vsnprintf(errbuff, MAX_ERROR - 1, fmt, ap);
+	vsnprintf(errbuf, sizeof(errbuf), fmt, ap);
 	va_end(ap);
 
-	server_disconnect(s, 1, 0, errbuff);
+	server_disconnect(s, 1, 0, errbuf);
 }
 
 /*
@@ -151,7 +141,7 @@ server_fatal(struct server *s, char *fmt, ...)
 struct send_handler
 {
 	char *name;
-	int (*func)(char*, char*, struct server*, struct channel*);
+	int (*func)(char*, struct server*, struct channel*);
 };
 
 /* TODO: prototype this and other functions */
@@ -271,11 +261,11 @@ send_mesg(struct server *s, struct channel *chan, char *mesg)
 	 *  - an unhandled command beginning with '/'
 	 */
 
-	char *p, *cmd_str, errbuff[MAX_ERROR];
+	char *p, *cmd_str;
 
 	if (*mesg == '/' && *(++mesg) != '/') {
 
-		int err;
+		int ret;
 
 		if (!(cmd_str = getarg(&mesg, " "))) {
 			newline(chan, 0, "-!!-", "Messages beginning with '/' require a command");
@@ -288,17 +278,14 @@ send_mesg(struct server *s, struct channel *chan, char *mesg)
 
 		const struct send_handler* handler = send_handler_lookup(cmd_str, strlen(cmd_str));
 
-		if (handler)
-			err = handler->func(errbuff, mesg, chan->server, chan);
-		else
-			err = sendf(errbuff, chan->server, "%s %s", cmd_str, mesg);
-
-		if (err)
-			newline(chan, 0, "-!!-", errbuff);
+		if (handler) {
+			handler->func(mesg, chan->server, chan);
+		} else if ((ret = io_sendf(s->connection, "%s %s", cmd_str, mesg)))
+			newlinef(chan, 0, "-!!-", "sendf fail: %s", io_err(ret));
 
 	} else {
-
 		/* Send to current channel */
+		int ret;
 
 		if (*mesg == 0)
 			fatal("message is empty", 0);
@@ -309,8 +296,8 @@ send_mesg(struct server *s, struct channel *chan, char *mesg)
 		else if (chan->parted)
 			newline(chan, 0, "-!!-", "Error: Parted from channel");
 
-		else if (sendf(errbuff, chan->server, "PRIVMSG %s :%s", chan->name.str, mesg))
-			newline(chan, 0, "-!!-", errbuff);
+		else if ((ret = io_sendf(s->connection, "PRIVMSG %s :%s", chan->name.str, mesg)))
+			newlinef(chan, 0, "-!!-", "sendf fail: %s", io_err(ret));
 
 		else
 			newline(chan, BUFFER_LINE_CHAT, chan->server->nick, mesg);
@@ -318,7 +305,7 @@ send_mesg(struct server *s, struct channel *chan, char *mesg)
 }
 
 static int
-send_clear(char *err, char *mesg, struct server *s, struct channel *c)
+send_clear(char *mesg, struct server *s, struct channel *c)
 {
 	/* /clear [channel] */
 
@@ -330,13 +317,13 @@ send_clear(char *err, char *mesg, struct server *s, struct channel *c)
 	else if ((cc = channel_list_get(&s->clist, targ)))
 		channel_clear(cc);
 	else
-		failf("Error: Channel '%s' not found", targ);
+		failf(c, "Error: Channel '%s' not found", targ);
 
 	return 0;
 }
 
 static int
-send_close(char *err, char *mesg, struct server *s, struct channel *c)
+send_close(char *mesg, struct server *s, struct channel *c)
 {
 	/* /close [channel] */
 
@@ -348,18 +335,17 @@ send_close(char *err, char *mesg, struct server *s, struct channel *c)
 	else if ((cc = channel_list_get(&s->clist, targ)))
 		channel_close(cc);
 	else
-		failf("Error: Channel '%s' not found", targ);
+		failf(c, "Error: Channel '%s' not found", targ);
 
 	return 0;
 }
 
 static int
-send_connect(char *err, char *mesg, struct server *s, struct channel *c)
+send_connect(char *mesg, struct server *s, struct channel *c)
 {
 	/* /connect [(host) | (host:port) | (host port)] */
 
 	// FIXME:
-	UNUSED(err);
 	UNUSED(mesg);
 	UNUSED(s);
 	UNUSED(c);
@@ -391,38 +377,39 @@ send_connect(char *err, char *mesg, struct server *s, struct channel *c)
 }
 
 static int
-send_ctcp(char *err, char *mesg, struct server *s, struct channel *c)
+send_ctcp(char *mesg, struct server *s, struct channel *c)
 {
 	/* /ctcp <target> <message> */
 
-	UNUSED(c);
-
+	int ret;
 	char *targ, *p;
 
 	if (!(targ = getarg(&mesg, " ")))
-		fail("Error: /ctcp <target> <command> [arguments]");
+		fail(c, "Error: /ctcp <target> <command> [arguments]");
 
 	/* Crude to check that at least some ctcp command exists */
 	while (*mesg == ' ')
 		mesg++;
 
 	if (*mesg == '\0')
-		fail("Error: /ctcp <target> <command> [arguments]");
+		fail(c, "Error: /ctcp <target> <command> [arguments]");
 
 	/* Ensure the command is uppercase */
 	for (p = mesg; *p && *p != ' '; p++)
 		*p = toupper(*p);
 
-	return sendf(err, s, "PRIVMSG %s :\x01""%s\x01", targ, mesg);
+	if ((ret = io_sendf(s->connection, "PRIVMSG %s :\x01""%s\x01", targ, mesg)))
+		failf(c, "sendf fail: %s", io_err(ret));
+
+	return 0;
 }
 
 static int
-send_disconnect(char *err, char *mesg, struct server *s, struct channel *c)
+send_disconnect(char *mesg, struct server *s, struct channel *c)
 {
 	/* /disconnect [quit message] */
 
 	// FIXME:
-	UNUSED(err);
 	UNUSED(mesg);
 	UNUSED(s);
 	UNUSED(c);
@@ -439,17 +426,20 @@ send_disconnect(char *err, char *mesg, struct server *s, struct channel *c)
 }
 
 static int
-send_me(char *err, char *mesg, struct server *s, struct channel *c)
+send_me(char *mesg, struct server *s, struct channel *c)
 {
 	/* /me <message> */
 
+	int ret;
+
 	if (c->buffer.type == BUFFER_SERVER)
-		fail("Error: This is not a channel");
+		fail(c, "Error: This is not a channel");
 
 	if (c->parted)
-		fail("Error: Parted from channel");
+		fail(c, "Error: Parted from channel");
 
-	fail_if(sendf(err, s, "PRIVMSG %s :\x01""ACTION %s\x01", c->name.str, mesg));
+	if ((ret= io_sendf(s->connection, "PRIVMSG %s :\x01""ACTION %s\x01", c->name.str, mesg)))
+		failf(c, "sendf fail: %s", io_err(ret));
 
 	newlinef(c, 0, "*", "%s %s", s->nick, mesg);
 
@@ -457,20 +447,20 @@ send_me(char *err, char *mesg, struct server *s, struct channel *c)
 }
 
 static int
-send_ignore(char *err, char *mesg, struct server *s, struct channel *c)
+send_ignore(char *mesg, struct server *s, struct channel *c)
 {
 	/* /ignore [nick] */
 
 	char *nick;
 
 	if (!s)
-		fail("Error: Not connected to server");
+		fail(c, "Error: Not connected to server");
 
 	if (!(nick = getarg(&mesg, " ")))
 		; /* TODO: print ignore list */
 
 	else if (user_list_add(&(s->ignore), nick, MODE_EMPTY) == USER_ERR_DUPLICATE)
-		failf("Error: Already ignoring '%s'", nick);
+		failf(c, "Error: Already ignoring '%s'", nick);
 
 	else
 		newlinef(c, 0, "--", "Ignoring '%s'", nick);
@@ -479,90 +469,106 @@ send_ignore(char *err, char *mesg, struct server *s, struct channel *c)
 }
 
 static int
-send_join(char *err, char *mesg, struct server *s, struct channel *c)
+send_join(char *mesg, struct server *s, struct channel *c)
 {
 	/* /join [target[,targets]*] */
 
+	int ret;
 	char *targ;
 
-	if ((targ = getarg(&mesg, " ")))
-		return sendf(err, s, "JOIN %s", targ);
+	if ((targ = getarg(&mesg, " "))) {
+		if ((ret = io_sendf(s->connection, "JOIN %s", c->name.str)))
+			failf(c, "sendf fail: %s", io_err(ret));
+	} else {
+		if (c->buffer.type == BUFFER_SERVER)
+			fail(c, "Error: JOIN requires a target");
 
-	if (c->buffer.type == BUFFER_SERVER)
-		fail("Error: JOIN requires a target");
+		if (c->buffer.type == BUFFER_PRIVATE)
+			fail(c, "Error: Can't rejoin private buffers");
 
-	if (c->buffer.type == BUFFER_PRIVATE)
-		fail("Error: Can't rejoin private buffers");
+		if (!c->parted)
+			fail(c, "Error: Not parted from channel");
 
-	if (!c->parted)
-		fail("Error: Not parted from channel");
-
-	return sendf(err, s, "JOIN %s", c->name.str);
-}
-
-static int
-send_msg(char *err, char *mesg, struct server *s, struct channel *c)
-{
-	/* Alias for /priv */
-
-	return send_privmsg(err, mesg, s, c);
-}
-
-static int
-send_nick(char *err, char *mesg, struct server *s, struct channel *c)
-{
-	/* /nick [nick] */
-
-	char *nick;
-
-	if ((nick = getarg(&mesg, " ")))
-		return sendf(err, s, "NICK %s", nick);
-
-	if (!s)
-		fail("Error: Not connected to server");
-
-	newlinef(c, 0, "--", "Your nick is %s", s->nick);
+		if ((ret = io_sendf(s->connection, "JOIN %s", c->name.str)))
+			failf(c, "sendf fail: %s", io_err(ret));
+	}
 
 	return 0;
 }
 
 static int
-send_part(char *err, char *mesg, struct server *s, struct channel *c)
+send_msg(char *mesg, struct server *s, struct channel *c)
 {
-	/* /part [[target[,targets]*] part message]*/
+	/* Alias for /priv */
+	send_privmsg(mesg, s, c);
 
-	char *targ;
-
-	if ((targ = getarg(&mesg, " ")))
-		return sendf(err, s, "PART %s :%s", targ, (*mesg) ? mesg : DEFAULT_QUIT_MESG);
-
-	if (c->buffer.type == BUFFER_SERVER)
-		fail("Error: PART requires a target");
-
-	if (c->buffer.type == BUFFER_PRIVATE)
-		fail("Error: Can't part private buffers");
-
-	if (c->parted)
-		fail("Error: Already parted from channel");
-
-	return sendf(err, s, "PART %s :%s", c->name.str, DEFAULT_QUIT_MESG);
+	return 0;
 }
 
 static int
-send_privmsg(char *err, char *mesg, struct server *s, struct channel *c)
+send_nick(char *mesg, struct server *s, struct channel *c)
+{
+	/* /nick [nick] */
+
+	int ret;
+	char *nick;
+
+	if ((nick = getarg(&mesg, " "))) {
+		if ((ret = io_sendf(s->connection, "NICK %s", nick)))
+			failf(c, "sendf fail: %s", io_err(ret));
+	} else {
+		if ((ret = io_sendf(s->connection, "NICK")))
+			failf(c, "sendf fail: %s", io_err(ret));
+	}
+
+	return 0;
+}
+
+static int
+send_part(char *mesg, struct server *s, struct channel *c)
+{
+	/* /part [[target[,targets]*] part message]*/
+
+	int ret;
+	char *targ;
+
+	if ((targ = getarg(&mesg, " "))) {
+		if ((ret = io_sendf(s->connection, "PART %s :%s", targ, (*mesg) ? mesg : DEFAULT_QUIT_MESG)))
+			failf(c, "sendf fail: %s", io_err(ret));
+	} else {
+		if (c->buffer.type == BUFFER_SERVER)
+			fail(c, "Error: PART requires a target");
+
+		if (c->buffer.type == BUFFER_PRIVATE)
+			fail(c, "Error: Can't part private buffers");
+
+		if (c->parted)
+			fail(c, "Error: Already parted from channel");
+
+		if ((ret = io_sendf(s->connection, "PART %s :%s", c->name.str, DEFAULT_QUIT_MESG)))
+			failf(c, "sendf fail: %s", io_err(ret));
+	}
+
+	return 0;
+}
+
+static int
+send_privmsg(char *mesg, struct server *s, struct channel *c)
 {
 	/* /(priv | msg) <target> <message> */
 
 	char *targ;
+	int ret;
 	struct channel *cc;
 
 	if (!(targ = getarg(&mesg, " ")))
-		fail("Error: Private messages require a target");
+		fail(c, "Error: Private messages require a target");
 
 	if (*mesg == '\0')
-		fail("Error: Private messages was null");
+		fail(c, "Error: Private messages was null");
 
-	fail_if(sendf(err, s, "PRIVMSG %s :%s", targ, mesg));
+	if ((ret = io_sendf(s->connection, "PRIVMSG %s :%s", targ, mesg)))
+		failf(c, "sendf fail: %s", io_err(ret));
 
 	if ((cc = channel_list_get(&s->clist, targ)) == NULL)
 		cc = new_channel(targ, s, c, BUFFER_PRIVATE);
@@ -573,11 +579,14 @@ send_privmsg(char *err, char *mesg, struct server *s, struct channel *c)
 }
 
 static int
-send_raw(char *err, char *mesg, struct server *s, struct channel *c)
+send_raw(char *mesg, struct server *s, struct channel *c)
 {
 	/* /raw <raw message> */
 
-	fail_if(sendf(err, s, "%s", mesg));
+	int ret;
+
+	if ((ret = io_sendf(s->connection, "%s", mesg)))
+		failf(c, "sendf fail: %s", io_err(ret));
 
 	newline(c, 0, "RAW >>", mesg);
 
@@ -585,35 +594,42 @@ send_raw(char *err, char *mesg, struct server *s, struct channel *c)
 }
 
 static int
-send_topic(char *err, char *mesg, struct server *s, struct channel *c)
+send_topic(char *mesg, struct server *s, struct channel *c)
 {
 	/* /topic [topic] */
+
+	int ret;
 
 	/* If no actual message is given, retrieve the current topic */
 	while (*mesg == ' ')
 		mesg++;
 
-	if (*mesg == '\0')
-		return sendf(err, s, "TOPIC %s", c->name.str);
+	if (*mesg == '\0') {
+		if ((ret = io_sendf(s->connection, "TOPIC %s", c->name.str)))
+			failf(c, "sendf fail: %s", io_err(ret));
+	} else {
+		if ((ret = io_sendf(s->connection, "TOPIC %s :%s", c->name.str, mesg)))
+			failf(c, "sendf fail: %s", io_err(ret));
+	}
 
-	return sendf(err, s, "TOPIC %s :%s", c->name.str, mesg);
+	return 0;
 }
 
 static int
-send_unignore(char *err, char *mesg, struct server *s, struct channel *c)
+send_unignore(char *mesg, struct server *s, struct channel *c)
 {
 	/* /unignore [nick] */
 
 	char *nick;
 
 	if (!s)
-		fail("Error: Not connected to server");
+		fail(c, "Error: Not connected to server");
 
 	if (!(nick = getarg(&mesg, " ")))
 		; /* TODO: print ignore list */
 
 	else if (user_list_del(&(s->ignore), nick) == USER_ERR_NOT_FOUND)
-		failf("Error: '%s' not on ignore list", nick);
+		failf(c, "Error: '%s' not on ignore list", nick);
 
 	else
 		newlinef(c, 0, "--", "No longer ignoring '%s'", nick);
@@ -622,12 +638,11 @@ send_unignore(char *err, char *mesg, struct server *s, struct channel *c)
 }
 
 static int
-send_quit(char *err, char *mesg, struct server *s, struct channel *c)
+send_quit(char *mesg, struct server *s, struct channel *c)
 {
 	/* /quit [quit message] */
 
 	UNUSED(c);
-	UNUSED(err);
 
 	struct server *t;
 
@@ -643,10 +658,11 @@ send_quit(char *err, char *mesg, struct server *s, struct channel *c)
 }
 
 static int
-send_version(char *err, char *mesg, struct server *s, struct channel *c)
+send_version(char *mesg, struct server *s, struct channel *c)
 {
 	/* /version [target] */
 
+	int ret;
 	char *targ;
 
 	if (s == NULL) {
@@ -655,10 +671,15 @@ send_version(char *err, char *mesg, struct server *s, struct channel *c)
 		return 0;
 	}
 
-	if ((targ = getarg(&mesg, " ")))
-		return sendf(err, s, "VERSION %s", targ);
-	else
-		return sendf(err, s, "VERSION");
+	if ((targ = getarg(&mesg, " "))) {
+		if ((ret = io_sendf(s->connection, "VERSION %s", targ)))
+			failf(c, "sendf fail: %s", io_err(ret));
+	} else {
+		if ((ret = io_sendf(s->connection, "VERSION")))
+			failf(c, "sendf fail: %s", io_err(ret));
+	}
+
+	return 0;
 }
 
 /*
@@ -668,7 +689,7 @@ send_version(char *err, char *mesg, struct server *s, struct channel *c)
 struct recv_handler
 {
 	char *name;
-	int (*func)(char*, struct parsed_mesg*, struct server*);
+	int (*func)(struct parsed_mesg*, struct server*);
 };
 
 static unsigned int
@@ -765,23 +786,18 @@ recv_mesg(struct server *s, struct parsed_mesg *p)
 {
 	const struct recv_handler* handler;
 
-	int err = 0;
-	char errbuff[MAX_ERROR];
+	/* TODO: parsed_mesg can cache the length of command/args/etc */
 
 	if (isdigit(*p->command))
-		err = recv_numeric(errbuff, p, s);
-	/* TODO: parsed_mesg can cache the length of command/args/etc */
+		recv_numeric(p, s);
 	else if ((handler = recv_handler_lookup(p->command, strlen(p->command))))
-		err = handler->func(errbuff, p, s);
+		handler->func(p, s);
 	else
 		newlinef(s->channel, 0, "-!!-", "Message type '%s' unknown", p->command);
-
-	if (err)
-		newline(s->channel, 0, "-!!-", errbuff);
 }
 
 static int
-recv_ctcp_req(char *err, struct parsed_mesg *p, struct server *s)
+recv_ctcp_req(struct parsed_mesg *p, struct server *s)
 {
 	/* CTCP Requests:
 	 * PRIVMSG <target> :0x01<command> <arguments>0x01
@@ -790,23 +806,24 @@ recv_ctcp_req(char *err, struct parsed_mesg *p, struct server *s)
 	 * NOTICE <target> :0x01<reply>0x01 */
 
 	char *targ, *cmd, *mesg;
+	int ret;
 
 	if (!p->from)
-		fail("CTCP: sender's nick is null");
+		fail(s->channel, "CTCP: sender's nick is null");
 
 	/* CTCP request from ignored user, do nothing */
 	if (user_list_get(&(s->ignore), p->from, 0))
 		return 0;
 
 	if (!(targ = getarg(&p->params, " ")))
-		fail("CTCP: target is null");
+		fail(s->channel, "CTCP: target is null");
 
 	if (!(mesg = getarg(&p->trailing, "\x01")))
-		fail("CTCP: invalid markup");
+		fail(s->channel, "CTCP: invalid markup");
 
 	/* Markup is valid, get command */
 	if (!(cmd = getarg(&mesg, " ")))
-		fail("CTCP: command is null");
+		fail(s->channel, "CTCP: command is null");
 
 	/* Handle the CTCP request if supported */
 
@@ -827,7 +844,7 @@ recv_ctcp_req(char *err, struct parsed_mesg *p, struct server *s)
 			}
 
 		} else if ((c = channel_list_get(&s->clist, targ)) == NULL)
-			failf("CTCP ACTION: channel '%s' not found", targ);
+			failf(s->channel, "CTCP ACTION: channel '%s' not found", targ);
 
 		newlinef(c, 0, "*", "%s %s", p->from, mesg);
 
@@ -841,7 +858,10 @@ recv_ctcp_req(char *err, struct parsed_mesg *p, struct server *s)
 
 		newlinef(s->channel, 0, "--", "CTCP CLIENTINFO request from %s", p->from);
 
-		return sendf(err, s, "NOTICE %s :\x01""CLIENTINFO ACTION PING VERSION TIME\x01", p->from);
+		if ((ret = io_sendf(s->connection, "NOTICE %s :\x01""CLIENTINFO ACTION PING VERSION TIME\x01", p->from)))
+			failf(s->channel, "sendf fail: %s", io_err(ret));
+
+		return 0;
 	}
 
 	if (!strcmp(cmd, "PING")) {
@@ -857,7 +877,10 @@ recv_ctcp_req(char *err, struct parsed_mesg *p, struct server *s)
 
 		newlinef(s->channel, 0, "--", "CTCP PING request from %s", p->from);
 
-		return sendf(err, s, "NOTICE %s :\x01""PING %lld\x01", p->from, milliseconds);
+		if ((ret = io_sendf(s->connection, "NOTICE %s :\x01""PING %lld\x01", p->from, milliseconds)))
+			failf(s->channel, "sendf fail: %s", io_err(ret));
+
+		return 0;
 	}
 
 	if (!strcmp(cmd, "VERSION")) {
@@ -867,8 +890,10 @@ recv_ctcp_req(char *err, struct parsed_mesg *p, struct server *s)
 
 		newlinef(s->channel, 0, "--", "CTCP VERSION request from %s", p->from);
 
-		return sendf(err, s,
-			"NOTICE %s :\x01""VERSION rirc v"VERSION", http://rcr.io/rirc\x01", p->from);
+		if ((ret = io_sendf(s->connection, "NOTICE %s :\x01""VERSION rirc v"VERSION", http://rcr.io/rirc\x01", p->from)))
+			failf(s->channel, "sendf fail: %s", io_err(ret));
+
+		return 0;
 	}
 
 	if (!strcmp(cmd, "TIME")) {
@@ -888,16 +913,21 @@ recv_ctcp_req(char *err, struct parsed_mesg *p, struct server *s)
 
 		newlinef(s->channel, 0, "--", "CTCP TIME request from %s", p->from);
 
-		return sendf(err, s, "NOTICE %s :\x01""TIME %s\x01", p->from, time_str);
+		if ((ret = io_sendf(s->connection, "NOTICE %s :\x01""TIME %s\x01", p->from, time_str)))
+			failf(s->channel, "sendf fail: %s", io_err(ret));
+
+		return 0;
 	}
 
 	/* Unsupported CTCP request */
-	fail_if(sendf(err, s, "NOTICE %s :\x01""ERRMSG %s not supported\x01", p->from, cmd));
-	failf("CTCP: Unknown command '%s' from %s", cmd, p->from);
+	if ((ret = io_sendf(s->connection, "NOTICE %s :\x01""ERRMSG %s not supported\x01", p->from, cmd)))
+		failf(s->channel, "sendf fail: %s", io_err(ret));
+
+	failf(s->channel, "CTCP: Unknown command '%s' from %s", cmd, p->from);
 }
 
 static int
-recv_ctcp_rpl(char *err, struct parsed_mesg *p, struct server *s)
+recv_ctcp_rpl(struct parsed_mesg *p, struct server *s)
 {
 	/* CTCP replies:
 	 * NOTICE <target> :0x01<command> <arguments>0x01 */
@@ -905,18 +935,18 @@ recv_ctcp_rpl(char *err, struct parsed_mesg *p, struct server *s)
 	char *cmd, *mesg;
 
 	if (!p->from)
-		fail("CTCP: sender's nick is null");
+		fail(s->channel, "CTCP: sender's nick is null");
 
 	/* CTCP reply from ignored user, do nothing */
 	if (user_list_get(&(s->ignore), p->from, 0))
 		return 0;
 
 	if (!(mesg = getarg(&p->trailing, "\x01")))
-		fail("CTCP: invalid markup");
+		fail(s->channel, "CTCP: invalid markup");
 
 	/* Markup is valid, get command */
 	if (!(cmd = getarg(&mesg, " ")))
-		fail("CTCP: command is null");
+		fail(s->channel, "CTCP: command is null");
 
 	newlinef(s->channel, 0, p->from, "CTCP %s reply: %s", cmd, mesg);
 
@@ -924,11 +954,9 @@ recv_ctcp_rpl(char *err, struct parsed_mesg *p, struct server *s)
 }
 
 static int
-recv_error(char *err, struct parsed_mesg *p, struct server *s)
+recv_error(struct parsed_mesg *p, struct server *s)
 {
 	/* ERROR :<message> */
-
-	UNUSED(err);
 
 	server_disconnect(s, 1, 0, p->trailing ? p->trailing : "Remote hangup");
 
@@ -936,7 +964,7 @@ recv_error(char *err, struct parsed_mesg *p, struct server *s)
 }
 
 static int
-recv_join(char *err, struct parsed_mesg *p, struct server *s)
+recv_join(struct parsed_mesg *p, struct server *s)
 {
 	/* :nick!user@hostname.domain JOIN [:]<channel> */
 
@@ -945,10 +973,10 @@ recv_join(char *err, struct parsed_mesg *p, struct server *s)
 	struct channel *c;
 
 	if (!p->from)
-		fail("JOIN: sender's nick is null");
+		fail(s->channel, "JOIN: sender's nick is null");
 
 	if (!(chan = getarg(&p->params, " ")) && !(chan = getarg(&p->trailing, " ")))
-		fail("JOIN: channel is null");
+		fail(s->channel, "JOIN: channel is null");
 
 	if (IS_ME(p->from)) {
 		if ((c = channel_list_get(&s->clist, chan)) == NULL)
@@ -961,12 +989,12 @@ recv_join(char *err, struct parsed_mesg *p, struct server *s)
 	} else {
 
 		if ((c = channel_list_get(&s->clist, chan)) == NULL)
-			failf("JOIN: channel '%s' not found", chan);
+			failf(s->channel, "JOIN: channel '%s' not found", chan);
 
 		if (user_list_add(&(c->users), p->from, MODE_EMPTY) == USER_ERR_DUPLICATE)
-			failf("Error: user '%s' alread on channel '%s'", p->from, c->name.str);
+			failf(s->channel, "Error: user '%s' alread on channel '%s'", p->from, c->name.str);
 
-		if (c->users.count < config.join_part_quit_threshold)
+		if (c->users.count < jpq_threshold)
 			newlinef(c, 0, ">", "%s!%s has joined %s", p->from, p->host, chan);
 
 		draw_status();
@@ -976,7 +1004,7 @@ recv_join(char *err, struct parsed_mesg *p, struct server *s)
 }
 
 static int
-recv_kick(char *err, struct parsed_mesg *p, struct server *s)
+recv_kick(struct parsed_mesg *p, struct server *s)
 {
 	/* :nick!user@hostname.domain KICK <channel> <user> :comment */
 
@@ -984,16 +1012,16 @@ recv_kick(char *err, struct parsed_mesg *p, struct server *s)
 	struct channel *c;
 
 	if (!p->from)
-		fail("KICK: sender's nick is null");
+		fail(s->channel, "KICK: sender's nick is null");
 
 	if (!(chan = getarg(&p->params, " ")))
-		fail("KICK: channel is null");
+		fail(s->channel, "KICK: channel is null");
 
 	if (!(user = getarg(&p->params, " ")))
-		fail("KICK: user is null");
+		fail(s->channel, "KICK: user is null");
 
 	if ((c = channel_list_get(&s->clist, chan)) == NULL)
-		failf("KICK: channel '%s' not found", chan);
+		failf(s->channel, "KICK: channel '%s' not found", chan);
 
 	/* RFC 2812, section 3.2.8:
 	 *
@@ -1014,7 +1042,7 @@ recv_kick(char *err, struct parsed_mesg *p, struct server *s)
 	} else {
 
 		if (user_list_del(&(c->users), user) == USER_ERR_NOT_FOUND)
-			failf("KICK: nick '%s' not found in '%s'", user, chan);
+			failf(s->channel, "KICK: nick '%s' not found in '%s'", user, chan);
 
 		if (p->trailing)
 			newlinef(c, 0, "--", "%s has kicked %s (%s)", p->from, user, p->trailing);
@@ -1028,7 +1056,7 @@ recv_kick(char *err, struct parsed_mesg *p, struct server *s)
 }
 
 static int
-recv_mode(char *err, struct parsed_mesg *p, struct server *s)
+recv_mode(struct parsed_mesg *p, struct server *s)
 {
 	/* MODE <targ> 1*[<modestring> [<mode arguments>]]
 	 *
@@ -1057,19 +1085,19 @@ recv_mode(char *err, struct parsed_mesg *p, struct server *s)
 	char *targ;
 
 	if (!(targ = getarg(&p->params, " ")))
-		fail("MODE: target is null");
+		fail(s->channel, "MODE: target is null");
 
 	if (IS_ME(targ))
-		return recv_mode_usermodes(err, p, &(s->mode_config), s);
+		return recv_mode_usermodes(p, &(s->mode_config), s);
 
 	if ((c = channel_list_get(&s->clist, targ)))
-		return recv_mode_chanmodes(err, p, &(s->mode_config), c);
+		return recv_mode_chanmodes(p, &(s->mode_config), c);
 
-	failf("MODE: target '%s' not found", targ);
+	failf(s->channel, "MODE: target '%s' not found", targ);
 }
 
 static int
-recv_mode_chanmodes(char *err, struct parsed_mesg *p, const struct mode_config *config, struct channel *c)
+recv_mode_chanmodes(struct parsed_mesg *p, const struct mode_config *config, struct channel *c)
 {
 	struct mode *chanmodes = &(c->chanmodes);
 	struct user *user;
@@ -1082,7 +1110,7 @@ recv_mode_chanmodes(char *err, struct parsed_mesg *p, const struct mode_config *
 	(((M) = getarg(&(P)->params, " ")) || ((M) = getarg(&(P)->trailing, " ")))
 
 	if (!MODE_GETARG(modestring, p))
-		fail("MODE: modestring is null");
+		fail(c, "MODE: modestring is null");
 
 	do {
 		mode_set = MODE_SET_INVALID;
@@ -1203,7 +1231,7 @@ recv_mode_chanmodes(char *err, struct parsed_mesg *p, const struct mode_config *
 }
 
 static int
-recv_mode_usermodes(char *err, struct parsed_mesg *p, const struct mode_config *config, struct server *s)
+recv_mode_usermodes(struct parsed_mesg *p, const struct mode_config *config, struct server *s)
 {
 	struct mode *usermodes = &(s->usermodes);
 
@@ -1215,7 +1243,7 @@ recv_mode_usermodes(char *err, struct parsed_mesg *p, const struct mode_config *
 	(((M) = getarg(&(P)->params, " ")) || ((M) = getarg(&(P)->trailing, " ")))
 
 	if (!MODE_GETARG(modes, p))
-		fail("MODE: modes are null");
+		fail(s->channel, "MODE: modes are null");
 
 	do {
 		mode_set = MODE_SET_INVALID;
@@ -1258,21 +1286,21 @@ recv_mode_usermodes(char *err, struct parsed_mesg *p, const struct mode_config *
 }
 
 static int
-recv_nick(char *err, struct parsed_mesg *p, struct server *s)
+recv_nick(struct parsed_mesg *p, struct server *s)
 {
 	/* :nick!user@hostname.domain NICK [:]<new nick> */
 
 	char *nick;
 
 	if (!p->from)
-		fail("NICK: old nick is null");
+		fail(s->channel, "NICK: old nick is null");
 
 	/* Some servers seem to send the new nick in the trailing */
 	if (!(nick = getarg(&p->params, " ")) && !(nick = getarg(&p->trailing, " ")))
-		fail("NICK: new nick is null");
+		fail(s->channel, "NICK: new nick is null");
 
 	if (IS_ME(p->from)) {
-		strncpy(s->nick, nick, NICKSIZE);
+		server_nick_set(s, nick);
 		newlinef(s->channel, 0, "--", "You are now known as %s", nick);
 	}
 
@@ -1293,7 +1321,7 @@ recv_nick(char *err, struct parsed_mesg *p, struct server *s)
 }
 
 static int
-recv_notice(char *err, struct parsed_mesg *p, struct server *s)
+recv_notice(struct parsed_mesg *p, struct server *s)
 {
 	/* :nick.hostname.domain NOTICE <target> :<message> */
 
@@ -1301,21 +1329,21 @@ recv_notice(char *err, struct parsed_mesg *p, struct server *s)
 	struct channel *c;
 
 	if (!p->trailing)
-		fail("NOTICE: message is null");
+		fail(s->channel, "NOTICE: message is null");
 
 	/* CTCP reply */
 	if (*p->trailing == 0x01)
-		return recv_ctcp_rpl(err, p, s);
+		return recv_ctcp_rpl(p, s);
 
 	if (!p->from)
-		fail("NOTICE: sender's nick is null");
+		fail(s->channel, "NOTICE: sender's nick is null");
 
 	/* Notice from ignored user, do nothing */
 	if (user_list_get(&(s->ignore), p->from, 0))
 		return 0;
 
 	if (!(targ = getarg(&p->params, " ")))
-		fail("NOTICE: target is null");
+		fail(s->channel, "NOTICE: target is null");
 
 	if ((c = channel_list_get(&s->clist, targ)))
 		newline(c, 0, p->from, p->trailing);
@@ -1326,7 +1354,7 @@ recv_notice(char *err, struct parsed_mesg *p, struct server *s)
 }
 
 static int
-recv_numeric(char *err, struct parsed_mesg *p, struct server *s)
+recv_numeric(struct parsed_mesg *p, struct server *s)
 {
 	/* :server <code> <target> [args] */
 
@@ -1341,7 +1369,7 @@ recv_numeric(char *err, struct parsed_mesg *p, struct server *s)
 		_code = _code * 10 + (*p->command - '0');
 
 		if (_code > 999)
-			fail("NUMERIC: greater than 999");
+			fail(s->channel, "NUMERIC: greater than 999");
 	}
 
 	enum numeric code = _code;
@@ -1362,21 +1390,19 @@ recv_numeric(char *err, struct parsed_mesg *p, struct server *s)
 
 	/* 001 :<Welcome message> */
 	case RPL_WELCOME:
-		/* Establishing new connection with a server, set initial nick,
+
+		/* Establishing new connection with a server,
 		 * handle any channel auto-join or rejoins */
-
-		strncpy(s->nick, targ, NICKSIZE);
-
-		/* Reset list of auto nicks */
-		s->nptr = s->nicks;
 
 		c = s->channel;
 
 		/* join any non-parted channels */
 		do {
 			//TODO: channel_list_foreach
-			if (c->buffer.type == BUFFER_CHANNEL && !c->parted)
-				fail_if(sendf(err, s, "JOIN %s", c->name.str));
+			if (c->buffer.type == BUFFER_CHANNEL && !c->parted) {
+				if ((ret = io_sendf(s->connection, "JOIN %s", c->name.str)))
+					failf(s->channel, "sendf fail: %s", io_err(ret));
+			}
 			c = c->next;
 		} while (c != s->channel);
 
@@ -1414,10 +1440,10 @@ recv_numeric(char *err, struct parsed_mesg *p, struct server *s)
 	case RPL_CHANNEL_URL:
 
 		if (!(chan = getarg(&p->params, " ")))
-			fail("RPL_CHANNEL_URL: channel is null");
+			fail(s->channel, "RPL_CHANNEL_URL: channel is null");
 
 		if ((c = channel_list_get(&s->clist, chan)) == NULL)
-			failf("RPL_CHANNEL_URL: channel '%s' not found", chan);
+			failf(s->channel, "RPL_CHANNEL_URL: channel '%s' not found", chan);
 
 		newlinef(c, 0, "--", "URL for %s is: \"%s\"", chan, p->trailing);
 		break;
@@ -1427,10 +1453,10 @@ recv_numeric(char *err, struct parsed_mesg *p, struct server *s)
 	case RPL_TOPIC:
 
 		if (!(chan = getarg(&p->params, " ")))
-			fail("RPL_TOPIC: channel is null");
+			fail(s->channel, "RPL_TOPIC: channel is null");
 
 		if ((c = channel_list_get(&s->clist, chan)) == NULL)
-			failf("RPL_TOPIC: channel '%s' not found", chan);
+			failf(s->channel, "RPL_TOPIC: channel '%s' not found", chan);
 
 		newlinef(c, 0, "--", "Topic for %s is \"%s\"", chan, p->trailing);
 		break;
@@ -1440,16 +1466,16 @@ recv_numeric(char *err, struct parsed_mesg *p, struct server *s)
 	case RPL_TOPICWHOTIME:
 
 		if (!(chan = getarg(&p->params, " ")))
-			fail("RPL_TOPICWHOTIME: channel is null");
+			fail(s->channel, "RPL_TOPICWHOTIME: channel is null");
 
 		if (!(nick = getarg(&p->params, " ")))
-			fail("RPL_TOPICWHOTIME: nick is null");
+			fail(s->channel, "RPL_TOPICWHOTIME: nick is null");
 
 		if (!(time = getarg(&p->params, " ")))
-			fail("RPL_TOPICWHOTIME: time is null");
+			fail(s->channel, "RPL_TOPICWHOTIME: time is null");
 
 		if ((c = channel_list_get(&s->clist, chan)) == NULL)
-			failf("RPL_TOPICWHOTIME: channel '%s' not found", chan);
+			failf(s->channel, "RPL_TOPICWHOTIME: channel '%s' not found", chan);
 
 		time_t raw_time = atoi(time);
 		time = ctime(&raw_time);
@@ -1467,13 +1493,13 @@ recv_numeric(char *err, struct parsed_mesg *p, struct server *s)
 
 		/* @:secret   *:private   =:public */
 		if (!(type = getarg(&p->params, " ")))
-			fail("RPL_NAMEREPLY: type is null");
+			fail(s->channel, "RPL_NAMEREPLY: type is null");
 
 		if (!(chan = getarg(&p->params, " ")))
-			fail("RPL_NAMEREPLY: channel is null");
+			fail(s->channel, "RPL_NAMEREPLY: channel is null");
 
 		if ((c = channel_list_get(&s->clist, chan)) == NULL)
-			failf("RPL_NAMEREPLY: channel '%s' not found", chan);
+			failf(s->channel, "RPL_NAMEREPLY: channel '%s' not found", chan);
 
 		if ((ret = mode_chanmode_prefix(&(c->chanmodes), &(s->mode_config), *type)))
 			newlinef(c, 0, "-!!-", "RPL_NAMEREPLY: invalid channel flag: '%c'", *type);
@@ -1540,11 +1566,11 @@ recv_numeric(char *err, struct parsed_mesg *p, struct server *s)
 
 		if (!(targ = getarg(&p->params, " "))) {
 			if (code == ERR_NOSUCHNICK)
-				fail("ERR_NOSUCHNICK: nick is null");
+				fail(s->channel, "ERR_NOSUCHNICK: nick is null");
 			if (code == ERR_NOSUCHSERVER)
-				fail("ERR_NOSUCHSERVER: server is null");
+				fail(s->channel, "ERR_NOSUCHSERVER: server is null");
 			if (code == ERR_NOSUCHCHANNEL)
-				fail("ERR_NOSUCHCHANNEL: channel is null");
+				fail(s->channel, "ERR_NOSUCHCHANNEL: channel is null");
 		}
 
 		/* Private buffer might not exist */
@@ -1561,7 +1587,7 @@ recv_numeric(char *err, struct parsed_mesg *p, struct server *s)
 	case ERR_CANNOTSENDTOCHAN:  /* <channel> :<reason> */
 
 		if (!(chan = getarg(&p->params, " ")))
-			fail("ERR_CANNOTSENDTOCHAN: channel is null");
+			fail(s->channel, "ERR_CANNOTSENDTOCHAN: channel is null");
 
 		/* Channel buffer might not exist */
 		if ((c = channel_list_get(&s->clist, chan)) == NULL)
@@ -1577,7 +1603,7 @@ recv_numeric(char *err, struct parsed_mesg *p, struct server *s)
 	case ERR_ERRONEUSNICKNAME:  /* 432 <nick> :<reason> */
 
 		if (!(nick = getarg(&p->params, " ")))
-			fail("ERR_ERRONEUSNICKNAME: nick is null");
+			fail(s->channel, "ERR_ERRONEUSNICKNAME: nick is null");
 
 		newlinef(s->channel, 0, "-!!-", "'%s' - %s", nick, p->trailing);
 		break;
@@ -1586,16 +1612,20 @@ recv_numeric(char *err, struct parsed_mesg *p, struct server *s)
 	case ERR_NICKNAMEINUSE:  /* 433 <nick> :Nickname is already in use */
 
 		if (!(nick = getarg(&p->params, " ")))
-			fail("ERR_NICKNAMEINUSE: nick is null");
+			fail(s->channel, "ERR_NICKNAMEINUSE: nick is null");
 
 		newlinef(s->channel, 0, "-!!-", "Nick '%s' in use", nick);
 
 		if (IS_ME(nick)) {
-			auto_nick(&(s->nptr), s->nick);
+
+			server_nicks_next(s);
 
 			newlinef(s->channel, 0, "-!!-", "Trying again with '%s'", s->nick);
 
-			return sendf(err, s, "NICK %s", s->nick);
+			if ((ret = io_sendf(s->connection, "NICK %s", s->nick)))
+				failf(s->channel, "sendf fail: %s", io_err(ret));
+
+			return 0;
 		}
 		break;
 
@@ -1620,7 +1650,7 @@ recv_numeric(char *err, struct parsed_mesg *p, struct server *s)
 }
 
 static int
-recv_part(char *err, struct parsed_mesg *p, struct server *s)
+recv_part(struct parsed_mesg *p, struct server *s)
 {
 	/* :nick!user@hostname.domain PART <channel> [:message] */
 
@@ -1628,10 +1658,10 @@ recv_part(char *err, struct parsed_mesg *p, struct server *s)
 	struct channel *c;
 
 	if (!p->from)
-		fail("PART: sender's nick is null");
+		fail(s->channel, "PART: sender's nick is null");
 
 	if (!(targ = getarg(&p->params, " ")))
-		fail("PART: target is null");
+		fail(s->channel, "PART: target is null");
 
 	if (IS_ME(p->from)) {
 
@@ -1652,12 +1682,12 @@ recv_part(char *err, struct parsed_mesg *p, struct server *s)
 	}
 
 	if ((c = channel_list_get(&s->clist, targ)) == NULL)
-		failf("PART: channel '%s' not found", targ);
+		failf(s->channel, "PART: channel '%s' not found", targ);
 
 	if (user_list_del(&(c->users), p->from) == USER_ERR_NOT_FOUND)
-		failf("PART: nick '%s' not found in '%s'", p->from, targ);
+		failf(s->channel, "PART: nick '%s' not found in '%s'", p->from, targ);
 
-	if (c->users.count < config.join_part_quit_threshold) {
+	if (c->users.count < jpq_threshold) {
 		if (p->trailing)
 			newlinef(c, 0, "<", "%s!%s has left %s (%s)", p->from, p->host, targ, p->trailing);
 		else
@@ -1670,23 +1700,27 @@ recv_part(char *err, struct parsed_mesg *p, struct server *s)
 }
 
 static int
-recv_ping(char *err, struct parsed_mesg *p, struct server *s)
+recv_ping(struct parsed_mesg *p, struct server *s)
 {
 	/* PING :<server> */
 
-	if (!p->trailing)
-		fail("PING: server is null");
+	int ret;
 
-	return sendf(err, s, "PONG %s", p->trailing);
+	if (!p->trailing)
+		fail(s->channel, "PING: server is null");
+
+	if ((ret = io_sendf(s->connection, "PONG %s", p->trailing)))
+		failf(s->channel, "sendf fail: %s", io_err(ret));
+
+	return 0;
 }
 
 static int
-recv_pong(char *err, struct parsed_mesg *p, struct server *s)
+recv_pong(struct parsed_mesg *p, struct server *s)
 {
 	/*  PONG <server> [<server2>] */
 
 	// FIXME:
-	UNUSED(err);
 	UNUSED(p);
 	UNUSED(s);
 
@@ -1702,7 +1736,7 @@ recv_pong(char *err, struct parsed_mesg *p, struct server *s)
 }
 
 static int
-recv_privmsg(char *err, struct parsed_mesg *p, struct server *s)
+recv_privmsg(struct parsed_mesg *p, struct server *s)
 {
 	/* :nick!user@hostname.domain PRIVMSG <target> :<message> */
 
@@ -1710,21 +1744,21 @@ recv_privmsg(char *err, struct parsed_mesg *p, struct server *s)
 	struct channel *c;
 
 	if (!p->trailing)
-		fail("PRIVMSG: message is null");
+		fail(s->channel, "PRIVMSG: message is null");
 
 	/* CTCP request */
 	if (*p->trailing == 0x01)
-		return recv_ctcp_req(err, p, s);
+		return recv_ctcp_req(p, s);
 
 	if (!p->from)
-		fail("PRIVMSG: sender's nick is null");
+		fail(s->channel, "PRIVMSG: sender's nick is null");
 
 	/* Privmsg from ignored user, do nothing */
 	if (user_list_get(&(s->ignore), p->from, 0))
 		return 0;
 
 	if (!(targ = getarg(&p->params, " ")))
-		fail("PRIVMSG: target is null");
+		fail(s->channel, "PRIVMSG: target is null");
 
 	/* Find the target channel */
 	if (IS_ME(targ)) {
@@ -1738,7 +1772,7 @@ recv_privmsg(char *err, struct parsed_mesg *p, struct server *s)
 		}
 
 	} else if ((c = channel_list_get(&s->clist, targ)) == NULL)
-		failf("PRIVMSG: channel '%s' not found", targ);
+		failf(s->channel, "PRIVMSG: channel '%s' not found", targ);
 
 	if (check_pinged(p->trailing, s->nick)) {
 
@@ -1757,18 +1791,18 @@ recv_privmsg(char *err, struct parsed_mesg *p, struct server *s)
 }
 
 static int
-recv_quit(char *err, struct parsed_mesg *p, struct server *s)
+recv_quit(struct parsed_mesg *p, struct server *s)
 {
 	/* :nick!user@hostname.domain QUIT [:message] */
 
 	if (!p->from)
-		fail("QUIT: sender's nick is null");
+		fail(s->channel, "QUIT: sender's nick is null");
 
 	struct channel *c = s->channel;
 	//TODO: channel_list_foreach
 	do {
 		if (user_list_del(&(c->users), p->from) == USER_ERR_NONE) {
-			if (c->users.count < config.join_part_quit_threshold) {
+			if (c->users.count < jpq_threshold) {
 				if (p->trailing)
 					newlinef(c, 0, "<", "%s!%s has quit (%s)", p->from, p->host, p->trailing);
 				else
@@ -1784,7 +1818,7 @@ recv_quit(char *err, struct parsed_mesg *p, struct server *s)
 }
 
 static int
-recv_topic(char *err, struct parsed_mesg *p, struct server *s)
+recv_topic(struct parsed_mesg *p, struct server *s)
 {
 	/* :nick!user@hostname.domain TOPIC <channel> :[topic] */
 
@@ -1792,16 +1826,16 @@ recv_topic(char *err, struct parsed_mesg *p, struct server *s)
 	struct channel *c;
 
 	if (!p->from)
-		fail("TOPIC: sender's nick is null");
+		fail(s->channel, "TOPIC: sender's nick is null");
 
 	if (!(targ = getarg(&p->params, " ")))
-		fail("TOPIC: target is null");
+		fail(s->channel, "TOPIC: target is null");
 
 	if (!p->trailing)
-		fail("TOPIC: topic is null");
+		fail(s->channel, "TOPIC: topic is null");
 
 	if ((c = channel_list_get(&s->clist, targ)) == NULL)
-		failf("TOPIC: channel '%s' not found", targ);
+		failf(s->channel, "TOPIC: channel '%s' not found", targ);
 
 	if (*p->trailing) {
 		newlinef(c, 0, "--", "%s has changed the topic:", p->from);

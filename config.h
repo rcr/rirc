@@ -3,6 +3,24 @@
  * Colours can be set [0, 255], Any other value (e.g. -1) will set
  * the default terminal foreground/background */
 
+/* Default comma separated set of Nicks to try on connection
+ *   String
+ *   ("": defaults to effective user id name)
+ */
+#define DEFAULT_NICK_SET ""
+
+/* Default Username and Realname sent during connection
+ *   String
+ *   ("": defaults to effective user id name)
+ */
+#define DEFAULT_USERNAME ""
+#define DEFAULT_REALNAME ""
+
+/* User count in channel before filtering JOIN/PART/QUIT messages
+ *   Integer
+ *   (0: no filtering) */
+#define JPQ_THRESHOLD 0
+
 /* Message sent for PART and QUIT by default */
 #define DEFAULT_QUIT_MESG "rirc v" VERSION
 
@@ -80,8 +98,8 @@
 #define IO_PING_MAX 300
 
 /* Reconnect backoff base delay
- *   Integer, [1, 10, 86400] */
-#define IO_RECONNECT_BACKOFF_BASE 10
+ *   Integer, [1, 4, 86400] */
+#define IO_RECONNECT_BACKOFF_BASE 4
 
 /* Reconnect backoff growth factor
  *   Integer, [1, 2, 32] */

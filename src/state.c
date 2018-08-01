@@ -12,7 +12,6 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <sys/ioctl.h>
-#include <signal.h>
 
 #include "src/draw.h"
 #include "src/io.h"
@@ -26,6 +25,7 @@ static struct
 
 	struct server_list servers;
 
+	// TODO: remove, use io.c
 	unsigned int term_cols;
 	unsigned int term_rows;
 
@@ -48,6 +48,10 @@ struct channel* default_channel(void) { return state.default_channel; }
 
 unsigned int _term_cols(void) { return state.term_cols; }
 unsigned int _term_rows(void) { return state.term_rows; }
+
+static void state_io_cxed(struct server*);
+static void state_io_dxed(struct server*);
+static void state_io_signal(enum io_sig_t);
 
 /* Set draw bits */
 #define X(BIT) void draw_##BIT(void) { state.draw.bits.BIT = 1; }
@@ -172,6 +176,7 @@ _newline(struct channel *c, enum buffer_line_t type, const char *from, const cha
 		_text.len = len;
 		_from.str = from;
 
+		// FIXME: don't need to get user for many non-user message types
 		if ((u = user_list_get(&(c->users), from, 0)) != NULL)
 			_from.len = u->nick.len;
 		else
@@ -189,7 +194,7 @@ _newline(struct channel *c, enum buffer_line_t type, const char *from, const cha
 }
 
 struct channel*
-new_channel(char *name, struct server *s, struct channel *chanlist, enum buffer_t type)
+new_channel(const char *name, struct server *s, struct channel *chanlist, enum buffer_t type)
 {
 	struct channel *c = channel(name);
 
@@ -304,9 +309,12 @@ channel_close(struct channel *c)
 			action(action_close_server, "Close server '%s'?   [y/n]", c->server->host);
 	} else {
 		/* Closing a channel */
-
-		if (c->buffer.type == BUFFER_CHANNEL && !c->parted)
-			sendf(NULL, c->server, "PART %s", c->name.str);
+		if (c->buffer.type == BUFFER_CHANNEL && !c->parted) {
+			int ret;
+			if (0 != (ret = io_sendf(c->server->connection, "PART %s", c->name.str))) {
+				newlinef(c->server->channel, 0, "sendf fail", "%s", io_err(ret));
+			}
+		}
 
 		/* If closing the current channel, update state to a new channel */
 		if (c == ccur) {
@@ -324,30 +332,6 @@ channel_close(struct channel *c)
 	}
 }
 
-/* Get a channel's next/previous, taking into account server wraparound */
-struct channel*
-channel_switch(struct channel *c, int next)
-{
-	struct channel *ret;
-
-	/* c in this case is the main buffer */
-	if (c->server == NULL)
-		return c;
-
-	if (next)
-		/* If wrapping around forwards, get next server's first channel */
-		ret = !(c->next == c->server->channel) ?
-			c->next : c->server->next->channel;
-	else
-		/* If wrapping around backwards, get previous server's last channel */
-		ret = !(c == c->server->channel) ?
-			c->prev : c->server->prev->channel->prev;
-
-	draw_all();
-
-	return ret;
-}
-
 //TODO:
 //improvement: don't set the scrollback if the buffer tail is in view
 void
@@ -359,7 +343,7 @@ buffer_scrollback_back(struct channel *c)
 
 	unsigned int buffer_i = b->scrollback,
 	             count = 0,
-				 text_w,
+	             text_w,
 	             cols = _term_cols(),
 	             rows = _term_rows() - 4;
 
@@ -435,46 +419,6 @@ buffer_scrollback_forw(struct channel *c)
 
 	draw_buffer();
 	draw_status();
-}
-
-void
-auto_nick(char **autonick, char *nick)
-{
-	/* Copy the next choice in a server's nicks to it's nick pointer, e.g.:
-	 *   "nick, nick_, nick__"
-	 *
-	 * If the server's options are exhausted (or NULL) set a randomized default */
-
-	char *p = *autonick;
-	int i;
-
-	while (p && (*p == ' ' || *p == ','))
-		p++;
-
-	if (p && *p != '\0') {
-		/* Copy the next choice into nick */
-
-		for (i = 0; i < NICKSIZE && *p && *p != ' ' && *p != ','; i++)
-			*nick++ = *p++;
-
-		*autonick = p;
-	} else {
-		/* Autonicks exhausted, generate a random nick */
-
-		char *base = "rirc_";
-		char *cset = "0123456789ABCDEF";
-
-		strcpy(nick, base);
-		nick += strlen(base);
-
-		size_t len = strlen(cset);
-
-		for (i = 0; i < 4; i++)
-			/* coverity[dont_call] Acceptable use of insecure rand() function */
-			*nick++ = cset[rand() % len];
-	}
-
-	*nick = '\0';
 }
 
 /* Usefull server/channel structure abstractions for drawing */
@@ -572,81 +516,81 @@ channel_move_next(void)
 
 
 
-
-
-
-
-void
-io_cb_cxng(const void *cb_obj, const char *fmt, ...)
+static void
+state_io_cxed(struct server *s)
 {
-	va_list ap;
-
-	struct channel *c = ((struct server *)cb_obj)->channel;
-
-	va_start(ap, fmt);
-	_newline(c, 0, "--", fmt, ap);
-	va_end(ap);
-}
-
-void
-io_cb_cxed(const void *cb_obj, const char *fmt, ...)
-{
-	va_list ap;
-
-	struct channel *c = ((struct server *)cb_obj)->channel;
-
-	va_start(ap, fmt);
-	_newline(c, 0, "--", fmt, ap);
-	va_end(ap);
-
-	/* TODO
-	 * send PASS
-	 * send NICK
-	 * send USER
-	 */
-
 	int ret;
-	char nickbuf[] = "NICK rcr\r\n";
-	char userbuf[] = "USER rcr 8 * :real rcr\r\n";
-	if (0 != (ret = io_sendf(((struct server *)cb_obj)->connection, nickbuf, sizeof(nickbuf)-1, 0)))
-		newlinef(c, 0, "sendf fail", "%s", io_err(ret));
-	if (0 != (ret = io_sendf(((struct server *)cb_obj)->connection, userbuf, sizeof(userbuf)-1, 0)))
-		newlinef(c, 0, "sendf fail", "%s", io_err(ret));
+
+	server_nicks_reset(s);
+	server_nicks_next(s);
+
+	if ((ret = io_sendf(s->connection, "NICK %s", s->nick)))
+		newlinef(s->channel, 0, "-!!-", "sendf fail: %s", io_err(ret));
+
+	if ((ret = io_sendf(s->connection, "USER %s 8 * :%s", s->username, s->realname)))
+		newlinef(s->channel, 0, "-!!-", "sendf fail: %s", io_err(ret));
+
+	// TODO: send PASS if set
+}
+
+static void
+state_io_dxed(struct server *s)
+{
+	(void)s;
+}
+
+static void
+state_io_signal(enum io_sig_t sig)
+{
+	switch (sig) {
+		case IO_SIGWINCH:
+			resize();
+			break;
+		default:
+			newlinef(state.default_channel, 0, "-!!-", "unhandled signal %d", sig);
+	}
 }
 
 void
-io_cb_lost(const void *cb_obj, const char *fmt, ...)
+io_cb(enum io_cb_t type, const void *cb_obj, ...)
 {
-	/* TODO */
-
+	struct server *s = (struct server *)cb_obj;
 	va_list ap;
 
-	struct channel *c = ((struct server *)cb_obj)->channel;
+	va_start(ap, cb_obj);
 
-	va_start(ap, fmt);
-	_newline(c, 0, "-!!-", fmt, ap);
+	switch (type) {
+		case IO_CB_CXED:
+			state_io_cxed(s);
+			_newline(s->channel, 0, "--", va_arg(ap, const char *), ap);
+			break;
+		case IO_CB_DXED:
+			state_io_dxed(s);
+			_newline(s->channel, 0, "-!!-", va_arg(ap, const char *), ap);
+			break;
+		case IO_CB_ERROR:
+			_newline(s->channel, 0, "-!!-", va_arg(ap, const char *), ap);
+			break;
+		case IO_CB_INFO:
+			_newline(s->channel, 0, "--", va_arg(ap, const char *), ap);
+			break;
+		case IO_CB_PING_0:
+		case IO_CB_PING_1:
+		case IO_CB_PING_N:
+			/* TODO  0: clear ping, draw
+			 *       1: send ping message
+			 *       N: set ping, draw */
+			break;
+		case IO_CB_SIGNAL:
+			state_io_signal(va_arg(ap, enum io_sig_t));
+			break;
+		default:
+			fatal("unhandled io_cb_t: %d", type);
+	}
+
 	va_end(ap);
-}
 
-void
-io_cb_ping(const void *cb_obj, unsigned int ping)
-{
-	struct channel *c = ((struct server *)cb_obj)->channel;
-
-	/* TODO */
-	newlinef(c, 0, "ping:", "%u", ping);
-}
-
-void
-io_cb_fail(const void *cb_obj, const char *fmt, ...)
-{
-	va_list ap;
-
-	struct channel *c = ((struct server *)cb_obj)->channel;
-
-	va_start(ap, fmt);
-	_newline(c, 0, "-!!-", fmt, ap);
-	va_end(ap);
+	redraw();
 }
 
 void
@@ -656,16 +600,14 @@ io_cb_read_inp(char *buff, size_t count)
 
 	/* FIXME: */
 	draw_input();
+	redraw();
 }
 
 void
 io_cb_read_soc(char *buff, size_t count, const void *cb_obj)
 {
+	(void)(count);
 	struct channel *c = ((struct server *)cb_obj)->channel;
-
-#ifdef DEBUG
-	newline(c, 0, "DEBUG <<", buff);
-#endif
 
 	struct parsed_mesg p;
 
@@ -673,16 +615,6 @@ io_cb_read_soc(char *buff, size_t count, const void *cb_obj)
 		newlinef(c, 0, "-!!-", "failed to parse message");
 	else
 		recv_mesg((struct server *)cb_obj, &p);
-}
 
-void
-io_cb_signal(int sig)
-{
-	switch (sig) {
-		case SIGWINCH:
-			resize();
-			break;
-		default:
-			newlinef(state.default_channel, 0, "-!!-", "unhandled signal %d", sig);
-	}
+	redraw();
 }

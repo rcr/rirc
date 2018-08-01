@@ -3,6 +3,7 @@
 
 #include <errno.h>
 #include <stddef.h>
+#include <stdio.h>
 #include <stdlib.h>
 
 /* Parsed IRC message */
@@ -47,12 +48,26 @@ void handle_error(int, const char*, ...);
 
 extern int fatal_exit;
 
+#define TO_STR(X) #X
+#define STR(X) TO_STR(X)
+
 #define MAX(A, B) ((A) > (B) ? (A) : (B))
 #define MIN(A, B) ((A) > (B) ? (B) : (A))
 
 #define ELEMS(X) (sizeof((X)) / sizeof((X)[0]))
 
 #define UNUSED(X) ((void)(X))
+
+#if (defined DEBUG) && !(defined TESTING)
+#define DEBUG_MSG(...) \
+	do { \
+		fprintf(stderr, "%s:%d:%-12s\t", __FILE__, __LINE__, __func__); \
+		fprintf(stderr, __VA_ARGS__); \
+		fprintf(stderr, "\n"); \
+	} while (0)
+#else
+#define DEBUG_MSG(...)
+#endif
 
 /* Irrecoverable error
  *   this define is precluded in test.h to aggregate fatal errors in testcases */
