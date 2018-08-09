@@ -147,6 +147,8 @@ static struct termios term;
 static volatile sig_atomic_t flag_sigwinch_cb; /* sigwinch callback */
 static volatile sig_atomic_t flag_sigwinch_ws; /* sigwinch ws resize */
 
+static void io_net_set_timeout(struct connection*, unsigned);
+
 static void io_lock_init(struct io_lock*);
 static void io_lock_term(struct io_lock*);
 static void io_lock_wake(struct io_lock*);
@@ -504,12 +506,7 @@ io_state_cxng(struct connection *c)
 static enum io_state_t
 io_state_cxed(struct connection *c)
 {
-	struct timeval tv = {
-		.tv_sec = IO_PING_MIN
-	};
-
-	if (setsockopt(c->soc, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) < 0)
-		fatal("setsockopt", errno);
+	io_net_set_timeout(c, IO_PING_MIN);
 
 	for (;;) {
 		char recvbuf[IO_MESG_LEN];
@@ -545,12 +542,7 @@ io_state_cxed(struct connection *c)
 static enum io_state_t
 io_state_ping(struct connection *c)
 {
-	struct timeval tv = {
-		.tv_sec = IO_PING_REFRESH
-	};
-
-	if (setsockopt(c->soc, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) < 0)
-		fatal("setsockopt", errno);
+	io_net_set_timeout(c, IO_PING_REFRESH);
 
 	for (;;) {
 		char recvbuf[IO_MESG_LEN];
@@ -685,6 +677,17 @@ io_recv(struct connection *c, char *buf, size_t n)
 			c->read.buf[c->read.i++] = buf[i];
 		}
 	}
+}
+
+static void
+io_net_set_timeout(struct connection *c, unsigned timeout)
+{
+	struct timeval tv = {
+		.tv_sec = timeout
+	};
+
+	if (setsockopt(c->soc, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) < 0)
+		fatal("setsockopt", errno);
 }
 
 static void
