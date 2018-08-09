@@ -19,6 +19,7 @@
 
 #include "config.h"
 #include "src/components/input.h"
+#include "src/io.h"
 #include "src/state.h"
 #include "src/utils/utils.h"
 
@@ -98,7 +99,7 @@ draw(union draw draw)
 
 	struct channel *c = current_channel();
 
-	if (_term_cols() < COLS_MIN || _term_rows() < ROWS_MIN) {
+	if (io_tty_cols() < COLS_MIN || io_tty_rows() < ROWS_MIN) {
 		printf(CLEAR_FULL MOVE(1, 1) "rirc");
 		goto no_draw;
 	}
@@ -108,9 +109,9 @@ draw(union draw draw)
 	if (draw.bits.buffer) _draw_buffer(&c->buffer,
 		(struct coords) {
 			.c1 = 1,
-			.cN = _term_cols(),
+			.cN = io_tty_cols(),
 			.r1 = 3,
-			.rN = _term_rows() - 2
+			.rN = io_tty_rows() - 2
 		});
 
 	if (draw.bits.nav)    _draw_nav(c);
@@ -118,9 +119,9 @@ draw(union draw draw)
 	if (draw.bits.input)  _draw_input(c->input,
 		(struct coords) {
 			.c1 = 1,
-			.cN = _term_cols(),
-			.r1 = _term_rows(),
-			.rN = _term_rows()
+			.cN = io_tty_cols(),
+			.r1 = io_tty_rows(),
+			.rN = io_tty_rows()
 		});
 
 	if (draw.bits.status) _draw_status(c);
@@ -419,7 +420,7 @@ _draw_nav(struct channel *c)
 	size_t len, total_len = 0;
 
 	/* Bump the channel frames, if applicable */
-	if ((total_len = (c->name.len + 2)) >= _term_cols())
+	if ((total_len = (c->name.len + 2)) >= io_tty_cols())
 		return;
 	else if (c == frame_prev && frame_prev != c_first)
 		frame_prev = channel_get_prev(frame_prev);
@@ -438,7 +439,7 @@ _draw_nav(struct channel *c)
 			tmp = channel_get_next(tmp_next);
 			len = tmp->name.len;
 
-			while ((total_len += (len + 2)) < _term_cols() && tmp != c_first) {
+			while ((total_len += (len + 2)) < io_tty_cols() && tmp != c_first) {
 
 				tmp_next = tmp;
 
@@ -456,7 +457,7 @@ _draw_nav(struct channel *c)
 			tmp = channel_get_prev(tmp_prev);
 			len = tmp->name.len;
 
-			while ((total_len += (len + 2)) < _term_cols() && tmp != c_last) {
+			while ((total_len += (len + 2)) < io_tty_cols() && tmp != c_last) {
 
 				tmp_prev = tmp;
 
@@ -471,7 +472,7 @@ _draw_nav(struct channel *c)
 		len = tmp->name.len;
 
 		/* Next channel doesn't fit */
-		if ((total_len += (len + 2)) >= _term_cols())
+		if ((total_len += (len + 2)) >= io_tty_cols())
 			break;
 
 		if (nextward)
@@ -630,8 +631,8 @@ _draw_status(struct channel *c)
 	float sb;
 	int ret;
 	unsigned int col = 0;
-	unsigned int cols = _term_cols();
-	unsigned int rows = _term_rows();
+	unsigned int cols = io_tty_cols();
+	unsigned int rows = io_tty_rows();
 
 	/* Insufficient columns for meaningful status */
 	if (cols < 3)

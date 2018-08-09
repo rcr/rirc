@@ -11,7 +11,6 @@
 #include <strings.h>
 #include <stdarg.h>
 #include <stdio.h>
-#include <sys/ioctl.h>
 
 #include "src/draw.h"
 #include "src/io.h"
@@ -24,10 +23,6 @@ static struct
 	struct channel *default_channel; /* the default rirc channel at startup */
 
 	struct server_list servers;
-
-	// TODO: remove, use io.c
-	unsigned int term_cols;
-	unsigned int term_rows;
 
 	union draw draw;
 } state;
@@ -45,9 +40,6 @@ static void _newline(struct channel*, enum buffer_line_t, const char*, const cha
 
 struct channel* current_channel(void) { return state.current_channel; }
 struct channel* default_channel(void) { return state.default_channel; }
-
-unsigned int _term_cols(void) { return state.term_cols; }
-unsigned int _term_rows(void) { return state.term_rows; }
 
 static void state_io_cxed(struct server*);
 static void state_io_dxed(struct server*);
@@ -73,21 +65,6 @@ redraw(void)
 }
 
 void
-resize(void)
-{
-	/* Resize the terminal dimensions */
-
-	struct winsize w;
-
-	ioctl(0, TIOCGWINSZ, &w);
-
-	state.term_rows = (w.ws_row > 0) ? w.ws_row : 0;
-	state.term_cols = (w.ws_col > 0) ? w.ws_col : 0;
-
-	draw_all();
-}
-
-void
 init_state(void)
 {
 	/* atexit doesn't set errno */
@@ -110,7 +87,7 @@ init_state(void)
 #endif
 
 	/* Initiate a full redraw */
-	resize();
+	draw_all();
 	redraw();
 }
 
@@ -344,8 +321,8 @@ buffer_scrollback_back(struct channel *c)
 	unsigned int buffer_i = b->scrollback,
 	             count = 0,
 	             text_w,
-	             cols = _term_cols(),
-	             rows = _term_rows() - 4;
+	             cols = io_tty_cols(),
+	             rows = io_tty_rows() - 4;
 
 	struct buffer_line *line = buffer_line(b, buffer_i);
 
@@ -386,8 +363,8 @@ buffer_scrollback_forw(struct channel *c)
 
 	unsigned int count = 0,
 	             text_w,
-	             cols = _term_cols(),
-	             rows = _term_rows() - 4;
+	             cols = io_tty_cols(),
+	             rows = io_tty_rows() - 4;
 
 	struct buffer *b = &c->buffer;
 
@@ -544,7 +521,7 @@ state_io_signal(enum io_sig_t sig)
 {
 	switch (sig) {
 		case IO_SIGWINCH:
-			resize();
+			draw_all();
 			break;
 		default:
 			newlinef(state.default_channel, 0, "-!!-", "unhandled signal %d", sig);

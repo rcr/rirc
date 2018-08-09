@@ -128,7 +128,7 @@ static void io_term_tty(void);
 static void* io_thread(void*);
 
 static void io_recv(struct connection*, char*, size_t);
-static void io_tty_winsz(void);
+static struct winsize* io_tty_winsize(void);
 
 static enum io_state_t io_state_dxed(struct connection*);
 static enum io_state_t io_state_rxng(struct connection*);
@@ -137,7 +137,6 @@ static enum io_state_t io_state_cxed(struct connection*);
 static enum io_state_t io_state_ping(struct connection*);
 
 static struct io_lock init_lock;
-static struct winsize tty_ws;
 
 // TODO
 static pthread_mutex_t cb_mutex;
@@ -708,9 +707,6 @@ io_init_sig(void)
 
 	if (sigaction(SIGWINCH, &sa, NULL) < 0)
 		fatal("sigaction - SIGWINCH", errno);
-
-	// TODO add sigusr here to block, otherwise created threads are going
-	// to wake on sigwinch
 }
 
 static void
@@ -734,6 +730,8 @@ io_init_tty(void)
 
 	if (atexit(io_term_tty) < 0)
 		fatal("atexit", 0);
+
+	io_tty_winsize();
 }
 
 static void
@@ -771,37 +769,37 @@ io_loop(void)
 	}
 }
 
-static void
-io_tty_winsz(void)
+static struct winsize*
+io_tty_winsize(void)
 {
+	static struct winsize tty_ws;
+
 	if (flag_sigwinch_ws) {
 		flag_sigwinch_ws = 0;
 
 		if (ioctl(0, TIOCGWINSZ, &tty_ws) < 0)
 			fatal("ioctl", errno);
 	}
+
+	return &tty_ws;
 }
 
 unsigned
 io_tty_cols(void)
 {
-	io_tty_winsz();
-
-	return (tty_ws.ws_col > 0) ? tty_ws.ws_col : 0;
+	return io_tty_winsize()->ws_col;
 }
 
 unsigned
 io_tty_rows(void)
 {
-	io_tty_winsz();
-
-	return (tty_ws.ws_row > 0) ? tty_ws.ws_row : 0;
+	return io_tty_winsize()->ws_row;
 }
 
 const char*
 io_err(int err)
 {
-	const char *err_strs[] = {
+	const char *const err_strs[] = {
 		[IO_ERR_NONE]  = "success",
 		[IO_ERR_TRUNC] = "data truncated",
 		[IO_ERR_DXED]  = "socket not connected",
