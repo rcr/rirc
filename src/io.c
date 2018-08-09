@@ -106,10 +106,10 @@ struct connection
 	} state;
 	int soc;
 	char ip_str[INET6_ADDRSTRLEN];
-	// FIXME: remove
-	pthread_mutex_t pt_state_mutex;
 
+	pthread_mutex_t pt_state_mutex;
 	pthread_t pt_tid;
+
 	struct {
 		size_t i;
 		char buf[IO_MESG_LEN];
@@ -119,7 +119,6 @@ struct connection
 };
 
 static char* io_strerror(int, char*, size_t);
-static void io_close(struct connection*);
 static void io_init(void);
 static void io_init_sig(void);
 static void io_init_tty(void);
@@ -128,7 +127,7 @@ static void io_term_tty(void);
 static void* io_thread(void*);
 
 static void io_recv(struct connection*, char*, size_t);
-static struct winsize* io_tty_winsize(void);
+static struct winsize* io_tty_winsize(int);
 
 static enum io_state_t io_state_dxed(struct connection*);
 static enum io_state_t io_state_rxng(struct connection*);
@@ -153,19 +152,6 @@ static void io_lock_init(struct io_lock*);
 static void io_lock_term(struct io_lock*);
 static void io_lock_wake(struct io_lock*);
 static void io_lock_wait(struct io_lock*, struct timespec*);
-
-static void
-io_close(struct connection *c)
-{
-	/* Lock thread state to prevent ambiguous handling of EINTR on close() */
-	if (c->soc >= 0) {
-		PT_LK(&(c->pt_state_mutex));
-		if (close(c->soc) < 0)
-			fatal("close", errno);
-		PT_UL(&(c->pt_state_mutex));
-		c->soc = -1;
-	}
-}
 
 static char*
 io_strerror(int errnum, char *buf, size_t buflen)
@@ -388,13 +374,8 @@ io_dx(struct connection *c)
 		case IO_ST_CXNG:
 		case IO_ST_CXED:
 		case IO_ST_PING:
-			do {
-				/* Signal and yield the cpu until the target thread
-				 * is flagged as having reached an EINTR handler */
-				PT_CF(pthread_kill(c->pt_tid, SIGUSR1));
-				if (sched_yield() < 0)
-					fatal("sched_yield", errno);
-			} while (0 /* TODO */);
+			if (shutdown(c->soc, SHUT_RDWR) < 0)
+				fatal("shutdown", errno);
 			break;
 		default:
 			fatal("Unknown net state", 0);
@@ -440,7 +421,9 @@ io_state_rxng(struct connection *c)
 
 	ts.tv_sec += c->rx_backoff;
 
-	PT_CB(io_cb(IO_CB_INFO, c->obj, "Attemping reconnect in: %us", c->rx_backoff));
+	PT_CB(io_cb(IO_CB_INFO, c->obj, "Attemping reconnect in %02u:%02u",
+		(c->rx_backoff / 60),
+		(c->rx_backoff % 60)));
 
 	io_lock_wait(&c->lock, &ts);
 	return IO_ST_CXNG;
@@ -449,27 +432,30 @@ io_state_rxng(struct connection *c)
 static enum io_state_t
 io_state_cxng(struct connection *c)
 {
-	int ret;
+	/* TODO: handle shutdown() on socket at all points, will fatal for now */
+	/* TODO: how to cancel getaddrino? */
+
 	char errbuf[1024];
+	enum io_state_t ret_state = IO_ST_CXED;
+	int ret;
+
 	struct addrinfo *p, *res, hints = {
 		.ai_family   = AF_UNSPEC,
 		.ai_flags    = AI_PASSIVE,
+		.ai_protocol = IPPROTO_TCP,
 		.ai_socktype = SOCK_STREAM
 	};
 
 	PT_CB(io_cb(IO_CB_INFO, c->obj, "Connecting to %s:%s ...", c->host, c->port));
 
 	if ((ret = getaddrinfo(c->host, c->port, &hints, &res))) {
-		if (ret != EAI_SYSTEM) {
-			PT_CB(io_cb(IO_CB_ERROR, c->obj, "Connection error (getaddrinfo): %s", gai_strerror(ret)));
-			return IO_ST_RXNG;
-		} else if (errno == EINTR) {
-			PT_CB(io_cb(IO_CB_ERROR, c->obj, "Connection error (getaddrinfo): %s", io_strerror(errno, errbuf, sizeof(errbuf))));
-			return IO_ST_RXNG;
-		} else {
-			PT_CB(io_cb(IO_CB_INFO, c->obj, "Connection attempt canceled"));
-			return IO_ST_DXED;
-		}
+
+		if (ret == EAI_SYSTEM)
+			PT_CB(io_cb(IO_CB_ERR, c->obj, "Error resolving host: %s", io_strerror(errno, errbuf, sizeof(errbuf))));
+		else
+			PT_CB(io_cb(IO_CB_ERR, c->obj, "Error resolving host: %s", gai_strerror(ret)));
+
+		return IO_ST_RXNG;
 	}
 
 	for (p = res; p != NULL; p = p->ai_next) {
@@ -477,30 +463,23 @@ io_state_cxng(struct connection *c)
 		if ((c->soc = socket(p->ai_family, p->ai_socktype, p->ai_protocol)) < 0)
 			continue;
 
-		if (connect(c->soc, p->ai_addr, p->ai_addrlen) == 0)
+		if ((ret = connect(c->soc, p->ai_addr, p->ai_addrlen)) == 0)
 			break;
 
-		if ((ret = errno) == EINTR) {
-			PT_CB(io_cb(IO_CB_INFO, c->obj, "Connection attempt canceled"));
-			io_close(c);
-			freeaddrinfo(res);
-			return IO_ST_DXED;
-		}
-
-		io_close(c);
+		if (close(c->soc) < 0)
+			fatal("close", errno);
 	}
 
-	if (p == NULL) {
-		PT_CB(io_cb(IO_CB_ERROR, c->obj, "Connection failure [%s]", io_strerror(errno, errbuf, sizeof(errbuf))));
-		freeaddrinfo(res);
-		return IO_ST_RXNG;
-	}
-
-	if ((ret = getnameinfo(p->ai_addr, p->ai_addrlen, c->ip_str, sizeof(c->ip_str), NULL, 0, NI_NUMERICHOST)))
+	if (ret != 0) {
+		PT_CB(io_cb(IO_CB_ERR, c->obj, "Error connecting: %s", io_strerror(errno, errbuf, sizeof(errbuf))));
+		ret_state = IO_ST_RXNG;
+	} else if ((ret = getnameinfo(p->ai_addr, p->ai_addrlen, c->ip_str, sizeof(c->ip_str), NULL, 0, NI_NUMERICHOST))) {
 		snprintf(c->ip_str, sizeof(c->ip_str), "IP loopup failure: %s", gai_strerror(ret));
+	}
 
 	freeaddrinfo(res);
-	return IO_ST_CXED;
+
+	return ret_state;
 }
 
 static enum io_state_t
@@ -528,10 +507,6 @@ io_state_cxed(struct connection *c)
 				return IO_ST_PING;
 			}
 
-			if (errno == EINTR) {
-				return IO_ST_DXED;
-			}
-
 			fatal("recv", errno);
 		} else {
 			io_recv(c, recvbuf, (size_t) ret);
@@ -553,20 +528,21 @@ io_state_ping(struct connection *c)
 
 			if (ret == 0) {
 				PT_CB(io_cb(IO_CB_DXED, c->obj, "Connection closed"));
-				io_close(c);
+				close(c->soc);
 				return IO_ST_CXNG;
 			}
 
+			// EPIPE?
 			if (errno == ECONNRESET) {
 				PT_CB(io_cb(IO_CB_DXED, c->obj, "Connection forcibly reset by peer"));
-				io_close(c);
+				close(c->soc);
 				return IO_ST_CXNG;
 			}
 
 			if (errno == EAGAIN || errno == EWOULDBLOCK) {
 				if ((ping += IO_PING_REFRESH) >= IO_PING_MAX) {
 					PT_CB(io_cb(IO_CB_DXED, c->obj, "Connection lost: ping timeout (%u)", IO_PING_MAX));
-					io_close(c);
+					close(c->soc);
 					return IO_ST_CXNG;
 				} else {
 					PT_CB(io_cb(IO_CB_PING_N, c->obj, ping));
@@ -574,11 +550,7 @@ io_state_ping(struct connection *c)
 				}
 			}
 
-			if (errno == EINTR) {
-				return IO_ST_DXED;
-			} else {
-				fatal("recv", errno);
-			}
+			fatal("recv", errno);
 
 		} else {
 			io_recv(c, recvbuf, (size_t) ret);
@@ -738,7 +710,7 @@ io_init_tty(void)
 	if (atexit(io_term_tty) < 0)
 		fatal("atexit", 0);
 
-	io_tty_winsize();
+	io_tty_winsize(1);
 }
 
 static void
@@ -777,11 +749,11 @@ io_loop(void)
 }
 
 static struct winsize*
-io_tty_winsize(void)
+io_tty_winsize(int force)
 {
 	static struct winsize tty_ws;
 
-	if (flag_sigwinch_ws) {
+	if (flag_sigwinch_ws || force) {
 		flag_sigwinch_ws = 0;
 
 		if (ioctl(0, TIOCGWINSZ, &tty_ws) < 0)
@@ -794,13 +766,13 @@ io_tty_winsize(void)
 unsigned
 io_tty_cols(void)
 {
-	return io_tty_winsize()->ws_col;
+	return io_tty_winsize(0)->ws_col;
 }
 
 unsigned
 io_tty_rows(void)
 {
-	return io_tty_winsize()->ws_row;
+	return io_tty_winsize(0)->ws_row;
 }
 
 const char*

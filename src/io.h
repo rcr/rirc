@@ -93,7 +93,7 @@ enum io_cb_t
 	IO_CB_INVALID,
 	IO_CB_CXED,   /* <const char *fmt>, [args, ...] */
 	IO_CB_DXED,   /* <const char *fmt>, [args, ...] */
-	IO_CB_ERROR,  /* <const char *fmt>, [args, ...] */
+	IO_CB_ERR,    /* <const char *fmt>, [args, ...] */
 	IO_CB_INFO,   /* <const char *fmt>, [args, ...] */
 	IO_CB_PING_0,
 	IO_CB_PING_1, /* <unsigned ping> */

@@ -545,7 +545,7 @@ io_cb(enum io_cb_t type, const void *cb_obj, ...)
 			state_io_dxed(s);
 			_newline(s->channel, 0, "-!!-", va_arg(ap, const char *), ap);
 			break;
-		case IO_CB_ERROR:
+		case IO_CB_ERR:
 			_newline(s->channel, 0, "-!!-", va_arg(ap, const char *), ap);
 			break;
 		case IO_CB_INFO:
