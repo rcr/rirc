@@ -593,6 +593,10 @@ io_thread(void *arg)
 {
 	struct connection *c = arg;
 
+	sigset_t sigset;
+	PT_CF(sigfillset(&sigset));
+	PT_CF(pthread_sigmask(SIG_BLOCK, &sigset, NULL));
+
 	io_lock_wake(&init_lock);
 
 	while (c->state != IO_ST_TERM) {
