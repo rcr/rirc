@@ -2,7 +2,6 @@
 #include <fcntl.h>
 #include <netdb.h>
 #include <pthread.h>
-#include <sched.h>
 #include <signal.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -71,7 +70,12 @@ server_disconnect(struct server *a, int b, int c, char *d)
 #define PT_CF(X) do { int ret; if ((ret = (X)) != 0) fatal((#X), ret); } while (0)
 #define PT_LK(X) PT_CF(pthread_mutex_lock((X)))
 #define PT_UL(X) PT_CF(pthread_mutex_unlock((X)))
-#define PT_CB(X) do { PT_LK(&cb_mutex); (X); PT_UL(&cb_mutex); } while (0)
+#define PT_CB(R, ...) \
+	do { \
+		PT_LK(&cb_mutex); \
+		io_cb((R), __VA_ARGS__); \
+		PT_UL(&cb_mutex); \
+	} while (0)
 
 enum io_err_t
 {
@@ -105,7 +109,7 @@ struct connection
 		IO_ST_SIZE
 	} state;
 	int soc;
-	char ip_str[INET6_ADDRSTRLEN];
+	char ip[INET6_ADDRSTRLEN];
 
 	pthread_mutex_t pt_state_mutex;
 	pthread_t pt_tid;
@@ -135,8 +139,6 @@ static enum io_state_t io_state_cxng(struct connection*);
 static enum io_state_t io_state_cxed(struct connection*);
 static enum io_state_t io_state_ping(struct connection*);
 
-static struct io_lock init_lock;
-
 // TODO
 static pthread_mutex_t cb_mutex;
 static pthread_once_t init_once = PTHREAD_ONCE_INIT;
@@ -163,16 +165,11 @@ io_strerror(int errnum, char *buf, size_t buflen)
 static void
 io_init(void)
 {
-	// TODO: this is just io_lock_init, no? and io_lock_term?
 	pthread_mutexattr_t m_attr;
 
 	PT_CF(pthread_mutexattr_init(&m_attr));
 	PT_CF(pthread_mutexattr_settype(&m_attr, PTHREAD_MUTEX_ERRORCHECK));
-
-	PT_CF(pthread_cond_init(&init_lock.cnd, NULL));
 	PT_CF(pthread_mutex_init(&cb_mutex, &m_attr));
-	PT_CF(pthread_mutex_init(&init_lock.mtx, &m_attr));
-
 	PT_CF(pthread_mutexattr_destroy(&m_attr));
 
 	if (atexit(io_term) != 0)
@@ -188,9 +185,7 @@ io_term(void)
 		fatal("pthread_mutex_trylock", ret);
 
 	PT_UL(&cb_mutex);
-	PT_CF(pthread_cond_destroy(&init_lock.cnd));
 	PT_CF(pthread_mutex_destroy(&cb_mutex));
-	PT_CF(pthread_mutex_destroy(&init_lock.mtx));
 }
 
 static void
@@ -271,8 +266,6 @@ connection(const void *obj, const char *host, const char *port)
 	PT_CF(pthread_create(&(c->pt_tid), &t_attr, io_thread, c));
 	PT_CF(pthread_attr_destroy(&t_attr));
 
-	io_lock_wait(&init_lock, NULL);
-
 	return c;
 }
 
@@ -301,7 +294,7 @@ io_sendf(struct connection *c, const char *fmt, ...)
 	if (len >= sizeof(sendbuf) - 2)
 		return IO_ERR_TRUNC;
 
-	DEBUG_MSG(" >> %s", sendbuf);
+	DEBUG_MSG("send: (%zu) %s", len, sendbuf);
 
 	sendbuf[len++] = '\r';
 	sendbuf[len++] = '\n';
@@ -421,9 +414,9 @@ io_state_rxng(struct connection *c)
 
 	ts.tv_sec += c->rx_backoff;
 
-	PT_CB(io_cb(IO_CB_INFO, c->obj, "Attemping reconnect in %02u:%02u",
+	PT_CB(IO_CB_INFO, c->obj, "Attemping reconnect in %02u:%02u",
 		(c->rx_backoff / 60),
-		(c->rx_backoff % 60)));
+		(c->rx_backoff % 60));
 
 	io_lock_wait(&c->lock, &ts);
 	return IO_ST_CXNG;
@@ -433,7 +426,7 @@ static enum io_state_t
 io_state_cxng(struct connection *c)
 {
 	/* TODO: handle shutdown() on socket at all points, will fatal for now */
-	/* TODO: how to cancel getaddrino? */
+	/* TODO: how to cancel getaddrinfo/getnameinfo? */
 
 	char errbuf[1024];
 	enum io_state_t ret_state = IO_ST_CXED;
@@ -446,14 +439,14 @@ io_state_cxng(struct connection *c)
 		.ai_socktype = SOCK_STREAM
 	};
 
-	PT_CB(io_cb(IO_CB_INFO, c->obj, "Connecting to %s:%s ...", c->host, c->port));
+	PT_CB(IO_CB_INFO, c->obj, "Connecting to %s:%s ...", c->host, c->port);
 
 	if ((ret = getaddrinfo(c->host, c->port, &hints, &res))) {
 
 		if (ret == EAI_SYSTEM)
-			PT_CB(io_cb(IO_CB_ERR, c->obj, "Error resolving host: %s", io_strerror(errno, errbuf, sizeof(errbuf))));
+			PT_CB(IO_CB_ERR, c->obj, "Error resolving host: %s", io_strerror(errno, errbuf, sizeof(errbuf)));
 		else
-			PT_CB(io_cb(IO_CB_ERR, c->obj, "Error resolving host: %s", gai_strerror(ret)));
+			PT_CB(IO_CB_ERR, c->obj, "Error resolving host: %s", gai_strerror(ret));
 
 		return IO_ST_RXNG;
 	}
@@ -463,18 +456,24 @@ io_state_cxng(struct connection *c)
 		if ((c->soc = socket(p->ai_family, p->ai_socktype, p->ai_protocol)) < 0)
 			continue;
 
-		if ((ret = connect(c->soc, p->ai_addr, p->ai_addrlen)) == 0)
+		if (connect(c->soc, p->ai_addr, p->ai_addrlen) == 0)
 			break;
 
 		if (close(c->soc) < 0)
 			fatal("close", errno);
 	}
 
-	if (ret != 0) {
-		PT_CB(io_cb(IO_CB_ERR, c->obj, "Error connecting: %s", io_strerror(errno, errbuf, sizeof(errbuf))));
+	if (p == NULL) {
+		PT_CB(IO_CB_ERR, c->obj, "Error connecting: %s", io_strerror(errno, errbuf, sizeof(errbuf)));
 		ret_state = IO_ST_RXNG;
-	} else if ((ret = getnameinfo(p->ai_addr, p->ai_addrlen, c->ip_str, sizeof(c->ip_str), NULL, 0, NI_NUMERICHOST))) {
-		snprintf(c->ip_str, sizeof(c->ip_str), "IP loopup failure: %s", gai_strerror(ret));
+	} else if (getnameinfo(p->ai_addr, p->ai_addrlen, c->ip, sizeof(c->ip), NULL, 0, NI_NUMERICHOST)) {
+
+		if (ret == EAI_SYSTEM)
+			PT_CB(IO_CB_ERR, c->obj, "Error resolving numeric host: %s", io_strerror(errno, errbuf, sizeof(errbuf)));
+		else
+			PT_CB(IO_CB_ERR, c->obj, "Error resolving numeric host: %s", gai_strerror(ret));
+
+		*c->ip = 0;
 	}
 
 	freeaddrinfo(res);
@@ -494,12 +493,13 @@ io_state_cxed(struct connection *c)
 		if ((ret = recv(c->soc, recvbuf, sizeof(recvbuf), 0)) <= 0) {
 
 			if (ret == 0) {
-				PT_CB(io_cb(IO_CB_DXED, c->obj, "Connection closed"));
+				PT_CB(IO_CB_DXED, c->obj, "Connection closed");
 				return IO_ST_CXNG;
 			}
 
+			// EPIPE?
 			if (errno == ECONNRESET) {
-				PT_CB(io_cb(IO_CB_DXED, c->obj, "Connection forcibly reset by peer"));
+				PT_CB(IO_CB_DXED, c->obj, "Connection forcibly reset by peer");
 				return IO_ST_CXNG;
 			}
 
@@ -527,25 +527,25 @@ io_state_ping(struct connection *c)
 		if ((ret = recv(c->soc, recvbuf, sizeof(recvbuf), 0)) <= 0) {
 
 			if (ret == 0) {
-				PT_CB(io_cb(IO_CB_DXED, c->obj, "Connection closed"));
+				PT_CB(IO_CB_DXED, c->obj, "Connection closed");
 				close(c->soc);
 				return IO_ST_CXNG;
 			}
 
 			// EPIPE?
 			if (errno == ECONNRESET) {
-				PT_CB(io_cb(IO_CB_DXED, c->obj, "Connection forcibly reset by peer"));
+				PT_CB(IO_CB_DXED, c->obj, "Connection forcibly reset by peer");
 				close(c->soc);
 				return IO_ST_CXNG;
 			}
 
 			if (errno == EAGAIN || errno == EWOULDBLOCK) {
 				if ((ping += IO_PING_REFRESH) >= IO_PING_MAX) {
-					PT_CB(io_cb(IO_CB_DXED, c->obj, "Connection lost: ping timeout (%u)", IO_PING_MAX));
+					PT_CB(IO_CB_DXED, c->obj, "Connection lost: ping timeout (%u)", IO_PING_MAX);
 					close(c->soc);
 					return IO_ST_CXNG;
 				} else {
-					PT_CB(io_cb(IO_CB_PING_N, c->obj, ping));
+					PT_CB(IO_CB_PING_N, c->obj, ping);
 					continue;
 				}
 			}
@@ -568,8 +568,6 @@ io_thread(void *arg)
 	sigset_t sigset;
 	PT_CF(sigfillset(&sigset));
 	PT_CF(pthread_sigmask(SIG_BLOCK, &sigset, NULL));
-
-	io_lock_wake(&init_lock);
 
 	while (c->state != IO_ST_TERM) {
 
@@ -613,13 +611,13 @@ io_thread(void *arg)
 		/* TODO: state table here */
 
 		if (o_state == IO_ST_PING && n_state == IO_ST_CXED)
-			PT_CB(io_cb(IO_CB_PING_0, c->obj));
-
-		if (o_state == IO_ST_CXNG && n_state == IO_ST_CXED)
-			PT_CB(io_cb(IO_CB_CXED, c->obj, "Connected to %s [%s]", c->host, c->ip_str));
+			PT_CB(IO_CB_PING_0, c->obj);
 
 		if (o_state == IO_ST_CXED && n_state == IO_ST_PING)
-			PT_CB(io_cb(IO_CB_PING_1, c->obj, IO_PING_MIN));
+			PT_CB(IO_CB_PING_1, c->obj, IO_PING_MIN);
+
+		if (o_state == IO_ST_CXNG && n_state == IO_ST_CXED)
+			PT_CB(IO_CB_CXED, c->obj, "Connected to %s [%s]", c->host, c->ip);
 
 		if (n_state == IO_ST_DXED || (o_state == IO_ST_CXNG && n_state == IO_ST_CXED))
 			c->rx_backoff = 0;
@@ -645,8 +643,10 @@ io_recv(struct connection *c, char *buf, size_t n)
 			c->read.buf[--c->read.i] = 0;
 
 			if (c->read.i) {
-				DEBUG_MSG(" << %s", c->read.buf);
-				PT_CB(io_cb_read_soc(c->read.buf, c->read.i - 1, c->obj));
+				DEBUG_MSG("recv: (%zu) %s", c->read.i, c->read.buf);
+				PT_LK(&cb_mutex);
+				io_cb_read_soc(c->read.buf, c->read.i - 1, c->obj);
+				PT_UL(&cb_mutex);
 				c->read.i = 0;
 			}
 		} else {
@@ -732,14 +732,17 @@ io_loop(void)
 		char buf[512];
 		ssize_t ret = read(STDIN_FILENO, buf, sizeof(buf));
 
-		if (ret > 0)
-			PT_CB(io_cb_read_inp(buf, ret));
+		if (ret > 0) {
+			PT_LK(&cb_mutex);
+			io_cb_read_inp(buf, ret);
+			PT_UL(&cb_mutex);
+		}
 
 		if (ret <= 0) {
 			if (errno == EINTR) {
 				if (flag_sigwinch_cb) {
 					flag_sigwinch_cb = 0;
-					PT_CB(io_cb(IO_CB_SIGNAL, NULL, IO_SIGWINCH));
+					PT_CB(IO_CB_SIGNAL, NULL, IO_SIGWINCH);
 				}
 			} else {
 				fatal("read", ret ? errno : 0);

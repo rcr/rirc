@@ -575,7 +575,9 @@ io_cb_read_inp(char *buff, size_t count)
 {
 	input(ccur->input, buff, count);
 
-	/* FIXME: */
+	/* FIXME:
+	 * can't send when cursor at position 0
+	 */
 	draw_input();
 	redraw();
 }

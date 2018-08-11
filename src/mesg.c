@@ -477,7 +477,7 @@ send_join(char *mesg, struct server *s, struct channel *c)
 	char *targ;
 
 	if ((targ = getarg(&mesg, " "))) {
-		if ((ret = io_sendf(s->connection, "JOIN %s", c->name.str)))
+		if ((ret = io_sendf(s->connection, "JOIN %s", targ)))
 			failf(c, "sendf fail: %s", io_err(ret));
 	} else {
 		if (c->buffer.type == BUFFER_SERVER)
