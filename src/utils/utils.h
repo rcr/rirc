@@ -55,6 +55,7 @@ extern int fatal_exit;
 #define MIN(A, B) ((A) > (B) ? (B) : (A))
 
 #define ELEMS(X) (sizeof((X)) / sizeof((X)[0]))
+#define ARR_ELEM(A, E) ((E) >= 0 && (size_t)(E) < ELEMS((A)))
 
 #define UNUSED(X) ((void)(X))
 

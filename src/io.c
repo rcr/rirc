@@ -83,7 +83,8 @@ enum io_err_t
 	IO_ERR_TRUNC,
 	IO_ERR_DXED,
 	IO_ERR_CXNG,
-	IO_ERR_CXED
+	IO_ERR_CXED,
+	IO_ERR_TERM
 };
 
 struct io_lock
@@ -107,10 +108,10 @@ struct connection
 		IO_ST_PING, /* Socket connected, network state in question */
 		IO_ST_TERM, /* Terminal thread state */
 		IO_ST_SIZE
-	} state;
+	} state_c, /* current thread state */
+	  state_f; /* forced thread state */
 	char ip[INET6_ADDRSTRLEN];
 	int soc;
-	pthread_mutex_t pt_state_mutex;
 	pthread_t pt_tid;
 	struct {
 		size_t i;
@@ -123,6 +124,7 @@ struct connection
 static char* io_strerror(int, char*, size_t);
 static struct winsize* io_tty_winsize(int);
 static void io_close(int*);
+static void io_shutdown(int);
 static void io_init(void);
 static void io_init_sig(void);
 static void io_init_tty(void);
@@ -162,13 +164,19 @@ io_strerror(int errnum, char *buf, size_t buflen)
 static void
 io_close(int *soc)
 {
-	int ret, _soc = *soc;
-
-	if (_soc >= 0 && (ret = close(_soc)) < 0) {
+	if (*soc >= 0 && close(*soc) < 0) {
 		fatal("close", errno);
 	}
 
 	*soc = -1;
+}
+
+static void
+io_shutdown(int soc)
+{
+	if (soc >= 0 && shutdown(soc, SHUT_RDWR) < 0) {
+		fatal("shutdown", errno);
+	}
 }
 
 static void
@@ -203,7 +211,7 @@ io_lock_init(struct io_lock *lock)
 	pthread_mutexattr_t m_attr;
 
 	PT_CF(pthread_mutexattr_init(&m_attr));
-	PT_CF(pthread_mutexattr_settype(&m_attr, PTHREAD_MUTEX_ERRORCHECK));
+	PT_CF(pthread_mutexattr_settype(&m_attr, PTHREAD_MUTEX_RECURSIVE));
 
 	PT_CF(pthread_cond_init(&(lock->cnd), NULL));
 	PT_CF(pthread_mutex_init(&(lock->mtx), &m_attr));
@@ -263,7 +271,8 @@ connection(const void *obj, const char *host, const char *port)
 	c->obj = obj;
 	c->host = strdup(host);
 	c->port = strdup(port);
-	c->state = IO_ST_DXED;
+	c->state_c = IO_ST_DXED;
+	c->state_f = IO_ST_INVALID;
 	io_lock_init(&(c->lock));
 
 	PT_CF(pthread_once(&init_once, io_init));
@@ -287,7 +296,7 @@ io_sendf(struct connection *c, const char *fmt, ...)
 	int ret;
 	size_t len;
 
-	if (c->state != IO_ST_CXED && c->state != IO_ST_PING)
+	if (c->state_c != IO_ST_CXED && c->state_c != IO_ST_PING)
 		return IO_ERR_DXED;
 
 	va_start(ap, fmt);
@@ -321,33 +330,36 @@ io_cx(struct connection *c)
 	/* Force a socket thread into IO_ST_CXNG state
 	 *
 	 * Valid only for states blocked on:
-	 *   - IO_ST_DXED: pthread_cond_wait()
-	 *   - IO_ST_RXNG: pthread_cond_timedwait()
+	 *   - IO_ST_DXED: io_lock_wait()
+	 *   - IO_ST_RXNG: io_lock_wait()
 	 */
 
-	enum io_err_t ret = IO_ERR_NONE;
+	PT_LK(&(c->lock.mtx));
+	enum io_err_t err = IO_ERR_NONE;
 
-	PT_LK(&(c->pt_state_mutex));
-
-	switch (c->state) {
+	switch (c->state_c) {
 		case IO_ST_DXED:
 		case IO_ST_RXNG:
+			c->state_f = IO_ST_CXNG;
 			io_lock_wake(&c->lock);
 			break;
 		case IO_ST_CXNG:
-			ret = IO_ERR_CXNG;
+			err = IO_ERR_CXNG;
 			break;
 		case IO_ST_CXED:
 		case IO_ST_PING:
-			ret = IO_ERR_CXED;
+			err = IO_ERR_CXED;
+			break;
+		case IO_ST_TERM:
+			err = IO_ERR_TERM;
 			break;
 		default:
 			fatal("Unknown net state", 0);
 	}
 
-	PT_UL(&(c->pt_state_mutex));
+	PT_UL(&(c->lock.mtx));
 
-	return ret;
+	return err;
 }
 
 int
@@ -356,47 +368,44 @@ io_dx(struct connection *c)
 	/* Force a socket thread into IO_ST_DXED state
 	 *
 	 * Valid only for states blocked on:
-	 *   - IO_ST_RXNG: pthread_cond_timedwait()
+	 *   - IO_ST_RXNG: io_lock_wait()
 	 *   - IO_ST_CXNG: connect()
 	 *   - IO_ST_CXED: recv()
 	 *   - IO_ST_PING: recv()
 	 */
 
-	enum io_err_t ret = IO_ERR_NONE;
-	enum io_state_t state;
+	PT_LK(&(c->lock.mtx));
+	enum io_err_t err = IO_ERR_NONE;
 
-	PT_LK(&(c->pt_state_mutex));
-	state = c->state;
-	PT_UL(&(c->pt_state_mutex));
-
-	switch (state) {
+	switch (c->state_c) {
 		case IO_ST_DXED:
-			ret = IO_ERR_DXED;
+			err = IO_ERR_DXED;
 			break;
 		case IO_ST_RXNG:
+			c->state_f = IO_ST_DXED;
 			io_lock_wake(&(c->lock));
 			break;
 		case IO_ST_CXNG:
-			/* TODO */
-			break;
 		case IO_ST_CXED:
 		case IO_ST_PING:
-			if (shutdown(c->soc, SHUT_RDWR) < 0)
-				fatal("shutdown", errno);
+			c->state_f = IO_ST_DXED;
+			io_shutdown(c->soc);
+			break;
+		case IO_ST_TERM:
+			err = IO_ERR_TERM;
 			break;
 		default:
 			fatal("Unknown net state", 0);
 	}
 
-	return ret;
+	PT_UL(&(c->lock.mtx));
+
+	return err;
 }
 
 void
 io_free(struct connection *c)
 {
-	/* TODO: this should basically be the
-	 * same as io_cx in the syn/ack sence, but just
-	 * set the new state to TERM, as iocx/dx set to CXNG/DXED */
 	(void)(c); /* TODO */
 }
 
@@ -475,7 +484,6 @@ io_state_cxng(struct connection *c)
 			break;
 
 		io_close(&soc);
-
 		soc = -1;
 	}
 
@@ -577,62 +585,55 @@ io_thread(void *arg)
 	PT_CF(sigfillset(&sigset));
 	PT_CF(pthread_sigmask(SIG_BLOCK, &sigset, NULL));
 
-	while (c->state != IO_ST_TERM) {
+	for (;;) {
 
-		enum io_state_t o_state,
-		                n_state;
+		enum io_state_t st_f, /* transition state from */
+		                st_t; /* transition state to */
 
-#if 0
-		enum io_state_t (*const io_state_fns[])(struct connection*) = {
+		enum io_state_t (*const st_fns[])(struct connection*) = {
 			[IO_ST_DXED] = io_state_dxed,
 			[IO_ST_CXNG] = io_state_cxng,
 			[IO_ST_RXNG] = io_state_rxng,
 			[IO_ST_CXED] = io_state_cxed,
 			[IO_ST_PING] = io_state_ping,
 		};
-#endif
 
-		switch ((o_state = c->state)) {
-			case IO_ST_DXED:
-				n_state = io_state_dxed(c);
-				break;
-			case IO_ST_CXNG:
-				n_state = io_state_cxng(c);
-				break;
-			case IO_ST_RXNG:
-				n_state = io_state_rxng(c);
-				break;
-			case IO_ST_CXED:
-				n_state = io_state_cxed(c);
-				break;
-			case IO_ST_PING:
-				n_state = io_state_ping(c);
-				break;
-			case IO_ST_TERM:
-				goto end_thread;
-			default:
-				fatal("Unknown net state", 0);
+		st_f = c->state_c;
+
+		if (!ARR_ELEM(st_fns, st_f) || !st_fns[st_f])
+			fatal("invalid state", 0);
+
+		st_t = st_fns[st_f](c);
+
+		PT_LK(&(c->lock.mtx));
+
+		if (c->state_f != IO_ST_INVALID) {
+			c->state_c = c->state_f;
+			c->state_f = IO_ST_INVALID;
+		} else {
+			c->state_c = st_t;
 		}
 
-		c->state = n_state;
+		PT_UL(&(c->lock.mtx));
 
-		/* TODO: state table here */
+		if (c->state_c == IO_ST_TERM)
+			break;
 
-		if (o_state == IO_ST_PING && n_state == IO_ST_CXED)
+		if (st_f == IO_ST_PING && st_t == IO_ST_CXED)
 			PT_CB(IO_CB_PING_0, c->obj);
 
-		if (o_state == IO_ST_CXED && n_state == IO_ST_PING)
+		if (st_f == IO_ST_CXED && st_t == IO_ST_PING)
 			PT_CB(IO_CB_PING_1, c->obj, IO_PING_MIN);
 
-		if (o_state == IO_ST_CXNG && n_state == IO_ST_CXED)
+		if (st_f == IO_ST_CXNG && st_t == IO_ST_CXED)
 			PT_CB(IO_CB_CXED, c->obj, "Connected to %s [%s]", c->host, c->ip);
 
-		if (n_state == IO_ST_DXED || (o_state == IO_ST_CXNG && n_state == IO_ST_CXED))
+		if (st_t == IO_ST_DXED || (st_f == IO_ST_CXNG && st_t == IO_ST_CXED))
 			c->rx_backoff = 0;
 	}
 
-end_thread:
-
+	io_shutdown(c->soc);
+	io_close(&(c->soc));
 	io_lock_term(&(c->lock));
 
 	free((void*)c->host);
@@ -794,12 +795,13 @@ io_err(int err)
 		[IO_ERR_TRUNC] = "data truncated",
 		[IO_ERR_DXED]  = "socket not connected",
 		[IO_ERR_CXNG]  = "socket connection in progress",
-		[IO_ERR_CXED]  = "socket connected"
+		[IO_ERR_CXED]  = "socket connected",
+		[IO_ERR_TERM]  = "thread is terminating"
 	};
 
 	const char *err_str = NULL;
 
-	if (err >= 0 && (size_t) err < ELEMS(err_strs))
+	if (ARR_ELEM(err_strs, err))
 		err_str = err_strs[err];
 
 	return err_str ? err_str : "unknown error";

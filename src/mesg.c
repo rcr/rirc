@@ -409,6 +409,14 @@ send_disconnect(char *mesg, struct server *s, struct channel *c)
 {
 	/* /disconnect [quit message] */
 
+	int ret;
+
+	// TODO: send quit message
+
+	if ((ret = io_dx(s->connection))) {
+		failf(c, "Error: %s", io_err(ret));
+	}
+
 	// FIXME:
 	UNUSED(mesg);
 	UNUSED(s);
