@@ -67,7 +67,7 @@ server_disconnect(struct server *a, int b, int c, char *d)
 	#error "IO_RECONNECT_BACKOFF_MAX: [0, 86400]"
 #endif
 
-#define PT_CF(X) do { int ret; if ((ret = (X)) != 0) fatal((#X), ret); } while (0)
+#define PT_CF(X) do { int ret; if ((ret = (X)) < 0) fatal((#X), ret); } while (0)
 #define PT_LK(X) PT_CF(pthread_mutex_lock((X)))
 #define PT_UL(X) PT_CF(pthread_mutex_unlock((X)))
 #define PT_CB(R, ...) \
@@ -106,8 +106,7 @@ struct connection
 		IO_ST_CXNG, /* Socket connection in progress */
 		IO_ST_CXED, /* Socket connected */
 		IO_ST_PING, /* Socket connected, network state in question */
-		IO_ST_TERM, /* Terminal thread state */
-		IO_ST_SIZE
+		IO_ST_TERM /* Terminal thread state */
 	} state_c, /* current thread state */
 	  state_f; /* forced thread state */
 	char ip[INET6_ADDRSTRLEN];
@@ -478,10 +477,9 @@ io_state_cxng(struct connection *c)
 			break;
 
 		io_close(&soc);
-		soc = -1;
 	}
 
-	if (soc == -1) {
+	if (p == NULL) {
 		PT_CB(IO_CB_ERR, c->obj, "Error connecting: %s", io_strerror(errno, errbuf, sizeof(errbuf)));
 		freeaddrinfo(res);
 		return IO_ST_RXNG;
@@ -585,11 +583,13 @@ io_thread(void *arg)
 		                st_t; /* transition state to */
 
 		enum io_state_t (*const st_fns[])(struct connection*) = {
-			[IO_ST_DXED] = io_state_dxed,
-			[IO_ST_CXNG] = io_state_cxng,
-			[IO_ST_RXNG] = io_state_rxng,
-			[IO_ST_CXED] = io_state_cxed,
-			[IO_ST_PING] = io_state_ping,
+			[IO_ST_INVALID] = NULL,
+			[IO_ST_DXED]    = io_state_dxed,
+			[IO_ST_CXNG]    = io_state_cxng,
+			[IO_ST_RXNG]    = io_state_rxng,
+			[IO_ST_CXED]    = io_state_cxed,
+			[IO_ST_PING]    = io_state_ping,
+			[IO_ST_TERM]    = NULL,
 		};
 
 		st_f = c->state_c;
