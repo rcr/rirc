@@ -409,6 +409,14 @@ send_disconnect(char *mesg, struct server *s, struct channel *c)
 {
 	/* /disconnect [quit message] */
 
+	int ret;
+
+	// TODO: send quit message
+
+	if ((ret = io_dx(s->connection))) {
+		failf(c, "Error: %s", io_err(ret));
+	}
+
 	// FIXME:
 	UNUSED(mesg);
 	UNUSED(s);
@@ -477,7 +485,7 @@ send_join(char *mesg, struct server *s, struct channel *c)
 	char *targ;
 
 	if ((targ = getarg(&mesg, " "))) {
-		if ((ret = io_sendf(s->connection, "JOIN %s", c->name.str)))
+		if ((ret = io_sendf(s->connection, "JOIN %s", targ)))
 			failf(c, "sendf fail: %s", io_err(ret));
 	} else {
 		if (c->buffer.type == BUFFER_SERVER)

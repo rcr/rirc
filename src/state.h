@@ -19,12 +19,6 @@ struct channel* current_channel(void);
 
 struct server_list* state_server_list(void);
 
-//TODO: rename
-unsigned int _term_cols(void);
-unsigned int _term_rows(void);
-
-void resize(void);
-
 void init_state(void);
 
 //TODO: move to channel.c, function of server's channel list

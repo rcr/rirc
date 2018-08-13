@@ -25,6 +25,7 @@
 #include <unistd.h>
 
 #include "src/components/input.h"
+#include "src/io.h"
 #include "src/state.h"
 #include "src/utils/utils.h"
 
@@ -446,7 +447,7 @@ reframe_line(struct input *in)
 
 	in->head = in->line->end;
 	in->tail = in->line->text + RIRC_MAX_INPUT;
-	in->window = in->head - (2 * _term_cols() / 3);
+	in->window = in->head - (2 * io_tty_cols() / 3);
 
 	if (in->window < in->line->text)
 		in->window = in->line->text;
