@@ -132,6 +132,7 @@ static void io_recv(struct connection*, char*, size_t);
 static void io_term(void);
 static void io_term_tty(void);
 static void* io_thread(void*);
+static void io_state_force(struct connection*, enum io_state_t);
 
 static enum io_state_t io_state_dxed(struct connection*);
 static enum io_state_t io_state_rxng(struct connection*);
@@ -327,34 +328,19 @@ io_sendf(struct connection *c, const char *fmt, ...)
 int
 io_cx(struct connection *c)
 {
-	/* Force a socket thread into IO_ST_CXNG state
-	 *
-	 * Valid only for states blocked on:
-	 *   - IO_ST_DXED: io_lock_wait()
-	 *   - IO_ST_RXNG: io_lock_wait()
-	 */
+	/* Force a socket thread into IO_ST_CXNG state */
 
-	PT_LK(&(c->lock.mtx));
 	enum io_err_t err = IO_ERR_NONE;
 
+	PT_LK(&(c->lock.mtx));
+
 	switch (c->state_c) {
-		case IO_ST_DXED:
-		case IO_ST_RXNG:
-			c->state_f = IO_ST_CXNG;
-			io_lock_wake(&c->lock);
-			break;
-		case IO_ST_CXNG:
-			err = IO_ERR_CXNG;
-			break;
-		case IO_ST_CXED:
-		case IO_ST_PING:
-			err = IO_ERR_CXED;
-			break;
-		case IO_ST_TERM:
-			err = IO_ERR_TERM;
-			break;
+		case IO_ST_CXNG: err = IO_ERR_CXNG; break;
+		case IO_ST_CXED: err = IO_ERR_CXED; break;
+		case IO_ST_PING: err = IO_ERR_CXED; break;
+		case IO_ST_TERM: err = IO_ERR_TERM; break;
 		default:
-			fatal("Unknown net state", 0);
+			io_state_force(c, IO_ST_CXNG);
 	}
 
 	PT_UL(&(c->lock.mtx));
@@ -365,37 +351,17 @@ io_cx(struct connection *c)
 int
 io_dx(struct connection *c)
 {
-	/* Force a socket thread into IO_ST_DXED state
-	 *
-	 * Valid only for states blocked on:
-	 *   - IO_ST_RXNG: io_lock_wait()
-	 *   - IO_ST_CXNG: connect()
-	 *   - IO_ST_CXED: recv()
-	 *   - IO_ST_PING: recv()
-	 */
+	/* Force a socket thread into IO_ST_DXED state */
 
-	PT_LK(&(c->lock.mtx));
 	enum io_err_t err = IO_ERR_NONE;
 
+	PT_LK(&(c->lock.mtx));
+
 	switch (c->state_c) {
-		case IO_ST_DXED:
-			err = IO_ERR_DXED;
-			break;
-		case IO_ST_RXNG:
-			c->state_f = IO_ST_DXED;
-			io_lock_wake(&(c->lock));
-			break;
-		case IO_ST_CXNG:
-		case IO_ST_CXED:
-		case IO_ST_PING:
-			c->state_f = IO_ST_DXED;
-			io_shutdown(c->soc);
-			break;
-		case IO_ST_TERM:
-			err = IO_ERR_TERM;
-			break;
+		case IO_ST_DXED: err = IO_ERR_DXED; break;
+		case IO_ST_TERM: err = IO_ERR_TERM; break;
 		default:
-			fatal("Unknown net state", 0);
+			io_state_force(c, IO_ST_DXED);
 	}
 
 	PT_UL(&(c->lock.mtx));
@@ -406,7 +372,35 @@ io_dx(struct connection *c)
 void
 io_free(struct connection *c)
 {
-	(void)(c); /* TODO */
+	/* Force a socket thread into the IO_ST_TERM state */
+
+	PT_LK(&(c->lock.mtx));
+	io_state_force(c, IO_ST_TERM);
+	PT_UL(&(c->lock.mtx));
+}
+
+static void
+io_state_force(struct connection *c, enum io_state_t state_f)
+{
+	/* Wake and force a connection thread's state */
+
+	c->state_f = state_f;
+
+	switch (c->state_c) {
+		case IO_ST_DXED: /* io_lock_wait() */
+		case IO_ST_RXNG: /* io_lock_wait() */
+			io_lock_wake(&(c->lock));
+			break;
+		case IO_ST_CXNG: /* connect() */
+		case IO_ST_CXED: /* recv() */
+		case IO_ST_PING: /* recv() */
+			io_shutdown(c->soc);
+			break;
+		case IO_ST_TERM:
+			break;
+		default:
+			fatal("Unknown net state", 0);
+	}
 }
 
 static enum io_state_t
@@ -547,7 +541,7 @@ io_state_ping(struct connection *c)
 	char errbuf[1024];
 	char recvbuf[IO_MESG_LEN];
 	ssize_t ret;
-	unsigned ping = 0;
+	unsigned ping = IO_PING_MIN;
 
 	for (;;) {
 
