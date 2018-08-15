@@ -224,14 +224,21 @@ action_close_server(char c)
 
 	if (c == 'y' || c == 'Y') {
 
-		//FIXME: logic here sucks
+		int ret;
 		struct channel *c = ccur;
+		struct server *s = c->server;
 
 		/* If closing the last server */
 		if ((state.current_channel = c->server->next->channel) == c->server->channel)
 			state.current_channel = state.default_channel;
 
-		server_disconnect(c->server, 0, 1, DEFAULT_QUIT_MESG);
+		if ((ret = io_sendf(s->connection, "QUIT %s", DEFAULT_QUIT_MESG)))
+			newlinef(s->channel, 0, "-!!-", "sendf fail: %s", io_err(ret));
+
+		io_dx(s->connection);
+		server_list_del(state_server_list(), s);
+		io_free(s->connection);
+		server_free(s);
 
 		draw_all();
 
@@ -576,6 +583,11 @@ io_cb_read_inp(char *buff, size_t count)
 	input(ccur->input, buff, count);
 
 	/* FIXME:
+	 *
+	 *
+	 * needs to be done before moving /quit -> :quit
+	 * where the former just sends a QUIT message but keeps the buffers open
+	 *
 	 * can't send when cursor at position 0
 	 */
 	draw_input();
@@ -585,7 +597,9 @@ io_cb_read_inp(char *buff, size_t count)
 void
 io_cb_read_soc(char *buff, size_t count, const void *cb_obj)
 {
+	/* TODO: */
 	(void)(count);
+
 	struct channel *c = ((struct server *)cb_obj)->channel;
 
 	struct parsed_mesg p;

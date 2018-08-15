@@ -18,16 +18,6 @@
 #include "src/io.h"
 #include "utils/utils.h"
 
-void
-server_disconnect(struct server *a, int b, int c, char *d)
-{
-	(void)a;
-	(void)b;
-	(void)c;
-	(void)d;
-	fatal("Not implemented", 0);
-}
-
 /* RFC 2812, section 2.3 */
 #define IO_MESG_LEN 512
 

@@ -78,9 +78,6 @@ static int recv_ctcp_rpl(struct parsed_mesg*, struct server*);
 /* Special case handler for numeric replies */
 static int recv_numeric(struct parsed_mesg*, struct server*);
 
-/* Handler for errors deemed fatal to a server's state */
-static void server_fatal(struct server*, char*, ...);
-
 static int recv_mode_chanmodes(struct parsed_mesg*, const struct mode_config*, struct channel*);
 static int recv_mode_usermodes(struct parsed_mesg*, const struct mode_config*, struct server*);
 
@@ -119,24 +116,9 @@ enum numeric {
 };
 
 
-/* TODO: remove this, call fail */
-static void
-server_fatal(struct server *s, char *fmt, ...)
-{
-	/* Encountered an error fatal to a server, disconnect and begin a reconnect */
-	char errbuf[512];
-	va_list ap;
-
-	va_start(ap, fmt);
-	vsnprintf(errbuf, sizeof(errbuf), fmt, ap);
-	va_end(ap);
-
-	server_disconnect(s, 1, 0, errbuf);
-}
-
 /*
  * Message sending handlers
- * */
+ */
 
 struct send_handler
 {
@@ -652,6 +634,18 @@ send_quit(char *mesg, struct server *s, struct channel *c)
 
 	UNUSED(c);
 
+	/* FIXME:
+	 *
+	 * This should send QUIT and keep servers open.
+	 *
+	 * `:quit` should exit the program
+	 *
+	 */
+	(void)mesg;
+	(void)s;
+	(void)c;
+
+#if 0
 	struct server *t;
 
 	if (s) do {
@@ -659,9 +653,9 @@ send_quit(char *mesg, struct server *s, struct channel *c)
 		s = s->next;
 		server_disconnect(t, 0, 1, (*mesg) ? mesg : DEFAULT_QUIT_MESG);
 	} while (t != s);
+#endif
 
 	exit(EXIT_SUCCESS);
-
 	return 0;
 }
 
@@ -692,7 +686,7 @@ send_version(char *mesg, struct server *s, struct channel *c)
 
 /*
  * Message receiving handlers
- * */
+ */
 
 struct recv_handler
 {
@@ -966,7 +960,16 @@ recv_error(struct parsed_mesg *p, struct server *s)
 {
 	/* ERROR :<message> */
 
-	server_disconnect(s, 1, 0, p->trailing ? p->trailing : "Remote hangup");
+	struct channel *c = s->channel;
+
+	newlinef(c, 0, "ERROR", "%s", (p->trailing ? p->trailing : "Remote hangup"));
+
+	for (c = c->next; c != s->channel; c = c->next) {
+		newlinef(c, 0, "-!!-", "(disconnected)");
+		c = c->next;
+	}
+
+	io_dx(s->connection);
 
 	return 0;
 }
@@ -976,7 +979,6 @@ recv_join(struct parsed_mesg *p, struct server *s)
 {
 	/* :nick!user@hostname.domain JOIN [:]<channel> */
 
-	//FIXME: chan / targ
 	char *chan;
 	struct channel *c;
 
@@ -1035,7 +1037,7 @@ recv_kick(struct parsed_mesg *p, struct server *s)
 	 *
 	 * If a "comment" is given, this will be sent instead of the default message,
 	 * the nickname of the user issuing the KICK.
-	 * */
+	 */
 	if (!strcmp(p->from, p->trailing))
 		p->trailing = NULL;
 
@@ -1384,14 +1386,15 @@ recv_numeric(struct parsed_mesg *p, struct server *s)
 
 	/* Message target is only used to establish s->nick when registering with a server */
 	if (!(targ = getarg(&p->params, " "))) {
-		server_fatal(s, "NUMERIC: target is null");
+		io_dx(s->connection);
+		fail(s->channel, "NUMERIC: target is null");
 		return 1;
 	}
 
 	/* Message target should match s->nick or '*' if unregistered, otherwise out of sync */
 	if (strcmp(targ, s->nick) && strcmp(targ, "*") && code != RPL_WELCOME) {
-		server_fatal(s, "NUMERIC: target mismatched, nick is '%s', received '%s'", s->nick, targ);
-		return 1;
+		io_dx(s->connection);
+		failf(s->channel, "NUMERIC: target mismatched, nick is '%s', received '%s'", s->nick, targ);
 	}
 
 	switch (code) {
