@@ -43,4 +43,11 @@ extern char *action_message;
 /* TODO: return state altering function */
 int input(struct input*, const char*, size_t);
 
+/* FIXME: */
+void _send_input(struct input*, char*);
+
+
+
+int input_empty(struct input*);
+
 #endif

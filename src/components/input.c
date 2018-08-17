@@ -72,9 +72,6 @@ static void tab_complete_command(struct input*, char*, size_t);
 static void tab_complete_nick(struct input*, char*, size_t);
 static void tab_complete(struct input*);
 
-/* Send the current input to be parsed and handled */
-static void send_input(void);
-
 /* Input line manipulation functions */
 static inline void cursor_left(struct input*);
 static inline void cursor_right(struct input*);
@@ -236,11 +233,6 @@ input_cchar(const char *c, size_t count)
 		/* Horizontal tab */
 		case 0x09:
 			tab_complete(ccur->input);
-			break;
-
-		/* Line feed */
-		case 0x0A:
-			send_input();
 			break;
 
 		/* ^C */
@@ -639,23 +631,16 @@ tab_complete_nick(struct input *inp, char *str, size_t len)
  * Input sending functions
  * */
 
-/* TODO: pass channel into this function too */
-static void
-send_input(void)
+void
+_send_input(struct input *in, char *buf)
 {
-	char sendbuff[BUFFSIZE];
-
-	struct input *in = ccur->input;
+	/* FIXME: refactoring WIP */
 
 	/* Before sending, copy the tail of the gap buffer back to the head */
 	reset_line(in);
 
-	/* After resetting, check for empty line */
-	if (in->head == in->line->text)
-		return;
-
 	/* Pass a copy of the message to the send handler, since it may modify the contents */
-	strcpy(sendbuff, in->line->text);
+	strcpy(buf, in->line->text);
 
 	/* Now check if the sent line was 'new' or was resent input scrollback
 	 *
@@ -696,7 +681,11 @@ send_input(void)
 	}
 
 	draw_input();
+}
 
-	/* Send the message last; the channel might be closed as a result of the command */
-	send_mesg(ccur->server, ccur, sendbuff);
+int
+input_empty(struct input *in)
+{
+	/* FIXME: if cursor is 0 this is wrong */
+	return (in->head == in->line->text);
 }

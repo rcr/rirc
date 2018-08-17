@@ -577,19 +577,46 @@ io_cb(enum io_cb_t type, const void *cb_obj, ...)
 	redraw();
 }
 
+static void
+send_cmnd(struct channel *c, char *buf)
+{
+	const char *cmnd;
+
+	if (!(cmnd = getarg(&buf, " "))) {
+		newline(c, 0, "-!!-", "Messages beginning with ':' require a command");
+		return;
+	}
+
+	if (!strcasecmp(cmnd, "quit")) {
+		/* TODO: close servers, free */
+		exit(EXIT_SUCCESS);
+	}
+}
+
 void
 io_cb_read_inp(char *buff, size_t count)
 {
-	input(ccur->input, buff, count);
+	/* Line feed */
+	if (*buff == 0x0A) {
 
-	/* FIXME:
-	 *
-	 *
-	 * needs to be done before moving /quit -> :quit
-	 * where the former just sends a QUIT message but keeps the buffers open
-	 *
-	 * can't send when cursor at position 0
-	 */
+		char sendbuf[BUFFSIZE];
+
+		if (input_empty(state.current_channel->input))
+			return;
+
+		_send_input(state.current_channel->input, sendbuf);
+
+		switch (sendbuf[0]) {
+			case ':':
+				send_cmnd(state.current_channel, sendbuf + 1);
+				break;
+			default:
+				send_mesg(ccur->server, ccur, sendbuf);
+		}
+	} else {
+		input(ccur->input, buff, count);
+	}
+
 	draw_input();
 	redraw();
 }

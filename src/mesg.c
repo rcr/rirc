@@ -630,32 +630,16 @@ send_unignore(char *mesg, struct server *s, struct channel *c)
 static int
 send_quit(char *mesg, struct server *s, struct channel *c)
 {
-	/* /quit [quit message] */
+	/* /quit :[quit message] */
 
-	UNUSED(c);
+	int ret;
 
-	/* FIXME:
-	 *
-	 * This should send QUIT and keep servers open.
-	 *
-	 * `:quit` should exit the program
-	 *
-	 */
-	(void)mesg;
-	(void)s;
-	(void)c;
+	if (!s)
+		fail(c, "Error: Not connected to server");
 
-#if 0
-	struct server *t;
+	if ((ret = io_sendf(s->connection, "QUIT :%s", (*mesg ? mesg : DEFAULT_QUIT_MESG))))
+		failf(c, "sendf fail: %s", io_err(ret));
 
-	if (s) do {
-		t = s;
-		s = s->next;
-		server_disconnect(t, 0, 1, (*mesg) ? mesg : DEFAULT_QUIT_MESG);
-	} while (t != s);
-#endif
-
-	exit(EXIT_SUCCESS);
 	return 0;
 }
 
@@ -961,6 +945,8 @@ recv_error(struct parsed_mesg *p, struct server *s)
 	/* ERROR :<message> */
 
 	struct channel *c = s->channel;
+
+	/* TODO: this is also sent to the user to confirm QUIT */
 
 	newlinef(c, 0, "ERROR", "%s", (p->trailing ? p->trailing : "Remote hangup"));
 
