@@ -111,7 +111,7 @@ struct connection
 };
 
 static char* io_strerror(int, char*, size_t);
-static struct winsize* io_tty_winsize(int);
+static struct winsize* io_tty_winsize(void);
 static void io_close(int*);
 static void io_shutdown(int);
 static void io_init(void);
@@ -135,7 +135,7 @@ static pthread_once_t init_once = PTHREAD_ONCE_INIT;
 static struct termios term;
 
 static volatile sig_atomic_t flag_sigwinch_cb; /* sigwinch callback */
-static volatile sig_atomic_t flag_sigwinch_ws; /* sigwinch ws resize */
+static volatile sig_atomic_t flag_tty_resized; /* sigwinch ws resize */
 
 static void io_net_set_timeout(struct connection*, unsigned);
 
@@ -665,7 +665,7 @@ sigaction_sigwinch(int sig)
 	UNUSED(sig);
 
 	flag_sigwinch_cb = 1;
-	flag_sigwinch_ws = 1;
+	flag_tty_resized = 0;
 }
 
 static void
@@ -702,8 +702,6 @@ io_init_tty(void)
 
 	if (atexit(io_term_tty) < 0)
 		fatal("atexit", 0);
-
-	io_tty_winsize(1);
 }
 
 static void
@@ -745,15 +743,16 @@ io_loop(void)
 }
 
 static struct winsize*
-io_tty_winsize(int force)
+io_tty_winsize(void)
 {
 	static struct winsize tty_ws;
 
-	if (flag_sigwinch_ws || force) {
-		flag_sigwinch_ws = 0;
+	if (flag_tty_resized == 0) {
 
 		if (ioctl(0, TIOCGWINSZ, &tty_ws) < 0)
 			fatal("ioctl", errno);
+
+		flag_tty_resized = 1;
 	}
 
 	return &tty_ws;
@@ -762,13 +761,13 @@ io_tty_winsize(int force)
 unsigned
 io_tty_cols(void)
 {
-	return io_tty_winsize(0)->ws_col;
+	return io_tty_winsize()->ws_col;
 }
 
 unsigned
 io_tty_rows(void)
 {
-	return io_tty_winsize(0)->ws_row;
+	return io_tty_winsize()->ws_row;
 }
 
 const char*
