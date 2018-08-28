@@ -67,14 +67,14 @@ test_io_recv(void)
 	assert_eq(cb_size, 5);
 	assert_strcmp(soc_buf, str2);
 
-	/* Test buffer overrun
-	 * (IO_MESG_LEN = 10) 1    2    3    4    5    6    7    8    9   10 */
-	const char str3[] = {'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 0};
-	IO_RECV(str3);
+	/* Test buffer overrun */
+	IO_RECV("abcdefghijklmnopqrstuvwxyz");
 	IO_RECV("\r\n");
 	assert_eq(cb_count, 6);
 	assert_eq(cb_size, 10);
 	assert_strcmp(soc_buf, "abcdefghij");
+
+#undef IO_RECV
 }
 
 int

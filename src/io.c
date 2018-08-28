@@ -108,7 +108,7 @@ struct connection
 	struct {
 		size_t i;
 		char cl;
-		char buf[IO_MESG_LEN];
+		char buf[IO_MESG_LEN + 1];
 	} read;
 	struct io_lock lock;
 	unsigned rx_backoff;
@@ -647,7 +647,7 @@ io_recv(struct connection *c, const char *buf, size_t n)
 			DEBUG_MSG("recv: (%zu) %s", c->read.i, c->read.buf);
 
 			PT_LK(&cb_mutex);
-			io_cb_read_soc((char *)c->read.buf, ci, c->obj);
+			io_cb_read_soc(c->read.buf, ci, c->obj);
 			PT_UL(&cb_mutex);
 
 			ci = 0;
