@@ -1,3 +1,4 @@
+#include <ctype.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <netdb.h>
@@ -19,7 +20,9 @@
 #include "utils/utils.h"
 
 /* RFC 2812, section 2.3 */
-#define IO_MESG_LEN 512
+#ifndef IO_MESG_LEN
+	#define IO_MESG_LEN 510
+#endif
 
 #ifndef IO_PING_MIN
 	#define IO_PING_MIN 150
@@ -104,6 +107,7 @@ struct connection
 	pthread_t pt_tid;
 	struct {
 		size_t i;
+		char cl;
 		char buf[IO_MESG_LEN];
 	} read;
 	struct io_lock lock;
@@ -117,7 +121,7 @@ static void io_shutdown(int);
 static void io_init(void);
 static void io_init_sig(void);
 static void io_init_tty(void);
-static void io_recv(struct connection*, char*, size_t);
+static void io_recv(struct connection*, const char*, size_t);
 static void io_term(void);
 static void io_term_tty(void);
 static void* io_thread(void*);
@@ -498,7 +502,7 @@ io_state_cxed(struct connection *c)
 	io_net_set_timeout(c, IO_PING_MIN);
 
 	char errbuf[1024];
-	char recvbuf[IO_MESG_LEN];
+	char recvbuf[2 << 12];
 	ssize_t ret;
 
 	while ((ret = recv(c->soc, recvbuf, sizeof(recvbuf), 0)) > 0)
@@ -527,7 +531,7 @@ io_state_ping(struct connection *c)
 	io_net_set_timeout(c, IO_PING_REFRESH);
 
 	char errbuf[1024];
-	char recvbuf[IO_MESG_LEN];
+	char recvbuf[2 << 12];
 	ssize_t ret;
 	unsigned ping = IO_PING_MIN;
 
@@ -628,24 +632,34 @@ io_thread(void *arg)
 }
 
 static void
-io_recv(struct connection *c, char *buf, size_t n)
+io_recv(struct connection *c, const char *buf, size_t n)
 {
+	char cc, cl = c->read.cl;
+	size_t ci = c->read.i;
+
 	for (size_t i = 0; i < n; i++) {
 
-		if (buf[i] == '\n' && c->read.i && c->read.buf[c->read.i - 1] == '\r') {
-			c->read.buf[--c->read.i] = 0;
+		cc = buf[i];
 
-			if (c->read.i) {
-				DEBUG_MSG("recv: (%zu) %s", c->read.i, c->read.buf);
-				PT_LK(&cb_mutex);
-				io_cb_read_soc(c->read.buf, c->read.i - 1, c->obj);
-				PT_UL(&cb_mutex);
-				c->read.i = 0;
-			}
-		} else {
-			c->read.buf[c->read.i++] = buf[i];
+		if (ci && cl == '\r' && cc == '\n') {
+			c->read.buf[ci] = 0;
+
+			DEBUG_MSG("recv: (%zu) %s", c->read.i, c->read.buf);
+
+			PT_LK(&cb_mutex);
+			io_cb_read_soc((char *)c->read.buf, ci, c->obj);
+			PT_UL(&cb_mutex);
+
+			ci = 0;
+		} else if (ci < IO_MESG_LEN && (isprint(cc) || cc == 0x01)) {
+			c->read.buf[ci++] = cc;
 		}
+
+		cl = cc;
 	}
+
+	c->read.cl = cl;
+	c->read.i = ci;
 }
 
 static void

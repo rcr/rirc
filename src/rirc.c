@@ -218,6 +218,4 @@ main(int argc, char **argv)
 		io_cx(cli_servers[i].s->connection);
 
 	io_loop();
-
-	return EXIT_SUCCESS;
 }
