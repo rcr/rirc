@@ -65,7 +65,7 @@ redraw(void)
 }
 
 void
-init_state(void)
+state_init(void)
 {
 	/* atexit doesn't set errno */
 	if (atexit(term_state) != 0)

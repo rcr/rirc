@@ -19,7 +19,7 @@ struct channel* current_channel(void);
 
 struct server_list* state_server_list(void);
 
-void init_state(void);
+void state_init(void);
 
 //TODO: move to channel.c, function of server's channel list
 /* Useful state retrieval abstractions */
