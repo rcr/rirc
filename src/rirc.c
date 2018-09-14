@@ -228,6 +228,8 @@ main(int argc, char **argv)
 	if (!default_realname || !default_realname[0])
 		default_realname = getpwuid_pw_name();
 
+	state_init();
+
 	for (size_t i = 0; i < n_servers; i++) {
 
 		if (cli_servers[i].nicks == NULL)
@@ -259,6 +261,5 @@ main(int argc, char **argv)
 	for (size_t i = 0; i < n_servers; i++)
 		io_cx(cli_servers[i].s->connection);
 
-	state_init();
 	io_loop();
 }

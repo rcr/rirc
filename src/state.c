@@ -508,13 +508,14 @@ state_io_cxed(struct server *s)
 	server_nicks_reset(s);
 	server_nicks_next(s);
 
+	if (s->pass && (ret = io_sendf(s->connection, "PASS %s", s->pass)))
+		newlinef(s->channel, 0, "-!!-", "sendf fail: %s", io_err(ret));
+
 	if ((ret = io_sendf(s->connection, "NICK %s", s->nick)))
 		newlinef(s->channel, 0, "-!!-", "sendf fail: %s", io_err(ret));
 
 	if ((ret = io_sendf(s->connection, "USER %s 8 * :%s", s->username, s->realname)))
 		newlinef(s->channel, 0, "-!!-", "sendf fail: %s", io_err(ret));
-
-	// TODO: send PASS if set
 }
 
 static void
@@ -591,6 +592,13 @@ send_cmnd(struct channel *c, char *buf)
 		/* TODO: close servers, free */
 		exit(EXIT_SUCCESS);
 	}
+
+	/* TODO:
+	 *
+	 * :connect
+	 * :close
+	 * :set (user, real, nicks, pass, channel key)
+	 */
 }
 
 void
