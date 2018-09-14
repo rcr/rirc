@@ -30,6 +30,7 @@ static int _assert_fatal_, _failures_, _failures_t_, _failure_printed_;
 static char _tc_errbuf_[512];
 
 static int _assert_strcmp(const char*, const char*);
+static int _assert_strncmp(const char*, const char*, size_t);
 
 static void _print_testcase_name_(const char*);
 
@@ -102,6 +103,12 @@ static void _print_testcase_name_(const char*);
 			fail_testf(#X " expected '%s', got '%s'", (Y) == NULL ? "NULL" : (Y), (X) == NULL ? "NULL" : (X)); \
 	} while (0)
 
+#define assert_strncmp(X, Y, N) \
+	do { \
+		if (_assert_strncmp(X, Y, N)) \
+			fail_testf(#X " expected '%.*s', got '%.*s'", (N), (Y) == NULL ? "NULL" : (Y), (N), (X) == NULL ? "NULL" : (X)); \
+	} while (0)
+
 #define assert_lt(X, Y) \
 	do { \
 		if (!((X) < (Y))) \
@@ -153,6 +160,15 @@ _assert_strcmp(const char *p1, const char *p2)
 	return strcmp(p1, p2);
 }
 
+static int
+_assert_strncmp(const char *p1, const char *p2, size_t n)
+{
+	if (p1 == NULL || p2 == NULL)
+		return p1 != p2;
+
+	return strncmp(p1, p2, n);
+}
+
 static void
 _print_testcase_name_(const char *name)
 {
@@ -172,6 +188,7 @@ _run_tests_(const char *filename, testcase testcases[], size_t len)
 {
 	/* Silence compiler warnings for test functions/vars that are included but not used */
 	((void)(_assert_strcmp));
+	((void)(_assert_strncmp));
 	((void)(_assert_fatal_));
 	((void)(_failure_printed_));
 	((void)(_tc_fatal_expected_));

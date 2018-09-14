@@ -15,9 +15,11 @@ struct server
 	const char *realname;
 	const char *nick;
 	struct {
-		const char *next;
+		size_t next;
+		size_t size;
+		const char *base;
 		const char **set;
-	} nick_set;
+	} nicks;
 	struct channel *channel;
 	//TODO: WIP
 	struct channel_list clist;

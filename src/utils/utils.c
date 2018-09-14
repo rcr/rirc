@@ -101,16 +101,18 @@ getarg(char **str, const char *sep)
 char*
 strdup(const char *str)
 {
-	/* Return dynamically allocated duplicate string */
+	return memdup(str, strlen(str) + 1);
+}
 
-	size_t len = strlen(str) + 1;
-
+void*
+memdup(const void *mem, size_t len)
+{
 	void *ret;
 
 	if ((ret = malloc(len)) == NULL)
 		fatal("malloc", errno);
 
-	return (char *) memcpy(ret, str, len);
+	return memcpy(ret, mem, len);
 }
 
 struct string*
@@ -177,7 +179,7 @@ irc_toupper(const int c)
 }
 
 int
-irc_isnickchar(const char c)
+irc_isnickchar(const char c, int first)
 {
 	/* RFC 2812, section 2.3.1
 	 *
@@ -187,7 +189,7 @@ irc_isnickchar(const char c)
 	 * special    =  %x5B-60 / %x7B-7D       ; "[", "]", "\", "`", "_", "^", "{", "|", "}"
 	 */
 
-	return ((c >= 0x41 && c <= 0x7D) || (c >= 0x30 && c <= 0x39) || c == '-');
+	return ((c >= 0x41 && c <= 0x7D) || (!first && ((c >= 0x30 && c <= 0x39) || c == '-')));
 }
 
 int
@@ -371,7 +373,7 @@ check_pinged(const char *mesg, const char *nick)
 			mesg++;
 
 		/* nick prefixes the word, following character is space or symbol */
-		if (!irc_strncmp(mesg, nick, len) && !irc_isnickchar(*(mesg + len)))
+		if (!irc_strncmp(mesg, nick, len) && !irc_isnickchar(*(mesg + len), 0))
 			return 1;
 
 		/* skip to end of word */

@@ -146,7 +146,52 @@ test_server_set_chans(void)
 static void
 test_server_set_nicks(void)
 {
-	/* TODO */
+	struct server s = {0};
+
+	server_nicks_next(&s);
+	assert_strncmp(s.nick, "rirc", 4);
+
+	/* empty values, invalid formats */
+	assert_eq(server_set_nicks(&s, ""), -1);
+	assert_eq(server_set_nicks(&s, ","), -1);
+	assert_eq(server_set_nicks(&s, ",,,"), -1);
+	assert_eq(server_set_nicks(&s, ",a,b,c"), -1);
+	assert_eq(server_set_nicks(&s, "a,b,c,"), -1);
+	assert_eq(server_set_nicks(&s, "a,b,c "), -1);
+	assert_eq(server_set_nicks(&s, "a b c"), -1);
+
+	/* invalid nicks */
+	assert_eq(server_set_nicks(&s, "!"), -1);
+	assert_eq(server_set_nicks(&s, "0abc"), -1);
+	assert_eq(server_set_nicks(&s, "abc,-def"), -1);
+	assert_eq(server_set_nicks(&s, "abc,d!ef"), -1);
+
+	assert_strncmp(s.nick, "rirc", 4);
+
+	/* valid */
+	assert_eq(server_set_nicks(&s, "a"), 0);
+	assert_eq((signed)s.nicks.size, 1);
+	assert_eq(server_set_nicks(&s, "abc,d"), 0);
+	assert_eq((signed)s.nicks.size, 2);
+	assert_eq(server_set_nicks(&s, "ab0,d,e-g"), 0);
+	assert_eq((signed)s.nicks.size, 3);
+	assert_eq(server_set_nicks(&s, "a_,b__,c___,d____"), 0);
+	assert_eq((signed)s.nicks.size, 4);
+
+	server_nicks_next(&s);
+	assert_strcmp(s.nick, "a_");
+	server_nicks_next(&s);
+	assert_strcmp(s.nick, "b__");
+	server_nicks_next(&s);
+	assert_strcmp(s.nick, "c___");
+	server_nicks_next(&s);
+	assert_strcmp(s.nick, "d____");
+	server_nicks_next(&s);
+	assert_strncmp(s.nick, "rirc", 4);
+
+	server_nicks_reset(&s);
+	server_nicks_next(&s);
+	assert_strcmp(s.nick, "a_");
 }
 
 static void

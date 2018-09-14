@@ -41,6 +41,10 @@ struct channel
 	char _[];
 };
 
+/* FIXME:
+ * undefined behavior in tree.h
+ *
+ * */
 struct channel_list
 {
 	SPLAY_HEAD(channel);

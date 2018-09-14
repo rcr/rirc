@@ -48,15 +48,12 @@ server(const char *host, const char *port, const char *pass, const char *user, c
 	s->channel = new_channel(host, s, NULL, BUFFER_SERVER);
 	channel_set_current(s->channel);
 
-	// FIXME:
-	if ((s->connection = connection(s, host, port)) == NULL)
-		goto err;
+	if ((s->connection = connection(s, host, port)) == NULL) {
+		server_free(s);
+		return NULL;
+	}
 
 	return s;
-
-err:
-	server_free(s);
-	return NULL;
 }
 
 static struct server*
@@ -107,7 +104,7 @@ server_list_del(struct server_list *sl, struct server *s)
 	struct server *tmp_h,
 	              *tmp_t;
 
-	if (sl->head == s &&  sl->tail == s) {
+	if (sl->head == s && sl->tail == s) {
 		/* Removing last server */
 		sl->head = NULL;
 		sl->tail = NULL;
@@ -138,16 +135,14 @@ server_list_del(struct server_list *sl, struct server *s)
 void
 server_free(struct server *s)
 {
-	server_nicks_reset(s);
-
 	free((void *)s->host);
 	free((void *)s->port);
 	free((void *)s->pass);
 	free((void *)s->username);
 	free((void *)s->realname);
 	free((void *)s->nick);
-	free((void *)s->nick_set.next);
-	free((void *)s->nick_set.set);
+	free((void *)s->nicks.base);
+	free((void *)s->nicks.set);
 	free(s);
 }
 
@@ -211,7 +206,7 @@ server_set_005(struct server *s, char *str)
 int
 server_set_chans(struct server *s, const char *chans)
 {
-	/* TODO: parse comma seperated list
+	/* TODO: parse comma seperated list of chans and keys
 	 *       test
 	 */
 	(void)s;
@@ -222,11 +217,46 @@ server_set_chans(struct server *s, const char *chans)
 int
 server_set_nicks(struct server *s, const char *nicks)
 {
-	/* TODO: parse comma seperated list
-	 *       test
-	 */
-	(void)s;
-	(void)nicks;
+	char *p1, *p2, *base;
+	size_t n = 0;
+
+	p2 = base = strdup(nicks);
+
+	do {
+		size_t len = 0;
+
+		p1 = p2;
+		p2 = strchr(p2, ',');
+
+		if (p2)
+			*p2++ = 0;
+
+		do {
+			if (!irc_isnickchar(p1[len], (len == 0))) {
+				free(base);
+				return -1;
+			}
+		} while (p1[++len]);
+
+		n++;
+
+	} while (p2);
+
+	free((void *)s->nicks.base);
+	free((void *)s->nicks.set);
+
+	s->nicks.next = 0;
+	s->nicks.size = n;
+	s->nicks.base = base;
+
+	if ((s->nicks.set = malloc(sizeof(*s->nicks.set) * n)) == NULL)
+		fatal("malloc", errno);
+
+	for (const char **set = s->nicks.set; n; n--, set++) {
+		*set = base;
+		base = strchr(base, 0) + 1;
+	}
+
 	return 0;
 }
 
@@ -365,8 +395,8 @@ server_nick_set(struct server *s, const char *nick)
 void
 server_nicks_next(struct server *s)
 {
-	if (s->nick_set.set && s->nick_set.next) {
-		server_nick_set(s, s->nick_set.next++);
+	if (s->nicks.size && s->nicks.next < s->nicks.size) {
+		server_nick_set(s, s->nicks.set[s->nicks.next++]);
 	} else {
 		/* Default to random nick, length 9 (RFC2912, section 1.2.1) */
 
@@ -385,6 +415,5 @@ server_nicks_next(struct server *s)
 void
 server_nicks_reset(struct server *s)
 {
-	if (s->nick_set.set)
-		s->nick_set.next = *s->nick_set.set;
+	s->nicks.next = 0;
 }

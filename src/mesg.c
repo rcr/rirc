@@ -463,6 +463,11 @@ send_join(char *mesg, struct server *s, struct channel *c)
 {
 	/* /join [target[,targets]*] */
 
+	// TODO: pass
+	// if no targets, send join/pass for current channel, else
+	// send unmodified
+	// :set pass
+
 	int ret;
 	char *targ;
 
@@ -1483,6 +1488,7 @@ recv_numeric(struct parsed_mesg *p, struct server *s)
 
 	// FIXME: this is returned from /names <target>
 	// ... /names returns all names on all channels
+	// flag channel namereply :1
 	//
 	// differentiate reply after JOIN or NAMES?
 	/* 353 ("="/"*"/"@") <channel> :*([ "@" / "+" ]<nick>) */
@@ -1508,7 +1514,7 @@ recv_numeric(struct parsed_mesg *p, struct server *s)
 			struct mode m = MODE_EMPTY;
 
 			/* Set user prefix */
-			if (!irc_isnickchar(*nick))
+			if (!irc_isnickchar(*nick, 1))
 				prefix = *nick++;
 
 			if (prefix && mode_prfxmode_prefix(&m, &(s->mode_config), prefix) != MODE_ERR_NONE)
