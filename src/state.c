@@ -71,7 +71,7 @@ state_init(void)
 	if (atexit(term_state) != 0)
 		fatal("atexit", 0);
 
-	state.default_channel = state.current_channel = new_channel("rirc", NULL, NULL, BUFFER_OTHER);
+	state.default_channel = state.current_channel = new_channel("rirc", NULL, NULL, CHANNEL_T_OTHER);
 
 	/* Splashscreen */
 	newline(state.default_channel, 0, "--", "      _");
@@ -171,13 +171,12 @@ _newline(struct channel *c, enum buffer_line_t type, const char *from, const cha
 }
 
 struct channel*
-new_channel(const char *name, struct server *s, struct channel *chanlist, enum buffer_t type)
+new_channel(const char *name, struct server *s, struct channel *chanlist, enum channel_t type)
 {
-	struct channel *c = channel(name);
+	struct channel *c = channel(name, type);
 
 	/* TODO: deprecated, move to channel.c */
 
-	c->buffer = buffer(type);
 	c->chanmodes_str.type = MODE_STR_CHANMODE;
 	c->input = new_input();
 	c->server = s;
@@ -229,7 +228,7 @@ state_server_set_chans(struct server *s, const char *chans)
 	} while (p2);
 
 	for (const char *chan = base; n; n--) {
-		new_channel(chan, s, s->channel, BUFFER_CHANNEL);
+		new_channel(chan, s, s->channel, CHANNEL_T_CHANNEL);
 		chan = strchr(chan, 0) + 1;
 	}
 
@@ -242,8 +241,7 @@ state_server_set_chans(struct server *s, const char *chans)
 void
 channel_clear(struct channel *c)
 {
-	c->buffer = buffer(c->buffer.type);
-
+	c->buffer = buffer();
 	draw_buffer();
 }
 
@@ -311,12 +309,12 @@ channel_close(struct channel *c)
 		return;
 	}
 
-	if (c->buffer.type == BUFFER_SERVER) {
+	if (c->type == CHANNEL_T_SERVER) {
 		/* Closing a server, confirm the number of channels being closed */
 
 		int num_chans = 0;
 
-		while ((c = c->next)->buffer.type != BUFFER_SERVER)
+		while ((c = c->next)->type != CHANNEL_T_SERVER)
 			num_chans++;
 
 		if (num_chans)
@@ -326,7 +324,7 @@ channel_close(struct channel *c)
 			action(action_close_server, "Close server '%s'?   [y/n]", c->server->host);
 	} else {
 		/* Closing a channel */
-		if (c->buffer.type == BUFFER_CHANNEL && !c->parted) {
+		if (c->type == CHANNEL_T_CHANNEL && !c->parted) {
 			int ret;
 			if (0 != (ret = io_sendf(c->server->connection, "PART %s", c->name.str))) {
 				newlinef(c->server->channel, 0, "sendf fail", "%s", io_err(ret));

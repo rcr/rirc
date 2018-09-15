@@ -10,7 +10,7 @@ channel_set_current(struct channel *c)
 }
 
 struct channel*
-new_channel(const char *n, struct server *s, struct channel *l, enum buffer_t t)
+new_channel(const char *n, struct server *s, struct channel *l, enum channel_t t)
 {
 	/* FIXME: mock new_channel until channel() is implemented */
 

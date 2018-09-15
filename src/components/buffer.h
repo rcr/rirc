@@ -22,16 +22,6 @@ enum buffer_line_t
 	BUFFER_LINE_T_SIZE
 };
 
-/* FIXME: Should be channel type, not really relevant to the buffer itself */
-enum buffer_t
-{
-	BUFFER_OTHER,   /* Default/all other buffers */
-	BUFFER_CHANNEL, /* Channel message buffer */
-	BUFFER_SERVER,  /* Server message buffer */
-	BUFFER_PRIVATE, /* Private message buffer */
-	BUFFER_T_SIZE
-};
-
 struct buffer_line
 {
 	enum buffer_line_t type;
@@ -51,7 +41,6 @@ struct buffer_line
 
 struct buffer
 {
-	enum buffer_t type;
 	unsigned int head;
 	unsigned int tail;
 	unsigned int scrollback; /* Index of the current line between [tail, head) for scrollback */
@@ -66,7 +55,7 @@ int buffer_page_forw(struct buffer*, unsigned int, unsigned int);
 
 unsigned int buffer_line_rows(struct buffer_line*, unsigned int);
 
-struct buffer buffer(enum buffer_t);
+struct buffer buffer(void);
 
 struct buffer_line* buffer_head(struct buffer*);
 struct buffer_line* buffer_tail(struct buffer*);

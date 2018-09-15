@@ -24,8 +24,19 @@ enum activity_t
  * input shouldn't be a pointer, and thus shouldn't require being freed
  * */
 
+enum channel_t
+{
+	CHANNEL_T_INVALID,
+	CHANNEL_T_OTHER,   /* Default/all other buffers */
+	CHANNEL_T_CHANNEL, /* Channel message buffer */
+	CHANNEL_T_SERVER,  /* Server message buffer */
+	CHANNEL_T_PRIVATE, /* Private message buffer */
+	CHANNEL_T_SIZE
+};
+
 struct channel
 {
+	enum channel_t type;
 	enum activity_t activity;
 	SPLAY_NODE(channel) node; /* Fast unordered retrieval */
 	struct buffer buffer;
@@ -50,7 +61,7 @@ struct channel_list
 	SPLAY_HEAD(channel);
 };
 
-struct channel* channel(const char*);
+struct channel* channel(const char*, enum channel_t);
 
 struct channel* channel_list_add(struct channel_list*, struct channel*);
 struct channel* channel_list_del(struct channel_list*, struct channel*);

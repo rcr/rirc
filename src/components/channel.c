@@ -16,7 +16,7 @@ channel_cmp(struct channel *c1, struct channel *c2)
 }
 
 struct channel*
-channel(const char *name)
+channel(const char *name, enum channel_t type)
 {
 	struct channel *c;
 
@@ -27,6 +27,7 @@ channel(const char *name)
 
 	c->name.len = len;
 	c->name.str = memcpy(c->_, name, len + 1);
+	c->type = type;
 
 	return c;
 }

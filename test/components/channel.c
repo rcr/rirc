@@ -14,9 +14,9 @@ test_channel_list(void)
 
 	memset(&clist, 0, sizeof(clist));
 
-	c1 = channel("aaa");
-	c2 = channel("bbb");
-	c3 = channel("bbb");
+	c1 = channel("aaa", CHANNEL_T_OTHER);
+	c2 = channel("bbb", CHANNEL_T_OTHER);
+	c3 = channel("bbb", CHANNEL_T_OTHER);
 
 	/* Test adding channels to list */
 	assert_ptrequals(channel_list_add(&clist, c1), NULL);

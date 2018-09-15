@@ -13,6 +13,7 @@
  * Interface for retrieving and altering global state of the program */
 
 int state_server_set_chans(struct server*, const char*);
+struct channel* new_channel(const char*, struct server*, struct channel*, enum channel_t);
 
 
 /* state.c */
@@ -30,9 +31,6 @@ struct channel* channel_get_first(void);
 struct channel* channel_get_last(void);
 struct channel* channel_get_next(struct channel*);
 struct channel* channel_get_prev(struct channel*);
-
-/* State altering interface */
-struct channel* new_channel(const char*, struct server*, struct channel*, enum buffer_t);
 
 /* FIXME: */
 void buffer_scrollback_back(struct channel*);

@@ -667,7 +667,7 @@ _draw_status(struct channel *c)
 
 	/* If private chat buffer:
 	 * -[priv] */
-	if (c->buffer.type == BUFFER_PRIVATE) {
+	if (c->type == CHANNEL_T_PRIVATE) {
 		ret = snprintf(status_buff + col, cols - col + 1, "%s", HORIZONTAL_SEPARATOR "[priv]");
 		if (ret < 0 || (col += ret) >= cols)
 			goto print_status;
@@ -675,7 +675,7 @@ _draw_status(struct channel *c)
 
 	/* If IRC channel buffer:
 	 * -[chancount chantype chanmodes] */
-	if (c->buffer.type == BUFFER_CHANNEL) {
+	if (c->type == CHANNEL_T_CHANNEL) {
 
 		ret = snprintf(status_buff + col, cols - col + 1,
 				HORIZONTAL_SEPARATOR "[%d", c->users.count);

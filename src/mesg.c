@@ -272,7 +272,7 @@ send_mesg(struct server *s, struct channel *chan, char *mesg)
 		if (*mesg == 0)
 			fatal("message is empty", 0);
 
-		else if (chan->buffer.type != BUFFER_CHANNEL && chan->buffer.type != BUFFER_PRIVATE)
+		else if (chan->type != CHANNEL_T_CHANNEL && chan->type != CHANNEL_T_PRIVATE)
 			newline(chan, 0, "-!!-", "Error: This is not a channel");
 
 		else if (chan->parted)
@@ -422,7 +422,7 @@ send_me(char *mesg, struct server *s, struct channel *c)
 
 	int ret;
 
-	if (c->buffer.type == BUFFER_SERVER)
+	if (c->type == CHANNEL_T_SERVER)
 		fail(c, "Error: This is not a channel");
 
 	if (c->parted)
@@ -475,10 +475,10 @@ send_join(char *mesg, struct server *s, struct channel *c)
 		if ((ret = io_sendf(s->connection, "JOIN %s", targ)))
 			failf(c, "sendf fail: %s", io_err(ret));
 	} else {
-		if (c->buffer.type == BUFFER_SERVER)
+		if (c->type == CHANNEL_T_SERVER)
 			fail(c, "Error: JOIN requires a target");
 
-		if (c->buffer.type == BUFFER_PRIVATE)
+		if (c->type == CHANNEL_T_PRIVATE)
 			fail(c, "Error: Can't rejoin private buffers");
 
 		if (!c->parted)
@@ -531,10 +531,10 @@ send_part(char *mesg, struct server *s, struct channel *c)
 		if ((ret = io_sendf(s->connection, "PART %s :%s", targ, (*mesg) ? mesg : DEFAULT_QUIT_MESG)))
 			failf(c, "sendf fail: %s", io_err(ret));
 	} else {
-		if (c->buffer.type == BUFFER_SERVER)
+		if (c->type == CHANNEL_T_SERVER)
 			fail(c, "Error: PART requires a target");
 
-		if (c->buffer.type == BUFFER_PRIVATE)
+		if (c->type == CHANNEL_T_PRIVATE)
 			fail(c, "Error: Can't part private buffers");
 
 		if (c->parted)
@@ -566,7 +566,7 @@ send_privmsg(char *mesg, struct server *s, struct channel *c)
 		failf(c, "sendf fail: %s", io_err(ret));
 
 	if ((cc = channel_list_get(&s->clist, targ)) == NULL)
-		cc = new_channel(targ, s, c, BUFFER_PRIVATE);
+		cc = new_channel(targ, s, c, CHANNEL_T_PRIVATE);
 
 	newline(cc, BUFFER_LINE_CHAT, s->nick, mesg);
 
@@ -827,7 +827,7 @@ recv_ctcp_req(struct parsed_mesg *p, struct server *s)
 			/* Sending emote to private channel */
 
 			if ((c = channel_list_get(&s->clist, p->from)) == NULL)
-				c = new_channel(p->from, s, s->channel, BUFFER_PRIVATE);
+				c = new_channel(p->from, s, s->channel, CHANNEL_T_PRIVATE);
 
 			if (c != ccur) {
 				c->activity = ACTIVITY_PINGED;
@@ -981,7 +981,7 @@ recv_join(struct parsed_mesg *p, struct server *s)
 
 	if (IS_ME(p->from)) {
 		if ((c = channel_list_get(&s->clist, chan)) == NULL)
-			channel_set_current(new_channel(chan, s, ccur, BUFFER_CHANNEL));
+			channel_set_current(new_channel(chan, s, ccur, CHANNEL_T_CHANNEL));
 		else {
 			c->parted = 0;
 			newlinef(c, 0, ">", "Joined %s", chan);
@@ -1401,7 +1401,7 @@ recv_numeric(struct parsed_mesg *p, struct server *s)
 		/* join any non-parted channels */
 		do {
 			//TODO: channel_list_foreach
-			if (c->buffer.type == BUFFER_CHANNEL && !c->parted) {
+			if (c->type == CHANNEL_T_CHANNEL && !c->parted) {
 				if ((ret = io_sendf(s->connection, "JOIN %s", c->name.str)))
 					failf(s->channel, "sendf fail: %s", io_err(ret));
 			}
@@ -1767,7 +1767,7 @@ recv_privmsg(struct parsed_mesg *p, struct server *s)
 	if (IS_ME(targ)) {
 
 		if ((c = channel_list_get(&s->clist, p->from)) == NULL)
-			c = new_channel(p->from, s, s->channel, BUFFER_PRIVATE);
+			c = new_channel(p->from, s, s->channel, CHANNEL_T_PRIVATE);
 
 		if (c != ccur) {
 			c->activity = ACTIVITY_PINGED;
