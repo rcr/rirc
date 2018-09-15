@@ -11,13 +11,13 @@
  *   - Modes set for a channel                 (chanmode)
  *   - Modes set for a user on a channel       (prfxmode)
  *
- * mode_config.chanmodes apply to a channel and the subtypes are given by A,B,C,D:
+ * mode_cfg.chanmodes apply to a channel and the subtypes are given by A,B,C,D:
  *   - A = Mode that adds or removes a nick or address to a list. Always has a parameter.
  *   - B = Mode that changes a setting and always has a parameter.
  *   - C = Mode that changes a setting and only has a parameter when set.
  *   - D = Mode that changes a setting and never has a parameter.
  *
- * mode_config.usermodes apply to the IRC user at a server level
+ * mode_cfg.usermodes apply to the IRC user at a server level
  *
  * PREFIX maps a subset of modes to user prefixes for that channel, in order of
  * precedence. Multiple prefix modes can be set for a user, but only one mode flag
@@ -58,15 +58,15 @@ enum mode_err_t
 	MODE_ERR_NONE
 };
 
-enum mode_config_t
+enum mode_cfg_t
 {
-	MODE_CONFIG_DEFAULTS,  /* Set RFC2811 mode defaults */
-	MODE_CONFIG_CHANMODES, /* Set numeric 004 chanmdoes string */
-	MODE_CONFIG_USERMODES, /* Set numeric 004 usermodes string */
-	MODE_CONFIG_PREFIX,    /* Set numeric 005 PREFIX */
-	MODE_CONFIG_SUBTYPES,  /* Set numeric 005 CHANMODES subtypes */
-	MODE_CONFIG_MODES,     /* Set numeric 005 MODES */
-	MODE_CONFIG_T_SIZE
+	MODE_CFG_DEFAULTS,  /* Set RFC2811 mode defaults */
+	MODE_CFG_CHANMODES, /* Set numeric 004 chanmdoes string */
+	MODE_CFG_USERMODES, /* Set numeric 004 usermodes string */
+	MODE_CFG_PREFIX,    /* Set numeric 005 PREFIX */
+	MODE_CFG_SUBTYPES,  /* Set numeric 005 CHANMODES subtypes */
+	MODE_CFG_MODES,     /* Set numeric 005 MODES */
+	MODE_CFG_T_SIZE
 };
 
 enum mode_set_t
@@ -94,7 +94,7 @@ struct mode
 	uint32_t upper; /* Uppercase mode bits */
 };
 
-struct mode_config
+struct mode_cfg
 {
 	unsigned int MODES;    /* Numeric 005 MODES */
 	struct mode chanmodes; /* Numeric 004 chanmodes string */
@@ -126,16 +126,16 @@ struct mode_str
 	} type;
 };
 
-enum chanmode_flag_t chanmode_type(const struct mode_config*, enum mode_set_t, int);
+enum chanmode_flag_t chanmode_type(const struct mode_cfg*, enum mode_set_t, int);
 
-enum mode_err_t mode_config(struct mode_config*, const char*, enum mode_config_t);
+enum mode_err_t mode_cfg(struct mode_cfg*, const char*, enum mode_cfg_t);
 
-enum mode_err_t mode_chanmode_set(struct mode*, const struct mode_config*, int, enum mode_set_t);
-enum mode_err_t mode_prfxmode_set(struct mode*, const struct mode_config*, int, enum mode_set_t);
-enum mode_err_t mode_usermode_set(struct mode*, const struct mode_config*, int, enum mode_set_t);
+enum mode_err_t mode_chanmode_set(struct mode*, const struct mode_cfg*, int, enum mode_set_t);
+enum mode_err_t mode_prfxmode_set(struct mode*, const struct mode_cfg*, int, enum mode_set_t);
+enum mode_err_t mode_usermode_set(struct mode*, const struct mode_cfg*, int, enum mode_set_t);
 
-enum mode_err_t mode_chanmode_prefix(struct mode*, const struct mode_config*, int);
-enum mode_err_t mode_prfxmode_prefix(struct mode*, const struct mode_config*, int);
+enum mode_err_t mode_chanmode_prefix(struct mode*, const struct mode_cfg*, int);
+enum mode_err_t mode_prfxmode_prefix(struct mode*, const struct mode_cfg*, int);
 
 char* mode_str(const struct mode*, struct mode_str*);
 

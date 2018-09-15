@@ -651,12 +651,12 @@ _draw_status(struct channel *c)
 	memset(status_buff, 0, cols + 1);
 
 	/* -[usermodes] */
-	if (c->server && *(c->server->usermodes_str.str)) {
+	if (c->server && *(c->server->mode_str.str)) {
 		ret = snprintf(status_buff + col, cols - col + 1, "%s", HORIZONTAL_SEPARATOR "[+");
 		if (ret < 0 || (col += ret) >= cols)
 			goto print_status;
 
-		ret = snprintf(status_buff + col, cols - col + 1, "%s", c->server->usermodes_str.str);
+		ret = snprintf(status_buff + col, cols - col + 1, "%s", c->server->mode_str.str);
 		if (ret < 0 || (col += ret) >= cols)
 			goto print_status;
 

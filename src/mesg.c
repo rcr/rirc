@@ -78,8 +78,8 @@ static int recv_ctcp_rpl(struct parsed_mesg*, struct server*);
 /* Special case handler for numeric replies */
 static int recv_numeric(struct parsed_mesg*, struct server*);
 
-static int recv_mode_chanmodes(struct parsed_mesg*, const struct mode_config*, struct channel*);
-static int recv_mode_usermodes(struct parsed_mesg*, const struct mode_config*, struct server*);
+static int recv_mode_chanmodes(struct parsed_mesg*, const struct mode_cfg*, struct channel*);
+static int recv_mode_usermodes(struct parsed_mesg*, const struct mode_cfg*, struct server*);
 
 /* Numeric Reply Codes */
 enum numeric {
@@ -1089,16 +1089,16 @@ recv_mode(struct parsed_mesg *p, struct server *s)
 		fail(s->channel, "MODE: target is null");
 
 	if (IS_ME(targ))
-		return recv_mode_usermodes(p, &(s->mode_config), s);
+		return recv_mode_usermodes(p, &(s->mode_cfg), s);
 
 	if ((c = channel_list_get(&s->clist, targ)))
-		return recv_mode_chanmodes(p, &(s->mode_config), c);
+		return recv_mode_chanmodes(p, &(s->mode_cfg), c);
 
 	failf(s->channel, "MODE: target '%s' not found", targ);
 }
 
 static int
-recv_mode_chanmodes(struct parsed_mesg *p, const struct mode_config *config, struct channel *c)
+recv_mode_chanmodes(struct parsed_mesg *p, const struct mode_cfg *cfg, struct channel *c)
 {
 	struct mode *chanmodes = &(c->chanmodes);
 	struct user *user;
@@ -1131,12 +1131,12 @@ recv_mode_chanmodes(struct parsed_mesg *p, const struct mode_config *config, str
 
 			modearg = NULL;
 
-			switch (chanmode_type(config, mode_set, flag)) {
+			switch (chanmode_type(cfg, mode_set, flag)) {
 
 				/* Doesn't consume an argument */
 				case MODE_FLAG_CHANMODE:
 
-					mode_err = mode_chanmode_set(chanmodes, config, flag, mode_set);
+					mode_err = mode_chanmode_set(chanmodes, cfg, flag, mode_set);
 
 					if (mode_err == MODE_ERR_NONE) {
 						newlinef(c, 0, "--", "%s%s%s mode: %c%c",
@@ -1156,7 +1156,7 @@ recv_mode_chanmodes(struct parsed_mesg *p, const struct mode_config *config, str
 						continue;
 					}
 
-					mode_err = mode_chanmode_set(chanmodes, config, flag, mode_set);
+					mode_err = mode_chanmode_set(chanmodes, cfg, flag, mode_set);
 
 					if (mode_err == MODE_ERR_NONE) {
 						newlinef(c, 0, "--", "%s%s%s mode: %c%c %s",
@@ -1182,7 +1182,7 @@ recv_mode_chanmodes(struct parsed_mesg *p, const struct mode_config *config, str
 						continue;
 					}
 
-					mode_prfxmode_set(&(user->prfxmodes), config, flag, mode_set);
+					mode_prfxmode_set(&(user->prfxmodes), cfg, flag, mode_set);
 
 					if (mode_err == MODE_ERR_NONE) {
 						newlinef(c, 0, "--", "%s%suser %s mode: %c%c",
@@ -1232,7 +1232,7 @@ recv_mode_chanmodes(struct parsed_mesg *p, const struct mode_config *config, str
 }
 
 static int
-recv_mode_usermodes(struct parsed_mesg *p, const struct mode_config *config, struct server *s)
+recv_mode_usermodes(struct parsed_mesg *p, const struct mode_cfg *cfg, struct server *s)
 {
 	struct mode *usermodes = &(s->usermodes);
 
@@ -1261,7 +1261,7 @@ recv_mode_usermodes(struct parsed_mesg *p, const struct mode_config *config, str
 				continue;
 			}
 
-			mode_err = mode_usermode_set(usermodes, config, flag, mode_set);
+			mode_err = mode_usermode_set(usermodes, cfg, flag, mode_set);
 
 			if (mode_err == MODE_ERR_NONE)
 				newlinef(s->channel, 0, "--", "%s%smode: %c%c",
@@ -1280,7 +1280,7 @@ recv_mode_usermodes(struct parsed_mesg *p, const struct mode_config *config, str
 
 #undef MODE_GETARG
 
-	mode_str(usermodes, &(s->usermodes_str));
+	mode_str(usermodes, &(s->mode_str));
 	draw_status();
 
 	return 0;
@@ -1504,7 +1504,7 @@ recv_numeric(struct parsed_mesg *p, struct server *s)
 		if ((c = channel_list_get(&s->clist, chan)) == NULL)
 			failf(s->channel, "RPL_NAMEREPLY: channel '%s' not found", chan);
 
-		if ((ret = mode_chanmode_prefix(&(c->chanmodes), &(s->mode_config), *type)))
+		if ((ret = mode_chanmode_prefix(&(c->chanmodes), &(s->mode_cfg), *type)))
 			newlinef(c, 0, "-!!-", "RPL_NAMEREPLY: invalid channel flag: '%c'", *type);
 
 		while ((nick = getarg(&p->trailing, " "))) {
@@ -1517,7 +1517,7 @@ recv_numeric(struct parsed_mesg *p, struct server *s)
 			if (!irc_isnickchar(*nick, 1))
 				prefix = *nick++;
 
-			if (prefix && mode_prfxmode_prefix(&m, &(s->mode_config), prefix) != MODE_ERR_NONE)
+			if (prefix && mode_prfxmode_prefix(&m, &(s->mode_cfg), prefix) != MODE_ERR_NONE)
 				newlinef(c, 0, "-!!-", "Invalid user prefix: '%c'", prefix);
 
 			if (user_list_add(&(c->users), nick, m) == USER_ERR_DUPLICATE)

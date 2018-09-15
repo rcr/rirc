@@ -40,9 +40,9 @@ server(const char *host, const char *port, const char *pass, const char *user, c
 	s->username = strdup(user);
 	s->realname = strdup(real);
 
-	s->usermodes_str.type = MODE_STR_USERMODE;
+	s->mode_str.type = MODE_STR_USERMODE;
 
-	mode_config(&(s->mode_config), NULL, MODE_CONFIG_DEFAULTS);
+	mode_cfg(&(s->mode_cfg), NULL, MODE_CFG_DEFAULTS);
 
 	// FIXME: channel()
 	s->channel = new_channel(host, s, NULL, BUFFER_SERVER);
@@ -174,7 +174,7 @@ server_set_004(struct server *s, char *str)
 
 		DEBUG_MSG("Setting numeric 004 user_modes: %s", user_modes);
 
-		if (mode_config(&(s->mode_config), user_modes, MODE_CONFIG_USERMODES) != MODE_ERR_NONE)
+		if (mode_cfg(&(s->mode_cfg), user_modes, MODE_CFG_USERMODES) != MODE_ERR_NONE)
 			newlinef(c, 0, "-!!-", "invalid numeric 004 user_modes: %s", user_modes);
 	}
 
@@ -182,7 +182,7 @@ server_set_004(struct server *s, char *str)
 
 		DEBUG_MSG("Setting numeric 004 chan_modes: %s", chan_modes);
 
-		if (mode_config(&(s->mode_config), chan_modes, MODE_CONFIG_CHANMODES) != MODE_ERR_NONE)
+		if (mode_cfg(&(s->mode_cfg), chan_modes, MODE_CFG_CHANMODES) != MODE_ERR_NONE)
 			newlinef(c, 0, "-!!-", "invalid numeric 004 chan_modes: %s", chan_modes);
 	}
 }
@@ -346,7 +346,7 @@ server_set_CHANMODES(struct server *s, char *val)
 {
 	DEBUG_MSG("Setting numeric 005 CHANMODES: %s", val);
 
-	return (mode_config(&(s->mode_config), val, MODE_CONFIG_SUBTYPES) != MODE_ERR_NONE);
+	return (mode_cfg(&(s->mode_cfg), val, MODE_CFG_SUBTYPES) != MODE_ERR_NONE);
 }
 
 static int
@@ -354,7 +354,7 @@ server_set_MODES(struct server *s, char *val)
 {
 	DEBUG_MSG("Setting numeric 005 MODES: %s", val);
 
-	return (mode_config(&(s->mode_config), val, MODE_CONFIG_MODES) != MODE_ERR_NONE);
+	return (mode_cfg(&(s->mode_cfg), val, MODE_CFG_MODES) != MODE_ERR_NONE);
 }
 
 static int
@@ -362,7 +362,7 @@ server_set_PREFIX(struct server *s, char *val)
 {
 	DEBUG_MSG("Setting numeric 005 PREFIX: %s", val);
 
-	return (mode_config(&(s->mode_config), val, MODE_CONFIG_PREFIX) != MODE_ERR_NONE);
+	return (mode_cfg(&(s->mode_cfg), val, MODE_CFG_PREFIX) != MODE_ERR_NONE);
 }
 
 void

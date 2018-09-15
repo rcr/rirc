@@ -24,9 +24,9 @@ struct server
 	//TODO: WIP
 	struct channel_list clist;
 	struct connection *connection;
-	struct mode        usermodes;
-	struct mode_str    usermodes_str;
-	struct mode_config mode_config;
+	struct mode usermodes;
+	struct mode_str mode_str;
+	struct mode_cfg mode_cfg;
 	struct server *next;
 	struct server *prev;
 	struct user_list ignore;
