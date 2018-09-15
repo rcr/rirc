@@ -984,7 +984,7 @@ recv_join(struct parsed_mesg *p, struct server *s)
 			channel_set_current(new_channel(chan, s, ccur, BUFFER_CHANNEL));
 		else {
 			c->parted = 0;
-			newlinef(c, 0, ">", "You have rejoined %s", chan);
+			newlinef(c, 0, ">", "Joined %s", chan);
 		}
 		draw_all();
 	} else {

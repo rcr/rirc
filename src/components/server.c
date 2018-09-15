@@ -204,17 +204,6 @@ server_set_005(struct server *s, char *str)
 }
 
 int
-server_set_chans(struct server *s, const char *chans)
-{
-	/* TODO: parse comma seperated list of chans and keys
-	 *       test
-	 */
-	(void)s;
-	(void)chans;
-	return 0;
-}
-
-int
 server_set_nicks(struct server *s, const char *nicks)
 {
 	char *p1, *p2, *base;
@@ -223,7 +212,7 @@ server_set_nicks(struct server *s, const char *nicks)
 	p2 = base = strdup(nicks);
 
 	do {
-		size_t len = 0;
+		n++;
 
 		p1 = p2;
 		p2 = strchr(p2, ',');
@@ -231,15 +220,10 @@ server_set_nicks(struct server *s, const char *nicks)
 		if (p2)
 			*p2++ = 0;
 
-		do {
-			if (!irc_isnickchar(p1[len], (len == 0))) {
-				free(base);
-				return -1;
-			}
-		} while (p1[++len]);
-
-		n++;
-
+		if (!irc_isnick(p1)) {
+			free(base);
+			return -1;
+		}
 	} while (p2);
 
 	free((void *)s->nicks.base);

@@ -205,6 +205,39 @@ free_channel(struct channel *c)
 	channel_free(c);
 }
 
+int
+state_server_set_chans(struct server *s, const char *chans)
+{
+	char *p1, *p2, *base;
+	size_t n = 0;
+
+	p2 = base = strdup(chans);
+
+	do {
+		n++;
+
+		p1 = p2;
+		p2 = strchr(p2, ',');
+
+		if (p2)
+			*p2++ = 0;
+
+		if (!irc_ischan(p1)) {
+			free(base);
+			return -1;
+		}
+	} while (p2);
+
+	for (const char *chan = base; n; n--) {
+		new_channel(chan, s, s->channel, BUFFER_CHANNEL);
+		chan = strchr(chan, 0) + 1;
+	}
+
+	free(base);
+
+	return 0;
+}
+
 /* TODO: buffer_clear */
 void
 channel_clear(struct channel *c)
@@ -274,7 +307,7 @@ channel_close(struct channel *c)
 	 * closed, update state appropriately */
 
 	if (c == state.default_channel) {
-		newline(c, 0, "--", "Type /quit to exit rirc");
+		newline(c, 0, "--", "Type :quit to exit rirc");
 		return;
 	}
 

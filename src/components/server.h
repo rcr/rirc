@@ -52,8 +52,6 @@ struct server* server_list_del(struct server_list*, struct server*);
 
 void server_set_004(struct server*, char*);
 void server_set_005(struct server*, char*);
-
-int server_set_chans(struct server*, const char*);
 int server_set_nicks(struct server*, const char*);
 
 void server_nick_set(struct server*, const char*);

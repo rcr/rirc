@@ -28,7 +28,12 @@ struct string
 	size_t len;
 };
 
-int irc_isnickchar(const char, int);
+int irc_isnickchar(char, int);
+int irc_ischanchar(char, int);
+int irc_isnick(const char*);
+int irc_ischan(const char*);
+
+
 //TODO: replace comps to channel / nicks
 int irc_strcmp(const char*, const char*);
 int irc_strncmp(const char*, const char*, size_t);

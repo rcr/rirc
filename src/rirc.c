@@ -232,9 +232,6 @@ main(int argc, char **argv)
 
 	for (size_t i = 0; i < n_servers; i++) {
 
-		if (cli_servers[i].nicks == NULL)
-			cli_servers[i].nicks = default_nick_set;
-
 		struct server *s = server(
 			cli_servers[i].host,
 			cli_servers[i].port,
@@ -246,10 +243,13 @@ main(int argc, char **argv)
 		if (s == NULL)
 			arg_error("failed to create: %s:%s", cli_servers[i].host, cli_servers[i].port);
 
+		if (cli_servers[i].nicks == NULL)
+			cli_servers[i].nicks = default_nick_set;
+
 		if (server_list_add(state_server_list(), s))
 			arg_error("duplicate server: %s:%s", cli_servers[i].host, cli_servers[i].port);
 
-		if (server_set_chans(s, cli_servers[i].chans))
+		if (cli_servers[i].chans && state_server_set_chans(s, cli_servers[i].chans))
 			arg_error("invalid chans: '%s'", cli_servers[i].chans);
 
 		if (server_set_nicks(s, cli_servers[i].nicks))

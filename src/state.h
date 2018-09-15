@@ -12,6 +12,9 @@
  *
  * Interface for retrieving and altering global state of the program */
 
+int state_server_set_chans(struct server*, const char*);
+
+
 /* state.c */
 /* FIXME: terrible, until i remove references to ccur/rirc */
 #define ccur (current_channel())

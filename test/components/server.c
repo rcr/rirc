@@ -138,15 +138,9 @@ test_server_list(void)
 }
 
 static void
-test_server_set_chans(void)
-{
-	/* TODO */
-}
-
-static void
 test_server_set_nicks(void)
 {
-	struct server *s = server("host1", "port1", NULL, "", "");
+	struct server *s = server("host", "port", NULL, "", "");
 
 	server_nicks_next(s);
 	assert_strncmp(s->nick, "rirc", 4);
@@ -283,7 +277,6 @@ main(void)
 {
 	testcase tests[] = {
 		TESTCASE(test_server_list),
-		TESTCASE(test_server_set_chans),
 		TESTCASE(test_server_set_nicks),
 		TESTCASE(test_parse_opt)
 	};

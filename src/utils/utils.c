@@ -160,26 +160,17 @@ irc_toupper(const int c)
 	 */
 
 	switch (c) {
-
-		case '{':
-			return '[';
-
-		case '}':
-			return ']';
-
-		case '|':
-			return '\\';
-
-		case '^':
-			return '~';
-
+		case '{': return '[';
+		case '}': return ']';
+		case '|': return '\\';
+		case '^': return '~';
 		default:
 			return (c >= 'a' && c <= 'z') ? (c + 'A' - 'a') : c;
 	}
 }
 
 int
-irc_isnickchar(const char c, int first)
+irc_isnickchar(char c, int first)
 {
 	/* RFC 2812, section 2.3.1
 	 *
@@ -190,6 +181,54 @@ irc_isnickchar(const char c, int first)
 	 */
 
 	return ((c >= 0x41 && c <= 0x7D) || (!first && ((c >= 0x30 && c <= 0x39) || c == '-')));
+}
+
+int
+irc_ischanchar(char c, int first)
+{
+	/* RFC 2812, section 2.3.1
+	 *
+	 * channel    =  ( "#" / "+" / ( "!" channelid ) / "&" ) chanstring
+	 *               [ ":" chanstring ]
+	 * chanstring =  %x01-07 / %x08-09 / %x0B-0C / %x0E-1F / %x21-2B
+	 * chanstring =/ %x2D-39 / %x3B-FF
+	 *                 ; any octet except NUL, BELL, CR, LF, " ", "," and ":"
+	 * channelid  = 5( %x41-5A / digit )   ; 5( A-Z / 0-9 )
+	 */
+
+	/* TODO: */
+	(void)c;
+	(void)first;
+
+	return 1;
+}
+
+int
+irc_isnick(const char *str)
+{
+	if (!irc_isnickchar(*str++, 1))
+		return 0;
+
+	while (*str) {
+		if (!irc_isnickchar(*str++, 0))
+			return 0;
+	}
+
+	return 1;
+}
+
+int
+irc_ischan(const char *str)
+{
+	if (!irc_ischanchar(*str++, 1))
+		return 0;
+
+	while (*str) {
+		if (!irc_ischanchar(*str++, 0))
+			return 0;
+	}
+
+	return 1;
 }
 
 int
