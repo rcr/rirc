@@ -29,9 +29,6 @@
 #include "src/state.h"
 #include "src/utils/utils.h"
 
-/* Max length of user action message */
-#define MAX_ACTION_MESG 256
-
 /* List of common IRC commands for tab completion */
 static char* irc_commands[] = {
 	"admin",    "away",     "clear",   "close",
@@ -53,19 +50,36 @@ static char* irc_commands[] = {
 	NULL
 };
 
-char *action_message;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 /* User input handlers */
 static int input_char(char);
 static int input_cchar(const char*, size_t);
-static int input_action(const char*, size_t);
-
-/* Action handling */
-static int (*action_handler)(char);
-static char action_buff[MAX_ACTION_MESG];
-
-/* Incremental channel search */
-static int action_find_channel(char);
 
 /* Case insensitive tab complete for commands and nicks */
 static void tab_complete_command(struct input*, char*, size_t);
@@ -144,9 +158,6 @@ input(struct input *inp, const char *buff, size_t count)
 	/* Handle input, checking for control character or escape
 	 * sequence. Otherwise copy all characters to the input struct
 	 * of the current context */
-
-	if (action_message)
-		return input_action(buff, count);
 
 	if (iscntrl(*buff))
 		return input_cchar(buff, count);
@@ -248,7 +259,7 @@ input_cchar(const char *c, size_t count)
 		case 0x06:
 			/* Find channel */
 			if (ccur->server)
-				action(action_find_channel, "Find: ");
+				; // action(action_find_channel, "Find: ");
 			break;
 
 		/* ^L */
@@ -291,43 +302,6 @@ input_cchar(const char *c, size_t count)
 	return 0;
 }
 
-static int
-input_action(const char *input, size_t len)
-{
-	/* Waiting for user confirmation */
-
-	if (len == 1 && (*input == 0x03 || action_handler(*input))) {
-		/* ^C canceled the action, or the action was resolved */
-
-		action_message = NULL;
-		action_handler = NULL;
-
-		draw_input();
-	}
-
-	return 0;
-}
-
-void
-action(int (*a_handler)(char), const char *fmt, ...)
-{
-	/* Begin a user action
-	 *
-	 * The action handler is then passed any future input, and is
-	 * expected to return a non-zero value when the action is resolved
-	 * */
-
-	va_list ap;
-
-	va_start(ap, fmt);
-	vsnprintf(action_buff, MAX_ACTION_MESG, fmt, ap);
-	va_end(ap);
-
-	action_handler = a_handler;
-	action_message = action_buff;
-
-	draw_input();
-}
 
 /*
  * Input line manipulation functions
@@ -445,108 +419,6 @@ reframe_line(struct input *in)
 		in->window = in->line->text;
 }
 
-/* TODO: This is a first draft for simple channel searching functionality.
- *
- * It can be cleaned up, and input.c is probably not the most ideal place for this */
-#define MAX_SEARCH 128
-struct channel *search_cptr; /* Used for iterative searching, before setting ccur */
-static char search_buff[MAX_SEARCH];
-static char *search_ptr = search_buff;
-
-static struct channel* search_channels(struct channel*, char*);
-static struct channel*
-search_channels(struct channel *start, char *search)
-{
-	if (start == NULL || *search == '\0')
-		return NULL;
-
-	/* Start the search one past the input */
-	struct channel *c = channel_get_next(start);
-
-	while (c != start) {
-
-		if (strstr(c->name.str, search))
-			return c;
-
-		c = channel_get_next(c);
-	}
-
-	return NULL;
-}
-
-/* Action line should be:
- *
- *
- * Find: [current result]/[(server if not current server[socket if not 6667])] : <search input> */
-static int
-action_find_channel(char c)
-{
-	/* Incremental channel search */
-
-	/* \n confirms selecting the current match */
-	if (c == '\n' && search_cptr) {
-		*(search_ptr = search_buff) = '\0';
-		channel_set_current(search_cptr);
-		search_cptr = NULL;
-		draw_all();
-		return 1;
-	}
-
-	/* \n, Esc, ^C cancels a search if no results are found */
-	if (c == '\n' || c == 0x1b || c == 0x03) {
-		*(search_ptr = search_buff) = '\0';
-		return 1;
-	}
-
-	/* ^F repeats the search forward from the current result,
-	 * or resets search criteria if no match */
-	if (c == 0x06) {
-		if (search_cptr == NULL) {
-			*(search_ptr = search_buff) = '\0';
-			action(action_find_channel, "Find: ");
-			return 0;
-		}
-
-		search_cptr = search_channels(search_cptr, search_buff);
-	} else if (c == 0x7f && search_ptr > search_buff) {
-		/* Backspace */
-
-		*(--search_ptr) = '\0';
-
-		search_cptr = search_channels(ccur, search_buff);
-	} else if (isprint(c) && search_ptr < search_buff + MAX_SEARCH && (search_cptr != NULL || *search_buff == '\0')) {
-		/* All other input */
-
-		*(search_ptr++) = c;
-		*search_ptr = '\0';
-
-		search_cptr = search_channels(ccur, search_buff);
-	}
-
-	/* Reprint the action message */
-	if (search_cptr == NULL) {
-		if (*search_buff)
-			action(action_find_channel, "Find: NO MATCH -- %s", search_buff);
-		else
-			action(action_find_channel, "Find: ");
-	} else {
-		/* Found a channel */
-		if (search_cptr->server == ccur->server) {
-			action(action_find_channel, "Find: %s -- %s",
-					search_cptr->name.str, search_buff);
-		} else {
-			if (!strcmp(search_cptr->server->port, "6667"))
-				action(action_find_channel, "Find: %s/%s -- %s",
-						search_cptr->server->host, search_cptr->name.str, search_buff);
-			else
-				action(action_find_channel, "Find: %s:%s/%s -- %s",
-						search_cptr->server->host, search_cptr->server->port,
-						search_cptr->name.str, search_buff);
-		}
-	}
-
-	return 0;
-}
 
 void
 tab_complete(struct input *inp)
