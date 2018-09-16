@@ -50,4 +50,14 @@ void _send_input(struct input*, char*);
 
 int input_empty(struct input*);
 
+/* Input line manipulation functions */
+void cursor_left(struct input*);
+void cursor_right(struct input*);
+void delete_left(struct input*);
+void delete_right(struct input*);
+void input_scroll_backwards(struct input*);
+void input_scroll_forwards(struct input*);
+
+void tab_complete(struct input*);
+
 #endif

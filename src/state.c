@@ -785,6 +785,116 @@ send_cmnd(struct channel *c, char *buf)
 	 */
 }
 
+static int input_cchar(const char*, size_t);
+static int
+input_cchar(const char *c, size_t count)
+{
+	/* Input a control character or escape sequence */
+
+	/* ESC begins a key sequence */
+	if (*c == 0x1b) {
+
+		c++;
+
+		if (*c == 0)
+			return 0;
+
+		/* arrow up */
+		else if (!strncmp(c, "[A", count - 1))
+			input_scroll_backwards(ccur->input);
+
+		/* arrow down */
+		else if (!strncmp(c, "[B", count - 1))
+			input_scroll_forwards(ccur->input);
+
+		/* arrow right */
+		else if (!strncmp(c, "[C", count - 1))
+			cursor_right(ccur->input);
+
+		/* arrow left */
+		else if (!strncmp(c, "[D", count - 1))
+			cursor_left(ccur->input);
+
+		/* delete */
+		else if (!strncmp(c, "[3~", count - 1))
+			delete_right(ccur->input);
+
+		/* page up */
+		else if (!strncmp(c, "[5~", count - 1))
+			buffer_scrollback_back(ccur);
+
+		/* page down */
+		else if (!strncmp(c, "[6~", count - 1))
+			buffer_scrollback_forw(ccur);
+
+	} else switch (*c) {
+
+		/* Backspace */
+		case 0x7F:
+			delete_left(ccur->input);
+			break;
+
+		/* Horizontal tab */
+		case 0x09:
+			tab_complete(ccur->input);
+			break;
+
+		/* ^C */
+		case 0x03:
+			/* Cancel current input */
+			ccur->input->head = ccur->input->line->text;
+			ccur->input->tail = ccur->input->line->text + RIRC_MAX_INPUT;
+			ccur->input->window = ccur->input->line->text;
+			draw_input();
+			break;
+
+		/* ^F */
+		case 0x06:
+			/* Find channel */
+			if (ccur->server)
+				 action(action_find_channel, "Find: ");
+			break;
+
+		/* ^L */
+		case 0x0C:
+			/* Clear current channel */
+			channel_clear(ccur);
+			break;
+
+		/* ^P */
+		case 0x10:
+			/* Go to previous channel */
+			channel_move_prev();
+			break;
+
+		/* ^N */
+		case 0x0E:
+			/* Go to next channel */
+			channel_move_next();
+			break;
+
+		/* ^X */
+		case 0x18:
+			/* Close current channel */
+			channel_close(ccur);
+			break;
+
+		/* ^U */
+		case 0x15:
+			/* Scoll buffer up */
+			buffer_scrollback_back(ccur);
+			break;
+
+		/* ^D */
+		case 0x04:
+			/* Scoll buffer down */
+			buffer_scrollback_forw(ccur);
+			break;
+	}
+
+	return 0;
+}
+
 void
 io_cb_read_inp(char *buff, size_t count)
 {
@@ -792,9 +902,10 @@ io_cb_read_inp(char *buff, size_t count)
 
 	if (action_message) {
 		input_action(buff, count);
-	/* Line feed */
+	} else if (iscntrl(*buff)) {
+		input_cchar(buff, count);
 	} else if (*buff == 0x0A) {
-
+		/* Line feed */
 		char sendbuf[BUFFSIZE];
 
 		if (input_empty(state.current_channel->input))

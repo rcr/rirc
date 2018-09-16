@@ -25,6 +25,7 @@ struct server_list* state_server_list(void);
 
 void state_init(void);
 
+// TODO: most of this stuff can be static
 //TODO: move to channel.c, function of server's channel list
 /* Useful state retrieval abstractions */
 struct channel* channel_get_first(void);

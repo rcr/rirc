@@ -50,49 +50,12 @@ static char* irc_commands[] = {
 	NULL
 };
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 /* User input handlers */
 static int input_char(char);
-static int input_cchar(const char*, size_t);
 
 /* Case insensitive tab complete for commands and nicks */
 static void tab_complete_command(struct input*, char*, size_t);
 static void tab_complete_nick(struct input*, char*, size_t);
-static void tab_complete(struct input*);
-
-/* Input line manipulation functions */
-static inline void cursor_left(struct input*);
-static inline void cursor_right(struct input*);
-static inline void delete_left(struct input*);
-static inline void delete_right(struct input*);
-static inline void input_scroll_backwards(struct input*);
-static inline void input_scroll_forwards(struct input*);
 
 /* Input line util functions */
 static inline void reset_line(struct input*);
@@ -159,9 +122,6 @@ input(struct input *inp, const char *buff, size_t count)
 	 * sequence. Otherwise copy all characters to the input struct
 	 * of the current context */
 
-	if (iscntrl(*buff))
-		return input_cchar(buff, count);
-
 	while (count-- && input_char(*buff))
 		buff++;
 
@@ -193,121 +153,11 @@ input_char(char c)
 	return 1;
 }
 
-static int
-input_cchar(const char *c, size_t count)
-{
-	/* Input a control character or escape sequence */
-
-	/* ESC begins a key sequence */
-	if (*c == 0x1b) {
-
-		c++;
-
-		if (*c == 0)
-			return 0;
-
-		/* arrow up */
-		else if (!strncmp(c, "[A", count - 1))
-			input_scroll_backwards(ccur->input);
-
-		/* arrow down */
-		else if (!strncmp(c, "[B", count - 1))
-			input_scroll_forwards(ccur->input);
-
-		/* arrow right */
-		else if (!strncmp(c, "[C", count - 1))
-			cursor_right(ccur->input);
-
-		/* arrow left */
-		else if (!strncmp(c, "[D", count - 1))
-			cursor_left(ccur->input);
-
-		/* delete */
-		else if (!strncmp(c, "[3~", count - 1))
-			delete_right(ccur->input);
-
-		/* page up */
-		else if (!strncmp(c, "[5~", count - 1))
-			buffer_scrollback_back(ccur);
-
-		/* page down */
-		else if (!strncmp(c, "[6~", count - 1))
-			buffer_scrollback_forw(ccur);
-
-	} else switch (*c) {
-
-		/* Backspace */
-		case 0x7F:
-			delete_left(ccur->input);
-			break;
-
-		/* Horizontal tab */
-		case 0x09:
-			tab_complete(ccur->input);
-			break;
-
-		/* ^C */
-		case 0x03:
-			/* Cancel current input */
-			ccur->input->head = ccur->input->line->text;
-			ccur->input->tail = ccur->input->line->text + RIRC_MAX_INPUT;
-			ccur->input->window = ccur->input->line->text;
-			draw_input();
-			break;
-
-		/* ^F */
-		case 0x06:
-			/* Find channel */
-			if (ccur->server)
-				; // action(action_find_channel, "Find: ");
-			break;
-
-		/* ^L */
-		case 0x0C:
-			/* Clear current channel */
-			channel_clear(ccur);
-			break;
-
-		/* ^P */
-		case 0x10:
-			/* Go to previous channel */
-			channel_move_prev();
-			break;
-
-		/* ^N */
-		case 0x0E:
-			/* Go to next channel */
-			channel_move_next();
-			break;
-
-		/* ^X */
-		case 0x18:
-			/* Close current channel */
-			channel_close(ccur);
-			break;
-
-		/* ^U */
-		case 0x15:
-			/* Scoll buffer up */
-			buffer_scrollback_back(ccur);
-			break;
-
-		/* ^D */
-		case 0x04:
-			/* Scoll buffer down */
-			buffer_scrollback_forw(ccur);
-			break;
-	}
-
-	return 0;
-}
-
-
 /*
  * Input line manipulation functions
  * */
 
-static inline void
+void
 cursor_left(struct input *in)
 {
 	/* Move the cursor left */
@@ -318,7 +168,7 @@ cursor_left(struct input *in)
 	draw_input();
 }
 
-static inline void
+void
 cursor_right(struct input *in)
 {
 	/* Move the cursor right */
@@ -329,7 +179,7 @@ cursor_right(struct input *in)
 	draw_input();
 }
 
-static inline void
+void
 delete_left(struct input *in)
 {
 	/* Delete the character left of the cursor */
@@ -340,7 +190,7 @@ delete_left(struct input *in)
 	draw_input();
 }
 
-static inline void
+void
 delete_right(struct input *in)
 {
 	/* Delete the character right of the cursor */
@@ -351,7 +201,7 @@ delete_right(struct input *in)
 	draw_input();
 }
 
-static inline void
+void
 input_scroll_backwards(struct input *in)
 {
 	/* Scroll backwards through the input history */
@@ -369,7 +219,7 @@ input_scroll_backwards(struct input *in)
 	draw_input();
 }
 
-static inline void
+void
 input_scroll_forwards(struct input *in)
 {
 	/* Scroll forwards through the input history */
@@ -418,7 +268,6 @@ reframe_line(struct input *in)
 	if (in->window < in->line->text)
 		in->window = in->line->text;
 }
-
 
 void
 tab_complete(struct input *inp)
