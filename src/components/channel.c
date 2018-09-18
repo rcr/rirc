@@ -6,8 +6,6 @@
 
 static inline int channel_cmp(struct channel*, struct channel*);
 
-SPLAY_GENERATE(channel_list, channel, node, channel_cmp)
-
 static inline int
 channel_cmp(struct channel *c1, struct channel *c2)
 {
@@ -16,7 +14,7 @@ channel_cmp(struct channel *c1, struct channel *c2)
 }
 
 struct channel*
-channel(const char *name)
+channel(const char *name, enum channel_t type)
 {
 	struct channel *c;
 
@@ -25,8 +23,11 @@ channel(const char *name)
 	if ((c = calloc(1, sizeof(*c) + len + 1)) == NULL)
 		fatal("calloc", errno);
 
+	c->chanmodes_str.type = MODE_STR_CHANMODE;
+	c->input = new_input();
 	c->name.len = len;
 	c->name.str = memcpy(c->_, name, len + 1);
+	c->type = type;
 
 	return c;
 }
@@ -34,25 +35,88 @@ channel(const char *name)
 void
 channel_free(struct channel *c)
 {
+	user_list_free(&(c->users));
+	free_input(c->input);
 	free(c);
 }
 
 struct channel*
 channel_list_add(struct channel_list *cl, struct channel *c)
 {
-	return SPLAY_ADD(channel_list, cl, c);
+	struct channel *tmp;
+
+	if ((tmp = channel_list_get(cl, c->name.str)) != NULL)
+		return tmp;
+
+	if (cl->head == NULL) {
+		cl->head = c->next = c;
+		cl->tail = c->prev = c;
+	} else {
+		c->next = cl->tail->next;
+		c->prev = cl->tail;
+		cl->head->prev = c;
+		cl->tail->next = c;
+		cl->tail = c;
+	}
+
+	return NULL;
 }
+
+// TODO: segault when deleting the tail and try to `prev` the head
 
 struct channel*
 channel_list_del(struct channel_list *cl, struct channel *c)
 {
-	return SPLAY_DEL(channel_list, cl, c);
+	struct channel *tmp_h,
+	               *tmp_t;
+
+	if (cl->head == NULL) {
+		return NULL;
+	} else if (cl->head == c && cl->tail == c) {
+		/* Removing tail */
+		cl->head = NULL;
+		cl->tail = NULL;
+	} else if ((tmp_h = cl->head) == c) {
+		/* Removing head */
+		cl->head = cl->tail->next = cl->head->next;
+		cl->head->prev = cl->tail;
+	} else if ((tmp_t = cl->tail) == c) {
+		/* Removing tail */
+		cl->tail = cl->head->prev = cl->tail->prev;
+		cl->tail->next = cl->head;
+	} else {
+		/* Removing some channel (head, tail) */
+		while ((tmp_h = tmp_h->next) != c) {
+			if (tmp_h == tmp_t)
+				return NULL;
+		}
+		c->next->prev = c->prev;
+		c->prev->next = c->next;
+	}
+
+	c->next = NULL;
+	c->prev = NULL;
+
+	return c;
 }
 
 struct channel*
 channel_list_get(struct channel_list *cl, const char *name)
 {
-	struct channel _chan = { .name = { .str = name } };
+	struct channel *tmp;
+	struct channel c = { .name = { .str = name } };
 
-	return SPLAY_GET(channel_list, cl, &_chan);
+	if ((tmp = cl->head) == NULL)
+		return NULL;
+
+	if (!channel_cmp(cl->head, &c))
+		return cl->head;
+
+	while ((tmp = tmp->next) != cl->head) {
+
+		if (!channel_cmp(tmp, &c))
+			return tmp;
+	}
+
+	return NULL;
 }

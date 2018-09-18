@@ -15,16 +15,18 @@ struct server
 	const char *realname;
 	const char *nick;
 	struct {
-		const char *next;
+		size_t next;
+		size_t size;
+		const char *base;
 		const char **set;
-	} nick_set;
+	} nicks;
 	struct channel *channel;
 	//TODO: WIP
 	struct channel_list clist;
 	struct connection *connection;
-	struct mode        usermodes;
-	struct mode_str    usermodes_str;
-	struct mode_config mode_config;
+	struct mode usermodes;
+	struct mode_str mode_str;
+	struct mode_cfg mode_cfg;
 	struct server *next;
 	struct server *prev;
 	struct user_list ignore;
@@ -47,11 +49,10 @@ struct server* server(
 
 struct server* server_list_add(struct server_list*, struct server*);
 struct server* server_list_del(struct server_list*, struct server*);
+struct server* server_list_get(struct server_list*, const char *, const char*);
 
 void server_set_004(struct server*, char*);
 void server_set_005(struct server*, char*);
-
-int server_set_chans(struct server*, const char*);
 int server_set_nicks(struct server*, const char*);
 
 void server_nick_set(struct server*, const char*);

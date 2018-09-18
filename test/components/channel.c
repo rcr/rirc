@@ -1,5 +1,7 @@
 #include "test/test.h"
 #include "src/components/channel.c"
+#include "src/components/input.c"
+#include "src/components/user.c"
 #include "src/utils/utils.c"
 
 static void
@@ -14,9 +16,9 @@ test_channel_list(void)
 
 	memset(&clist, 0, sizeof(clist));
 
-	c1 = channel("aaa");
-	c2 = channel("bbb");
-	c3 = channel("bbb");
+	c1 = channel("aaa", CHANNEL_T_OTHER);
+	c2 = channel("bbb", CHANNEL_T_OTHER);
+	c3 = channel("bbb", CHANNEL_T_OTHER);
 
 	/* Test adding channels to list */
 	assert_ptrequals(channel_list_add(&clist, c1), NULL);
@@ -31,9 +33,6 @@ test_channel_list(void)
 	/* Test retrieving by name */
 	assert_ptrequals(channel_list_get(&clist, "aaa"), c1);
 	assert_ptrequals(channel_list_get(&clist, "bbb"), c2);
-
-	/* Test replacing user in list */
-	/* TODO */
 
 	/* Test removing channels from list */
 	assert_ptrequals(channel_list_del(&clist, c1), c1);

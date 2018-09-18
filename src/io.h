@@ -1,11 +1,6 @@
 #ifndef IO_H
 #define IO_H
 
-/* FIXME: refactoring, stubbed until removal */
-struct server;
-void server_disconnect(struct server*, int, int, char*);
-
-
 /* Handling off all network io, user input and signals
  *
  * The state of a connection at any given time can be

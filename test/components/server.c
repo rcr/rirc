@@ -10,13 +10,12 @@ channel_set_current(struct channel *c)
 }
 
 struct channel*
-new_channel(const char *n, struct server *s, struct channel *l, enum buffer_t t)
+new_channel(const char *n, struct server *s, enum channel_t t)
 {
 	/* FIXME: mock new_channel until channel() is implemented */
 
 	UNUSED(n);
 	UNUSED(s);
-	UNUSED(l);
 	UNUSED(t);
 	return NULL;
 }
@@ -138,15 +137,56 @@ test_server_list(void)
 }
 
 static void
-test_server_set_chans(void)
-{
-	/* TODO */
-}
-
-static void
 test_server_set_nicks(void)
 {
-	/* TODO */
+	struct server *s = server("host", "port", NULL, "", "");
+
+	server_nicks_next(s);
+	assert_strncmp(s->nick, "rirc", 4);
+
+	/* empty values, invalid formats */
+	assert_eq(server_set_nicks(s, ""), -1);
+	assert_eq(server_set_nicks(s, ","), -1);
+	assert_eq(server_set_nicks(s, ",,,"), -1);
+	assert_eq(server_set_nicks(s, ",a,b,c"), -1);
+	assert_eq(server_set_nicks(s, "a,b,c,"), -1);
+	assert_eq(server_set_nicks(s, "a,b,c "), -1);
+	assert_eq(server_set_nicks(s, "a b c"), -1);
+
+	/* invalid nicks */
+	assert_eq(server_set_nicks(s, "!"), -1);
+	assert_eq(server_set_nicks(s, "0abc"), -1);
+	assert_eq(server_set_nicks(s, "abc,-def"), -1);
+	assert_eq(server_set_nicks(s, "abc,d!ef"), -1);
+
+	assert_strncmp(s->nick, "rirc", 4);
+
+	/* valid */
+	assert_eq(server_set_nicks(s, "a"), 0);
+	assert_eq((signed)s->nicks.size, 1);
+	assert_eq(server_set_nicks(s, "abc,d"), 0);
+	assert_eq((signed)s->nicks.size, 2);
+	assert_eq(server_set_nicks(s, "ab0,d,e-g"), 0);
+	assert_eq((signed)s->nicks.size, 3);
+	assert_eq(server_set_nicks(s, "a_,b__,c___,d____"), 0);
+	assert_eq((signed)s->nicks.size, 4);
+
+	server_nicks_next(s);
+	assert_strcmp(s->nick, "a_");
+	server_nicks_next(s);
+	assert_strcmp(s->nick, "b__");
+	server_nicks_next(s);
+	assert_strcmp(s->nick, "c___");
+	server_nicks_next(s);
+	assert_strcmp(s->nick, "d____");
+	server_nicks_next(s);
+	assert_strncmp(s->nick, "rirc", 4);
+
+	server_nicks_reset(s);
+	server_nicks_next(s);
+	assert_strcmp(s->nick, "a_");
+
+	server_free(s);
 }
 
 static void
@@ -236,7 +276,6 @@ main(void)
 {
 	testcase tests[] = {
 		TESTCASE(test_server_list),
-		TESTCASE(test_server_set_chans),
 		TESTCASE(test_server_set_nicks),
 		TESTCASE(test_parse_opt)
 	};

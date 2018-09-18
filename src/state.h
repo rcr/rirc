@@ -12,24 +12,24 @@
  *
  * Interface for retrieving and altering global state of the program */
 
+int state_server_set_chans(struct server*, const char*);
+struct channel* new_channel(const char*, struct server*, enum channel_t);
+
+
 /* state.c */
-/* FIXME: terrible, until i remove references to ccur/rirc */
-#define ccur (current_channel())
 struct channel* current_channel(void);
 
 struct server_list* state_server_list(void);
 
-void init_state(void);
+void state_init(void);
 
+// TODO: most of this stuff can be static
 //TODO: move to channel.c, function of server's channel list
 /* Useful state retrieval abstractions */
 struct channel* channel_get_first(void);
 struct channel* channel_get_last(void);
 struct channel* channel_get_next(struct channel*);
 struct channel* channel_get_prev(struct channel*);
-
-/* State altering interface */
-struct channel* new_channel(const char*, struct server*, struct channel*, enum buffer_t);
 
 /* FIXME: */
 void buffer_scrollback_back(struct channel*);

@@ -1,36 +1,12 @@
-/* input.c
- *
- * Input handling from stdin
- *
- * All input is handled synchronously and refers to the current
- * channel being drawn (ccur)
- *
- * A buffer input line consists of a doubly linked list of gap buffers
- *
- * Escape sequences are assumed to be ANSI. As such, you mileage may vary
- * */
+/* TODO:
+ * complete rewrite and unit test
+ */
 
-//TODO: complete rewrite,
-// line->end is not properly set in a lot of cases,
-// should be rewritten with a better thought out design
-//
-// keybind handlers or send_mesg() should be returned from input
-// to be called by the stateful code, for easier testing
-
-#include <ctype.h>
-#include <stdarg.h>
-#include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
 
 #include "src/components/input.h"
-#include "src/io.h"
 #include "src/state.h"
 #include "src/utils/utils.h"
-
-/* Max length of user action message */
-#define MAX_ACTION_MESG 256
 
 /* List of common IRC commands for tab completion */
 static char* irc_commands[] = {
@@ -53,39 +29,16 @@ static char* irc_commands[] = {
 	NULL
 };
 
-char *action_message;
-
 /* User input handlers */
-static int input_char(char);
-static int input_cchar(const char*, size_t);
-static int input_action(const char*, size_t);
-
-/* Action handling */
-static int (*action_handler)(char);
-static char action_buff[MAX_ACTION_MESG];
-
-/* Incremental channel search */
-static int action_find_channel(char);
+static int input_char(struct input*, char);
 
 /* Case insensitive tab complete for commands and nicks */
-static void tab_complete_command(struct input*, char*, size_t);
-static void tab_complete_nick(struct input*, char*, size_t);
-static void tab_complete(struct input*);
-
-/* Send the current input to be parsed and handled */
-static void send_input(void);
-
-/* Input line manipulation functions */
-static inline void cursor_left(struct input*);
-static inline void cursor_right(struct input*);
-static inline void delete_left(struct input*);
-static inline void delete_right(struct input*);
-static inline void input_scroll_backwards(struct input*);
-static inline void input_scroll_forwards(struct input*);
+static int tab_complete_command(struct input*, char*, size_t);
+static int tab_complete_nick(struct input*, struct user_list*, char*, size_t);
 
 /* Input line util functions */
 static inline void reset_line(struct input*);
-static inline void reframe_line(struct input*);
+static inline void reframe_line(struct input*, unsigned int);
 
 static void new_list_head(struct input*);
 
@@ -148,21 +101,15 @@ input(struct input *inp, const char *buff, size_t count)
 	 * sequence. Otherwise copy all characters to the input struct
 	 * of the current context */
 
-	if (action_message)
-		return input_action(buff, count);
+	size_t start = count;
 
-	if (iscntrl(*buff))
-		return input_cchar(buff, count);
-
-	while (count-- && input_char(*buff))
+	while (count && input_char(inp, *buff)) {
 		buff++;
+		count--;
+	}
 
-	/* FIXME: by the time control reaches here, the input
-	 * buffer should be know, remove all references to ccur
-	 * in this file */
-	UNUSED(inp);
-
-	return 0;
+	/* returns zero if no characters added */
+	return (start != count);
 }
 
 /*
@@ -170,255 +117,104 @@ input(struct input *inp, const char *buff, size_t count)
  * */
 
 static int
-input_char(char c)
+input_char(struct input *inp, char c)
 {
 	/* Input a single character */
 
-	if (ccur->input->head >= ccur->input->tail)
+	if (inp->head >= inp->tail)
 		/* Gap buffer is full */
 		return 0;
 
-	*ccur->input->head++ = c;
-
-	draw_input();
-
+	*inp->head++ = c;
 	return 1;
-}
-
-static int
-input_cchar(const char *c, size_t count)
-{
-	/* Input a control character or escape sequence */
-
-	/* ESC begins a key sequence */
-	if (*c == 0x1b) {
-
-		c++;
-
-		if (*c == 0)
-			return 0;
-
-		/* arrow up */
-		else if (!strncmp(c, "[A", count - 1))
-			input_scroll_backwards(ccur->input);
-
-		/* arrow down */
-		else if (!strncmp(c, "[B", count - 1))
-			input_scroll_forwards(ccur->input);
-
-		/* arrow right */
-		else if (!strncmp(c, "[C", count - 1))
-			cursor_right(ccur->input);
-
-		/* arrow left */
-		else if (!strncmp(c, "[D", count - 1))
-			cursor_left(ccur->input);
-
-		/* delete */
-		else if (!strncmp(c, "[3~", count - 1))
-			delete_right(ccur->input);
-
-		/* page up */
-		else if (!strncmp(c, "[5~", count - 1))
-			buffer_scrollback_back(ccur);
-
-		/* page down */
-		else if (!strncmp(c, "[6~", count - 1))
-			buffer_scrollback_forw(ccur);
-
-	} else switch (*c) {
-
-		/* Backspace */
-		case 0x7F:
-			delete_left(ccur->input);
-			break;
-
-		/* Horizontal tab */
-		case 0x09:
-			tab_complete(ccur->input);
-			break;
-
-		/* Line feed */
-		case 0x0A:
-			send_input();
-			break;
-
-		/* ^C */
-		case 0x03:
-			/* Cancel current input */
-			ccur->input->head = ccur->input->line->text;
-			ccur->input->tail = ccur->input->line->text + RIRC_MAX_INPUT;
-			ccur->input->window = ccur->input->line->text;
-			draw_input();
-			break;
-
-		/* ^F */
-		case 0x06:
-			/* Find channel */
-			if (ccur->server)
-				action(action_find_channel, "Find: ");
-			break;
-
-		/* ^L */
-		case 0x0C:
-			/* Clear current channel */
-			channel_clear(ccur);
-			break;
-
-		/* ^P */
-		case 0x10:
-			/* Go to previous channel */
-			channel_move_prev();
-			break;
-
-		/* ^N */
-		case 0x0E:
-			/* Go to next channel */
-			channel_move_next();
-			break;
-
-		/* ^X */
-		case 0x18:
-			/* Close current channel */
-			channel_close(ccur);
-			break;
-
-		/* ^U */
-		case 0x15:
-			/* Scoll buffer up */
-			buffer_scrollback_back(ccur);
-			break;
-
-		/* ^D */
-		case 0x04:
-			/* Scoll buffer down */
-			buffer_scrollback_forw(ccur);
-			break;
-	}
-
-	return 0;
-}
-
-static int
-input_action(const char *input, size_t len)
-{
-	/* Waiting for user confirmation */
-
-	if (len == 1 && (*input == 0x03 || action_handler(*input))) {
-		/* ^C canceled the action, or the action was resolved */
-
-		action_message = NULL;
-		action_handler = NULL;
-
-		draw_input();
-	}
-
-	return 0;
-}
-
-void
-action(int (*a_handler)(char), const char *fmt, ...)
-{
-	/* Begin a user action
-	 *
-	 * The action handler is then passed any future input, and is
-	 * expected to return a non-zero value when the action is resolved
-	 * */
-
-	va_list ap;
-
-	va_start(ap, fmt);
-	vsnprintf(action_buff, MAX_ACTION_MESG, fmt, ap);
-	va_end(ap);
-
-	action_handler = a_handler;
-	action_message = action_buff;
-
-	draw_input();
 }
 
 /*
  * Input line manipulation functions
  * */
 
-static inline void
+int
 cursor_left(struct input *in)
 {
 	/* Move the cursor left */
 
-	if (in->head > in->line->text)
+	if (in->head > in->line->text) {
 		*(--in->tail) = *(--in->head);
+		return 1;
+	}
 
-	draw_input();
+	return 0;
 }
 
-static inline void
+int
 cursor_right(struct input *in)
 {
 	/* Move the cursor right */
 
-	if (in->tail < in->line->text + RIRC_MAX_INPUT)
+	if (in->tail < in->line->text + RIRC_MAX_INPUT) {
 		*(in->head++) = *(in->tail++);
+		return 1;
+	}
 
-	draw_input();
+	return 0;
 }
 
-static inline void
+int
 delete_left(struct input *in)
 {
 	/* Delete the character left of the cursor */
 
-	if (in->head > in->line->text)
+	if (in->head > in->line->text) {
 		in->head--;
+		return 1;
+	}
 
-	draw_input();
+	return 0;
 }
 
-static inline void
+int
 delete_right(struct input *in)
 {
 	/* Delete the character right of the cursor */
 
-	if (in->tail < in->line->text + RIRC_MAX_INPUT)
+	if (in->tail < in->line->text + RIRC_MAX_INPUT) {
 		in->tail++;
+		return 1;
+	}
 
-	draw_input();
+	return 0;
 }
 
-static inline void
-input_scroll_backwards(struct input *in)
+int
+input_scroll_back(struct input *in, unsigned int cols)
 {
 	/* Scroll backwards through the input history */
 
 	/* Scrolling backwards on the last line */
 	if (in->line->prev == in->list_head)
-		return;
+		return 0;
 
 	reset_line(in);
-
 	in->line = in->line->prev;
+	reframe_line(in, cols);
 
-	reframe_line(in);
-
-	draw_input();
+	return 1;
 }
 
-static inline void
-input_scroll_forwards(struct input *in)
+int
+input_scroll_forw(struct input *in, unsigned int cols)
 {
 	/* Scroll forwards through the input history */
 
 	/* Scrolling forward on the first line */
 	if (in->line == in->list_head)
-		return;
+		return 0;
 
 	reset_line(in);
-
 	in->line = in->line->next;
+	reframe_line(in, cols);
 
-	reframe_line(in);
-
-	draw_input();
+	return 1;
 }
 
 /*
@@ -441,123 +237,20 @@ reset_line(struct input *in)
 }
 
 static inline void
-reframe_line(struct input *in)
+reframe_line(struct input *in, unsigned int cols)
 {
 	/* Reframe a line's draw window */
 
 	in->head = in->line->end;
 	in->tail = in->line->text + RIRC_MAX_INPUT;
-	in->window = in->head - (2 * io_tty_cols() / 3);
+	in->window = in->head - (2 * cols / 3);
 
 	if (in->window < in->line->text)
 		in->window = in->line->text;
 }
 
-/* TODO: This is a first draft for simple channel searching functionality.
- *
- * It can be cleaned up, and input.c is probably not the most ideal place for this */
-#define MAX_SEARCH 128
-struct channel *search_cptr; /* Used for iterative searching, before setting ccur */
-static char search_buff[MAX_SEARCH];
-static char *search_ptr = search_buff;
-
-static struct channel* search_channels(struct channel*, char*);
-static struct channel*
-search_channels(struct channel *start, char *search)
-{
-	if (start == NULL || *search == '\0')
-		return NULL;
-
-	/* Start the search one past the input */
-	struct channel *c = channel_get_next(start);
-
-	while (c != start) {
-
-		if (strstr(c->name.str, search))
-			return c;
-
-		c = channel_get_next(c);
-	}
-
-	return NULL;
-}
-
-/* Action line should be:
- *
- *
- * Find: [current result]/[(server if not current server[socket if not 6667])] : <search input> */
-static int
-action_find_channel(char c)
-{
-	/* Incremental channel search */
-
-	/* \n confirms selecting the current match */
-	if (c == '\n' && search_cptr) {
-		*(search_ptr = search_buff) = '\0';
-		channel_set_current(search_cptr);
-		search_cptr = NULL;
-		draw_all();
-		return 1;
-	}
-
-	/* \n, Esc, ^C cancels a search if no results are found */
-	if (c == '\n' || c == 0x1b || c == 0x03) {
-		*(search_ptr = search_buff) = '\0';
-		return 1;
-	}
-
-	/* ^F repeats the search forward from the current result,
-	 * or resets search criteria if no match */
-	if (c == 0x06) {
-		if (search_cptr == NULL) {
-			*(search_ptr = search_buff) = '\0';
-			action(action_find_channel, "Find: ");
-			return 0;
-		}
-
-		search_cptr = search_channels(search_cptr, search_buff);
-	} else if (c == 0x7f && search_ptr > search_buff) {
-		/* Backspace */
-
-		*(--search_ptr) = '\0';
-
-		search_cptr = search_channels(ccur, search_buff);
-	} else if (isprint(c) && search_ptr < search_buff + MAX_SEARCH && (search_cptr != NULL || *search_buff == '\0')) {
-		/* All other input */
-
-		*(search_ptr++) = c;
-		*search_ptr = '\0';
-
-		search_cptr = search_channels(ccur, search_buff);
-	}
-
-	/* Reprint the action message */
-	if (search_cptr == NULL) {
-		if (*search_buff)
-			action(action_find_channel, "Find: NO MATCH -- %s", search_buff);
-		else
-			action(action_find_channel, "Find: ");
-	} else {
-		/* Found a channel */
-		if (search_cptr->server == ccur->server) {
-			action(action_find_channel, "Find: %s -- %s",
-					search_cptr->name.str, search_buff);
-		} else {
-			if (!strcmp(search_cptr->server->port, "6667"))
-				action(action_find_channel, "Find: %s/%s -- %s",
-						search_cptr->server->host, search_cptr->name.str, search_buff);
-			else
-				action(action_find_channel, "Find: %s:%s/%s -- %s",
-						search_cptr->server->host, search_cptr->server->port,
-						search_cptr->name.str, search_buff);
-		}
-	}
-
-	return 0;
-}
-
-void
-tab_complete(struct input *inp)
+int
+tab_complete(struct input *inp, struct user_list *ul)
 {
 	/* Case insensitive tab complete for commands and nicks */
 
@@ -566,23 +259,23 @@ tab_complete(struct input *inp)
 
 	/* Don't tab complete at beginning of line or if previous character is space */
 	if (inp->head == inp->line->text || *(inp->head - 1) == ' ')
-		return;
+		return 0;
 
 	/* Don't tab complete if cursor is scrolled left and next character isn't space */
 	if (inp->tail < (inp->line->text + RIRC_MAX_INPUT) && *inp->tail != ' ')
-		return;
+		return 0;
 
 	/* Scan backwards for the point to tab complete from */
 	while (str > inp->line->text && *(str - 1) != ' ')
 		len++, str--;
 
 	if (str == inp->line->text && *str == '/')
-		tab_complete_command(inp, ++str, --len);
+		return tab_complete_command(inp, ++str, --len);
 	else
-		tab_complete_nick(inp, str, len);
+		return tab_complete_nick(inp, ul, str, len);
 }
 
-static void
+static int
 tab_complete_command(struct input *inp, char *str, size_t len)
 {
 	/* Command tab completion */
@@ -600,15 +293,19 @@ tab_complete_command(struct input *inp, char *str, size_t len)
 		while (len--)
 			delete_left(inp);
 
-		while (*p && input_char(*p++))
+		while (*p && input_char(inp, *p++))
 			;
 
-		input_char(' ');
+		input_char(inp, ' ');
+
+		return 1;
+	} else {
+		return 0;
 	}
 }
 
-static void
-tab_complete_nick(struct input *inp, char *str, size_t len)
+static int
+tab_complete_nick(struct input *inp, struct user_list *ul, char *str, size_t len)
 {
 	/* Nick tab completion */
 
@@ -616,7 +313,7 @@ tab_complete_nick(struct input *inp, char *str, size_t len)
 
 	struct user *u;
 
-	if ((u = user_list_get(&(ccur->users), str, len))) {
+	if ((u = user_list_get(ul, str, len))) {
 
 		p = u->nick.str;
 
@@ -624,14 +321,18 @@ tab_complete_nick(struct input *inp, char *str, size_t len)
 		while (len--)
 			delete_left(inp);
 
-		while (*p && input_char(*p++))
+		while (*p && input_char(inp, *p++))
 			;
 
 		/* Tab completing first word in input, append delimiter and space */
 		if (str == inp->line->text) {
-			input_char(TAB_COMPLETE_DELIMITER);
-			input_char(' ');
+			input_char(inp, TAB_COMPLETE_DELIMITER);
+			input_char(inp, ' ');
 		}
+
+		return 1;
+	} else {
+		return 0;
 	}
 }
 
@@ -639,23 +340,16 @@ tab_complete_nick(struct input *inp, char *str, size_t len)
  * Input sending functions
  * */
 
-/* TODO: pass channel into this function too */
-static void
-send_input(void)
+void
+_send_input(struct input *in, char *buf)
 {
-	char sendbuff[BUFFSIZE];
-
-	struct input *in = ccur->input;
+	/* FIXME: refactoring WIP */
 
 	/* Before sending, copy the tail of the gap buffer back to the head */
 	reset_line(in);
 
-	/* After resetting, check for empty line */
-	if (in->head == in->line->text)
-		return;
-
 	/* Pass a copy of the message to the send handler, since it may modify the contents */
-	strcpy(sendbuff, in->line->text);
+	strcpy(buf, in->line->text);
 
 	/* Now check if the sent line was 'new' or was resent input scrollback
 	 *
@@ -691,12 +385,12 @@ send_input(void)
 		in->line->next = in->list_head;
 
 		in->line = in->list_head;
-
-		reframe_line(in);
 	}
+}
 
-	draw_input();
-
-	/* Send the message last; the channel might be closed as a result of the command */
-	send_mesg(ccur->server, ccur, sendbuff);
+int
+input_empty(struct input *in)
+{
+	/* FIXME: if cursor is 0 this is wrong */
+	return (in->head == in->line->text);
 }

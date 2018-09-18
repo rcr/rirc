@@ -207,9 +207,9 @@ buffer_scrollback_status(struct buffer *b)
 }
 
 struct buffer
-buffer(enum buffer_t type)
+buffer(void)
 {
 	/* Initialize a buffer */
 
-	return (struct buffer) { .type = type };
+	return (struct buffer) {0};
 }

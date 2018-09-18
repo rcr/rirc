@@ -7,4 +7,6 @@ extern const char *default_nick_set;
 extern const char *default_username;
 extern const char *default_realname;
 
+extern const char *runtime_name;
+
 #endif

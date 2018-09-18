@@ -3,7 +3,8 @@
  *
  * All manipulation of global program state
  *
- **/
+ * TODO: moved keys, actions to this file. needs cleanup
+ */
 
 #include <ctype.h>
 #include <stdlib.h>
@@ -14,6 +15,7 @@
 
 #include "src/draw.h"
 #include "src/io.h"
+#include "src/rirc.h"
 #include "src/state.h"
 #include "src/utils/utils.h"
 
@@ -33,7 +35,6 @@ state_server_list(void)
 	return &state.servers;
 }
 
-static int action_close_server(char);
 static void term_state(void);
 
 static void _newline(struct channel*, enum buffer_line_t, const char*, const char*, va_list);
@@ -65,13 +66,13 @@ redraw(void)
 }
 
 void
-init_state(void)
+state_init(void)
 {
 	/* atexit doesn't set errno */
 	if (atexit(term_state) != 0)
 		fatal("atexit", 0);
 
-	state.default_channel = state.current_channel = new_channel("rirc", NULL, NULL, BUFFER_OTHER);
+	state.default_channel = state.current_channel = new_channel("rirc", NULL, CHANNEL_T_OTHER);
 
 	/* Splashscreen */
 	newline(state.default_channel, 0, "--", "      _");
@@ -96,16 +97,16 @@ term_state(void)
 {
 	/* Exit handler; must return normally */
 
-	free_channel(state.default_channel);
-
 	/* Reset terminal colours */
 	printf("\x1b[38;0;m");
 	printf("\x1b[48;0;m");
 
 #ifndef DEBUG
 	/* Clear screen */
-	if (!fatal_exit)
+	if (!fatal_exit) {
 		printf("\x1b[H\x1b[J");
+		channel_free(state.default_channel);
+	}
 #endif
 }
 
@@ -164,28 +165,21 @@ _newline(struct channel *c, enum buffer_line_t type, const char *from, const cha
 
 	c->activity = MAX(c->activity, ACTIVITY_ACTIVE);
 
-	if (c == ccur)
+	if (c == current_channel())
 		draw_buffer();
 	else
 		draw_nav();
 }
 
 struct channel*
-new_channel(const char *name, struct server *s, struct channel *chanlist, enum buffer_t type)
+new_channel(const char *name, struct server *s, enum channel_t type)
 {
-	struct channel *c = channel(name);
+	struct channel *c = channel(name, type);
 
 	/* TODO: deprecated, move to channel.c */
 
-	c->buffer = buffer(type);
-	c->chanmodes_str.type = MODE_STR_CHANMODE;
-	c->input = new_input();
-	c->server = s;
-
-	/* Append the new channel to the list */
-	DLL_ADD(chanlist, c);
-
 	if (s) {
+		c->server = s;
 		channel_list_add(&s->clist, c);
 	}
 
@@ -194,26 +188,108 @@ new_channel(const char *name, struct server *s, struct channel *chanlist, enum b
 	return c;
 }
 
-void
-free_channel(struct channel *c)
+int
+state_server_set_chans(struct server *s, const char *chans)
 {
-	/* TODO: deprecated, move to channel.c */
+	char *p1, *p2, *base;
+	size_t n = 0;
 
-	user_list_free(&(c->users));
-	free_input(c->input);
+	p2 = base = strdup(chans);
 
-	channel_free(c);
+	do {
+		n++;
+
+		p1 = p2;
+		p2 = strchr(p2, ',');
+
+		if (p2)
+			*p2++ = 0;
+
+		if (!irc_ischan(p1)) {
+			free(base);
+			return -1;
+		}
+	} while (p2);
+
+	for (const char *chan = base; n; n--) {
+		new_channel(chan, s, CHANNEL_T_CHANNEL);
+		chan = strchr(chan, 0) + 1;
+	}
+
+	free(base);
+
+	return 0;
 }
 
 /* TODO: buffer_clear */
 void
 channel_clear(struct channel *c)
 {
-	c->buffer = buffer(c->buffer.type);
-
+	c->buffer = buffer();
 	draw_buffer();
 }
 
+/* WIP:
+ *
+ * removed action subsystem from input.c
+ *
+ * eventually should go in action.{h,c}
+ *
+ */
+/* Max length of user action message */
+#define MAX_ACTION_MESG 256
+char *action_message;
+static int action_close_server(char);
+static int input_action(const char*, size_t);
+/* Action handling */
+static int (*action_handler)(char);
+static char action_buff[MAX_ACTION_MESG];
+/* Incremental channel search */
+static int action_find_channel(char);
+/* TODO: This is a first draft for simple channel searching functionality.
+ *
+ * It can be cleaned up, and input.c is probably not the most ideal place for this */
+#define MAX_SEARCH 128
+struct channel *search_cptr; /* Used for iterative searching, before setting the current channel */
+static char search_buff[MAX_SEARCH];
+static char *search_ptr = search_buff;
+
+static struct channel* search_channels(struct channel*, char*);
+static struct channel*
+search_channels(struct channel *start, char *search)
+{
+	if (start == NULL || *search == '\0')
+		return NULL;
+
+	/* Start the search one past the input */
+	struct channel *c = channel_get_next(start);
+
+	while (c != start) {
+
+		if (strstr(c->name.str, search))
+			return c;
+
+		c = channel_get_next(c);
+	}
+
+	return NULL;
+}
+static int
+input_action(const char *input, size_t len)
+{
+	/* Waiting for user confirmation */
+
+	if (len == 1 && (*input == 0x03 || action_handler(*input))) {
+		/* ^C canceled the action, or the action was resolved */
+
+		action_message = NULL;
+		action_handler = NULL;
+
+		return 1;
+	}
+
+	return 0;
+}
 static int
 action_close_server(char c)
 {
@@ -224,18 +300,118 @@ action_close_server(char c)
 
 	if (c == 'y' || c == 'Y') {
 
-		//FIXME: logic here sucks
-		struct channel *c = ccur;
+		int ret;
+		struct channel *c = current_channel();
+		struct server *s = c->server;
 
 		/* If closing the last server */
 		if ((state.current_channel = c->server->next->channel) == c->server->channel)
 			state.current_channel = state.default_channel;
 
-		server_disconnect(c->server, 0, 1, DEFAULT_QUIT_MESG);
+		if ((ret = io_sendf(s->connection, "QUIT %s", DEFAULT_QUIT_MESG)))
+			newlinef(s->channel, 0, "-!!-", "sendf fail: %s", io_err(ret));
+
+		io_dx(s->connection);
+		server_list_del(state_server_list(), s);
+		io_free(s->connection);
+		server_free(s);
 
 		draw_all();
 
 		return 1;
+	}
+
+	return 0;
+}
+void
+action(int (*a_handler)(char), const char *fmt, ...)
+{
+	/* Begin a user action
+	 *
+	 * The action handler is then passed any future input, and is
+	 * expected to return a non-zero value when the action is resolved
+	 * */
+
+	va_list ap;
+
+	va_start(ap, fmt);
+	vsnprintf(action_buff, MAX_ACTION_MESG, fmt, ap);
+	va_end(ap);
+
+	action_handler = a_handler;
+	action_message = action_buff;
+
+	draw_input();
+}
+/* Action line should be:
+ *
+ *
+ * Find: [current result]/[(server if not current server[socket if not 6667])] : <search input> */
+static int
+action_find_channel(char c)
+{
+	/* Incremental channel search */
+
+	/* \n confirms selecting the current match */
+	if (c == '\n' && search_cptr) {
+		*(search_ptr = search_buff) = '\0';
+		channel_set_current(search_cptr);
+		search_cptr = NULL;
+		draw_all();
+		return 1;
+	}
+
+	/* \n, Esc, ^C cancels a search if no results are found */
+	if (c == '\n' || c == 0x1b || c == 0x03) {
+		*(search_ptr = search_buff) = '\0';
+		return 1;
+	}
+
+	/* ^F repeats the search forward from the current result,
+	 * or resets search criteria if no match */
+	if (c == 0x06) {
+		if (search_cptr == NULL) {
+			*(search_ptr = search_buff) = '\0';
+			action(action_find_channel, "Find: ");
+			return 0;
+		}
+
+		search_cptr = search_channels(search_cptr, search_buff);
+	} else if (c == 0x7f && search_ptr > search_buff) {
+		/* Backspace */
+
+		*(--search_ptr) = '\0';
+
+		search_cptr = search_channels(current_channel(), search_buff);
+	} else if (isprint(c) && search_ptr < search_buff + MAX_SEARCH && (search_cptr != NULL || *search_buff == '\0')) {
+		/* All other input */
+
+		*(search_ptr++) = c;
+		*search_ptr = '\0';
+
+		search_cptr = search_channels(current_channel(), search_buff);
+	}
+
+	/* Reprint the action message */
+	if (search_cptr == NULL) {
+		if (*search_buff)
+			action(action_find_channel, "Find: NO MATCH -- %s", search_buff);
+		else
+			action(action_find_channel, "Find: ");
+	} else {
+		/* Found a channel */
+		if (search_cptr->server == current_channel()->server) {
+			action(action_find_channel, "Find: %s -- %s",
+					search_cptr->name.str, search_buff);
+		} else {
+			if (!strcmp(search_cptr->server->port, "6667"))
+				action(action_find_channel, "Find: %s/%s -- %s",
+						search_cptr->server->host, search_cptr->name.str, search_buff);
+			else
+				action(action_find_channel, "Find: %s:%s/%s -- %s",
+						search_cptr->server->host, search_cptr->server->port,
+						search_cptr->name.str, search_buff);
+		}
 	}
 
 	return 0;
@@ -267,16 +443,16 @@ channel_close(struct channel *c)
 	 * closed, update state appropriately */
 
 	if (c == state.default_channel) {
-		newline(c, 0, "--", "Type /quit to exit rirc");
+		newline(c, 0, "--", "Type :quit to exit rirc");
 		return;
 	}
 
-	if (c->buffer.type == BUFFER_SERVER) {
+	if (c->type == CHANNEL_T_SERVER) {
 		/* Closing a server, confirm the number of channels being closed */
 
 		int num_chans = 0;
 
-		while ((c = c->next)->buffer.type != BUFFER_SERVER)
+		while ((c = c->next)->type != CHANNEL_T_SERVER)
 			num_chans++;
 
 		if (num_chans)
@@ -286,26 +462,24 @@ channel_close(struct channel *c)
 			action(action_close_server, "Close server '%s'?   [y/n]", c->server->host);
 	} else {
 		/* Closing a channel */
-		if (c->buffer.type == BUFFER_CHANNEL && !c->parted) {
+
+		if (c->type == CHANNEL_T_CHANNEL && !c->parted) {
 			int ret;
 			if (0 != (ret = io_sendf(c->server->connection, "PART %s", c->name.str))) {
+				// FIXME: closing a parted channel when server is disconnected isnt an error
 				newlinef(c->server->channel, 0, "sendf fail", "%s", io_err(ret));
 			}
 		}
 
 		/* If closing the current channel, update state to a new channel */
-		if (c == ccur) {
-			state.current_channel = !(c->next == c->server->channel) ? c->next : c->prev;
-			draw_all();
+		if (c == current_channel()) {
+			channel_set_current(c->next);
 		} else {
 			draw_nav();
 		}
 
-		DLL_DEL(c->server->channel, c);
-
 		channel_list_del(&c->server->clist, c);
-
-		free_channel(c);
+		channel_free(c);
 	}
 }
 
@@ -406,14 +580,6 @@ channel_get_first(void)
 	struct server *s = state.servers.head;
 
 	return s ? s->channel : NULL;
-
-	/* FIXME: */
-#if 0
-	struct server *s = state.servers.head;
-
-	/* First channel of the first server */
-	return !s ? state.default_channel : s->channel;
-#endif
 }
 
 struct channel*
@@ -421,15 +587,7 @@ channel_get_last(void)
 {
 	struct server *s = state.servers.tail;
 
-	return s ? s->channel : NULL;
-
-	/* FIXME: */
-#if 0
-	struct server *s = state.servers.tail;
-
-	/* Last channel of the last server */
-	return !s ? state.default_channel : s->channel->prev;
-#endif
+	return s ? s->channel->prev : NULL;
 }
 
 struct channel*
@@ -437,9 +595,10 @@ channel_get_next(struct channel *c)
 {
 	if (c == state.default_channel)
 		return c;
-	else
+	else {
 		/* Return the next channel, accounting for server wrap around */
-		return !(c->next == c->server->channel) ?  c->next : c->server->next->channel;
+		return !(c->next == c->server->channel) ? c->next : c->server->next->channel;
+	}
 }
 
 struct channel*
@@ -449,16 +608,14 @@ channel_get_prev(struct channel *c)
 		return c;
 	else
 		/* Return the previous channel, accounting for server wrap around */
-		return !(c == c->server->channel) ?  c->prev : c->server->prev->channel->prev;
+		return !(c == c->server->channel) ? c->prev : c->server->prev->channel->prev;
 }
 
 void
 channel_set_current(struct channel *c)
 {
 	/* Set the state to an arbitrary channel */
-
 	state.current_channel = c;
-
 	draw_all();
 }
 
@@ -501,13 +658,14 @@ state_io_cxed(struct server *s)
 	server_nicks_reset(s);
 	server_nicks_next(s);
 
+	if (s->pass && (ret = io_sendf(s->connection, "PASS %s", s->pass)))
+		newlinef(s->channel, 0, "-!!-", "sendf fail: %s", io_err(ret));
+
 	if ((ret = io_sendf(s->connection, "NICK %s", s->nick)))
 		newlinef(s->channel, 0, "-!!-", "sendf fail: %s", io_err(ret));
 
 	if ((ret = io_sendf(s->connection, "USER %s 8 * :%s", s->username, s->realname)))
 		newlinef(s->channel, 0, "-!!-", "sendf fail: %s", io_err(ret));
-
-	// TODO: send PASS if set
 }
 
 static void
@@ -570,22 +728,230 @@ io_cb(enum io_cb_t type, const void *cb_obj, ...)
 	redraw();
 }
 
+static void
+send_cmnd(struct channel *c, char *buf)
+{
+	const char *cmnd;
+
+	if (!(cmnd = getarg(&buf, " "))) {
+		newline(c, 0, "-!!-", "Messages beginning with ':' require a command");
+		return;
+	}
+
+	if (!strcasecmp(cmnd, "quit")) {
+		/* TODO: close servers, free */
+		exit(EXIT_SUCCESS);
+	}
+
+	if (!strcasecmp(cmnd, "connect")) {
+
+		const char *host = NULL,
+		           *port = NULL,
+		           *pass = NULL,
+		           *user = NULL,
+		           *real = NULL,
+		           *help = ":connect [host [port] [pass] [user] [real]]";
+
+		struct server *s;
+
+		if (!(host = getarg(&buf, " "))) {
+			newlinef(c, 0, "-!!-", "%s", help);
+			return;
+		}
+
+		port = getarg(&buf, " ");
+		pass = getarg(&buf, " ");
+		user = getarg(&buf, " ");
+		real = getarg(&buf, " ");
+
+		port = (port ? port : "6667");
+		user = default_username;
+		real = default_realname;
+
+		if ((s = server_list_get(&state.servers, host, port)) != NULL) {
+			channel_set_current(s->channel);
+			newlinef(s->channel, 0, "-!!-", "already connected to %s:%s", host, port);
+		} else {
+			if ((s = server(host, port, pass, user, real)) == NULL)
+				fatal("failed to create server", 0);
+
+			server_list_add(state_server_list(), s);
+			channel_set_current(s->channel);
+			io_cx(s->connection);
+			draw_all();
+		}
+		return;
+	}
+
+	if (!strcasecmp(cmnd, "clear")) {
+		channel_clear(current_channel());
+		return;
+	}
+
+	if (!strcasecmp(cmnd, "close")) {
+		channel_close(current_channel());
+		return;
+	}
+
+	if (!strcasecmp(cmnd, "set")) {
+		/* TODO user, real, nicks, pass, key */
+		return;
+	}
+}
+
+static int input_cchar(const char*, size_t);
+static int
+input_cchar(const char *c, size_t count)
+{
+	/* Input a control character or escape sequence */
+
+	/* ESC begins a key sequence */
+	if (*c == 0x1b) {
+
+		c++;
+
+		if (*c == 0)
+			return 0;
+
+		/* arrow up */
+		else if (!strncmp(c, "[A", count - 1))
+			return input_scroll_back(current_channel()->input, io_tty_cols());
+
+		/* arrow down */
+		else if (!strncmp(c, "[B", count - 1))
+			return input_scroll_forw(current_channel()->input, io_tty_cols());
+
+		/* arrow right */
+		else if (!strncmp(c, "[C", count - 1))
+			return cursor_right(current_channel()->input);
+
+		/* arrow left */
+		else if (!strncmp(c, "[D", count - 1))
+			return cursor_left(current_channel()->input);
+
+		/* delete */
+		else if (!strncmp(c, "[3~", count - 1))
+			return delete_right(current_channel()->input);
+
+		/* page up */
+		else if (!strncmp(c, "[5~", count - 1))
+			buffer_scrollback_back(current_channel());
+
+		/* page down */
+		else if (!strncmp(c, "[6~", count - 1))
+			buffer_scrollback_forw(current_channel());
+
+	} else switch (*c) {
+
+		/* Backspace */
+		case 0x7F:
+			return delete_left(current_channel()->input);
+
+		/* Horizontal tab */
+		case 0x09:
+			return tab_complete(current_channel()->input, &(current_channel()->users));
+
+		/* ^C */
+		case 0x03:
+			/* Cancel current input */
+			current_channel()->input->head = current_channel()->input->line->text;
+			current_channel()->input->tail = current_channel()->input->line->text + RIRC_MAX_INPUT;
+			current_channel()->input->window = current_channel()->input->line->text;
+			return 1;
+
+		/* ^F */
+		case 0x06:
+			/* Find channel */
+			if (current_channel()->server)
+				 action(action_find_channel, "Find: ");
+			break;
+
+		/* ^L */
+		case 0x0C:
+			/* Clear current channel */
+			/* TODO: as action with confirmation */
+			channel_clear(current_channel());
+			break;
+
+		/* ^P */
+		case 0x10:
+			/* Go to previous channel */
+			channel_move_prev();
+			break;
+
+		/* ^N */
+		case 0x0E:
+			/* Go to next channel */
+			channel_move_next();
+			break;
+
+		/* ^X */
+		case 0x18:
+			/* Close current channel */
+			channel_close(current_channel());
+			break;
+
+		/* ^U */
+		case 0x15:
+			/* Scoll buffer up */
+			buffer_scrollback_back(current_channel());
+			break;
+
+		/* ^D */
+		case 0x04:
+			/* Scoll buffer down */
+			buffer_scrollback_forw(current_channel());
+			break;
+	}
+
+	return 0;
+}
+
 void
 io_cb_read_inp(char *buff, size_t count)
 {
-	input(ccur->input, buff, count);
+	/* TODO: cleanup, switch on input type/contents */
 
-	/* FIXME:
-	 * can't send when cursor at position 0
-	 */
-	draw_input();
+	int redraw_input = 0;
+
+	if (action_message) {
+		redraw_input = input_action(buff, count);
+	} else if (*buff == 0x0A) {
+		/* Line feed */
+		char sendbuf[BUFFSIZE];
+
+		if (input_empty(state.current_channel->input))
+			return;
+
+		_send_input(state.current_channel->input, sendbuf);
+
+		switch (sendbuf[0]) {
+			case ':':
+				send_cmnd(state.current_channel, sendbuf + 1);
+				break;
+			default:
+				send_mesg(current_channel()->server, current_channel(), sendbuf);
+		}
+		redraw_input = 1;
+
+	} else if (iscntrl(*buff)) {
+		redraw_input = input_cchar(buff, count);
+	} else {
+		redraw_input = input(current_channel()->input, buff, count);
+	}
+
+	if (redraw_input)
+		draw_input();
+
 	redraw();
 }
 
 void
 io_cb_read_soc(char *buff, size_t count, const void *cb_obj)
 {
+	/* TODO: */
 	(void)(count);
+
 	struct channel *c = ((struct server *)cb_obj)->channel;
 
 	struct parsed_mesg p;

@@ -20,7 +20,6 @@ struct opt
 
 static int parse_opt(struct opt*, char**);
 static int server_cmp(const struct server*, const struct server*);
-static struct server* server_list_get(struct server_list*, struct server*);
 
 #define X(cmd) static int server_set_##cmd(struct server*, char*);
 HANDLED_005
@@ -40,39 +39,39 @@ server(const char *host, const char *port, const char *pass, const char *user, c
 	s->username = strdup(user);
 	s->realname = strdup(real);
 
-	s->usermodes_str.type = MODE_STR_USERMODE;
+	s->mode_str.type = MODE_STR_USERMODE;
 
-	mode_config(&(s->mode_config), NULL, MODE_CONFIG_DEFAULTS);
+	mode_cfg(&(s->mode_cfg), NULL, MODE_CFG_DEFAULTS);
 
 	// FIXME: channel()
-	s->channel = new_channel(host, s, NULL, BUFFER_SERVER);
+	s->channel = new_channel(host, s, CHANNEL_T_SERVER);
+
+	// move this to the state_new_server
 	channel_set_current(s->channel);
 
-	// FIXME:
-	if ((s->connection = connection(s, host, port)) == NULL)
-		goto err;
+	if ((s->connection = connection(s, host, port)) == NULL) {
+		server_free(s);
+		return NULL;
+	}
 
 	return s;
-
-err:
-	server_free(s);
-	return NULL;
 }
 
-static struct server*
-server_list_get(struct server_list *sl, struct server *s)
+struct server*
+server_list_get(struct server_list *sl, const char *host, const char *port)
 {
 	struct server *tmp;
+	struct server s = { .host = host, .port = port };
 
 	if ((tmp = sl->head) == NULL)
 		return NULL;
 
-	if (!server_cmp(sl->head, s))
+	if (!server_cmp(sl->head, &s))
 		return sl->head;
 
 	while ((tmp = tmp->next) != sl->head) {
 
-		if (!server_cmp(tmp, s))
+		if (!server_cmp(tmp, &s))
 			return tmp;
 	}
 
@@ -84,7 +83,7 @@ server_list_add(struct server_list *sl, struct server *s)
 {
 	struct server *tmp;
 
-	if ((tmp = server_list_get(sl, s)) != NULL)
+	if ((tmp = server_list_get(sl, s->host, s->port)) != NULL)
 		return s;
 
 	if (sl->head == NULL) {
@@ -107,17 +106,17 @@ server_list_del(struct server_list *sl, struct server *s)
 	struct server *tmp_h,
 	              *tmp_t;
 
-	if (sl->head == s &&  sl->tail == s) {
+	if (sl->head == s && sl->tail == s) {
 		/* Removing last server */
 		sl->head = NULL;
 		sl->tail = NULL;
 	} else if ((tmp_h = sl->head) == s) {
 		/* Removing head */
-		sl->head = sl->head->next;
+		sl->head = sl->tail->next = sl->head->next;
 		sl->head->prev = sl->tail;
 	} else if ((tmp_t = sl->tail) == s) {
 		/* Removing tail */
-		sl->tail = sl->tail->prev;
+		sl->tail = sl->head->prev = sl->tail->prev;
 		sl->tail->next = sl->head;
 	} else {
 		/* Removing some server (head, tail) */
@@ -138,16 +137,14 @@ server_list_del(struct server_list *sl, struct server *s)
 void
 server_free(struct server *s)
 {
-	server_nicks_reset(s);
-
 	free((void *)s->host);
 	free((void *)s->port);
 	free((void *)s->pass);
 	free((void *)s->username);
 	free((void *)s->realname);
 	free((void *)s->nick);
-	free((void *)s->nick_set.next);
-	free((void *)s->nick_set.set);
+	free((void *)s->nicks.base);
+	free((void *)s->nicks.set);
 	free(s);
 }
 
@@ -179,7 +176,7 @@ server_set_004(struct server *s, char *str)
 
 		DEBUG_MSG("Setting numeric 004 user_modes: %s", user_modes);
 
-		if (mode_config(&(s->mode_config), user_modes, MODE_CONFIG_USERMODES) != MODE_ERR_NONE)
+		if (mode_cfg(&(s->mode_cfg), user_modes, MODE_CFG_USERMODES) != MODE_ERR_NONE)
 			newlinef(c, 0, "-!!-", "invalid numeric 004 user_modes: %s", user_modes);
 	}
 
@@ -187,7 +184,7 @@ server_set_004(struct server *s, char *str)
 
 		DEBUG_MSG("Setting numeric 004 chan_modes: %s", chan_modes);
 
-		if (mode_config(&(s->mode_config), chan_modes, MODE_CONFIG_CHANMODES) != MODE_ERR_NONE)
+		if (mode_cfg(&(s->mode_cfg), chan_modes, MODE_CFG_CHANMODES) != MODE_ERR_NONE)
 			newlinef(c, 0, "-!!-", "invalid numeric 004 chan_modes: %s", chan_modes);
 	}
 }
@@ -209,24 +206,43 @@ server_set_005(struct server *s, char *str)
 }
 
 int
-server_set_chans(struct server *s, const char *chans)
-{
-	/* TODO: parse comma seperated list
-	 *       test
-	 */
-	(void)s;
-	(void)chans;
-	return 0;
-}
-
-int
 server_set_nicks(struct server *s, const char *nicks)
 {
-	/* TODO: parse comma seperated list
-	 *       test
-	 */
-	(void)s;
-	(void)nicks;
+	char *p1, *p2, *base;
+	size_t n = 0;
+
+	p2 = base = strdup(nicks);
+
+	do {
+		n++;
+
+		p1 = p2;
+		p2 = strchr(p2, ',');
+
+		if (p2)
+			*p2++ = 0;
+
+		if (!irc_isnick(p1)) {
+			free(base);
+			return -1;
+		}
+	} while (p2);
+
+	free((void *)s->nicks.base);
+	free((void *)s->nicks.set);
+
+	s->nicks.next = 0;
+	s->nicks.size = n;
+	s->nicks.base = base;
+
+	if ((s->nicks.set = malloc(sizeof(*s->nicks.set) * n)) == NULL)
+		fatal("malloc", errno);
+
+	for (const char **set = s->nicks.set; n; n--, set++) {
+		*set = base;
+		base = strchr(base, 0) + 1;
+	}
+
 	return 0;
 }
 
@@ -332,7 +348,7 @@ server_set_CHANMODES(struct server *s, char *val)
 {
 	DEBUG_MSG("Setting numeric 005 CHANMODES: %s", val);
 
-	return (mode_config(&(s->mode_config), val, MODE_CONFIG_SUBTYPES) != MODE_ERR_NONE);
+	return (mode_cfg(&(s->mode_cfg), val, MODE_CFG_SUBTYPES) != MODE_ERR_NONE);
 }
 
 static int
@@ -340,7 +356,7 @@ server_set_MODES(struct server *s, char *val)
 {
 	DEBUG_MSG("Setting numeric 005 MODES: %s", val);
 
-	return (mode_config(&(s->mode_config), val, MODE_CONFIG_MODES) != MODE_ERR_NONE);
+	return (mode_cfg(&(s->mode_cfg), val, MODE_CFG_MODES) != MODE_ERR_NONE);
 }
 
 static int
@@ -348,7 +364,7 @@ server_set_PREFIX(struct server *s, char *val)
 {
 	DEBUG_MSG("Setting numeric 005 PREFIX: %s", val);
 
-	return (mode_config(&(s->mode_config), val, MODE_CONFIG_PREFIX) != MODE_ERR_NONE);
+	return (mode_cfg(&(s->mode_cfg), val, MODE_CFG_PREFIX) != MODE_ERR_NONE);
 }
 
 void
@@ -365,8 +381,8 @@ server_nick_set(struct server *s, const char *nick)
 void
 server_nicks_next(struct server *s)
 {
-	if (s->nick_set.set && s->nick_set.next) {
-		server_nick_set(s, s->nick_set.next++);
+	if (s->nicks.size && s->nicks.next < s->nicks.size) {
+		server_nick_set(s, s->nicks.set[s->nicks.next++]);
 	} else {
 		/* Default to random nick, length 9 (RFC2912, section 1.2.1) */
 
@@ -385,6 +401,5 @@ server_nicks_next(struct server *s)
 void
 server_nicks_reset(struct server *s)
 {
-	if (s->nick_set.set)
-		s->nick_set.next = *s->nick_set.set;
+	s->nicks.next = 0;
 }

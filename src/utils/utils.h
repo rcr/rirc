@@ -28,14 +28,21 @@ struct string
 	size_t len;
 };
 
-int irc_isnickchar(const char);
+int irc_isnickchar(char, int);
+int irc_ischanchar(char, int);
+int irc_isnick(const char*);
+int irc_ischan(const char*);
+
+
 //TODO: replace comps to channel / nicks
 int irc_strcmp(const char*, const char*);
 int irc_strncmp(const char*, const char*, size_t);
 
 char* getarg(char**, const char*);
-char* strdup(const char*);
 char* word_wrap(int, char**, char*);
+
+char* strdup(const char*);
+void* memdup(const void*, size_t);
 
 int check_pinged(const char*, const char*);
 int parse_mesg(struct parsed_mesg*, char*);

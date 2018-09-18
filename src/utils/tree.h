@@ -1,6 +1,8 @@
 #ifndef TREE_H
 #define TREE_H
 
+/* FIXME: undefined behaviour reported by clang in AVL/SPLAY implementations */
+
 #include <stddef.h>
 
 #define MAX(A, B) ((A) > (B) ? (A) : (B))
