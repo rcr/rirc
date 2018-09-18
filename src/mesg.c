@@ -201,12 +201,12 @@ send_handler_lookup(register const char *str, register size_t len)
 		{"PRIVMSG",    send_privmsg},
 		{"UNIGNORE",   send_unignore},
 		{"NICK",       send_nick},
-		{"CLOSE",      send_close},
+		{"CLOSE",      NULL},
 		{"",           NULL},
 		{"CONNECT",    NULL},
 		{"MSG",        send_msg},
 		{"CTCP",       send_ctcp},
-		{"CLEAR",      send_clear},
+		{"CLEAR",      NULL},
 		{"",           NULL},
 		{"VERSION",    send_version},
 		{"",           NULL},
@@ -220,6 +220,8 @@ send_handler_lookup(register const char *str, register size_t len)
 
 	(void)send_connect;
 	(void)send_disconnect;
+	(void)send_clear;
+	(void)send_close;
 
 	if (len <= MAX_WORD_LENGTH && len >= MIN_WORD_LENGTH) {
 
@@ -241,6 +243,10 @@ send_handler_lookup(register const char *str, register size_t len)
 static int send_connect(char *m, struct server *s, struct channel *c)
 { (void)m; (void)s; (void)c; return 0; }
 static int send_disconnect(char *m, struct server *s, struct channel *c)
+{ (void)m; (void)s; (void)c; return 0; }
+static int send_clear(char *m, struct server *s, struct channel *c)
+{ (void)m; (void)s; (void)c; return 0; }
+static int send_close(char *m, struct server *s, struct channel *c)
 { (void)m; (void)s; (void)c; return 0; }
 
 void
@@ -294,42 +300,6 @@ send_mesg(struct server *s, struct channel *chan, char *mesg)
 		else
 			newline(chan, BUFFER_LINE_CHAT, chan->server->nick, mesg);
 	}
-}
-
-static int
-send_clear(char *mesg, struct server *s, struct channel *c)
-{
-	/* /clear [channel] */
-
-	char *targ;
-	struct channel *cc;
-
-	if (!(targ = getarg(&mesg, " ")))
-		channel_clear(c);
-	else if ((cc = channel_list_get(&s->clist, targ)))
-		channel_clear(cc);
-	else
-		failf(c, "Error: Channel '%s' not found", targ);
-
-	return 0;
-}
-
-static int
-send_close(char *mesg, struct server *s, struct channel *c)
-{
-	/* /close [channel] */
-
-	char *targ;
-	struct channel *cc;
-
-	if (!(targ = getarg(&mesg, " ")))
-		channel_close(c);
-	else if ((cc = channel_list_get(&s->clist, targ)))
-		channel_close(cc);
-	else
-		failf(c, "Error: Channel '%s' not found", targ);
-
-	return 0;
 }
 
 static int

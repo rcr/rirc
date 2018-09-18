@@ -745,14 +745,14 @@ send_cmnd(struct channel *c, char *buf)
 
 	if (!strcasecmp(cmnd, "connect")) {
 
-		struct server *s;
-
 		const char *host = NULL,
 		           *port = NULL,
 		           *pass = NULL,
 		           *user = NULL,
 		           *real = NULL,
 		           *help = ":connect [host [port] [pass] [user] [real]]";
+
+		struct server *s;
 
 		if (!(host = getarg(&buf, " "))) {
 			newlinef(c, 0, "-!!-", "%s", help);
@@ -784,12 +784,12 @@ send_cmnd(struct channel *c, char *buf)
 	}
 
 	if (!strcasecmp(cmnd, "clear")) {
-		/* TODO: replace send_clear */
+		channel_clear(current_channel());
 		return;
 	}
 
 	if (!strcasecmp(cmnd, "close")) {
-		/* TODO: replace send_close */
+		channel_close(current_channel());
 		return;
 	}
 
