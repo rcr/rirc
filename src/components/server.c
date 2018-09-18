@@ -20,7 +20,6 @@ struct opt
 
 static int parse_opt(struct opt*, char**);
 static int server_cmp(const struct server*, const struct server*);
-static struct server* server_list_get(struct server_list*, struct server*);
 
 #define X(cmd) static int server_set_##cmd(struct server*, char*);
 HANDLED_005
@@ -58,20 +57,21 @@ server(const char *host, const char *port, const char *pass, const char *user, c
 	return s;
 }
 
-static struct server*
-server_list_get(struct server_list *sl, struct server *s)
+struct server*
+server_list_get(struct server_list *sl, const char *host, const char *port)
 {
 	struct server *tmp;
+	struct server s = { .host = host, .port = port };
 
 	if ((tmp = sl->head) == NULL)
 		return NULL;
 
-	if (!server_cmp(sl->head, s))
+	if (!server_cmp(sl->head, &s))
 		return sl->head;
 
 	while ((tmp = tmp->next) != sl->head) {
 
-		if (!server_cmp(tmp, s))
+		if (!server_cmp(tmp, &s))
 			return tmp;
 	}
 
@@ -83,7 +83,7 @@ server_list_add(struct server_list *sl, struct server *s)
 {
 	struct server *tmp;
 
-	if ((tmp = server_list_get(sl, s)) != NULL)
+	if ((tmp = server_list_get(sl, s->host, s->port)) != NULL)
 		return s;
 
 	if (sl->head == NULL) {

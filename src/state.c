@@ -15,6 +15,7 @@
 
 #include "src/draw.h"
 #include "src/io.h"
+#include "src/rirc.h"
 #include "src/state.h"
 #include "src/utils/utils.h"
 
@@ -477,8 +478,6 @@ channel_close(struct channel *c)
 			draw_nav();
 		}
 
-		// TODO: something here..... we used to DLL del here?
-
 		channel_list_del(&c->server->clist, c);
 		channel_free(c);
 	}
@@ -744,13 +743,60 @@ send_cmnd(struct channel *c, char *buf)
 		exit(EXIT_SUCCESS);
 	}
 
-	/* TODO:
-	 *
-	 * :connect
-	 * :close
-	 * :clear
-	 * :set (user, real, nicks, pass, channel key)
-	 */
+	if (!strcasecmp(cmnd, "connect")) {
+
+		struct server *s;
+
+		const char *host = NULL,
+		           *port = NULL,
+		           *pass = NULL,
+		           *user = NULL,
+		           *real = NULL,
+		           *help = ":connect [host [port] [pass] [user] [real]]";
+
+		if (!(host = getarg(&buf, " "))) {
+			newlinef(c, 0, "-!!-", "%s", help);
+			return;
+		}
+
+		port = getarg(&buf, " ");
+		pass = getarg(&buf, " ");
+		user = getarg(&buf, " ");
+		real = getarg(&buf, " ");
+
+		port = (port ? port : "6667");
+		user = default_username;
+		real = default_realname;
+
+		if ((s = server_list_get(&state.servers, host, port)) != NULL) {
+			channel_set_current(s->channel);
+			newlinef(s->channel, 0, "-!!-", "already connected to %s:%s", host, port);
+		} else {
+			if ((s = server(host, port, pass, user, real)) == NULL)
+				fatal("failed to create server", 0);
+
+			server_list_add(state_server_list(), s);
+			channel_set_current(s->channel);
+			io_cx(s->connection);
+			draw_all();
+		}
+		return;
+	}
+
+	if (!strcasecmp(cmnd, "clear")) {
+		/* TODO: replace send_clear */
+		return;
+	}
+
+	if (!strcasecmp(cmnd, "close")) {
+		/* TODO: replace send_close */
+		return;
+	}
+
+	if (!strcasecmp(cmnd, "set")) {
+		/* TODO user, real, nicks, pass, key */
+		return;
+	}
 }
 
 static int input_cchar(const char*, size_t);

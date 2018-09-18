@@ -49,6 +49,7 @@ struct server* server(
 
 struct server* server_list_add(struct server_list*, struct server*);
 struct server* server_list_del(struct server_list*, struct server*);
+struct server* server_list_get(struct server_list*, const char *, const char*);
 
 void server_set_004(struct server*, char*);
 void server_set_005(struct server*, char*);

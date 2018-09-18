@@ -176,6 +176,7 @@ send_handler_hash(register const char *str, register size_t len)
 	return hval;
 }
 
+// TODO: should be regenerated
 const struct send_handler*
 send_handler_lookup(register const char *str, register size_t len)
 {
@@ -202,7 +203,7 @@ send_handler_lookup(register const char *str, register size_t len)
 		{"NICK",       send_nick},
 		{"CLOSE",      send_close},
 		{"",           NULL},
-		{"CONNECT",    send_connect},
+		{"CONNECT",    NULL},
 		{"MSG",        send_msg},
 		{"CTCP",       send_ctcp},
 		{"CLEAR",      send_clear},
@@ -210,12 +211,15 @@ send_handler_lookup(register const char *str, register size_t len)
 		{"VERSION",    send_version},
 		{"",           NULL},
 		{"QUIT",       send_quit},
-		{"DISCONNECT", send_disconnect},
+		{"DISCONNECT", NULL},
 		{"",           NULL},
 		{"",           NULL},
 		{"",           NULL},
 		{"JOIN",       send_join}
     };
+
+	(void)send_connect;
+	(void)send_disconnect;
 
 	if (len <= MAX_WORD_LENGTH && len >= MIN_WORD_LENGTH) {
 
@@ -232,6 +236,12 @@ send_handler_lookup(register const char *str, register size_t len)
 
 	return NULL;
 }
+
+// TODO not used
+static int send_connect(char *m, struct server *s, struct channel *c)
+{ (void)m; (void)s; (void)c; return 0; }
+static int send_disconnect(char *m, struct server *s, struct channel *c)
+{ (void)m; (void)s; (void)c; return 0; }
 
 void
 send_mesg(struct server *s, struct channel *chan, char *mesg)
@@ -323,42 +333,6 @@ send_close(char *mesg, struct server *s, struct channel *c)
 }
 
 static int
-send_connect(char *mesg, struct server *s, struct channel *c)
-{
-	/* /connect [(host) | (host:port) | (host port)] */
-
-	// FIXME:
-	UNUSED(mesg);
-	UNUSED(s);
-	UNUSED(c);
-
-#if 0
-	char *host, *port;
-
-	if (!(host = getarg(&mesg, " :"))) {
-
-		/* If no hostname arg is given, attempt to reconnect on the current server */
-
-		if (!s)
-			fail("Error: /connect <host [port] | host:port>");
-
-		else if (s->soc >= 0 || s->connecting)
-			fail("Error: Already connected or reconnecting to server");
-
-		host = s->host;
-		port = s->port;
-
-	} else if (!(port = getarg(&mesg, " "))) {
-		port = "6667";
-	}
-
-	server_connect(host, port, NULL, NULL);
-#endif
-
-	return 0;
-}
-
-static int
 send_ctcp(char *mesg, struct server *s, struct channel *c)
 {
 	/* /ctcp <target> <message> */
@@ -382,35 +356,6 @@ send_ctcp(char *mesg, struct server *s, struct channel *c)
 
 	if ((ret = io_sendf(s->connection, "PRIVMSG %s :\x01""%s\x01", targ, mesg)))
 		failf(c, "sendf fail: %s", io_err(ret));
-
-	return 0;
-}
-
-static int
-send_disconnect(char *mesg, struct server *s, struct channel *c)
-{
-	/* /disconnect [quit message] */
-
-	int ret;
-
-	// TODO: send quit message
-
-	if ((ret = io_dx(s->connection))) {
-		failf(c, "Error: %s", io_err(ret));
-	}
-
-	// FIXME:
-	UNUSED(mesg);
-	UNUSED(s);
-	UNUSED(c);
-
-#if 0
-	/* Server isn't connecting, connected or waiting to connect */
-	if (!s || (!s->connecting && s->soc < 0 && !s->reconnect_time))
-		fail("Error: Not connected to server");
-
-	server_disconnect(s, 0, 0, (*mesg) ? mesg : DEFAULT_QUIT_MESG);
-#endif
 
 	return 0;
 }
