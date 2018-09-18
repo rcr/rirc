@@ -866,13 +866,10 @@ recv_error(struct parsed_mesg *p, struct server *s)
 
 	struct channel *c = s->channel;
 
-	/* TODO: this is also sent to the user to confirm QUIT */
-
 	newlinef(c, 0, "ERROR", "%s", (p->trailing ? p->trailing : "Remote hangup"));
 
 	for (c = c->next; c != s->channel; c = c->next) {
 		newlinef(c, 0, "-!!-", "(disconnected)");
-		c = c->next;
 	}
 
 	io_dx(s->connection);
