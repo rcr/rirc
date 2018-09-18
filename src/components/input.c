@@ -1,25 +1,8 @@
-/* input.c
- *
- * Input handling from stdin
- *
- * A buffer input line consists of a doubly linked list of gap buffers
- *
- * Escape sequences are assumed to be ANSI. As such, you mileage may vary
- * */
+/* TODO:
+ * complete rewrite and unit test
+ */
 
-//TODO: complete rewrite,
-// line->end is not properly set in a lot of cases,
-// should be rewritten with a better thought out design
-//
-// keybind handlers or send_mesg() should be returned from input
-// to be called by the stateful code, for easier testing
-
-#include <ctype.h>
-#include <stdarg.h>
-#include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
 
 #include "src/components/input.h"
 #include "src/state.h"

@@ -10,13 +10,12 @@ channel_set_current(struct channel *c)
 }
 
 struct channel*
-new_channel(const char *n, struct server *s, struct channel *l, enum channel_t t)
+new_channel(const char *n, struct server *s, enum channel_t t)
 {
 	/* FIXME: mock new_channel until channel() is implemented */
 
 	UNUSED(n);
 	UNUSED(s);
-	UNUSED(l);
 	UNUSED(t);
 	return NULL;
 }

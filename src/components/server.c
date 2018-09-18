@@ -45,7 +45,7 @@ server(const char *host, const char *port, const char *pass, const char *user, c
 	mode_cfg(&(s->mode_cfg), NULL, MODE_CFG_DEFAULTS);
 
 	// FIXME: channel()
-	s->channel = new_channel(host, s, NULL, CHANNEL_T_SERVER);
+	s->channel = new_channel(host, s, CHANNEL_T_SERVER);
 
 	// move this to the state_new_server
 	channel_set_current(s->channel);
@@ -112,11 +112,11 @@ server_list_del(struct server_list *sl, struct server *s)
 		sl->tail = NULL;
 	} else if ((tmp_h = sl->head) == s) {
 		/* Removing head */
-		sl->head = sl->head->next;
+		sl->head = sl->tail->next = sl->head->next;
 		sl->head->prev = sl->tail;
 	} else if ((tmp_t = sl->tail) == s) {
 		/* Removing tail */
-		sl->tail = sl->tail->prev;
+		sl->tail = sl->head->prev = sl->tail->prev;
 		sl->tail->next = sl->head;
 	} else {
 		/* Removing some server (head, tail) */

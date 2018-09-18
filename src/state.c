@@ -3,7 +3,8 @@
  *
  * All manipulation of global program state
  *
- **/
+ * TODO: moved keys, actions to this file. needs cleanup
+ */
 
 #include <ctype.h>
 #include <stdlib.h>
@@ -70,7 +71,7 @@ state_init(void)
 	if (atexit(term_state) != 0)
 		fatal("atexit", 0);
 
-	state.default_channel = state.current_channel = new_channel("rirc", NULL, NULL, CHANNEL_T_OTHER);
+	state.default_channel = state.current_channel = new_channel("rirc", NULL, CHANNEL_T_OTHER);
 
 	/* Splashscreen */
 	newline(state.default_channel, 0, "--", "      _");
@@ -170,18 +171,14 @@ _newline(struct channel *c, enum buffer_line_t type, const char *from, const cha
 }
 
 struct channel*
-new_channel(const char *name, struct server *s, struct channel *chanlist, enum channel_t type)
+new_channel(const char *name, struct server *s, enum channel_t type)
 {
 	struct channel *c = channel(name, type);
 
 	/* TODO: deprecated, move to channel.c */
 
-	c->server = s;
-
-	/* Append the new channel to the list */
-	DLL_ADD(chanlist, c);
-
 	if (s) {
+		c->server = s;
 		channel_list_add(&s->clist, c);
 	}
 
@@ -214,7 +211,7 @@ state_server_set_chans(struct server *s, const char *chans)
 	} while (p2);
 
 	for (const char *chan = base; n; n--) {
-		new_channel(chan, s, s->channel, CHANNEL_T_CHANNEL);
+		new_channel(chan, s, CHANNEL_T_CHANNEL);
 		chan = strchr(chan, 0) + 1;
 	}
 
@@ -464,22 +461,23 @@ channel_close(struct channel *c)
 			action(action_close_server, "Close server '%s'?   [y/n]", c->server->host);
 	} else {
 		/* Closing a channel */
+
 		if (c->type == CHANNEL_T_CHANNEL && !c->parted) {
 			int ret;
 			if (0 != (ret = io_sendf(c->server->connection, "PART %s", c->name.str))) {
+				// FIXME: closing a parted channel when server is disconnected isnt an error
 				newlinef(c->server->channel, 0, "sendf fail", "%s", io_err(ret));
 			}
 		}
 
 		/* If closing the current channel, update state to a new channel */
 		if (c == current_channel()) {
-			state.current_channel = !(c->next == c->server->channel) ? c->next : c->prev;
-			draw_all();
+			channel_set_current(c->next);
 		} else {
 			draw_nav();
 		}
 
-		DLL_DEL(c->server->channel, c);
+		// TODO: something here..... we used to DLL del here?
 
 		channel_list_del(&c->server->clist, c);
 		channel_free(c);
@@ -583,14 +581,6 @@ channel_get_first(void)
 	struct server *s = state.servers.head;
 
 	return s ? s->channel : NULL;
-
-	/* FIXME: */
-#if 0
-	struct server *s = state.servers.head;
-
-	/* First channel of the first server */
-	return !s ? state.default_channel : s->channel;
-#endif
 }
 
 struct channel*
@@ -598,15 +588,7 @@ channel_get_last(void)
 {
 	struct server *s = state.servers.tail;
 
-	return s ? s->channel : NULL;
-
-	/* FIXME: */
-#if 0
-	struct server *s = state.servers.tail;
-
-	/* Last channel of the last server */
-	return !s ? state.default_channel : s->channel->prev;
-#endif
+	return s ? s->channel->prev : NULL;
 }
 
 struct channel*
@@ -614,9 +596,10 @@ channel_get_next(struct channel *c)
 {
 	if (c == state.default_channel)
 		return c;
-	else
+	else {
 		/* Return the next channel, accounting for server wrap around */
-		return !(c->next == c->server->channel) ?  c->next : c->server->next->channel;
+		return !(c->next == c->server->channel) ? c->next : c->server->next->channel;
+	}
 }
 
 struct channel*
@@ -626,16 +609,14 @@ channel_get_prev(struct channel *c)
 		return c;
 	else
 		/* Return the previous channel, accounting for server wrap around */
-		return !(c == c->server->channel) ?  c->prev : c->server->prev->channel->prev;
+		return !(c == c->server->channel) ? c->prev : c->server->prev->channel->prev;
 }
 
 void
 channel_set_current(struct channel *c)
 {
 	/* Set the state to an arbitrary channel */
-
 	state.current_channel = c;
-
 	draw_all();
 }
 
@@ -767,6 +748,7 @@ send_cmnd(struct channel *c, char *buf)
 	 *
 	 * :connect
 	 * :close
+	 * :clear
 	 * :set (user, real, nicks, pass, channel key)
 	 */
 }
@@ -841,6 +823,7 @@ input_cchar(const char *c, size_t count)
 		/* ^L */
 		case 0x0C:
 			/* Clear current channel */
+			/* TODO: as action with confirmation */
 			channel_clear(current_channel());
 			break;
 
@@ -881,7 +864,7 @@ input_cchar(const char *c, size_t count)
 void
 io_cb_read_inp(char *buff, size_t count)
 {
-	/* TODO: cleanup */
+	/* TODO: cleanup, switch on input type/contents */
 
 	int redraw_input = 0;
 

@@ -34,9 +34,6 @@ test_channel_list(void)
 	assert_ptrequals(channel_list_get(&clist, "aaa"), c1);
 	assert_ptrequals(channel_list_get(&clist, "bbb"), c2);
 
-	/* Test replacing user in list */
-	/* TODO */
-
 	/* Test removing channels from list */
 	assert_ptrequals(channel_list_del(&clist, c1), c1);
 	assert_ptrequals(channel_list_del(&clist, c2), c2);
