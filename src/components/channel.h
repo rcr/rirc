@@ -2,6 +2,7 @@
 #define CHANNEL_H
 
 #include "src/components/buffer.h"
+#include "src/components/input.h"
 #include "src/components/mode.h"
 #include "src/components/user.h"
 #include "src/utils/tree.h"

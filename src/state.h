@@ -17,8 +17,6 @@ struct channel* new_channel(const char*, struct server*, struct channel*, enum c
 
 
 /* state.c */
-/* FIXME: terrible, until i remove references to ccur/rirc */
-#define ccur (current_channel())
 struct channel* current_channel(void);
 
 struct server_list* state_server_list(void);

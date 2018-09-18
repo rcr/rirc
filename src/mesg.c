@@ -829,7 +829,7 @@ recv_ctcp_req(struct parsed_mesg *p, struct server *s)
 			if ((c = channel_list_get(&s->clist, p->from)) == NULL)
 				c = new_channel(p->from, s, s->channel, CHANNEL_T_PRIVATE);
 
-			if (c != ccur) {
+			if (c != current_channel()) {
 				c->activity = ACTIVITY_PINGED;
 				draw_nav();
 			}
@@ -981,7 +981,7 @@ recv_join(struct parsed_mesg *p, struct server *s)
 
 	if (IS_ME(p->from)) {
 		if ((c = channel_list_get(&s->clist, chan)) == NULL)
-			channel_set_current(new_channel(chan, s, ccur, CHANNEL_T_CHANNEL));
+			channel_set_current(new_channel(chan, s, current_channel(), CHANNEL_T_CHANNEL));
 		else {
 			c->parted = 0;
 			newlinef(c, 0, ">", "Joined %s", chan);
@@ -1769,7 +1769,7 @@ recv_privmsg(struct parsed_mesg *p, struct server *s)
 		if ((c = channel_list_get(&s->clist, p->from)) == NULL)
 			c = new_channel(p->from, s, s->channel, CHANNEL_T_PRIVATE);
 
-		if (c != ccur) {
+		if (c != current_channel()) {
 			c->activity = ACTIVITY_PINGED;
 			draw_nav();
 		}
@@ -1781,7 +1781,7 @@ recv_privmsg(struct parsed_mesg *p, struct server *s)
 
 		bell();
 
-		if (c != ccur) {
+		if (c != current_channel()) {
 			c->activity = ACTIVITY_PINGED;
 			draw_nav();
 		}

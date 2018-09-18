@@ -2,9 +2,6 @@
  *
  * Input handling from stdin
  *
- * All input is handled synchronously and refers to the current
- * channel being drawn (ccur)
- *
  * A buffer input line consists of a doubly linked list of gap buffers
  *
  * Escape sequences are assumed to be ANSI. As such, you mileage may vary
@@ -25,7 +22,6 @@
 #include <unistd.h>
 
 #include "src/components/input.h"
-#include "src/io.h"
 #include "src/state.h"
 #include "src/utils/utils.h"
 
@@ -51,15 +47,15 @@ static char* irc_commands[] = {
 };
 
 /* User input handlers */
-static int input_char(char);
+static int input_char(struct input*, char);
 
 /* Case insensitive tab complete for commands and nicks */
-static void tab_complete_command(struct input*, char*, size_t);
-static void tab_complete_nick(struct input*, char*, size_t);
+static int tab_complete_command(struct input*, char*, size_t);
+static int tab_complete_nick(struct input*, struct user_list*, char*, size_t);
 
 /* Input line util functions */
 static inline void reset_line(struct input*);
-static inline void reframe_line(struct input*);
+static inline void reframe_line(struct input*, unsigned int);
 
 static void new_list_head(struct input*);
 
@@ -122,15 +118,15 @@ input(struct input *inp, const char *buff, size_t count)
 	 * sequence. Otherwise copy all characters to the input struct
 	 * of the current context */
 
-	while (count-- && input_char(*buff))
+	size_t start = count;
+
+	while (count && input_char(inp, *buff)) {
 		buff++;
+		count--;
+	}
 
-	/* FIXME: by the time control reaches here, the input
-	 * buffer should be know, remove all references to ccur
-	 * in this file */
-	UNUSED(inp);
-
-	return 0;
+	/* returns zero if no characters added */
+	return (start != count);
 }
 
 /*
@@ -138,18 +134,15 @@ input(struct input *inp, const char *buff, size_t count)
  * */
 
 static int
-input_char(char c)
+input_char(struct input *inp, char c)
 {
 	/* Input a single character */
 
-	if (ccur->input->head >= ccur->input->tail)
+	if (inp->head >= inp->tail)
 		/* Gap buffer is full */
 		return 0;
 
-	*ccur->input->head++ = c;
-
-	draw_input();
-
+	*inp->head++ = c;
 	return 1;
 }
 
@@ -157,84 +150,88 @@ input_char(char c)
  * Input line manipulation functions
  * */
 
-void
+int
 cursor_left(struct input *in)
 {
 	/* Move the cursor left */
 
-	if (in->head > in->line->text)
+	if (in->head > in->line->text) {
 		*(--in->tail) = *(--in->head);
+		return 1;
+	}
 
-	draw_input();
+	return 0;
 }
 
-void
+int
 cursor_right(struct input *in)
 {
 	/* Move the cursor right */
 
-	if (in->tail < in->line->text + RIRC_MAX_INPUT)
+	if (in->tail < in->line->text + RIRC_MAX_INPUT) {
 		*(in->head++) = *(in->tail++);
+		return 1;
+	}
 
-	draw_input();
+	return 0;
 }
 
-void
+int
 delete_left(struct input *in)
 {
 	/* Delete the character left of the cursor */
 
-	if (in->head > in->line->text)
+	if (in->head > in->line->text) {
 		in->head--;
+		return 1;
+	}
 
-	draw_input();
+	return 0;
 }
 
-void
+int
 delete_right(struct input *in)
 {
 	/* Delete the character right of the cursor */
 
-	if (in->tail < in->line->text + RIRC_MAX_INPUT)
+	if (in->tail < in->line->text + RIRC_MAX_INPUT) {
 		in->tail++;
+		return 1;
+	}
 
-	draw_input();
+	return 0;
 }
 
-void
-input_scroll_backwards(struct input *in)
+int
+input_scroll_back(struct input *in, unsigned int cols)
 {
 	/* Scroll backwards through the input history */
 
 	/* Scrolling backwards on the last line */
 	if (in->line->prev == in->list_head)
-		return;
+		return 0;
 
 	reset_line(in);
-
 	in->line = in->line->prev;
+	reframe_line(in, cols);
 
-	reframe_line(in);
-
-	draw_input();
+	return 1;
 }
 
-void
-input_scroll_forwards(struct input *in)
+int
+input_scroll_forw(struct input *in, unsigned int cols)
 {
 	/* Scroll forwards through the input history */
 
 	/* Scrolling forward on the first line */
 	if (in->line == in->list_head)
-		return;
+		return 0;
 
 	reset_line(in);
-
 	in->line = in->line->next;
+	reframe_line(in, cols);
 
-	reframe_line(in);
-
-	draw_input();
+	return 1;
 }
 
 /*
@@ -257,20 +254,20 @@ reset_line(struct input *in)
 }
 
 static inline void
-reframe_line(struct input *in)
+reframe_line(struct input *in, unsigned int cols)
 {
 	/* Reframe a line's draw window */
 
 	in->head = in->line->end;
 	in->tail = in->line->text + RIRC_MAX_INPUT;
-	in->window = in->head - (2 * io_tty_cols() / 3);
+	in->window = in->head - (2 * cols / 3);
 
 	if (in->window < in->line->text)
 		in->window = in->line->text;
 }
 
-void
-tab_complete(struct input *inp)
+int
+tab_complete(struct input *inp, struct user_list *ul)
 {
 	/* Case insensitive tab complete for commands and nicks */
 
@@ -279,23 +276,23 @@ tab_complete(struct input *inp)
 
 	/* Don't tab complete at beginning of line or if previous character is space */
 	if (inp->head == inp->line->text || *(inp->head - 1) == ' ')
-		return;
+		return 0;
 
 	/* Don't tab complete if cursor is scrolled left and next character isn't space */
 	if (inp->tail < (inp->line->text + RIRC_MAX_INPUT) && *inp->tail != ' ')
-		return;
+		return 0;
 
 	/* Scan backwards for the point to tab complete from */
 	while (str > inp->line->text && *(str - 1) != ' ')
 		len++, str--;
 
 	if (str == inp->line->text && *str == '/')
-		tab_complete_command(inp, ++str, --len);
+		return tab_complete_command(inp, ++str, --len);
 	else
-		tab_complete_nick(inp, str, len);
+		return tab_complete_nick(inp, ul, str, len);
 }
 
-static void
+static int
 tab_complete_command(struct input *inp, char *str, size_t len)
 {
 	/* Command tab completion */
@@ -313,15 +310,19 @@ tab_complete_command(struct input *inp, char *str, size_t len)
 		while (len--)
 			delete_left(inp);
 
-		while (*p && input_char(*p++))
+		while (*p && input_char(inp, *p++))
 			;
 
-		input_char(' ');
+		input_char(inp, ' ');
+
+		return 1;
+	} else {
+		return 0;
 	}
 }
 
-static void
-tab_complete_nick(struct input *inp, char *str, size_t len)
+static int
+tab_complete_nick(struct input *inp, struct user_list *ul, char *str, size_t len)
 {
 	/* Nick tab completion */
 
@@ -329,7 +330,7 @@ tab_complete_nick(struct input *inp, char *str, size_t len)
 
 	struct user *u;
 
-	if ((u = user_list_get(&(ccur->users), str, len))) {
+	if ((u = user_list_get(ul, str, len))) {
 
 		p = u->nick.str;
 
@@ -337,14 +338,18 @@ tab_complete_nick(struct input *inp, char *str, size_t len)
 		while (len--)
 			delete_left(inp);
 
-		while (*p && input_char(*p++))
+		while (*p && input_char(inp, *p++))
 			;
 
 		/* Tab completing first word in input, append delimiter and space */
 		if (str == inp->line->text) {
-			input_char(TAB_COMPLETE_DELIMITER);
-			input_char(' ');
+			input_char(inp, TAB_COMPLETE_DELIMITER);
+			input_char(inp, ' ');
 		}
+
+		return 1;
+	} else {
+		return 0;
 	}
 }
 
@@ -397,11 +402,7 @@ _send_input(struct input *in, char *buf)
 		in->line->next = in->list_head;
 
 		in->line = in->list_head;
-
-		reframe_line(in);
 	}
-
-	draw_input();
 }
 
 int

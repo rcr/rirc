@@ -25,6 +25,8 @@ channel(const char *name, enum channel_t type)
 	if ((c = calloc(1, sizeof(*c) + len + 1)) == NULL)
 		fatal("calloc", errno);
 
+	c->chanmodes_str.type = MODE_STR_CHANMODE;
+	c->input = new_input();
 	c->name.len = len;
 	c->name.str = memcpy(c->_, name, len + 1);
 	c->type = type;
@@ -35,6 +37,8 @@ channel(const char *name, enum channel_t type)
 void
 channel_free(struct channel *c)
 {
+	user_list_free(&(c->users));
+	free_input(c->input);
 	free(c);
 }
 

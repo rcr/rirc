@@ -95,16 +95,16 @@ term_state(void)
 {
 	/* Exit handler; must return normally */
 
-	free_channel(state.default_channel);
-
 	/* Reset terminal colours */
 	printf("\x1b[38;0;m");
 	printf("\x1b[48;0;m");
 
 #ifndef DEBUG
 	/* Clear screen */
-	if (!fatal_exit)
+	if (!fatal_exit) {
 		printf("\x1b[H\x1b[J");
+		channel_free(state.default_channel);
+	}
 #endif
 }
 
@@ -163,7 +163,7 @@ _newline(struct channel *c, enum buffer_line_t type, const char *from, const cha
 
 	c->activity = MAX(c->activity, ACTIVITY_ACTIVE);
 
-	if (c == ccur)
+	if (c == current_channel())
 		draw_buffer();
 	else
 		draw_nav();
@@ -176,8 +176,6 @@ new_channel(const char *name, struct server *s, struct channel *chanlist, enum c
 
 	/* TODO: deprecated, move to channel.c */
 
-	c->chanmodes_str.type = MODE_STR_CHANMODE;
-	c->input = new_input();
 	c->server = s;
 
 	/* Append the new channel to the list */
@@ -190,17 +188,6 @@ new_channel(const char *name, struct server *s, struct channel *chanlist, enum c
 	draw_all();
 
 	return c;
-}
-
-void
-free_channel(struct channel *c)
-{
-	/* TODO: deprecated, move to channel.c */
-
-	user_list_free(&(c->users));
-	free_input(c->input);
-
-	channel_free(c);
 }
 
 int
@@ -265,7 +252,7 @@ static int action_find_channel(char);
  *
  * It can be cleaned up, and input.c is probably not the most ideal place for this */
 #define MAX_SEARCH 128
-struct channel *search_cptr; /* Used for iterative searching, before setting ccur */
+struct channel *search_cptr; /* Used for iterative searching, before setting the current channel */
 static char search_buff[MAX_SEARCH];
 static char *search_ptr = search_buff;
 
@@ -300,7 +287,7 @@ input_action(const char *input, size_t len)
 		action_message = NULL;
 		action_handler = NULL;
 
-		draw_input();
+		return 1;
 	}
 
 	return 0;
@@ -316,7 +303,7 @@ action_close_server(char c)
 	if (c == 'y' || c == 'Y') {
 
 		int ret;
-		struct channel *c = ccur;
+		struct channel *c = current_channel();
 		struct server *s = c->server;
 
 		/* If closing the last server */
@@ -397,14 +384,14 @@ action_find_channel(char c)
 
 		*(--search_ptr) = '\0';
 
-		search_cptr = search_channels(ccur, search_buff);
+		search_cptr = search_channels(current_channel(), search_buff);
 	} else if (isprint(c) && search_ptr < search_buff + MAX_SEARCH && (search_cptr != NULL || *search_buff == '\0')) {
 		/* All other input */
 
 		*(search_ptr++) = c;
 		*search_ptr = '\0';
 
-		search_cptr = search_channels(ccur, search_buff);
+		search_cptr = search_channels(current_channel(), search_buff);
 	}
 
 	/* Reprint the action message */
@@ -415,7 +402,7 @@ action_find_channel(char c)
 			action(action_find_channel, "Find: ");
 	} else {
 		/* Found a channel */
-		if (search_cptr->server == ccur->server) {
+		if (search_cptr->server == current_channel()->server) {
 			action(action_find_channel, "Find: %s -- %s",
 					search_cptr->name.str, search_buff);
 		} else {
@@ -485,7 +472,7 @@ channel_close(struct channel *c)
 		}
 
 		/* If closing the current channel, update state to a new channel */
-		if (c == ccur) {
+		if (c == current_channel()) {
 			state.current_channel = !(c->next == c->server->channel) ? c->next : c->prev;
 			draw_all();
 		} else {
@@ -495,8 +482,7 @@ channel_close(struct channel *c)
 		DLL_DEL(c->server->channel, c);
 
 		channel_list_del(&c->server->clist, c);
-
-		free_channel(c);
+		channel_free(c);
 	}
 }
 
@@ -801,64 +787,61 @@ input_cchar(const char *c, size_t count)
 
 		/* arrow up */
 		else if (!strncmp(c, "[A", count - 1))
-			input_scroll_backwards(ccur->input);
+			return input_scroll_back(current_channel()->input, io_tty_cols());
 
 		/* arrow down */
 		else if (!strncmp(c, "[B", count - 1))
-			input_scroll_forwards(ccur->input);
+			return input_scroll_forw(current_channel()->input, io_tty_cols());
 
 		/* arrow right */
 		else if (!strncmp(c, "[C", count - 1))
-			cursor_right(ccur->input);
+			return cursor_right(current_channel()->input);
 
 		/* arrow left */
 		else if (!strncmp(c, "[D", count - 1))
-			cursor_left(ccur->input);
+			return cursor_left(current_channel()->input);
 
 		/* delete */
 		else if (!strncmp(c, "[3~", count - 1))
-			delete_right(ccur->input);
+			return delete_right(current_channel()->input);
 
 		/* page up */
 		else if (!strncmp(c, "[5~", count - 1))
-			buffer_scrollback_back(ccur);
+			buffer_scrollback_back(current_channel());
 
 		/* page down */
 		else if (!strncmp(c, "[6~", count - 1))
-			buffer_scrollback_forw(ccur);
+			buffer_scrollback_forw(current_channel());
 
 	} else switch (*c) {
 
 		/* Backspace */
 		case 0x7F:
-			delete_left(ccur->input);
-			break;
+			return delete_left(current_channel()->input);
 
 		/* Horizontal tab */
 		case 0x09:
-			tab_complete(ccur->input);
-			break;
+			return tab_complete(current_channel()->input, &(current_channel()->users));
 
 		/* ^C */
 		case 0x03:
 			/* Cancel current input */
-			ccur->input->head = ccur->input->line->text;
-			ccur->input->tail = ccur->input->line->text + RIRC_MAX_INPUT;
-			ccur->input->window = ccur->input->line->text;
-			draw_input();
-			break;
+			current_channel()->input->head = current_channel()->input->line->text;
+			current_channel()->input->tail = current_channel()->input->line->text + RIRC_MAX_INPUT;
+			current_channel()->input->window = current_channel()->input->line->text;
+			return 1;
 
 		/* ^F */
 		case 0x06:
 			/* Find channel */
-			if (ccur->server)
+			if (current_channel()->server)
 				 action(action_find_channel, "Find: ");
 			break;
 
 		/* ^L */
 		case 0x0C:
 			/* Clear current channel */
-			channel_clear(ccur);
+			channel_clear(current_channel());
 			break;
 
 		/* ^P */
@@ -876,19 +859,19 @@ input_cchar(const char *c, size_t count)
 		/* ^X */
 		case 0x18:
 			/* Close current channel */
-			channel_close(ccur);
+			channel_close(current_channel());
 			break;
 
 		/* ^U */
 		case 0x15:
 			/* Scoll buffer up */
-			buffer_scrollback_back(ccur);
+			buffer_scrollback_back(current_channel());
 			break;
 
 		/* ^D */
 		case 0x04:
 			/* Scoll buffer down */
-			buffer_scrollback_forw(ccur);
+			buffer_scrollback_forw(current_channel());
 			break;
 	}
 
@@ -898,12 +881,12 @@ input_cchar(const char *c, size_t count)
 void
 io_cb_read_inp(char *buff, size_t count)
 {
-	/* TODO: switch on input type, removed from input.c */
+	/* TODO: cleanup */
+
+	int redraw_input = 0;
 
 	if (action_message) {
-		input_action(buff, count);
-	} else if (iscntrl(*buff)) {
-		input_cchar(buff, count);
+		redraw_input = input_action(buff, count);
 	} else if (*buff == 0x0A) {
 		/* Line feed */
 		char sendbuf[BUFFSIZE];
@@ -918,13 +901,19 @@ io_cb_read_inp(char *buff, size_t count)
 				send_cmnd(state.current_channel, sendbuf + 1);
 				break;
 			default:
-				send_mesg(ccur->server, ccur, sendbuf);
+				send_mesg(current_channel()->server, current_channel(), sendbuf);
 		}
+		redraw_input = 1;
+
+	} else if (iscntrl(*buff)) {
+		redraw_input = input_cchar(buff, count);
 	} else {
-		input(ccur->input, buff, count);
+		redraw_input = input(current_channel()->input, buff, count);
 	}
 
-	draw_input();
+	if (redraw_input)
+		draw_input();
+
 	redraw();
 }
 

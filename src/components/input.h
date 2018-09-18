@@ -1,6 +1,8 @@
 #ifndef INPUT_H
 #define INPUT_H
 
+#include "user.h"
+
 #define SCROLLBACK_INPUT 15
 #define BUFFSIZE 512
 #define RIRC_MAX_INPUT 256 /* FIXME: MAX_INPUT conflicts with limits.h */
@@ -51,13 +53,14 @@ void _send_input(struct input*, char*);
 int input_empty(struct input*);
 
 /* Input line manipulation functions */
-void cursor_left(struct input*);
-void cursor_right(struct input*);
-void delete_left(struct input*);
-void delete_right(struct input*);
-void input_scroll_backwards(struct input*);
-void input_scroll_forwards(struct input*);
+// TODO: rename, input_*
+int cursor_left(struct input*);
+int cursor_right(struct input*);
+int delete_left(struct input*);
+int delete_right(struct input*);
+int input_scroll_back(struct input*, unsigned int);
+int input_scroll_forw(struct input*, unsigned int);
 
-void tab_complete(struct input*);
+int tab_complete(struct input*, struct user_list*);
 
 #endif
