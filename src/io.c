@@ -787,19 +787,14 @@ io_tty_rows(void)
 const char*
 io_err(int err)
 {
-	const char *const err_strs[] = {
-		[IO_ERR_NONE]  = "success",
-		[IO_ERR_TRUNC] = "data truncated",
-		[IO_ERR_DXED]  = "socket not connected",
-		[IO_ERR_CXNG]  = "socket connection in progress",
-		[IO_ERR_CXED]  = "socket connected",
-		[IO_ERR_TERM]  = "thread is terminating"
-	};
-
-	const char *err_str = NULL;
-
-	if (ARR_ELEM(err_strs, err))
-		err_str = err_strs[err];
-
-	return err_str ? err_str : "unknown error";
+	switch (err) {
+		case IO_ERR_NONE:  return "success";
+		case IO_ERR_TRUNC: return "data truncated";
+		case IO_ERR_DXED:  return "socket not connected";
+		case IO_ERR_CXNG:  return "socket connection in progress";
+		case IO_ERR_CXED:  return "socket connected";
+		case IO_ERR_TERM:  return "thread is terminating";
+		default:
+			return "unknown error";
+	}
 }

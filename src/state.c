@@ -745,51 +745,50 @@ send_cmnd(struct channel *c, char *buf)
 
 	if (!strcasecmp(cmnd, "connect")) {
 
-		const char *host = NULL,
-		           *port = NULL,
-		           *pass = NULL,
-		           *user = NULL,
-		           *real = NULL,
+		const char *host = getarg(&buf, " "),
+		           *port = getarg(&buf, " "),
+		           *pass = getarg(&buf, " "),
+		           *user = getarg(&buf, " "),
+		           *real = getarg(&buf, " "),
 		           *help = ":connect [host [port] [pass] [user] [real]]";
 
 		struct server *s;
 
-		if (!(host = getarg(&buf, " "))) {
-			newlinef(c, 0, "-!!-", "%s", help);
-			return;
-		}
-
-		port = getarg(&buf, " ");
-		pass = getarg(&buf, " ");
-		user = getarg(&buf, " ");
-		real = getarg(&buf, " ");
-
-		port = (port ? port : "6667");
-		user = default_username;
-		real = default_realname;
-
-		if ((s = server_list_get(&state.servers, host, port)) != NULL) {
-			channel_set_current(s->channel);
-			newlinef(s->channel, 0, "-!!-", "already connected to %s:%s", host, port);
+		if (host == NULL) {
+			int err;
+			if (c->server == NULL) {
+				newlinef(c, 0, "-!!-", "%s", help);
+			} else if ((err = io_cx(c->server->connection))) {
+				newlinef(c, 0, "-!!-", "%s", io_err(err));
+			}
 		} else {
-			if ((s = server(host, port, pass, user, real)) == NULL)
-				fatal("failed to create server", 0);
+			port = (port ? port : "6667");
+			user = default_username;
+			real = default_realname;
 
-			server_list_add(state_server_list(), s);
-			channel_set_current(s->channel);
-			io_cx(s->connection);
-			draw_all();
+			if ((s = server_list_get(&state.servers, host, port)) != NULL) {
+				channel_set_current(s->channel);
+				newlinef(s->channel, 0, "-!!-", "already connected to %s:%s", host, port);
+			} else {
+				if ((s = server(host, port, pass, user, real)) == NULL)
+					fatal("failed to create server", 0);
+
+				server_list_add(state_server_list(), s);
+				channel_set_current(s->channel);
+				io_cx(s->connection);
+				draw_all();
+			}
 		}
 		return;
 	}
 
 	if (!strcasecmp(cmnd, "clear")) {
-		channel_clear(current_channel());
+		channel_clear(c);
 		return;
 	}
 
 	if (!strcasecmp(cmnd, "close")) {
-		channel_close(current_channel());
+		channel_close(c);
 		return;
 	}
 
