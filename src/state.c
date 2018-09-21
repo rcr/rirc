@@ -652,12 +652,10 @@ state_io_cxed(struct server *s)
 static void
 state_io_dxed(struct server *s)
 {
-	struct channel *c;
-
-	do {
+	for (struct channel *c = s->channel->next; c != s->channel; c = c->next) {
 		newline(c, 0, "-!!-", "(disconnected)");
 		channel_reset(c);
-	} while ((c = c->next) != s->channel);
+	}
 }
 
 static void
