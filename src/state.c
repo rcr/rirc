@@ -417,25 +417,6 @@ action_find_channel(char c)
 	return 0;
 }
 
-/* TODO: move to channel.c */
-void
-reset_channel(struct channel *c)
-{
-	mode_reset(&(c->chanmodes), &(c->chanmodes_str));
-
-	user_list_free(&(c->users));
-}
-
-/* TODO: move to channel.c */
-void
-part_channel(struct channel *c)
-{
-	/* Set the state of a parted channel */
-	reset_channel(c);
-
-	c->parted = 1;
-}
-
 void
 channel_close(struct channel *c)
 {
@@ -671,7 +652,12 @@ state_io_cxed(struct server *s)
 static void
 state_io_dxed(struct server *s)
 {
-	(void)s;
+	struct channel *c;
+
+	do {
+		newline(c, 0, "-!!-", "(disconnected)");
+		channel_reset(c);
+	} while ((c = c->next) != s->channel);
 }
 
 static void

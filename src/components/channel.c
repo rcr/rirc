@@ -119,3 +119,17 @@ channel_list_get(struct channel_list *cl, const char *name)
 
 	return NULL;
 }
+
+void
+channel_part(struct channel *c)
+{
+	channel_reset(c);
+	c->parted = 1;
+}
+
+void
+channel_reset(struct channel *c)
+{
+	mode_reset(&(c->chanmodes), &(c->chanmodes_str));
+	user_list_free(&(c->users));
+}

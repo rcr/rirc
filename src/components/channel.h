@@ -69,6 +69,9 @@ struct channel* channel_list_get(struct channel_list*, const char*);
  * input shouldn't be a pointer, and thus shouldn't require being freed
  */
 
+void channel_part(struct channel*);
+void channel_reset(struct channel*);
+
 void channel_free(struct channel*);
 
 #endif
