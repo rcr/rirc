@@ -13,8 +13,8 @@ STANDARDS = -std=c99 \
 
 CC = cc
 PP = cc -E
-CFLAGS    = -I. $(STANDARDS) -DVERSION=\"$(VERSION)\" -Wall -Wextra -pedantic -O2 -flto
-CFLAGS_D  = -I. $(STANDARDS) -DVERSION=\"$(VERSION)\" -Wall -Wextra -pedantic -O0 -g -DDEBUG
+CFLAGS    = -I. $(STANDARDS) -DVERSION=\"$(VERSION)\" $(D_EXT) -Wall -Wextra -pedantic -O2 -flto
+CFLAGS_D  = -I. $(STANDARDS) -DVERSION=\"$(VERSION)\" $(D_EXT) -Wall -Wextra -pedantic -O0 -g -DDEBUG
 LDFLAGS   = -pthread
 LDFLAGS_D = -pthread
 
