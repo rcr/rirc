@@ -16,6 +16,7 @@
 
 static const char* opt_arg_str(char);
 static const char* getpwuid_pw_name(void);
+static void parse_args(int, char**);
 
 #ifndef DEBUG
 const char *runtime_name = "rirc";
@@ -98,8 +99,8 @@ getpwuid_pw_name(void)
 	return passwd->pw_name;
 }
 
-int
-main(int argc, char **argv)
+static void
+parse_args(int argc, char **argv)
 {
 	int opt_c = 0,
 	    opt_i = 0;
@@ -243,16 +244,13 @@ main(int argc, char **argv)
 		if (s == NULL)
 			arg_error("failed to create: %s:%s", cli_servers[i].host, cli_servers[i].port);
 
-		if (cli_servers[i].nicks == NULL)
-			cli_servers[i].nicks = default_nick_set;
-
 		if (server_list_add(state_server_list(), s))
 			arg_error("duplicate server: %s:%s", cli_servers[i].host, cli_servers[i].port);
 
 		if (cli_servers[i].chans && state_server_set_chans(s, cli_servers[i].chans))
 			arg_error("invalid chans: '%s'", cli_servers[i].chans);
 
-		if (server_set_nicks(s, cli_servers[i].nicks))
+		if (server_set_nicks(s, (cli_servers[i].nicks ? cli_servers[i].nicks : default_nick_set)))
 			arg_error("invalid nicks: '%s'", cli_servers[i].nicks);
 
 		cli_servers[i].s = s;
@@ -260,6 +258,11 @@ main(int argc, char **argv)
 
 	for (size_t i = 0; i < n_servers; i++)
 		io_cx(cli_servers[i].s->connection);
+}
 
+int
+main(int argc, char **argv)
+{
+	parse_args(argc, argv);
 	io_loop();
 }
