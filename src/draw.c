@@ -622,10 +622,10 @@ _draw_status(struct channel *c)
 	/* TODO: channel modes, channel type_flag, servermodes */
 
 	/* server / private chat:
-	 * |-[usermodes]-(latency)---...|
+	 * |-[usermodes]-(ping)---...|
 	 *
 	 * channel:
-	 * |-[usermodes]-[chancount chantype chanmodes]/[priv]-(latency)---...|
+	 * |-[usermodes]-[chancount chantype chanmodes]/[priv]-(ping)---...|
 	 * */
 
 	float sb;
@@ -699,10 +699,10 @@ _draw_status(struct channel *c)
 			goto print_status;
 	}
 
-	/* -(latency) */
-	if (c->server && c->server->latency_delta) {
+	/* -(ping) */
+	if (c->server && c->server->ping) {
 		ret = snprintf(status_buff + col, cols - col + 1,
-				HORIZONTAL_SEPARATOR "(%llds)", (long long) c->server->latency_delta);
+				HORIZONTAL_SEPARATOR "(%llds)", (long long) c->server->ping);
 		if (ret < 0 || (col += ret) >= cols)
 			goto print_status;
 	}

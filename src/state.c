@@ -44,6 +44,7 @@ struct channel* default_channel(void) { return state.default_channel; }
 
 static void state_io_cxed(struct server*);
 static void state_io_dxed(struct server*);
+static void state_io_ping(struct server*, unsigned int);
 static void state_io_signal(enum io_sig_t);
 
 /* Set draw bits */
@@ -674,6 +675,19 @@ state_io_dxed(struct server *s)
 }
 
 static void
+state_io_ping(struct server *s, unsigned int ping)
+{
+	int ret;
+
+	s->ping = ping;
+
+	if (ping != IO_PING_MIN)
+		draw_status();
+	else if ((ret = io_sendf(s->connection, "PING")))
+		newlinef(s->channel, 0, "-!!-", "sendf fail: %s", io_err(ret));
+}
+
+static void
 state_io_signal(enum io_sig_t sig)
 {
 	switch (sig) {
@@ -702,18 +716,16 @@ io_cb(enum io_cb_t type, const void *cb_obj, ...)
 			state_io_dxed(s);
 			_newline(s->channel, 0, "-!!-", va_arg(ap, const char *), ap);
 			break;
+		case IO_CB_PING_0:
+		case IO_CB_PING_1:
+		case IO_CB_PING_N:
+			state_io_ping(s, va_arg(ap, unsigned int));
+			break;
 		case IO_CB_ERR:
 			_newline(s->channel, 0, "-!!-", va_arg(ap, const char *), ap);
 			break;
 		case IO_CB_INFO:
 			_newline(s->channel, 0, "--", va_arg(ap, const char *), ap);
-			break;
-		case IO_CB_PING_0:
-		case IO_CB_PING_1:
-		case IO_CB_PING_N:
-			/* TODO  0: clear ping, draw
-			 *       1: send ping message
-			 *       N: set ping, draw */
 			break;
 		case IO_CB_SIGNAL:
 			state_io_signal(va_arg(ap, enum io_sig_t));

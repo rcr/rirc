@@ -90,7 +90,7 @@ enum io_cb_t
 	IO_CB_DXED,   /* <const char *fmt>, [args, ...] */
 	IO_CB_ERR,    /* <const char *fmt>, [args, ...] */
 	IO_CB_INFO,   /* <const char *fmt>, [args, ...] */
-	IO_CB_PING_0,
+	IO_CB_PING_0, /* <unsigned ping> */
 	IO_CB_PING_1, /* <unsigned ping> */
 	IO_CB_PING_N, /* <unsigned ping> */
 	IO_CB_SIGNAL, /* <io_sig_t sig> */

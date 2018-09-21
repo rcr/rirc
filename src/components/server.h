@@ -21,7 +21,6 @@ struct server
 		const char **set;
 	} nicks;
 	struct channel *channel;
-	//TODO: WIP
 	struct channel_list clist;
 	struct connection *connection;
 	struct mode usermodes;
@@ -30,7 +29,7 @@ struct server
 	struct server *next;
 	struct server *prev;
 	struct user_list ignore;
-	unsigned latency_delta;
+	unsigned ping;
 };
 
 struct server_list
