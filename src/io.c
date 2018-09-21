@@ -595,7 +595,7 @@ io_thread(void *arg)
 			break;
 
 		if (st_f == IO_ST_PING && st_t == IO_ST_CXED)
-			PT_CB(IO_CB_PING_0, c->obj);
+			PT_CB(IO_CB_PING_0, c->obj, 0);
 
 		if (st_f == IO_ST_CXED && st_t == IO_ST_PING)
 			PT_CB(IO_CB_PING_1, c->obj, IO_PING_MIN);

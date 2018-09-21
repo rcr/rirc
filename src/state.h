@@ -46,9 +46,6 @@ void free_channel(struct channel*);
 void newlinef(struct channel*, enum buffer_line_t, const char*, const char*, ...);
 void newline(struct channel*, enum buffer_line_t, const char*, const char*);
 
-void part_channel(struct channel*);
-void reset_channel(struct channel*);
-
 /* TODO: refactor, should be static in state */
 /* Function prototypes for setting draw bits */
 #define X(bit) void draw_##bit(void);
