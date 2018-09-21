@@ -1,6 +1,8 @@
 # rirc
 [![Coverity Scan Build](https://scan.coverity.com/projects/4940/badge.svg)](https://scan.coverity.com/projects/4940)
 
+![rirc](docs/birb.jpg?raw=true "rirc")
+
 A minimalistic irc client written in C.
 
 While still under development, it currently supports
@@ -35,6 +37,14 @@ Options:
   -r, --realname=REALNAME  Connect to SERVER using REALNAME
   -n, --nicks=NICKS        Comma separated list of nicks to use for SERVER
   -c, --chans=CHANNELS     Comma separated list of channels to join for SERVER
+```
+
+Commands:
+```
+  :quit
+  :clear
+  :close
+  :connect [host [port] [pass] [user] [real]]
 ```
 
 Keys:
