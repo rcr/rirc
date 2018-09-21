@@ -760,8 +760,8 @@ send_cmnd(struct channel *c, char *buf)
 			}
 		} else {
 			port = (port ? port : "6667");
-			user = default_username;
-			real = default_realname;
+			user = (user ? user : default_username);
+			real = (real ? real : default_realname);
 
 			if ((s = server_list_get(&state.servers, host, port)) != NULL) {
 				channel_set_current(s->channel);
