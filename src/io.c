@@ -75,11 +75,13 @@
 enum io_err_t
 {
 	IO_ERR_NONE,
-	IO_ERR_TRUNC,
-	IO_ERR_DXED,
-	IO_ERR_CXNG,
 	IO_ERR_CXED,
-	IO_ERR_TERM
+	IO_ERR_CXNG,
+	IO_ERR_DXED,
+	IO_ERR_FMT,
+	IO_ERR_SEND,
+	IO_ERR_TERM,
+	IO_ERR_TRUNC,
 };
 
 struct io_lock
@@ -117,38 +119,34 @@ struct connection
 };
 
 static const char* io_strerror(struct connection*, int);
-static struct winsize* io_tty_winsize(void);
-static void io_close(int*);
-static void io_shutdown(int);
+static enum io_state_t io_state_cxed(struct connection*);
+static enum io_state_t io_state_cxng(struct connection*);
+static enum io_state_t io_state_dxed(struct connection*);
+static enum io_state_t io_state_ping(struct connection*);
+static enum io_state_t io_state_rxng(struct connection*);
 static void io_init(void);
 static void io_init_sig(void);
 static void io_init_tty(void);
+static void io_lock_init(struct io_lock*);
+static void io_lock_term(struct io_lock*);
+static void io_lock_wait(struct io_lock*, struct timespec*);
+static void io_lock_wake(struct io_lock*);
+static void io_net_set_timeout(struct connection*, unsigned);
 static void io_recv(struct connection*, const char*, size_t);
+static void io_soc_close(int*);
+static void io_soc_shutdown(int);
+static void io_state_force(struct connection*, enum io_state_t);
 static void io_term(void);
 static void io_term_tty(void);
+static void io_tty_winsize(void);
 static void* io_thread(void*);
-static void io_state_force(struct connection*, enum io_state_t);
-
-static enum io_state_t io_state_dxed(struct connection*);
-static enum io_state_t io_state_rxng(struct connection*);
-static enum io_state_t io_state_cxng(struct connection*);
-static enum io_state_t io_state_cxed(struct connection*);
-static enum io_state_t io_state_ping(struct connection*);
 
 static pthread_mutex_t cb_mutex;
 static pthread_once_t init_once = PTHREAD_ONCE_INIT;
-
 static struct termios term;
-
+static struct winsize tty_ws;
 static volatile sig_atomic_t flag_sigwinch_cb; /* sigwinch callback */
 static volatile sig_atomic_t flag_tty_resized; /* sigwinch ws resize */
-
-static void io_net_set_timeout(struct connection*, unsigned);
-
-static void io_lock_init(struct io_lock*);
-static void io_lock_term(struct io_lock*);
-static void io_lock_wake(struct io_lock*);
-static void io_lock_wait(struct io_lock*, struct timespec*);
 
 static const char*
 io_strerror(struct connection *c, int errnum)
@@ -158,17 +156,16 @@ io_strerror(struct connection *c, int errnum)
 }
 
 static void
-io_close(int *soc)
+io_soc_close(int *soc)
 {
 	if (*soc >= 0 && close(*soc) < 0) {
 		fatal("close", errno);
 	}
-
 	*soc = -1;
 }
 
 static void
-io_shutdown(int soc)
+io_soc_shutdown(int soc)
 {
 	if (soc >= 0 && shutdown(soc, SHUT_RDWR) < 0) {
 		fatal("shutdown", errno);
@@ -288,10 +285,9 @@ int
 io_sendf(struct connection *c, const char *fmt, ...)
 {
 	char sendbuf[512];
-
-	va_list ap;
 	int ret;
 	size_t len;
+	va_list ap;
 
 	if (c->st_c != IO_ST_CXED && c->st_c != IO_ST_PING)
 		return IO_ERR_DXED;
@@ -300,23 +296,21 @@ io_sendf(struct connection *c, const char *fmt, ...)
 	ret = vsnprintf(sendbuf, sizeof(sendbuf) - 2, fmt, ap);
 	va_end(ap);
 
-	if (ret <= 0) {
-		return IO_ERR_NONE; /* TODO handle error */
-	}
+	if (ret <= 0)
+		return IO_ERR_FMT;
 
-	len = ret;
+	len = (size_t) ret;
 
 	if (len >= sizeof(sendbuf) - 2)
 		return IO_ERR_TRUNC;
 
-	DEBUG_MSG("send: (%zu) %s", len, sendbuf);
-
 	sendbuf[len++] = '\r';
 	sendbuf[len++] = '\n';
 
-	if (send(c->soc, sendbuf, len, 0) < 0) {
-		return IO_ERR_NONE; /* TODO: handle error */
-	}
+	if (send(c->soc, sendbuf, len, 0) < 0)
+		return IO_ERR_SEND;
+
+	DEBUG_MSG("send: (%zu) %s", len, sendbuf);
 
 	return IO_ERR_NONE;
 }
@@ -390,7 +384,7 @@ io_state_force(struct connection *c, enum io_state_t st_f)
 		case IO_ST_CXNG: /* connect() */
 		case IO_ST_CXED: /* recv() */
 		case IO_ST_PING: /* recv() */
-			io_shutdown(c->soc);
+			io_soc_shutdown(c->soc);
 			break;
 		case IO_ST_TERM:
 			break;
@@ -472,7 +466,7 @@ io_state_cxng(struct connection *c)
 		if (connect(soc, p->ai_addr, p->ai_addrlen) == 0)
 			break;
 
-		io_close(&soc);
+		io_soc_close(&soc);
 	}
 
 	if (p == NULL) {
@@ -483,7 +477,7 @@ io_state_cxng(struct connection *c)
 
 	c->soc = soc;
 
-	if (getnameinfo(p->ai_addr, p->ai_addrlen, c->ip, sizeof(c->ip), NULL, 0, NI_NUMERICHOST)) {
+	if ((ret = getnameinfo(p->ai_addr, p->ai_addrlen, c->ip, sizeof(c->ip), NULL, 0, NI_NUMERICHOST))) {
 
 		if (ret == EAI_SYSTEM)
 			PT_CB(IO_CB_ERR, c->obj, "Error resolving numeric host: %s", io_strerror(c, errno));
@@ -494,7 +488,6 @@ io_state_cxng(struct connection *c)
 	}
 
 	freeaddrinfo(res);
-
 	return IO_ST_CXED;
 }
 
@@ -519,7 +512,7 @@ io_state_cxed(struct connection *c)
 		PT_CB(IO_CB_DXED, c->obj, "recv error:", io_strerror(c, errno));
 	}
 
-	io_close(&(c->soc));
+	io_soc_close(&(c->soc));
 
 	return (ret == 0 ? IO_ST_DXED : IO_ST_CXNG);
 }
@@ -553,7 +546,7 @@ io_state_ping(struct connection *c)
 		break;
 	}
 
-	io_close(&(c->soc));
+	io_soc_close(&(c->soc));
 
 	return (ret == 0 ? IO_ST_DXED : IO_ST_CXNG);
 }
@@ -614,8 +607,8 @@ io_thread(void *arg)
 			c->rx_backoff = 0;
 	}
 
-	io_shutdown(c->soc);
-	io_close(&(c->soc));
+	io_soc_shutdown(c->soc);
+	io_soc_close(&(c->soc));
 	io_lock_term(&(c->lock));
 
 	free((void*)c->host);
@@ -628,17 +621,17 @@ io_thread(void *arg)
 static void
 io_recv(struct connection *c, const char *buf, size_t n)
 {
-	char cc, cl = c->read.cl;
 	size_t ci = c->read.i;
 
 	for (size_t i = 0; i < n; i++) {
 
-		cc = buf[i];
+		char cc = buf[i];
 
-		if (ci && cl == '\r' && cc == '\n') {
+		if (ci && cc == '\n' && ((i && buf[i - 1] == '\r') || (!i && c->read.cl == '\r'))) {
+
 			c->read.buf[ci] = 0;
 
-			DEBUG_MSG("recv: (%zu) %s", c->read.i, c->read.buf);
+			DEBUG_MSG("recv: (%zu) %s", ci, c->read.buf);
 
 			PT_LK(&cb_mutex);
 			io_cb_read_soc(c->read.buf, ci, c->obj);
@@ -648,11 +641,9 @@ io_recv(struct connection *c, const char *buf, size_t n)
 		} else if (ci < IO_MESG_LEN && (isprint(cc) || cc == 0x01)) {
 			c->read.buf[ci++] = cc;
 		}
-
-		cl = cc;
 	}
 
-	c->read.cl = cl;
+	c->read.cl = buf[n - 1];
 	c->read.i = ci;
 }
 
@@ -750,32 +741,29 @@ io_loop(void)
 	}
 }
 
-static struct winsize*
+static void
 io_tty_winsize(void)
 {
-	static struct winsize tty_ws;
-
 	if (flag_tty_resized == 0) {
+		flag_tty_resized = 1;
 
 		if (ioctl(0, TIOCGWINSZ, &tty_ws) < 0)
 			fatal("ioctl", errno);
-
-		flag_tty_resized = 1;
 	}
-
-	return &tty_ws;
 }
 
 unsigned
 io_tty_cols(void)
 {
-	return io_tty_winsize()->ws_col;
+	io_tty_winsize();
+	return tty_ws.ws_col;
 }
 
 unsigned
 io_tty_rows(void)
 {
-	return io_tty_winsize()->ws_row;
+	io_tty_winsize();
+	return tty_ws.ws_row;
 }
 
 const char*
@@ -783,11 +771,13 @@ io_err(int err)
 {
 	switch (err) {
 		case IO_ERR_NONE:  return "success";
-		case IO_ERR_TRUNC: return "data truncated";
-		case IO_ERR_DXED:  return "socket not connected";
-		case IO_ERR_CXNG:  return "socket connection in progress";
 		case IO_ERR_CXED:  return "socket connected";
+		case IO_ERR_CXNG:  return "socket connection in progress";
+		case IO_ERR_DXED:  return "socket not connected";
+		case IO_ERR_FMT:   return "failed to format message";
+		case IO_ERR_SEND:  return "failed to send message";
 		case IO_ERR_TERM:  return "thread is terminating";
+		case IO_ERR_TRUNC: return "data truncated";
 		default:
 			return "unknown error";
 	}
