@@ -221,11 +221,10 @@ state_server_set_chans(struct server *s, const char *chans)
 	return 0;
 }
 
-/* TODO: buffer_clear */
 void
 channel_clear(struct channel *c)
 {
-	c->buffer = buffer();
+	memset(&(c->buffer), 0, sizeof(c->buffer));
 	draw_buffer();
 }
 

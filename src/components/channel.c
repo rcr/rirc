@@ -4,13 +4,13 @@
 #include "src/components/channel.h"
 #include "src/utils/utils.h"
 
-static inline int channel_cmp(struct channel*, struct channel*);
+static inline int channel_cmp(struct channel*, const char*);
 
 static inline int
-channel_cmp(struct channel *c1, struct channel *c2)
+channel_cmp(struct channel *c, const char *name)
 {
 	/* TODO: CASEMAPPING, as ftpr held by the server */
-	return irc_strcmp(c1->name.str, c2->name.str);
+	return irc_strcmp(c->name.str, name);
 }
 
 struct channel*
@@ -104,17 +104,16 @@ struct channel*
 channel_list_get(struct channel_list *cl, const char *name)
 {
 	struct channel *tmp;
-	struct channel c = { .name = { .str = name } };
 
 	if ((tmp = cl->head) == NULL)
 		return NULL;
 
-	if (!channel_cmp(cl->head, &c))
+	if (!channel_cmp(cl->head, name))
 		return cl->head;
 
 	while ((tmp = tmp->next) != cl->head) {
 
-		if (!channel_cmp(tmp, &c))
+		if (!channel_cmp(tmp, name))
 			return tmp;
 	}
 
