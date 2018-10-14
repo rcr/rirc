@@ -76,28 +76,9 @@ to join on
 .SH USAGE
 .TS
 l .
-rirc can be controlled by a combination of key bindings and commands, where:
+rirc is controlled by a combination of key bindings and commands, where:
   <arg> denotes required arguments
   [arg] denotes optional arguments
-.TE
-
-.TS
-.tab(;);
-lb l .
-Commands:
-  /close
-  /connect;[host:port | host [port]]
-  /disconnect;[quit message]
-  /ignore [nick]
-  /join;[target, [targets...]]
-  /me;<message>
-  /nick;[nick]
-  /part;[target [targets...]] [part message]
-  /priv;<target> <message>
-  /quit;[quit message]
-  /raw;<message>
-  /unignore;[nick]
-  /version
 .TE
 
 .TS
@@ -112,6 +93,41 @@ Keys:
   ^X;close current channel
   ^U;scroll current buffer up
   ^D;scroll current buffer down
+.TE
+
+.TS
+l .
+Commands beginning with ':' are interpreted as rirc commands
+and control the local client, e.g.:
+.TE
+
+.TS
+.tab(;);
+lb l .
+Commands:
+  :clear;
+  :close;
+  :connect;[host [port] [pass] [user] [real]]
+  :quit;
+.TE
+
+.TS
+l .
+Commands beginning with '/' are interpreted as IRC commands
+and will be sent to the current server, e.g.:
+.TE
+
+.TS
+.tab(;);
+lb l .
+IRC commands:
+  /join;[target, [targets...]]
+  /me;<message>
+  /nick;[nick]
+  /part;[target [targets...]] [part message]
+  /priv;<target> <message>
+  /quit;[quit message]
+  /raw;<message>
 .TE
 
 .SH AUTHORS

@@ -729,6 +729,7 @@ static void
 send_cmnd(struct channel *c, char *buf)
 {
 	const char *cmnd;
+	int err;
 
 	if (!(cmnd = getarg(&buf, " "))) {
 		newline(c, 0, "-!!-", "Messages beginning with ':' require a command");
@@ -736,7 +737,7 @@ send_cmnd(struct channel *c, char *buf)
 	}
 
 	if (!strcasecmp(cmnd, "quit")) {
-		/* TODO: close servers, free */
+		/* TODO: send optional quit message, close servers, free */
 		exit(EXIT_SUCCESS);
 	}
 
@@ -752,7 +753,6 @@ send_cmnd(struct channel *c, char *buf)
 		struct server *s;
 
 		if (host == NULL) {
-			int err;
 			if (c->server == NULL) {
 				newlinef(c, 0, "-!!-", "%s", help);
 			} else if ((err = io_cx(c->server->connection))) {
@@ -793,6 +793,14 @@ send_cmnd(struct channel *c, char *buf)
 		/* TODO user, real, nicks, pass, key */
 		return;
 	}
+
+	/* TODO:
+	 * help
+	 * ignore
+	 * unignore
+	 * version
+	 * find
+	 */
 }
 
 static int input_cchar(const char*, size_t);

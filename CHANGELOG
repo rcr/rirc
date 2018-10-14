@@ -1,0 +1,13 @@
+# Changelog
+Summary of notable changes and features
+
+## Unreleased (dev)
+merged
+
+## [0.1.0]
+### Initial release
+Started in 2014 as a hobby project, rirc has been a fully useable,
+albeit basic, IRC client since it's early inception. This version
+marks an initial release supporting a basic subset of the IRC
+protocol and client management features one would expect in everyday
+usage.
