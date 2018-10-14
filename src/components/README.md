@@ -34,7 +34,7 @@ Stateful component hierarchy
        |
        |__mode
        |__mode_str
-       |__mode_config
+       |__mode_cfg
        |
        |__user_list
            |

@@ -12,14 +12,16 @@ irc client.
 
 ## Building:
 
-Default build:
 ```
-make rirc
+make
 ```
-
-Debug build
+Or
 ```
 make debug
+```
+
+```
+make install
 ```
 
 ## Usage:

@@ -351,6 +351,7 @@ send_me(char *mesg, struct server *s, struct channel *c)
 	return 0;
 }
 
+// TODO: :ignore
 static int
 send_ignore(char *mesg, struct server *s, struct channel *c)
 {
@@ -525,6 +526,7 @@ send_topic(char *mesg, struct server *s, struct channel *c)
 	return 0;
 }
 
+// TODO: :unignore
 static int
 send_unignore(char *mesg, struct server *s, struct channel *c)
 {
@@ -563,6 +565,7 @@ send_quit(char *mesg, struct server *s, struct channel *c)
 	return 0;
 }
 
+// TODO: :version
 static int
 send_version(char *mesg, struct server *s, struct channel *c)
 {
