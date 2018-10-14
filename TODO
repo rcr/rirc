@@ -1,20 +1,16 @@
+FIXME:
+UNHANDLED ~ 461 PING :Not enough parameters
+
+
 TODO
 ---------------------------
-this iteration
-	- RFC2812 compliance
-	- Fixes for parsing args
-
 next iteration
-	- hook up new server/channel/mode/etc implementations
-	- TODO/FIXME cleanups
+	- RFC2812 compliance
 
 Continue refactoring:
-	- Move/split components (e.g. server, channel, input, etc):
-		src/components/*.{c,h}, src/README.md
 	- Untangle headers
 	- Rewrite input DLL as circular buffer of gap buffers, with copy on repeat,
 		use abstractions in _draw_input
-	- Split net/server code
 	- Error/warning writing from stateless components, e.g.:
 		- mode.c should be able to call err("...") on some passed parameter
 		  and have it written to the appropriate buffer with the appropriate
@@ -26,39 +22,36 @@ Continue refactoring:
 		  be added
 	- more debug information, levels, for various events, a debug pannel as a new channel
 	  type when debug flag is set
-	- fix poll/sleep cycle for sockets and input fd, use posix timers when socket timing out?
 
-
-server passwords, e.g.
-:connect irc.server.tld 6667 password
-	sends PASS during registration if set, stored
-	with the connection object
+action_error
+display error to user for confirmation, e.g. :connect <server>
+when connections are maxed
 
 get termcap strings in draw.c on startup
 
+fuzzy search > substring search for channels
+
 Testing:
 	- Stateful code integration testing (manually drive state with network callbacks)
-	- callgrind profiling
+	- callgrind, helgrind profiling
 	- Coverage (gcov)
 		- link test/foo.c against src/foo.o built with coverage flags
 		- ./test/script.sh ?
 	- Fuzzing handlers (afl)
 	- Try musl C
-	- add tests directory to coverity scan
+
+buffer performance improvements:
+	- reduce overall size, pack strings in contiguous realloc'ed array
+	- cache line breaks
+	- pre-format time
+
+abstract list.h from channel/server/input lists
+
+SASL auth:
+	- cli -a/--auth
+	- :connect
 
 ----------------------
-/quit -> issue quit for current serrver
-	/exit -> quit rirc?
-	/quit     quit current server
-	/quit -a  quit all servers and rirc
-
-/connect  -> issue actual connect
-	/server -> create new server?
-	/cconnect?
-	/oper-connect?
-	what other oper-* commands?
-	/connect -s  <- oper command
-
 
 Summary of rirc protocol implementation:
 
@@ -445,15 +438,14 @@ Summary of rirc protocol implementation:
 
 
 ----------------------
-	/NICKS, /IGNORE, /UNIGNORE,
+	/NICKS,
+	:IGNORE, :UNIGNORE,
 		print the current nicks, ignore list, to the channel
 		^(Also print this implicitly when end of nicks numeric is received)
 		^(Print as buffer_line type dynamically to fill available terminal space)
 
 FIXME:
 ----------------------
-valgrind reports addrinfo memory lost when cancelling hung connection
-
 show connect eta intead of ping when reconnecting
 
 show disconnected/parted in status bar for channels instead of 0 user count
@@ -464,16 +456,8 @@ Make sure all the thread related code is using thread-safe functions,
 and that proper cancellation points are used. Make sure no resources
 can be left hanging (eg: sockets left open when a thread is canceled?)
 
-Implement generic command arguments
-	/<cmd> -arg
-e.g.
-	/topic -unset
-
 Empty trailing should be null, e.g.:
 ":nick!~user@host PART #channel :" -> "< ~ nick!~user@host has left #channel ()"
-
-when disconnected and reconnected, PING/PONG seems to be out of sync?
-	client continuously goes into timing out, though connection is still established
 
 I broke the activity colouring stuff:
 	join/part/quit sets activity (it shouldnt)

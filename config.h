@@ -3,6 +3,24 @@
  * Colours can be set [0, 255], Any other value (e.g. -1) will set
  * the default terminal foreground/background */
 
+/* Default comma separated set of Nicks to try on connection
+ *   String
+ *   ("": defaults to effective user id name)
+ */
+#define DEFAULT_NICK_SET ""
+
+/* Default Username and Realname sent during connection
+ *   String
+ *   ("": defaults to effective user id name)
+ */
+#define DEFAULT_USERNAME ""
+#define DEFAULT_REALNAME ""
+
+/* User count in channel before filtering JOIN/PART/QUIT messages
+ *   Integer
+ *   (0: no filtering) */
+#define JPQ_THRESHOLD 0
+
 /* Message sent for PART and QUIT by default */
 #define DEFAULT_QUIT_MESG "rirc v" VERSION
 
@@ -67,26 +85,26 @@
 /* Seconds before displaying ping
  *   Integer, [0, 150, 86400]
  *   (0: no ping handling) */
-#define NET_PING_MIN 150
+#define IO_PING_MIN 150
 
 /* Seconds between refreshing ping display
  *   Integer, [0, 5, 86400]
  *   (0: no ping handling) */
-#define NET_PING_REFRESH 5
+#define IO_PING_REFRESH 5
 
 /* Seconds before timeout reconnect
  *   Integer, [0, 300, 86400]
  *   (0: no ping timeout reconnect) */
-#define NET_PING_MAX 300
+#define IO_PING_MAX 300
 
 /* Reconnect backoff base delay
- *   Integer, [1, 10, 86400] */
-#define NET_RECONNECT_BACKOFF_BASE 10
+ *   Integer, [1, 4, 86400] */
+#define IO_RECONNECT_BACKOFF_BASE 4
 
 /* Reconnect backoff growth factor
  *   Integer, [1, 2, 32] */
-#define NET_RECONNECT_BACKOFF_FACTOR 2
+#define IO_RECONNECT_BACKOFF_FACTOR 2
 
 /* Reconnect backoff maximum
  *   Integer, [1, 86400, 86400] */
-#define NET_RECONNECT_BACKOFF_MAX 86400
+#define IO_RECONNECT_BACKOFF_MAX 86400

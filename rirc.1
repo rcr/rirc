@@ -1,17 +1,24 @@
+'\" t
 .TH RIRC 1 rirc\-VERSION
 .SH NAME
 rirc \- a minimalistic irc client written in C
 .SH SYNOPSIS
 .B rirc
-.RB [ -vh ]
-.RB [ -c
+.RB [ -hv ]
+.RB [ -s
 .I server
 .RB [ -p
 .IR port ]
+.RB [ -w
+.IR pass ]
 .RB [ -n
 .IR nicks ]
-.RB [ -j
-.IR join ]]
+.RB [ -c
+.IR chans "]
+.RB [ -u
+.IR username "]
+.RB [ -r
+.IR realname "]], ...]"
 .SH DESCRIPTION
 .P
 rirc is a lightweight Internet Relay Chat client.
@@ -25,9 +32,9 @@ file and (re)compiling the source code.
 Print this message and exit
 .TP
 .B -v, --version
-Print version information and exit
+Print rirc version and exit
 .TP
-.BI "-c, --connect=" server
+.BI "-s, --server=" server
 Connect to
 .I server
 .TP
@@ -37,83 +44,92 @@ Connect to
 using
 .I port
 .TP
+.BI "-w, --pass=" pass
+Connect to
+.I server
+using
+.I pass
+.TP
+.BI "-u, --username=" username
+Connect to
+.I server
+using
+.I username
+.TP
+.BI "-r, --realname=" realname
+Connect to
+.I server
+using
+.I realname
+.TP
 .BI "-n, --nicks=" nicks
 Comma separated list of
 .I nicks
 to use for
 .I server
 .TP
-.BI "-j, --join=" join
-Comma separated list of channels to
-.I join
-on
+.BI "-c, --chans=" chans
+Comma separated list of
+.I chans
+to join on
 .I server
 .SH USAGE
-rirc can be controlled by a combination of key bindings and commands, where:
-.EE
-.RI " - <" "arg" ">"
-denotes required arguments
-.EE
-.RI " - [" "arg" "]"
-denotes optional arguments
-.P
-.B Keys:
-.EE
-.BR "  ^F     " "find channel"
-.EE
-.BR "  ^N     " "go to next channel"
-.EE
-.BR "  ^P     " "go to previous channel"
-.EE
-.BR "  ^C     " "cancel current input/action"
-.EE
-.BR "  ^L     " "clear current channel"
-.EE
-.BR "  ^X     " "close current channel"
-.EE
-.BR "  ^U     " "scroll current buffer up"
-.EE
-.BR "  ^D     " "scroll current buffer down"
-.EE
-.P
-.B Commands:
-.B "  /connect"
-.RI "   [" "host" " | " "host:port" " | " "host port" "]"
-.EE
-.B "  /close"
-.EE
-.B "  /disconnect"
-.RI "[" "quit message" "]"
-.EE
-.B "  /me"
-.RI "        <" "message" ">"
-.EE
-.B "  /join"
-.RI "      [" "target" " [" "targets..." "]]"
-.EE
-.B "  /nick"
-.RI "      [" "nick" "]"
-.EE
-.B "  /part"
-.RI "      [" "target" " [" "targets..." "]] [" "part message" "]"
-.EE
-.B "  /priv"
-.RI "      <" "target" "> <" "message" ">"
-.EE
-.B "  /raw"
-.RI "       <" "message" ">"
-.EE
-.B "  /quit"
-.RI "      [" "quit message" "]"
-.EE
-.B "  /version"
-.EE
-.B "  /ignore"
-.RI "    [" "nick" "]"
-.EE
-.B "  /unignore"
-.RI "  [" "nick" "]"
-.EE
+.TS
+l .
+rirc is controlled by a combination of key bindings and commands, where:
+  <arg> denotes required arguments
+  [arg] denotes optional arguments
+.TE
+
+.TS
+.tab(;);
+lb l .
+Keys:
+  ^F;find channel
+  ^N;go to next channel
+  ^P;go to previous channel
+  ^C;cancel current input/action
+  ^L;clear current channel
+  ^X;close current channel
+  ^U;scroll current buffer up
+  ^D;scroll current buffer down
+.TE
+
+.TS
+l .
+Commands beginning with ':' are interpreted as rirc commands
+and control the local client, e.g.:
+.TE
+
+.TS
+.tab(;);
+lb l .
+Commands:
+  :clear;
+  :close;
+  :connect;[host [port] [pass] [user] [real]]
+  :quit;
+.TE
+
+.TS
+l .
+Commands beginning with '/' are interpreted as IRC commands
+and will be sent to the current server, e.g.:
+.TE
+
+.TS
+.tab(;);
+lb l .
+IRC commands:
+  /join;[target, [targets...]]
+  /me;<message>
+  /nick;[nick]
+  /part;[target [targets...]] [part message]
+  /priv;<target> <message>
+  /quit;[quit message]
+  /raw;<message>
+.TE
+
 .SH AUTHORS
 .MT mail@rcr.io
 Richard 'rcr' Robbins

@@ -1,6 +1,6 @@
 /* TODO: reduce overall size of buffer, implement growable text area with
- * ring of buffer_lines pointing to strings, instantiated with initial size
- * arena based allocator
+ * ring of buffer_lines pointing to strings, keeping nulls for easy casting
+ * to c strings
  *
  * i.e.            line(n).text            line(n+1).text
  *                           v                         v
@@ -8,10 +8,13 @@
  *                    ^                         ^
  *          line(n).user             line(n+1).user
  *
- * will allow removal of text/from truncation
- *    - line pointers would have to be updated (by ptrdiff_t) to point to the
- *      newly allocated space if it moves
- *    - or rather, allocate pages at a time as singly linked list
+ *
+ * growable area, e.g. realloced in factors of 1.5, indexed by buffer_segment, e.g.
+ * struct segment {
+ *     uint16_t index;
+ *     uint16_t len;
+ * }
+ * indexed from base of data pointer
  *
  * TODO: cache a sensible number of line breaks (2?) against the line width
  * and dynamically calculate the rest, terminal size rarely changes
@@ -204,9 +207,9 @@ buffer_scrollback_status(struct buffer *b)
 }
 
 struct buffer
-buffer(enum buffer_t type)
+buffer(void)
 {
 	/* Initialize a buffer */
 
-	return (struct buffer) { .type = type };
+	return (struct buffer) {0};
 }

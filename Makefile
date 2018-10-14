@@ -1,16 +1,21 @@
 .POSIX:
 
-VERSION = 0.1
+VERSION = 0.1.0
 
 # Install paths
 EXE_DIR = /usr/local/bin
 MAN_DIR = /usr/local/share/man/man1
 
+STANDARDS = -std=c99 \
+ -D_POSIX_C_SOURCE=200812L \
+ -D_DARWIN_C_SOURCE=200812L \
+ -D_BSD_VISIBLE=1
+
 CC = cc
 PP = cc -E
-CFLAGS    = -I. -std=c99 -DVERSION=\"$(VERSION)\" -D_POSIX_C_SOURCE=200112L -Wall -Wextra -pedantic -O2
-CFLAGS_D  = -I. -std=c99 -DVERSION=\"$(VERSION)\" -D_POSIX_C_SOURCE=200112L -Wall -Wextra -pedantic -O0 -g -DDEBUG
-LDFLAGS   = -pthread -s
+CFLAGS    = -I. $(STANDARDS) -DVERSION=\"$(VERSION)\" $(D_EXT) -Wall -Wextra -pedantic -O2 -flto
+CFLAGS_D  = -I. $(STANDARDS) -DVERSION=\"$(VERSION)\" $(D_EXT) -Wall -Wextra -pedantic -O0 -g -DDEBUG
+LDFLAGS   = -pthread
 LDFLAGS_D = -pthread
 
 # Build, source, test source directories
@@ -73,8 +78,7 @@ debug:   $(EXE_D)
 test:    $(DIR_B) $(OBJS_T)
 
 clean:
-	@echo cleaning
-	@rm -rf $(DIR_B) $(EXE_R) $(EXE_D)
+	rm -rf $(DIR_B) $(EXE_R) $(EXE_D)
 
 define make-dirs
 	for dir in $(SRCDIRS);   do mkdir -p $(DIR_B)/$$dir; done

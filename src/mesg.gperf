@@ -18,9 +18,7 @@ struct send_handler;
 %%
 CLEAR,      send_clear
 CLOSE,      send_close
-CONNECT,    send_connect
 CTCP,       send_ctcp
-DISCONNECT, send_disconnect
 IGNORE,     send_ignore
 JOIN,       send_join
 ME,         send_me

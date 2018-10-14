@@ -7,39 +7,29 @@
 #include "src/components/server.h"
 #include "src/draw.h"
 #include "src/mesg.h"
-#include "src/net.h"
 
 /* state.h
  *
  * Interface for retrieving and altering global state of the program */
 
+int state_server_set_chans(struct server*, const char*);
+struct channel* new_channel(const char*, struct server*, enum channel_t);
+
+
 /* state.c */
-/* FIXME: terrible, until i remove references to ccur/rirc */
-#define rirc (default_channel())
-#define ccur (current_channel())
 struct channel* current_channel(void);
-struct channel* default_channel(void);
 
-//TODO: rename
-unsigned int _term_cols(void);
-unsigned int _term_rows(void);
+struct server_list* state_server_list(void);
 
-void resize(void);
+void state_init(void);
 
-void init_state(void);
-void free_state(void);
-
+// TODO: most of this stuff can be static
 //TODO: move to channel.c, function of server's channel list
 /* Useful state retrieval abstractions */
-struct channel* channel_get(char*, struct server*);
 struct channel* channel_get_first(void);
 struct channel* channel_get_last(void);
 struct channel* channel_get_next(struct channel*);
 struct channel* channel_get_prev(struct channel*);
-
-/* State altering interface */
-struct channel* new_channel(char*, struct server*, struct channel*, enum buffer_t);
-void auto_nick(char**, char*);
 
 /* FIXME: */
 void buffer_scrollback_back(struct channel*);
@@ -52,10 +42,9 @@ void channel_move_next(void);
 void channel_set_current(struct channel*);
 
 void free_channel(struct channel*);
-void newline(struct channel*, enum buffer_line_t, const char*, const char*);
+
 void newlinef(struct channel*, enum buffer_line_t, const char*, const char*, ...);
-void part_channel(struct channel*);
-void reset_channel(struct channel*);
+void newline(struct channel*, enum buffer_line_t, const char*, const char*);
 
 /* TODO: refactor, should be static in state */
 /* Function prototypes for setting draw bits */

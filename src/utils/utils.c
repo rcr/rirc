@@ -101,16 +101,18 @@ getarg(char **str, const char *sep)
 char*
 strdup(const char *str)
 {
-	/* Return dynamically allocated duplicate string */
+	return memdup(str, strlen(str) + 1);
+}
 
-	size_t len = strlen(str) + 1;
-
+void*
+memdup(const void *mem, size_t len)
+{
 	void *ret;
 
 	if ((ret = malloc(len)) == NULL)
 		fatal("malloc", errno);
 
-	return (char *) memcpy(ret, str, len);
+	return memcpy(ret, mem, len);
 }
 
 struct string*
@@ -158,26 +160,17 @@ irc_toupper(const int c)
 	 */
 
 	switch (c) {
-
-		case '{':
-			return '[';
-
-		case '}':
-			return ']';
-
-		case '|':
-			return '\\';
-
-		case '^':
-			return '~';
-
+		case '{': return '[';
+		case '}': return ']';
+		case '|': return '\\';
+		case '^': return '~';
 		default:
 			return (c >= 'a' && c <= 'z') ? (c + 'A' - 'a') : c;
 	}
 }
 
 int
-irc_isnickchar(const char c)
+irc_isnickchar(char c, int first)
 {
 	/* RFC 2812, section 2.3.1
 	 *
@@ -187,7 +180,55 @@ irc_isnickchar(const char c)
 	 * special    =  %x5B-60 / %x7B-7D       ; "[", "]", "\", "`", "_", "^", "{", "|", "}"
 	 */
 
-	return ((c >= 0x41 && c <= 0x7D) || (c >= 0x30 && c <= 0x39) || c == '-');
+	return ((c >= 0x41 && c <= 0x7D) || (!first && ((c >= 0x30 && c <= 0x39) || c == '-')));
+}
+
+int
+irc_ischanchar(char c, int first)
+{
+	/* RFC 2812, section 2.3.1
+	 *
+	 * channel    =  ( "#" / "+" / ( "!" channelid ) / "&" ) chanstring
+	 *               [ ":" chanstring ]
+	 * chanstring =  %x01-07 / %x08-09 / %x0B-0C / %x0E-1F / %x21-2B
+	 * chanstring =/ %x2D-39 / %x3B-FF
+	 *                 ; any octet except NUL, BELL, CR, LF, " ", "," and ":"
+	 * channelid  = 5( %x41-5A / digit )   ; 5( A-Z / 0-9 )
+	 */
+
+	/* TODO: */
+	(void)c;
+	(void)first;
+
+	return 1;
+}
+
+int
+irc_isnick(const char *str)
+{
+	if (!irc_isnickchar(*str++, 1))
+		return 0;
+
+	while (*str) {
+		if (!irc_isnickchar(*str++, 0))
+			return 0;
+	}
+
+	return 1;
+}
+
+int
+irc_ischan(const char *str)
+{
+	if (!irc_ischanchar(*str++, 1))
+		return 0;
+
+	while (*str) {
+		if (!irc_ischanchar(*str++, 0))
+			return 0;
+	}
+
+	return 1;
 }
 
 int
@@ -371,7 +412,7 @@ check_pinged(const char *mesg, const char *nick)
 			mesg++;
 
 		/* nick prefixes the word, following character is space or symbol */
-		if (!irc_strncmp(mesg, nick, len) && !irc_isnickchar(*(mesg + len)))
+		if (!irc_strncmp(mesg, nick, len) && !irc_isnickchar(*(mesg + len), 0))
 			return 1;
 
 		/* skip to end of word */
@@ -441,4 +482,3 @@ word_wrap(int n, char **str, char *end)
 
 	return ret;
 }
-

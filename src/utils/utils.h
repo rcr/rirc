@@ -3,6 +3,7 @@
 
 #include <errno.h>
 #include <stddef.h>
+#include <stdio.h>
 #include <stdlib.h>
 
 /* Parsed IRC message */
@@ -27,14 +28,21 @@ struct string
 	size_t len;
 };
 
-int irc_isnickchar(const char);
+int irc_isnickchar(char, int);
+int irc_ischanchar(char, int);
+int irc_isnick(const char*);
+int irc_ischan(const char*);
+
+
 //TODO: replace comps to channel / nicks
 int irc_strcmp(const char*, const char*);
 int irc_strncmp(const char*, const char*, size_t);
 
 char* getarg(char**, const char*);
-char* strdup(const char*);
 char* word_wrap(int, char**, char*);
+
+char* strdup(const char*);
+void* memdup(const void*, size_t);
 
 int check_pinged(const char*, const char*);
 int parse_mesg(struct parsed_mesg*, char*);
@@ -47,8 +55,27 @@ void handle_error(int, const char*, ...);
 
 extern int fatal_exit;
 
+#define TO_STR(X) #X
+#define STR(X) TO_STR(X)
+
 #define MAX(A, B) ((A) > (B) ? (A) : (B))
 #define MIN(A, B) ((A) > (B) ? (B) : (A))
+
+#define ELEMS(X) (sizeof((X)) / sizeof((X)[0]))
+#define ARR_ELEM(A, E) ((E) >= 0 && (size_t)(E) < ELEMS((A)))
+
+#define UNUSED(X) ((void)(X))
+
+#if (defined DEBUG) && !(defined TESTING)
+#define DEBUG_MSG(...) \
+	do { \
+		fprintf(stderr, "%s:%d:%-12s\t", __FILE__, __LINE__, __func__); \
+		fprintf(stderr, __VA_ARGS__); \
+		fprintf(stderr, "\n"); \
+	} while (0)
+#else
+#define DEBUG_MSG(...)
+#endif
 
 /* Irrecoverable error
  *   this define is precluded in test.h to aggregate fatal errors in testcases */

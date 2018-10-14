@@ -1,260 +1,268 @@
-/* For sigaction */
-#define _DARWIN_C_SOURCE 200112L
-/* For SIGWINCH on FreeBSD */
-#ifndef __BSD_VISIBLE
-#define __BSD_VISIBLE 1
-#endif
-
 #include <getopt.h>
-#include <signal.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <termios.h>
+#include <pwd.h>
+#include <unistd.h>
 
-#include "src/net2.h"
+#include "config.h"
+#include "src/io.h"
 #include "src/state.h"
 
-#define opt_error(MESG) \
-	do { puts((MESG)); exit(EXIT_FAILURE); } while (0);
+#define arg_error(...) \
+	do { fprintf(stderr, "%s: ", runtime_name); \
+	     fprintf(stderr, __VA_ARGS__); \
+	     fprintf(stderr, "\n"); \
+	     fprintf(stderr, "%s --help for usage\n", runtime_name); \
+	     exit(EXIT_FAILURE); \
+	} while (0);
 
-static void cleanup(void);
-static void startup(int, char**);
-static void main_loop(void);
-static void usage(void);
-static void signal_sigwinch(int);
+static const char* opt_arg_str(char);
+static const char* getpwuid_pw_name(void);
+static void parse_args(int, char**);
 
-static struct termios oterm;
-static struct sigaction sa_sigwinch;
+#ifndef DEBUG
+const char *runtime_name = "rirc";
+#else
+const char *runtime_name = "rirc.debug";
+#endif
 
-static volatile sig_atomic_t flag_sigwinch;
+#ifndef DEFAULT_NICK_SET
+const char *default_nick_set = DEFAULT_NICK_SET;
+#else
+const char *default_nick_set;
+#endif
 
-/* Global configuration */
-struct config config =
+#ifndef DEFAULT_USERNAME
+const char *default_username = DEFAULT_USERNAME;
+#else
+const char *default_username;
+#endif
+
+#ifndef DEFAULT_REALNAME
+const char *default_realname = DEFAULT_REALNAME;
+#else
+const char *default_realname;
+#endif
+
+static const char *const rirc_usage =
+"\n"
+"rirc v"VERSION" ~ Richard C. Robbins <mail@rcr.io>\n"
+"\n"
+"Usage:\n"
+"  rirc [-hv] [-s server [-p port] [-w pass] [-n nicks] [-c chans] [-u user] [-r real]], ...]\n"
+"\n"
+"Help:\n"
+"  -h, --help            Print this message and exit\n"
+"  -v, --version         Print rirc version and exit\n"
+"\n"
+"Options:\n"
+"  -s, --server=SERVER      Connect to SERVER\n"
+"  -p, --port=PORT          Connect to SERVER using PORT\n"
+"  -w, --pass=PASS          Connect to SERVER using PASS\n"
+"  -u, --username=USERNAME  Connect to SERVER using USERNAME\n"
+"  -r, --realname=REALNAME  Connect to SERVER using REALNAME\n"
+"  -n, --nicks=NICKS        Comma separated list of nicks to use for SERVER\n"
+"  -c, --chans=CHANNELS     Comma separated list of channels to join for SERVER\n"
+;
+
+static const char *const rirc_version =
+"rirc v"VERSION
+#ifdef DEBUG
+" (debug build)"
+#endif
+;
+
+static const char*
+opt_arg_str(char c)
 {
-	.username = "rirc_v" VERSION,
-	.realname = "rirc v" VERSION,
-	.join_part_quit_threshold = 100
-};
+	switch (c) {
+		case 's': return "-s/--server";
+		case 'p': return "-p/--port";
+		case 'w': return "-w/--pass";
+		case 'n': return "-n/--nicks";
+		case 'c': return "-c/--chans";
+		case 'u': return "-u/--username";
+		case 'r': return "-r/--realname";
+		default:
+			fatal("unknown option flag", 0);
+	}
+}
+
+static const char*
+getpwuid_pw_name(void)
+{
+	static struct passwd *passwd;
+
+	errno = 0;
+
+	if (!passwd && !(passwd = getpwuid(geteuid())))
+		fatal("getpwuid", (errno ? errno : ENOENT));
+
+	return passwd->pw_name;
+}
+
+static void
+parse_args(int argc, char **argv)
+{
+	int opt_c = 0,
+	    opt_i = 0;
+
+	size_t n_servers = 0;
+
+	if (argc > 0)
+		runtime_name = argv[0];
+
+	srand(time(NULL));
+
+	opterr = 0;
+
+	struct option long_opts[] = {
+		{"server",   required_argument, 0, 's'},
+		{"port",     required_argument, 0, 'p'},
+		{"pass",     required_argument, 0, 'w'},
+		{"nicks",    required_argument, 0, 'n'},
+		{"chans",    required_argument, 0, 'c'},
+		{"username", required_argument, 0, 'u'},
+		{"realname", required_argument, 0, 'r'},
+		{"version",  no_argument,       0, 'v'},
+		{"help",     no_argument,       0, 'h'},
+		{0, 0, 0, 0}
+	};
+
+	struct cli_server {
+		const char *host;
+		const char *port;
+		const char *pass;
+		const char *nicks;
+		const char *chans;
+		const char *username;
+		const char *realname;
+		struct server *s;
+	} cli_servers[IO_MAX_CONNECTIONS];
+
+	/* FIXME: getopt_long is a GNU extension */
+	while (0 < (opt_c = getopt_long(argc, argv, ":s:p:w:n:c:r:u:vh", long_opts, &opt_i))) {
+
+		switch (opt_c) {
+
+			case 's': /* Connect to server */
+
+				if (*optarg == '-')
+					arg_error("-s/--server requires an argument");
+
+				if (++n_servers == IO_MAX_CONNECTIONS)
+					arg_error("exceeded maximum number of servers (%d)", IO_MAX_CONNECTIONS);
+
+				cli_servers[n_servers - 1].host = optarg;
+				cli_servers[n_servers - 1].port = "6667";
+				cli_servers[n_servers - 1].pass = NULL;
+				cli_servers[n_servers - 1].nicks = NULL;
+				cli_servers[n_servers - 1].chans = NULL;
+				cli_servers[n_servers - 1].username = NULL;
+				cli_servers[n_servers - 1].realname = NULL;
+				break;
+
+			#define CHECK_SERVER_OPTARG(OPT_C) \
+				if (*optarg == '-') \
+					arg_error("option '%s' requires an argument", opt_arg_str((OPT_C))); \
+				if (n_servers == 0) \
+					arg_error("option '%s' requires a server argument first", opt_arg_str((OPT_C)));
+
+			case 'p': /* Connect using port */
+				CHECK_SERVER_OPTARG(opt_c);
+				cli_servers[n_servers - 1].port = optarg;
+				break;
+
+			case 'w': /* Connect using port */
+				CHECK_SERVER_OPTARG(opt_c);
+				cli_servers[n_servers - 1].pass = optarg;
+				break;
+
+			case 'n': /* Comma separated list of nicks to use */
+				CHECK_SERVER_OPTARG(opt_c);
+				cli_servers[n_servers - 1].nicks = optarg;
+				break;
+
+			case 'c': /* Comma separated list of channels to join */
+				CHECK_SERVER_OPTARG(opt_c);
+				cli_servers[n_servers - 1].chans = optarg;
+				break;
+
+			case 'u': /* Connect using username */
+				CHECK_SERVER_OPTARG(opt_c);
+				cli_servers[n_servers - 1].username = optarg;
+				break;
+
+			case 'r': /* Connect using realname */
+				CHECK_SERVER_OPTARG(opt_c);
+				cli_servers[n_servers - 1].realname = optarg;
+				break;
+
+			#undef CHECK_SERVER_OPTARG
+
+			case 'v':
+				puts(rirc_version);
+				exit(EXIT_SUCCESS);
+
+			case 'h':
+				puts(rirc_usage);
+				exit(EXIT_SUCCESS);
+
+			case '?':
+				arg_error("unknown options '%s'", argv[optind - 1]);
+
+			case ':':
+				arg_error("option '%s' requires an argument", opt_arg_str(optopt));
+
+			default:
+				arg_error("unknown opt error");
+		}
+	}
+
+	if (optind < argc)
+		arg_error("unused option '%s'", argv[optind]);
+
+	if (!default_nick_set || !default_nick_set[0])
+		default_nick_set = getpwuid_pw_name();
+
+	if (!default_username || !default_username[0])
+		default_username = getpwuid_pw_name();
+
+	if (!default_realname || !default_realname[0])
+		default_realname = getpwuid_pw_name();
+
+	state_init();
+
+	for (size_t i = 0; i < n_servers; i++) {
+
+		struct server *s = server(
+			cli_servers[i].host,
+			cli_servers[i].port,
+			cli_servers[i].pass,
+			(cli_servers[i].username ? cli_servers[i].username : default_username),
+			(cli_servers[i].realname ? cli_servers[i].realname : default_realname)
+		);
+
+		if (s == NULL)
+			arg_error("failed to create: %s:%s", cli_servers[i].host, cli_servers[i].port);
+
+		if (server_list_add(state_server_list(), s))
+			arg_error("duplicate server: %s:%s", cli_servers[i].host, cli_servers[i].port);
+
+		if (cli_servers[i].chans && state_server_set_chans(s, cli_servers[i].chans))
+			arg_error("invalid chans: '%s'", cli_servers[i].chans);
+
+		if (server_set_nicks(s, (cli_servers[i].nicks ? cli_servers[i].nicks : default_nick_set)))
+			arg_error("invalid nicks: '%s'", cli_servers[i].nicks);
+
+		cli_servers[i].s = s;
+	}
+
+	for (size_t i = 0; i < n_servers; i++)
+		io_cx(cli_servers[i].s->connection);
+}
 
 int
 main(int argc, char **argv)
 {
-	startup(argc, argv);
-
-	main_loop();
-
-	return EXIT_SUCCESS;
-}
-
-static void
-usage(void)
-{
-	puts(
-	"\n"
-	"rirc version " VERSION " ~ Richard C. Robbins <mail@rcr.io>\n"
-	"\n"
-	"Usage:\n"
-	"  rirc [-c server [OPTIONS]]*\n"
-	"\n"
-	"Help:\n"
-	"  -h, --help             Print this message\n"
-	"\n"
-	"Options:\n"
-	"  -c, --connect=SERVER   Connect to SERVER\n"
-	"  -p, --port=PORT        Connect using PORT\n"
-	"  -j, --join=CHANNELS    Comma separated list of channels to join\n"
-	"  -n, --nicks=NICKS      Comma and/or space separated list of nicks to use\n"
-	"  -v, --version          Print rirc version and exit\n"
-	"\n"
-	"Examples:\n"
-	"  rirc -c server -j '#chan'\n"
-	"  rirc -c server -j '#chan' -c server2 -j '#chan2'\n"
-	"  rirc -c server -p 1234 -j '#chan1,#chan2' -n 'nick, nick_, nick__'\n"
-	);
-}
-
-static void
-startup(int argc, char **argv)
-{
-	int c, i, opt_i = 0, server_i = -1;
-
-	struct option long_opts[] =
-	{
-		{"connect", required_argument, 0, 'c'},
-		{"port",    required_argument, 0, 'p'},
-		{"join",    required_argument, 0, 'j'},
-		{"nick",    required_argument, 0, 'n'},
-		{"version", no_argument,       0, 'v'},
-		{"help",    no_argument,       0, 'h'},
-		{0, 0, 0, 0}
-	};
-
-	struct auto_server {
-		char *host;
-		char *port;
-		char *join;
-		char *nicks;
-	} auto_servers[MAX_SERVERS] = {{0, 0, 0, 0}};
-
-	while ((c = getopt_long(argc, argv, "c:p:n:j:vh", long_opts, &opt_i))) {
-
-		if (c == -1)
-			break;
-
-		switch (c) {
-
-			/* Connect to server */
-			case 'c':
-				if (*optarg == '-')
-					opt_error("-c/--connect requires an argument");
-
-				if (++server_i == MAX_SERVERS)
-					opt_error("exceeded maximum number of servers (" STR(MAX_SERVERS) ")");
-
-				auto_servers[server_i].host = optarg;
-				break;
-
-			/* Connect using port */
-			case 'p':
-				if (*optarg == '-')
-					opt_error("-p/--port requires an argument");
-
-				if (server_i < 0)
-					opt_error("-p/--port requires a server argument first");
-
-				auto_servers[server_i].port = optarg;
-				break;
-
-			/* Comma and/or space separated list of nicks to use */
-			case 'n':
-				if (*optarg == '-')
-					opt_error("-n/--nick requires an argument");
-
-				if (server_i < 0)
-					opt_error("-n/--nick requires a server argument first");
-
-				auto_servers[server_i].nicks = optarg;
-				break;
-
-			/* Comma separated list of channels to join */
-			case 'j':
-				if (*optarg == '-')
-					opt_error("-j/--join requires an argument");
-
-				if (server_i < 0)
-					opt_error("-j/--join requires a server argument first");
-
-				auto_servers[server_i].join = optarg;
-				break;
-
-			/* Print rirc version and exit */
-			case 'v':
-				puts("rirc version " VERSION);
-				exit(EXIT_SUCCESS);
-
-			/* Print rirc usage and exit */
-			case 'h':
-				usage();
-				exit(EXIT_SUCCESS);
-
-			default:
-				printf("%s --help for usage\n", argv[0]);
-				exit(EXIT_FAILURE);
-		}
-	}
-
-	/* stdout is fflush()'ed on every redraw */
-	errno = 0; /* "may set errno" */
-	if (setvbuf(stdout, NULL, _IOFBF, 0) != 0)
-		fatal("setvbuf", errno);
-
-	/* Set terminal to raw mode */
-	if (tcgetattr(0, &oterm) < 0)
-		fatal("tcgetattr", errno);
-
-	struct termios nterm = oterm;
-
-	nterm.c_lflag &= ~(ECHO | ICANON | ISIG);
-	nterm.c_cc[VMIN]  = 0;
-	nterm.c_cc[VTIME] = 0;
-
-	if (tcsetattr(0, TCSADRAIN, &nterm) < 0)
-		fatal("tcsetattr", errno);
-
-	srand(time(NULL));
-
-	/* Set up signal handlers */
-	sa_sigwinch.sa_handler = signal_sigwinch;
-	if (sigaction(SIGWINCH, &sa_sigwinch, NULL) == -1)
-		fatal("sigaction - SIGWINCH", errno);
-
-	/* atexit doesn't set errno */
-	if (atexit(cleanup) != 0)
-		fatal("atexit", 0);
-
-	init_state();
-
-	config.default_nick = getenv("USER");
-
-	for (i = 0; i <= server_i; i++) {
-
-		//TODO: - split server.c / net.c
-		//      - add servers to server list
-		//      - add channels per server to server's channel list
-		//      - initiate connection
-		server_connect(
-			auto_servers[i].host,
-			auto_servers[i].port ? auto_servers[i].port : "6667",
-			auto_servers[i].nicks,
-			auto_servers[i].join
-		);
-	}
-}
-
-static void
-cleanup(void)
-{
-	/* Exit handler; must return normally */
-
-	/* Reset terminal colours */
-	printf("\x1b[38;0;m");
-	printf("\x1b[48;0;m");
-
-#ifndef DEBUG
-	/* Clear screen */
-	if (!fatal_exit)
-		printf("\x1b[H\x1b[J");
-#endif
-
-	/* Reset terminal modes */
-	tcsetattr(0, TCSADRAIN, &oterm);
-}
-
-/* TODO: install sig handlers for cleanly exiting in debug mode */ 
-static void
-signal_sigwinch(int signum)
-{
-	UNUSED(signum);
-
-	flag_sigwinch = 1;
-}
-
-static void
-main_loop(void)
-{
-	for (;;) {
-
-		/* For each server, check connection status, and input */
-		check_servers();
-
-		/* Window has changed size */
-		if (flag_sigwinch) {
-			flag_sigwinch = 0;
-			resize();
-		}
-
-		redraw();
-
-		net_poll();
-	}
+	parse_args(argc, argv);
+	io_loop();
 }

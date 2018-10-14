@@ -19,6 +19,7 @@
 
 #include "config.h"
 #include "src/components/input.h"
+#include "src/io.h"
 #include "src/state.h"
 #include "src/utils/utils.h"
 
@@ -98,7 +99,7 @@ draw(union draw draw)
 
 	struct channel *c = current_channel();
 
-	if (_term_cols() < COLS_MIN || _term_rows() < ROWS_MIN) {
+	if (io_tty_cols() < COLS_MIN || io_tty_rows() < ROWS_MIN) {
 		printf(CLEAR_FULL MOVE(1, 1) "rirc");
 		goto no_draw;
 	}
@@ -108,9 +109,9 @@ draw(union draw draw)
 	if (draw.bits.buffer) _draw_buffer(&c->buffer,
 		(struct coords) {
 			.c1 = 1,
-			.cN = _term_cols(),
+			.cN = io_tty_cols(),
 			.r1 = 3,
-			.rN = _term_rows() - 2
+			.rN = io_tty_rows() - 2
 		});
 
 	if (draw.bits.nav)    _draw_nav(c);
@@ -118,9 +119,9 @@ draw(union draw draw)
 	if (draw.bits.input)  _draw_input(c->input,
 		(struct coords) {
 			.c1 = 1,
-			.cN = _term_cols(),
-			.r1 = _term_rows(),
-			.rN = _term_rows()
+			.cN = io_tty_cols(),
+			.r1 = io_tty_rows(),
+			.rN = io_tty_rows()
 		});
 
 	if (draw.bits.status) _draw_status(c);
@@ -419,7 +420,7 @@ _draw_nav(struct channel *c)
 	size_t len, total_len = 0;
 
 	/* Bump the channel frames, if applicable */
-	if ((total_len = (c->name.len + 2)) >= _term_cols())
+	if ((total_len = (c->name.len + 2)) >= io_tty_cols())
 		return;
 	else if (c == frame_prev && frame_prev != c_first)
 		frame_prev = channel_get_prev(frame_prev);
@@ -438,7 +439,7 @@ _draw_nav(struct channel *c)
 			tmp = channel_get_next(tmp_next);
 			len = tmp->name.len;
 
-			while ((total_len += (len + 2)) < _term_cols() && tmp != c_first) {
+			while ((total_len += (len + 2)) < io_tty_cols() && tmp != c_first) {
 
 				tmp_next = tmp;
 
@@ -456,7 +457,7 @@ _draw_nav(struct channel *c)
 			tmp = channel_get_prev(tmp_prev);
 			len = tmp->name.len;
 
-			while ((total_len += (len + 2)) < _term_cols() && tmp != c_last) {
+			while ((total_len += (len + 2)) < io_tty_cols() && tmp != c_last) {
 
 				tmp_prev = tmp;
 
@@ -471,7 +472,7 @@ _draw_nav(struct channel *c)
 		len = tmp->name.len;
 
 		/* Next channel doesn't fit */
-		if ((total_len += (len + 2)) >= _term_cols())
+		if ((total_len += (len + 2)) >= io_tty_cols())
 			break;
 
 		if (nextward)
@@ -599,7 +600,7 @@ _draw_input(struct input *in, struct coords coords)
 			if (ptr == in->head)
 				ptr = in->tail;
 
-			if (ptr == in->line->text + MAX_INPUT)
+			if (ptr == in->line->text + RIRC_MAX_INPUT)
 				break;
 
 			*input_ptr++ = *ptr++;
@@ -621,17 +622,17 @@ _draw_status(struct channel *c)
 	/* TODO: channel modes, channel type_flag, servermodes */
 
 	/* server / private chat:
-	 * |-[usermodes]-(latency)---...|
+	 * |-[usermodes]-(ping)---...|
 	 *
 	 * channel:
-	 * |-[usermodes]-[chancount chantype chanmodes]/[priv]-(latency)---...|
+	 * |-[usermodes]-[chancount chantype chanmodes]/[priv]-(ping)---...|
 	 * */
 
 	float sb;
 	int ret;
 	unsigned int col = 0;
-	unsigned int cols = _term_cols();
-	unsigned int rows = _term_rows();
+	unsigned int cols = io_tty_cols();
+	unsigned int rows = io_tty_rows();
 
 	/* Insufficient columns for meaningful status */
 	if (cols < 3)
@@ -650,12 +651,12 @@ _draw_status(struct channel *c)
 	memset(status_buff, 0, cols + 1);
 
 	/* -[usermodes] */
-	if (c->server && *(c->server->usermodes_str.str)) {
+	if (c->server && *(c->server->mode_str.str)) {
 		ret = snprintf(status_buff + col, cols - col + 1, "%s", HORIZONTAL_SEPARATOR "[+");
 		if (ret < 0 || (col += ret) >= cols)
 			goto print_status;
 
-		ret = snprintf(status_buff + col, cols - col + 1, "%s", c->server->usermodes_str.str);
+		ret = snprintf(status_buff + col, cols - col + 1, "%s", c->server->mode_str.str);
 		if (ret < 0 || (col += ret) >= cols)
 			goto print_status;
 
@@ -666,7 +667,7 @@ _draw_status(struct channel *c)
 
 	/* If private chat buffer:
 	 * -[priv] */
-	if (c->buffer.type == BUFFER_PRIVATE) {
+	if (c->type == CHANNEL_T_PRIVATE) {
 		ret = snprintf(status_buff + col, cols - col + 1, "%s", HORIZONTAL_SEPARATOR "[priv]");
 		if (ret < 0 || (col += ret) >= cols)
 			goto print_status;
@@ -674,7 +675,7 @@ _draw_status(struct channel *c)
 
 	/* If IRC channel buffer:
 	 * -[chancount chantype chanmodes] */
-	if (c->buffer.type == BUFFER_CHANNEL) {
+	if (c->type == CHANNEL_T_CHANNEL) {
 
 		ret = snprintf(status_buff + col, cols - col + 1,
 				HORIZONTAL_SEPARATOR "[%d", c->users.count);
@@ -698,10 +699,10 @@ _draw_status(struct channel *c)
 			goto print_status;
 	}
 
-	/* -(latency) */
-	if (c->server && c->server->latency_delta) {
+	/* -(ping) */
+	if (c->server && c->server->ping) {
 		ret = snprintf(status_buff + col, cols - col + 1,
-				HORIZONTAL_SEPARATOR "(%llds)", (long long) c->server->latency_delta);
+				HORIZONTAL_SEPARATOR "(%llds)", (long long) c->server->ping);
 		if (ret < 0 || (col += ret) >= cols)
 			goto print_status;
 	}

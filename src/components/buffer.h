@@ -6,7 +6,6 @@
 #include "src/utils/utils.h"
 #include "config.h"
 
-
 #define TEXT_LENGTH_MAX 510 /* FIXME: remove max lengths in favour of growable buffer */
 #define FROM_LENGTH_MAX 100
 
@@ -21,15 +20,6 @@ enum buffer_line_t
 	BUFFER_LINE_CHAT,   /* Line of text from another IRC user */
 	BUFFER_LINE_PINGED, /* Line of text from another IRC user containing current nick */
 	BUFFER_LINE_T_SIZE
-};
-
-enum buffer_t
-{
-	BUFFER_OTHER,   /* Default/all other buffers */
-	BUFFER_CHANNEL, /* Channel message buffer */
-	BUFFER_SERVER,  /* Server message buffer */
-	BUFFER_PRIVATE, /* Private message buffer */
-	BUFFER_T_SIZE
 };
 
 struct buffer_line
@@ -51,7 +41,6 @@ struct buffer_line
 
 struct buffer
 {
-	enum buffer_t type;
 	unsigned int head;
 	unsigned int tail;
 	unsigned int scrollback; /* Index of the current line between [tail, head) for scrollback */
@@ -66,7 +55,7 @@ int buffer_page_forw(struct buffer*, unsigned int, unsigned int);
 
 unsigned int buffer_line_rows(struct buffer_line*, unsigned int);
 
-struct buffer buffer(enum buffer_t);
+struct buffer buffer(void);
 
 struct buffer_line* buffer_head(struct buffer*);
 struct buffer_line* buffer_tail(struct buffer*);

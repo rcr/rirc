@@ -1,6 +1,8 @@
 #ifndef TEST_H
 #define TEST_H
 
+#define TESTING
+
 /* TODO: list the test types at the top of file with usage */
 
 #include <inttypes.h>
@@ -28,6 +30,7 @@ static int _assert_fatal_, _failures_, _failures_t_, _failure_printed_;
 static char _tc_errbuf_[512];
 
 static int _assert_strcmp(const char*, const char*);
+static int _assert_strncmp(const char*, const char*, size_t);
 
 static void _print_testcase_name_(const char*);
 
@@ -77,7 +80,7 @@ static void _print_testcase_name_(const char*);
 		if (_assert_fatal_) { \
 			longjmp(_tc_fatal_expected_, 1); \
 		} else { \
-			snprintf(_tc_errbuf_, sizeof(_tc_errbuf_) - 1, "FATAL in "__FILE__" - %s : '%s'", __func__, M); \
+			snprintf(_tc_errbuf_, sizeof(_tc_errbuf_) - 1, "FATAL in "__FILE__":%d - %s : '%s'", __LINE__, __func__, M); \
 			longjmp(_tc_fatal_unexpected_, 1); \
 		} \
 	} while (0)
@@ -98,6 +101,12 @@ static void _print_testcase_name_(const char*);
 	do { \
 		if (_assert_strcmp(X, Y)) \
 			fail_testf(#X " expected '%s', got '%s'", (Y) == NULL ? "NULL" : (Y), (X) == NULL ? "NULL" : (X)); \
+	} while (0)
+
+#define assert_strncmp(X, Y, N) \
+	do { \
+		if (_assert_strncmp(X, Y, N)) \
+			fail_testf(#X " expected '%.*s', got '%.*s'", (N), (Y) == NULL ? "NULL" : (Y), (N), (X) == NULL ? "NULL" : (X)); \
 	} while (0)
 
 #define assert_lt(X, Y) \
@@ -151,6 +160,15 @@ _assert_strcmp(const char *p1, const char *p2)
 	return strcmp(p1, p2);
 }
 
+static int
+_assert_strncmp(const char *p1, const char *p2, size_t n)
+{
+	if (p1 == NULL || p2 == NULL)
+		return p1 != p2;
+
+	return strncmp(p1, p2, n);
+}
+
 static void
 _print_testcase_name_(const char *name)
 {
@@ -168,6 +186,14 @@ _print_testcase_name_(const char *name)
 static int
 _run_tests_(const char *filename, testcase testcases[], size_t len)
 {
+	/* Silence compiler warnings for test functions/vars that are included but not used */
+	((void)(_assert_strcmp));
+	((void)(_assert_strncmp));
+	((void)(_assert_fatal_));
+	((void)(_failure_printed_));
+	((void)(_tc_fatal_expected_));
+	((void)(_tc_fatal_unexpected_));
+
 	printf("%s... ", filename);
 	fflush(stdout);
 
@@ -197,13 +223,6 @@ _run_tests_(const char *filename, testcase testcases[], size_t len)
 		printf(" OK\n");
 		return EXIT_SUCCESS;
 	}
-
-	/* Silence compiler warnings for test functions/vars that are included but not used */
-	((void)(_assert_strcmp));
-	((void)(_assert_fatal_));
-	((void)(_failure_printed_));
-	((void)(_tc_fatal_expected_));
-	((void)(_tc_fatal_unexpected_));
 }
 
 /* Macro so the proper filename is printed */
