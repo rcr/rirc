@@ -38,9 +38,7 @@ struct input
 
 /* TODO: refactor */
 struct input* new_input(void);
-void action(int(*)(char), const char*, ...);
 void free_input(struct input*);
-extern char *action_message;
 
 /* TODO: return state altering function */
 int input(struct input*, const char*, size_t);

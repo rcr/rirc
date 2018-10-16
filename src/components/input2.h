@@ -10,24 +10,41 @@
 #define INPUT_LEN_MAX 410
 #endif
 
+#ifndef INPUT_HIST_MAX
+#define INPUT_HIST_MAX 16
+#endif
+
+struct input2_hist
+{
+	const char *text;
+	struct input2_hist *prev;
+	struct input2_hist *next;
+};
+
 struct input2
 {
 	char text[INPUT_LEN_MAX];
+	struct {
+		struct input2_hist *head;
+		struct input2_hist *tail;
+	} hist;
 	uint16_t head;
 	uint16_t tail;
 };
 
+/* Initialize input */
 void input2(struct input2*);
+void input2_free(struct input2*);
 
-int input2_empty(struct input2*);
-int input2_full(struct input2*);
-
+/* Input manipulation */
+int input2_clear(struct input2*);
 int input2_del(struct input2*, int);
 int input2_ins(struct input2*, const char*, size_t);
-
+int input2_hist(struct input2*, int);
 int input2_move(struct input2*, int);
+int input2_push(struct input2*);
 
-/* Write the current input to string */
+/* Write input to string */
 char* input2_write(struct input2*, char*, size_t);
 
 #endif

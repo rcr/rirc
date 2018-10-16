@@ -55,4 +55,6 @@ void draw_all(void);
 
 void redraw(void);
 
+extern char *action_message;
+
 #endif

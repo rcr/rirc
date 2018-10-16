@@ -1,9 +1,8 @@
-/* TODO: input2 -> input */
-
 #include "test/test.h"
 
-/* Preclude definition for testing */
+/* Preclude definitions for testing */
 #define INPUT_LEN_MAX 10
+#define INPUT_HIST_MAX 3
 
 #include "src/components/input2.c"
 
@@ -15,8 +14,18 @@ test_input(void)
 
 	input2(&inp);
 
-	assert_eq(input2_empty(&inp), 1);
+	assert_eq(input2_iszero(&inp), 1);
 	assert_strcmp(input2_write(&inp, buf, sizeof(buf)), "");
+
+	input2_free(&inp);
+}
+
+static void
+test_input_clear(void)
+{
+	/* TODO
+	 * test that the working input is cleared
+	 * test that scrolled back input history is reset to head */
 }
 
 static void
@@ -40,6 +49,8 @@ test_input_ins(void)
 	/* Full */
 	assert_eq(input2_ins(&inp, "z", 1), 0);
 	assert_strcmp(input2_write(&inp, buf, sizeof(buf)), "abcdefghij");
+
+	input2_free(&inp);
 }
 
 static void
@@ -51,21 +62,55 @@ test_input_del(void)
 	input2(&inp);
 
 	/* Deleting back/forw on empty input */
+	assert_strcmp(input2_write(&inp, buf, sizeof(buf)), "");
 	assert_eq(input2_del(&inp, 0), 0);
 	assert_eq(input2_del(&inp, 1), 0);
-	assert_strcmp(input2_write(&inp, buf, sizeof(buf)), "");
 
-	assert_eq(input2_ins(&inp, "abcef", 5), 1);
+	assert_eq(input2_ins(&inp, "abcefg", 6), 1);
+	assert_eq(input2_move(&inp, 0), 1);
+	assert_eq(input2_move(&inp, 0), 1);
 	assert_eq(input2_move(&inp, 0), 1);
 	assert_eq(input2_move(&inp, 0), 1);
 
 	/* Delete left */
 	assert_eq(input2_del(&inp, 0), 1);
-	assert_strcmp(input2_write(&inp, buf, sizeof(buf)), "abef");
+	assert_strcmp(input2_write(&inp, buf, sizeof(buf)), "acefg");
+	assert_eq(input2_del(&inp, 0), 1);
+	assert_strcmp(input2_write(&inp, buf, sizeof(buf)), "cefg");
+	assert_eq(input2_del(&inp, 0), 0);
 
 	/* Delete right */
 	assert_eq(input2_del(&inp, 1), 1);
-	assert_strcmp(input2_write(&inp, buf, sizeof(buf)), "abf");
+	assert_strcmp(input2_write(&inp, buf, sizeof(buf)), "efg");
+	assert_eq(input2_del(&inp, 1), 1);
+	assert_strcmp(input2_write(&inp, buf, sizeof(buf)), "fg");
+	assert_eq(input2_del(&inp, 1), 1);
+	assert_strcmp(input2_write(&inp, buf, sizeof(buf)), "g");
+	assert_eq(input2_del(&inp, 1), 1);
+	assert_strcmp(input2_write(&inp, buf, sizeof(buf)), "");
+	assert_eq(input2_del(&inp, 1), 0);
+
+	input2_free(&inp);
+}
+
+static void
+test_input_hist(void)
+{
+	char buf[INPUT_LEN_MAX + 1];
+	struct input2 inp;
+
+	input2(&inp);
+
+	/* TODO:
+	 * push some inputs, test that tails are cleaned up
+	 *
+	 * scroll back and all the way forward
+	 * replay last
+	 * replay middle
+	 * replay first history
+	 */
+
+	input2_free(&inp);
 }
 
 static void
@@ -102,6 +147,8 @@ test_input_move(void)
 	assert_eq(input2_move(&inp, 1), 0);
 	assert_eq(input2_ins(&inp, "g", 1), 1);
 	assert_strcmp(input2_write(&inp, buf, sizeof(buf)), "eacdfbg");
+
+	input2_free(&inp);
 }
 
 static void
@@ -130,6 +177,8 @@ test_input_write(void)
 	assert_eq(input2_ins(&inp, "fghij", 5), 1);
 	assert_strcmp(input2_write(&inp, buf1, sizeof(buf1)), "fghijabcde");
 	assert_strcmp(input2_write(&inp, buf1, sizeof(buf2)), "fghi");
+
+	input2_free(&inp);
 }
 
 int
@@ -137,8 +186,10 @@ main(void)
 {
 	testcase tests[] = {
 		TESTCASE(test_input),
+		TESTCASE(test_input_clear),
 		TESTCASE(test_input_ins),
 		TESTCASE(test_input_del),
+		TESTCASE(test_input_hist),
 		TESTCASE(test_input_move),
 		TESTCASE(test_input_write)
 	};
