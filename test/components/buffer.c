@@ -31,7 +31,9 @@ test_buffer(void)
 {
 	/* Test retrieving values from an initialized buffer and resetting it */
 
-	struct buffer b = buffer();
+	struct buffer b;
+
+	buffer(&b);
 
 	assert_eq(buffer_size(&b), 0);
 	assert_null(buffer_head(&b));
@@ -39,7 +41,7 @@ test_buffer(void)
 	assert_null(buffer_line(&b, b.scrollback));
 
 	/* Reset the buffer, check values again */
-	b = buffer();
+	buffer(&b);
 
 	assert_eq(buffer_size(&b), 0);
 	assert_null(buffer_head(&b));
@@ -53,8 +55,9 @@ test_buffer_head(void)
 	/* Test retrieving the first line after pushing to a full buffer */
 
 	int i;
+	struct buffer b;
 
-	struct buffer b = buffer();
+	buffer(&b);
 
 	assert_null(buffer_head(&b));
 
@@ -71,8 +74,9 @@ test_buffer_tail(void)
 	/* Test retrieving the last line after pushing to a full buffer */
 
 	int i;
+	struct buffer b;
 
-	struct buffer b = buffer();
+	buffer(&b);
 
 	assert_null(buffer_tail(&b));
 
@@ -93,7 +97,9 @@ test_buffer_line(void)
 {
 	/* Test that retrieving a buffer line fails when i != [tail, head) */
 
-	struct buffer b = buffer();
+	struct buffer b;
+
+	buffer(&b);
 
 	/* Should retrieve null for an empty buffer */
 	assert_eq(buffer_size(&b), 0);
@@ -184,7 +190,9 @@ test_buffer_scrollback(void)
 	 *   Buffer scrollback stays locked to the tail when incrementing
 	 * */
 
-	struct buffer b = buffer();
+	struct buffer b;
+
+	buffer(&b);
 
 	/* Empty buffer returns NULL */
 	assert_null(buffer_line(&b, b.scrollback));
@@ -222,7 +230,9 @@ test_buffer_scrollback_status(void)
 {
 	/* Test retrieving buffer scrollback status */
 
-	struct buffer b = buffer();
+	struct buffer b;
+
+	buffer(&b);
 
 	b.head = (BUFFER_LINES_MAX / 2) - 1;
 	b.tail = UINT_MAX - (BUFFER_LINES_MAX / 2);
@@ -245,7 +255,9 @@ test_buffer_index_overflow(void)
 {
 	/* Test masked indexing after unsigned integer overflow */
 
-	struct buffer b = buffer();
+	struct buffer b;
+
+	buffer(&b);
 
 	b.head = UINT_MAX;
 	b.tail = UINT_MAX - 1;
@@ -270,7 +282,9 @@ test_buffer_line_overlength(void)
 {
 	/* Test that lines over the maximum length are recursively split and added separately */
 
-	struct buffer b = buffer();
+	struct buffer b;
+
+	buffer(&b);
 
 	/* Indices to first and last positions of lines, total length = 2.5 times the maximum */
 	unsigned int f1 = 0,
@@ -316,7 +330,9 @@ test_buffer_line_rows(void)
 {
 	/* Test calculating the number of rows a buffer line occupies */
 
-	struct buffer b = buffer();
+	struct buffer b;
+
+	buffer(&b);
 
 	_buffer_newline(&b, "aa bb cc");
 
@@ -354,8 +370,10 @@ test_buffer_newline_prefix(void)
 {
 	/* Test adding lines to a buffer with prefix */
 
-	struct buffer b = buffer();
+	struct buffer b;
 	struct buffer_line *line;
+
+	buffer(&b);
 
 	struct string from;
 	struct string text;

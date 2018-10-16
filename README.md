@@ -26,7 +26,7 @@ make install
 
 ## Usage:
 ```
-  rirc [-hv] [-s server [-p port] [-w pass] [-n nicks] [-c chans] [-u user] [-r real]], ...]
+  rirc [-hv] [-s server [-p port] [-w pass] [-u user] [-r real] [-n nicks] [-c chans]], ...]
 
 Help:
   -h, --help            Print this message and exit
@@ -60,6 +60,10 @@ Keys:
   ^C : cancel input/action
   ^U : scroll buffer up
   ^D : scroll buffer down
+   ← : input cursor back
+   → : input cursor forward
+   ↑ : input history back
+   ↓ : input history forward
 ```
 
 ## More info:

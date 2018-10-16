@@ -206,10 +206,10 @@ buffer_scrollback_status(struct buffer *b)
 	return (float)(b->head - b->scrollback) / (float)(buffer_size(b));
 }
 
-struct buffer
-buffer(void)
+void
+buffer(struct buffer *b)
 {
 	/* Initialize a buffer */
 
-	return (struct buffer) {0};
+	memset(b, 0, sizeof(*b));
 }

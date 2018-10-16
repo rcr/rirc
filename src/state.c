@@ -915,6 +915,14 @@ void
 io_cb_read_inp(char *buff, size_t count)
 {
 	/* TODO: cleanup, switch on input type/contents */
+	// input types:
+	//    message
+	//    paste
+	//    key/sequence
+	//    ::message
+	//    :command
+	//    //message
+	//    /command
 
 	int redraw_input = 0;
 

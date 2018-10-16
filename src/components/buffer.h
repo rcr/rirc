@@ -55,7 +55,7 @@ int buffer_page_forw(struct buffer*, unsigned int, unsigned int);
 
 unsigned int buffer_line_rows(struct buffer_line*, unsigned int);
 
-struct buffer buffer(void);
+void buffer(struct buffer*);
 
 struct buffer_line* buffer_head(struct buffer*);
 struct buffer_line* buffer_tail(struct buffer*);
