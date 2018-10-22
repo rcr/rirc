@@ -3,27 +3,37 @@
 #include "src/components/input2.h"
 #include "src/utils/utils.h"
 
-static int input2_del_back(struct input2*);
-static int input2_del_forw(struct input2*);
-static int input2_hist_back(struct input2*);
-static int input2_hist_forw(struct input2*);
+#if (INPUT_HIST_MAX & (INPUT_HIST_MAX - 1)) != 0
+/* Required for proper masking when indexing */
+#error INPUT_HIST_MAX must be a power of 2
+#endif
+
+#define MASK(X) ((X) & (INPUT_HIST_MAX - 1))
+
+static int input2_cursor_back(struct input2*);
+static int input2_cursor_forw(struct input2*);
+static int input2_delete_back(struct input2*);
+static int input2_delete_forw(struct input2*);
 static int input2_isfull(struct input2*);
 static int input2_iszero(struct input2*);
-static int input2_move_back(struct input2*);
-static int input2_move_forw(struct input2*);
-static unsigned input2_size(struct input2*);
+static size_t input2_size(struct input2*);
+static size_t input2_hist_size(struct input2*);
 
 void
 input2(struct input2 *inp)
 {
 	inp->head = 0;
 	inp->tail = INPUT_LEN_MAX;
+	inp->hist.current = 0;
+	inp->hist.head = 0;
+	inp->hist.tail = 0;
 }
 
 void
 input2_free(struct input2 *inp)
 {
-	(void)inp;
+	while (inp->hist.tail != inp->hist.head)
+		free(inp->hist.buf[MASK(inp->hist.tail++)]);
 }
 
 int
@@ -41,16 +51,25 @@ input2_clear(struct input2 *inp)
 }
 
 int
-input2_del(struct input2 *inp, int forw)
+input2_cursor(struct input2 *inp, int forw)
 {
 	if (forw)
-		return input2_del_forw(inp);
+		return input2_cursor_forw(inp);
 	else
-		return input2_del_back(inp);
+		return input2_cursor_back(inp);
 }
 
 int
-input2_ins(struct input2 *inp, const char *c, size_t count)
+input2_delete(struct input2 *inp, int forw)
+{
+	if (forw)
+		return input2_delete_forw(inp);
+	else
+		return input2_delete_back(inp);
+}
+
+int
+input2_insert(struct input2 *inp, const char *c, size_t count)
 {
 	size_t i = count;
 
@@ -62,40 +81,46 @@ input2_ins(struct input2 *inp, const char *c, size_t count)
 }
 
 int
-input2_hist(struct input2 *inp, int forw)
+input2_hist_back(struct input2 *inp)
 {
-	if (forw)
-		return input2_hist_forw(inp);
-	else
-		return input2_hist_back(inp);
+	/* TODO */
+	(void)inp;
+	return 0;
 }
 
 int
-input2_move(struct input2 *inp, int forw)
+input2_hist_forw(struct input2 *inp)
 {
-	if (forw)
-		return input2_move_forw(inp);
-	else
-		return input2_move_back(inp);
+	/* TODO */
+	(void)inp;
+	return 0;
 }
 
 int
-input2_push(struct input2 *inp)
+input2_hist_push(struct input2 *inp)
 {
-	/* Push the current input line to history */
+	char *str;
+	size_t len;
 
-	unsigned size;
-
-	if ((size = input2_size(inp)) == 0)
+	if ((len = input2_size(inp)) == 0)
 		return 0;
 
-	// TODO: must:
-	//  add the current line to history
-	//  del the hist tail if full
-	//  add a new line context to the head
+	if ((str = malloc(len + 1)) == NULL)
+		fatal("malloc", errno);
 
-	// save the whole input line struct? or just linked list of const char*,
-	// copied into working input area on scroll?
+	input2_write(inp, str, len + 1);
+
+	if (inp->hist.current) {
+		; // TODO: move hist to head
+	} else if (input2_hist_size(inp) == INPUT_HIST_MAX) {
+		free(inp->hist.buf[MASK(inp->hist.tail++)]);
+	}
+
+	inp->hist.buf[MASK(inp->hist.head++)] = str;
+	inp->hist.current = 0;
+
+	inp->head = 0;
+	inp->tail = INPUT_LEN_MAX;
 
 	return 1;
 }
@@ -137,7 +162,7 @@ input2_iszero(struct input2 *inp)
 }
 
 static int
-input2_del_back(struct input2 *inp)
+input2_delete_back(struct input2 *inp)
 {
 	if (inp->head == 0)
 		return 0;
@@ -148,7 +173,7 @@ input2_del_back(struct input2 *inp)
 }
 
 static int
-input2_del_forw(struct input2 *inp)
+input2_delete_forw(struct input2 *inp)
 {
 	if (inp->tail == INPUT_LEN_MAX)
 		return 0;
@@ -159,23 +184,7 @@ input2_del_forw(struct input2 *inp)
 }
 
 static int
-input2_hist_back(struct input2 *inp)
-{
-	/* TODO */
-	(void)inp;
-	return 0;
-}
-
-static int
-input2_hist_forw(struct input2 *inp)
-{
-	/* TODO */
-	(void)inp;
-	return 0;
-}
-
-static int
-input2_move_back(struct input2 *inp)
+input2_cursor_back(struct input2 *inp)
 {
 	if (inp->head == 0)
 		return 0;
@@ -186,7 +195,7 @@ input2_move_back(struct input2 *inp)
 }
 
 static int
-input2_move_forw(struct input2 *inp)
+input2_cursor_forw(struct input2 *inp)
 {
 	if (inp->tail == INPUT_LEN_MAX)
 		return 0;
@@ -196,8 +205,14 @@ input2_move_forw(struct input2 *inp)
 	return 1;
 }
 
-static unsigned
+static size_t
 input2_size(struct input2 *inp)
 {
 	return (inp->head + (inp->tail - INPUT_LEN_MAX));
+}
+
+static size_t
+input2_hist_size(struct input2 *inp)
+{
+	return inp->hist.head - inp->hist.tail;
 }

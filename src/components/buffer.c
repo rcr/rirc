@@ -31,8 +31,8 @@
 #include "src/components/buffer.h"
 
 #if (BUFFER_LINES_MAX & (BUFFER_LINES_MAX - 1)) != 0
-	/* Required for proper masking when indexing */
-	#error BUFFER_LINES_MAX must be a power of 2
+/* Required for proper masking when indexing */
+#error BUFFER_LINES_MAX must be a power of 2
 #endif
 
 #define MASK(X) ((X) & (BUFFER_LINES_MAX - 1))

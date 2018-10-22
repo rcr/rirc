@@ -25,24 +25,28 @@ struct input2
 {
 	char text[INPUT_LEN_MAX];
 	struct {
-		struct input2_hist *head;
-		struct input2_hist *tail;
+		char *buf[INPUT_HIST_MAX];
+		uint16_t current;
+		uint16_t head;
+		uint16_t tail;
 	} hist;
 	uint16_t head;
 	uint16_t tail;
 };
 
-/* Initialize input */
 void input2(struct input2*);
 void input2_free(struct input2*);
 
 /* Input manipulation */
 int input2_clear(struct input2*);
-int input2_del(struct input2*, int);
-int input2_ins(struct input2*, const char*, size_t);
-int input2_hist(struct input2*, int);
-int input2_move(struct input2*, int);
-int input2_push(struct input2*);
+int input2_cursor(struct input2*, int);
+int input2_delete(struct input2*, int);
+int input2_insert(struct input2*, const char*, size_t);
+
+/* Input history */
+int input2_hist_back(struct input2*);
+int input2_hist_forw(struct input2*);
+int input2_hist_push(struct input2*);
 
 /* Write input to string */
 char* input2_write(struct input2*, char*, size_t);
