@@ -14,7 +14,7 @@ test_input(void)
 
 	input2(&inp);
 
-	assert_eq(input2_iszero(&inp), 1);
+	assert_eq(input2_text_iszero(&inp), 1);
 	assert_strcmp(input2_write(&inp, buf, sizeof(buf)), "");
 
 	input2_free(&inp);
@@ -213,6 +213,12 @@ test_input_write(void)
 	input2_free(&inp);
 }
 
+static void
+test_input_complete(void)
+{
+	/* TODO */
+}
+
 int
 main(void)
 {
@@ -223,7 +229,8 @@ main(void)
 		TESTCASE(test_input_del),
 		TESTCASE(test_input_hist),
 		TESTCASE(test_input_move),
-		TESTCASE(test_input_write)
+		TESTCASE(test_input_write),
+		TESTCASE(test_input_complete)
 	};
 
 	return run_tests(tests);

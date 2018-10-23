@@ -10,16 +10,14 @@
 #define INPUT_LEN_MAX 410
 #endif
 
+/* Number of history lines to keep for input. For proper
+ * ring buffer masking this must be a power of 2 */
 #ifndef INPUT_HIST_MAX
 #define INPUT_HIST_MAX 16
 #endif
 
-struct input2_hist
-{
-	const char *text;
-	struct input2_hist *prev;
-	struct input2_hist *next;
-};
+/* Input completion callback type */
+typedef const char* (*f_completion_cb)(const char*, int);
 
 struct input2
 {
@@ -42,6 +40,9 @@ int input2_clear(struct input2*);
 int input2_cursor(struct input2*, int);
 int input2_delete(struct input2*, int);
 int input2_insert(struct input2*, const char*, size_t);
+
+/* Input completion */
+int input2_complete(struct input2*, f_completion_cb);
 
 /* Input history */
 int input2_hist_back(struct input2*);

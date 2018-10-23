@@ -14,10 +14,10 @@ static int input2_cursor_back(struct input2*);
 static int input2_cursor_forw(struct input2*);
 static int input2_delete_back(struct input2*);
 static int input2_delete_forw(struct input2*);
-static int input2_isfull(struct input2*);
-static int input2_iszero(struct input2*);
-static size_t input2_size(struct input2*);
+static int input2_text_isfull(struct input2*);
+static int input2_text_iszero(struct input2*);
 static size_t input2_hist_size(struct input2*);
+static size_t input2_text_size(struct input2*);
 
 void
 input2(struct input2 *inp)
@@ -41,7 +41,7 @@ input2_clear(struct input2 *inp)
 {
 	/* TODO: should reset from history */
 
-	if (input2_iszero(inp))
+	if (input2_text_iszero(inp))
 		return 0;
 
 	inp->head = 0;
@@ -73,11 +73,27 @@ input2_insert(struct input2 *inp, const char *c, size_t count)
 {
 	size_t i = count;
 
-	while (!input2_isfull(inp) && i--) {
+	while (!input2_text_isfull(inp) && i--) {
 		inp->text[inp->head++] = *c++;
 	}
 
 	return (i != count);
+}
+
+int
+input2_complete(struct input2 *inp, f_completion_cb cb)
+{
+	/* TODO: should pass to the callback:
+	 *  - the complete word under the cursor
+	 *  - flag if the word is the line leader
+	 *
+	 * callback returns a string to replace the word under the cursor
+	 * and returns 0 if no change was made
+	 */
+
+	(void)inp;
+	(void)cb;
+	return 0;
 }
 
 int
@@ -102,7 +118,7 @@ input2_hist_push(struct input2 *inp)
 	char *str;
 	size_t len;
 
-	if ((len = input2_size(inp)) == 0)
+	if ((len = input2_text_size(inp)) == 0)
 		return 0;
 
 	if ((str = malloc(len + 1)) == NULL)
@@ -150,15 +166,25 @@ input2_write(struct input2 *inp, char *buf, size_t max)
 }
 
 static int
-input2_isfull(struct input2 *inp)
+input2_cursor_back(struct input2 *inp)
 {
-	return (input2_size(inp) == INPUT_LEN_MAX);
+	if (inp->head == 0)
+		return 0;
+
+	inp->text[--inp->tail] = inp->text[--inp->head];
+
+	return 1;
 }
 
 static int
-input2_iszero(struct input2 *inp)
+input2_cursor_forw(struct input2 *inp)
 {
-	return (input2_size(inp) == 0);
+	if (inp->tail == INPUT_LEN_MAX)
+		return 0;
+
+	inp->text[inp->head++] = inp->text[inp->tail++];
+
+	return 1;
 }
 
 static int
@@ -184,29 +210,19 @@ input2_delete_forw(struct input2 *inp)
 }
 
 static int
-input2_cursor_back(struct input2 *inp)
+input2_text_isfull(struct input2 *inp)
 {
-	if (inp->head == 0)
-		return 0;
-
-	inp->text[--inp->tail] = inp->text[--inp->head];
-
-	return 1;
+	return (input2_text_size(inp) == INPUT_LEN_MAX);
 }
 
 static int
-input2_cursor_forw(struct input2 *inp)
+input2_text_iszero(struct input2 *inp)
 {
-	if (inp->tail == INPUT_LEN_MAX)
-		return 0;
-
-	inp->text[inp->head++] = inp->text[inp->tail++];
-
-	return 1;
+	return (input2_text_size(inp) == 0);
 }
 
 static size_t
-input2_size(struct input2 *inp)
+input2_text_size(struct input2 *inp)
 {
 	return (inp->head + (inp->tail - INPUT_LEN_MAX));
 }
@@ -214,5 +230,5 @@ input2_size(struct input2 *inp)
 static size_t
 input2_hist_size(struct input2 *inp)
 {
-	return inp->hist.head - inp->hist.tail;
+	return (inp->hist.head - inp->hist.tail);
 }
