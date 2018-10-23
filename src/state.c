@@ -4,6 +4,8 @@
  * All manipulation of global program state
  *
  * TODO: moved keys, actions to this file. needs cleanup
+ *
+ * TODO: move tab complete to this file, for nicks, /command, :command
  */
 
 #include <ctype.h>

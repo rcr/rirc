@@ -23,9 +23,31 @@ test_input(void)
 static void
 test_input_clear(void)
 {
-	/* TODO
-	 * test that the working input is cleared
-	 * test that scrolled back input history is reset to head */
+	/* TODO test that scrolled back input history is reset to head */
+
+	struct input2 inp;
+
+	input2(&inp);
+
+	/* Test clearing empty input */
+	assert_eq(input2_clear(&inp), 0);
+	assert_eq(input2_text_iszero(&inp), 1);
+
+	/* Test clearing non-empty input */
+	assert_eq(input2_insert(&inp, "abc", 3), 1);
+	assert_eq(input2_clear(&inp), 1);
+	assert_eq(input2_text_iszero(&inp), 1);
+
+	/* Test clearing non-empty input, cursor at start */
+	assert_eq(input2_insert(&inp, "abc", 3), 1);
+	assert_eq(input2_cursor(&inp, 0), 1);
+	assert_eq(input2_cursor(&inp, 0), 1);
+	assert_eq(input2_cursor(&inp, 0), 1);
+	assert_eq(input2_cursor(&inp, 0), 0);
+	assert_eq(input2_clear(&inp), 1);
+	assert_eq(input2_text_iszero(&inp), 1);
+
+	input2_free(&inp);
 }
 
 static void
