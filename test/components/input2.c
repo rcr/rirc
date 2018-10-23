@@ -219,6 +219,30 @@ test_input_complete(void)
 	/* TODO */
 }
 
+static void
+test_input_text_size(void)
+{
+	struct input2 inp;
+
+	input2(&inp);
+
+	/* Test size is correct from 0 -> max */
+	for (int i = 0; i < INPUT_LEN_MAX; i++) {
+		assert_eq((int)input2_text_size(&inp), i);
+		assert_eq(input2_insert(&inp, "a", 1), 1);
+	}
+
+	assert_eq((int)input2_text_size(&inp), INPUT_LEN_MAX);
+
+	/* Test size is correct regardless of cursor position */
+	for (int i = 0; i < INPUT_LEN_MAX; i++) {
+		assert_eq(input2_cursor(&inp, 0), 1);
+		assert_eq((int)input2_text_size(&inp), INPUT_LEN_MAX);
+	}
+
+	input2_free(&inp);
+}
+
 int
 main(void)
 {
@@ -230,7 +254,8 @@ main(void)
 		TESTCASE(test_input_hist),
 		TESTCASE(test_input_move),
 		TESTCASE(test_input_write),
-		TESTCASE(test_input_complete)
+		TESTCASE(test_input_complete),
+		TESTCASE(test_input_text_size)
 	};
 
 	return run_tests(tests);

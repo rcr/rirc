@@ -146,7 +146,8 @@ input2_write(struct input2 *inp, char *buf, size_t max)
 {
 	/* Write the input to `buf` as a null terminated string */
 
-	uint16_t i = 0, j = 0;
+	uint16_t i = 0,
+	         j = 0;
 
 	while (max > 1 && i < inp->head) {
 		buf[j++] = inp->text[i++];
@@ -224,7 +225,7 @@ input2_text_iszero(struct input2 *inp)
 static size_t
 input2_text_size(struct input2 *inp)
 {
-	return (inp->head + (inp->tail - INPUT_LEN_MAX));
+	return (inp->head + (INPUT_LEN_MAX - inp->tail));
 }
 
 static size_t
