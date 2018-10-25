@@ -802,6 +802,9 @@ send_cmnd(struct channel *c, char *buf)
 	 * unignore
 	 * version
 	 * find
+	 * buffers
+	 * b#
+	 * b<num>
 	 */
 }
 

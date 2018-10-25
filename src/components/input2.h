@@ -17,7 +17,7 @@
 #endif
 
 /* Input completion callback type */
-typedef const char* (*f_completion_cb)(const char*, int);
+typedef uint16_t (*f_completion_cb)(char*, uint16_t, uint16_t, int);
 
 struct input2
 {

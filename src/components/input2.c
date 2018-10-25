@@ -83,17 +83,48 @@ input2_insert(struct input2 *inp, const char *c, size_t count)
 int
 input2_complete(struct input2 *inp, f_completion_cb cb)
 {
-	/* TODO: should pass to the callback:
-	 *  - the complete word under the cursor
-	 *  - flag if the word is the line leader
-	 *
-	 * callback returns a string to replace the word under the cursor
-	 * and returns 0 if no change was made
-	 */
+	/* Completion is valid when the cursor is:
+	 *  - above any character in a word
+	 *  - above a space immediately following a word
+	 *  - at the end of a line following a word */
 
-	(void)inp;
-	(void)cb;
-	return 0;
+	uint16_t i, len, max, ret;
+
+	if (input2_text_iszero(inp))
+		return 0;
+
+	uint16_t head = inp->head,
+	         tail = inp->tail;
+
+	while (inp->head && inp->text[inp->head - 1] != ' ')
+		input2_cursor(inp, 0);
+
+	/* No word to complete, restore cursor */
+	if (inp->text[inp->head] == ' ') {
+		inp->head = head;
+		inp->tail = tail;
+		return 0;
+	}
+
+	i = inp->tail;
+
+	while (i < INPUT_LEN_MAX && inp->text[i] != ' ')
+		i++;
+
+	len = (i - inp->tail);
+	max = (INPUT_LEN_MAX - input2_text_size(inp));
+
+	ret = (*cb)((inp->text + inp->head), len, max, (inp->head == 0));
+
+	if (ret == 0) {
+		inp->head = head;
+		inp->tail = tail;
+	} else {
+		inp->head += ret;
+		inp->tail += len;
+	}
+
+	return (ret != 0);
 }
 
 int

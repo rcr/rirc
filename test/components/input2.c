@@ -6,6 +6,27 @@
 
 #include "src/components/input2.c"
 
+uint16_t
+rot1(char *str, uint16_t len, uint16_t max, int first)
+{
+	/* Completetion function, increments all characters */
+
+	uint16_t i = 0;
+
+	while (i < len && i < max)
+		str[i++] += 1;
+
+	(void)first;
+	/* TODO:
+	if (first) {
+		str[i++] = '!';
+		str[i++] = '!';
+	}
+	*/
+
+	return i;
+}
+
 static void
 test_input(void)
 {
@@ -230,7 +251,7 @@ test_input_write(void)
 	/* Test output is always null terminated */
 	assert_eq(input2_insert(&inp, "fghij", 5), 1);
 	assert_strcmp(input2_write(&inp, buf1, sizeof(buf1)), "fghijabcde");
-	assert_strcmp(input2_write(&inp, buf1, sizeof(buf2)), "fghi");
+	assert_strcmp(input2_write(&inp, buf2, sizeof(buf2)), "fghi");
 
 	input2_free(&inp);
 }
@@ -238,7 +259,73 @@ test_input_write(void)
 static void
 test_input_complete(void)
 {
-	/* TODO */
+	char buf[INPUT_LEN_MAX + 1];
+	struct input2 inp;
+
+	input2(&inp);
+
+	/* Test empty */
+	assert_eq(input2_complete(&inp, rot1), 0);
+	assert_eq(input2_clear(&inp), 0);
+
+	/* Test only space */
+	assert_eq(input2_insert(&inp, " ", 1), 1);
+	assert_eq(input2_complete(&inp, rot1), 0);
+	assert_eq(input2_clear(&inp), 1);
+
+	/* Test: ` abc `
+	 *             ^ */
+	assert_eq(input2_insert(&inp, " abc ", 5), 1);
+	assert_eq(input2_complete(&inp, rot1), 0);
+	assert_strcmp(input2_write(&inp, buf, sizeof(buf)), " abc ");
+
+	/* Test: ` abc `
+	 *            ^ */
+	assert_eq(input2_cursor(&inp, 0), 1);
+	assert_eq(inp.text[inp.head], ' ');
+	assert_eq(input2_complete(&inp, rot1), 1);
+	assert_eq(inp.text[inp.head], ' ');
+	assert_strcmp(input2_write(&inp, buf, sizeof(buf)), " bcd ");
+
+	/* Test: ` bcd `
+	 *           ^ */
+	assert_eq(input2_cursor(&inp, 0), 1);
+	assert_eq(inp.text[inp.head], 'd');
+	assert_eq(input2_complete(&inp, rot1), 1);
+	assert_eq(inp.text[inp.head], ' ');
+	assert_strcmp(input2_write(&inp, buf, sizeof(buf)), " cde ");
+
+	/* Test: ` cde `
+	 *          ^ */
+	assert_eq(input2_cursor(&inp, 0), 1);
+	assert_eq(input2_cursor(&inp, 0), 1);
+	assert_eq(inp.text[inp.head], 'd');
+	assert_eq(input2_complete(&inp, rot1), 1);
+	assert_eq(inp.text[inp.head], ' ');
+	assert_strcmp(input2_write(&inp, buf, sizeof(buf)), " def ");
+
+	/* Test: ` def `
+	 *         ^ */
+	assert_eq(input2_cursor(&inp, 0), 1);
+	assert_eq(input2_cursor(&inp, 0), 1);
+	assert_eq(input2_cursor(&inp, 0), 1);
+	assert_eq(inp.text[inp.head], 'd');
+	assert_eq(input2_complete(&inp, rot1), 1);
+	assert_eq(inp.text[inp.head], ' ');
+	assert_strcmp(input2_write(&inp, buf, sizeof(buf)), " efg ");
+
+	/* Test: ` efg `
+	 *        ^ */
+	assert_eq(input2_cursor(&inp, 0), 1);
+	assert_eq(input2_cursor(&inp, 0), 1);
+	assert_eq(input2_cursor(&inp, 0), 1);
+	assert_eq(input2_cursor(&inp, 0), 1);
+	assert_eq(inp.text[inp.head], ' ');
+	assert_eq(input2_complete(&inp, rot1), 0);
+	assert_eq(inp.text[inp.head], ' ');
+	assert_strcmp(input2_write(&inp, buf, sizeof(buf)), " efg ");
+
+	input2_free(&inp);
 }
 
 static void
