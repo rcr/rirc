@@ -1,13 +1,67 @@
 #include "test/test.h"
 
 /* Preclude definitions for testing */
-#define INPUT_LEN_MAX 10
+#define INPUT_LEN_MAX 16
 #define INPUT_HIST_MAX 4
 
 #include "src/components/input2.c"
 
-uint16_t
-rot1(char *str, uint16_t len, uint16_t max, int first)
+static uint16_t completion_l(char*, uint16_t, uint16_t, int);
+static uint16_t completion_m(char*, uint16_t, uint16_t, int);
+static uint16_t completion_s(char*, uint16_t, uint16_t, int);
+static uint16_t completion_rot1(char*, uint16_t, uint16_t, int);
+
+static uint16_t
+completion_l(char *str, uint16_t len, uint16_t max, int first)
+{
+	/* Completes to word longer than len */
+
+	(void)len;
+	(void)first;
+
+	const char longer[] = "xyxyxy";
+
+	if (max < sizeof(longer) - 1)
+		return 0;
+
+	memcpy(str, longer, sizeof(longer) - 1);
+
+	return sizeof(longer) - 1;
+}
+
+static uint16_t
+completion_m(char *str, uint16_t len, uint16_t max, int first)
+{
+	/* Writes up to max chars */
+
+	(void)first;
+
+	for (uint16_t i = 0; i < (len + max); i++)
+		str[i] = 'x';
+
+	return (len + max);
+}
+
+static uint16_t
+completion_s(char *str, uint16_t len, uint16_t max, int first)
+{
+	/* Completes to word shorter than len */
+
+	(void)len;
+	(void)first;
+
+	const char shorter[] = "z";
+
+	if (max < sizeof(shorter) - 1)
+		return 0;
+
+	memcpy(str, shorter, sizeof(shorter) - 1);
+
+	return sizeof(shorter) - 1;
+}
+
+static uint16_t
+completion_rot1(char *str, uint16_t len, uint16_t max, int first)
 {
 	/* Completetion function, increments all characters */
 
@@ -16,13 +70,10 @@ rot1(char *str, uint16_t len, uint16_t max, int first)
 	while (i < len && i < max)
 		str[i++] += 1;
 
-	(void)first;
-	/* TODO:
 	if (first) {
 		str[i++] = '!';
 		str[i++] = '!';
 	}
-	*/
 
 	return i;
 }
@@ -87,11 +138,14 @@ test_input_ins(void)
 	assert_eq(input2_insert(&inp, "fgh", 3), 1);
 	assert_eq(input2_insert(&inp, "i", 1), 1);
 	assert_eq(input2_insert(&inp, "j", 1), 1);
-	assert_strcmp(input2_write(&inp, buf, sizeof(buf)), "abcdefghij");
+	assert_eq(input2_insert(&inp, "klmnop", 6), 1);
+	assert_strcmp(input2_write(&inp, buf, sizeof(buf)), "abcdefghijklmnop");
+	assert_eq((int)input2_text_size(&inp), INPUT_LEN_MAX);
 
 	/* Full */
 	assert_eq(input2_insert(&inp, "z", 1), 0);
-	assert_strcmp(input2_write(&inp, buf, sizeof(buf)), "abcdefghij");
+	assert_strcmp(input2_write(&inp, buf, sizeof(buf)), "abcdefghijklmnop");
+	assert_eq((int)input2_text_size(&inp), INPUT_LEN_MAX);
 
 	input2_free(&inp);
 }
@@ -249,9 +303,9 @@ test_input_write(void)
 	assert_strcmp(input2_write(&inp, buf1, sizeof(buf1)), "abcde");
 
 	/* Test output is always null terminated */
-	assert_eq(input2_insert(&inp, "fghij", 5), 1);
-	assert_strcmp(input2_write(&inp, buf1, sizeof(buf1)), "fghijabcde");
-	assert_strcmp(input2_write(&inp, buf2, sizeof(buf2)), "fghi");
+	assert_eq(input2_insert(&inp, "fghijklmno", 10), 1);
+	assert_strcmp(input2_write(&inp, buf1, sizeof(buf1)), "fghijklmnoabcde");
+	assert_strcmp(input2_write(&inp, buf2, sizeof(buf2)), "fghijkl");
 
 	input2_free(&inp);
 }
@@ -265,25 +319,25 @@ test_input_complete(void)
 	input2(&inp);
 
 	/* Test empty */
-	assert_eq(input2_complete(&inp, rot1), 0);
+	assert_eq(input2_complete(&inp, completion_rot1), 0);
 	assert_eq(input2_clear(&inp), 0);
 
 	/* Test only space */
 	assert_eq(input2_insert(&inp, " ", 1), 1);
-	assert_eq(input2_complete(&inp, rot1), 0);
+	assert_eq(input2_complete(&inp, completion_rot1), 0);
 	assert_eq(input2_clear(&inp), 1);
 
 	/* Test: ` abc `
 	 *             ^ */
 	assert_eq(input2_insert(&inp, " abc ", 5), 1);
-	assert_eq(input2_complete(&inp, rot1), 0);
+	assert_eq(input2_complete(&inp, completion_rot1), 0);
 	assert_strcmp(input2_write(&inp, buf, sizeof(buf)), " abc ");
 
 	/* Test: ` abc `
 	 *            ^ */
 	assert_eq(input2_cursor(&inp, 0), 1);
 	assert_eq(inp.text[inp.head], ' ');
-	assert_eq(input2_complete(&inp, rot1), 1);
+	assert_eq(input2_complete(&inp, completion_rot1), 1);
 	assert_eq(inp.text[inp.head], ' ');
 	assert_strcmp(input2_write(&inp, buf, sizeof(buf)), " bcd ");
 
@@ -291,7 +345,7 @@ test_input_complete(void)
 	 *           ^ */
 	assert_eq(input2_cursor(&inp, 0), 1);
 	assert_eq(inp.text[inp.head], 'd');
-	assert_eq(input2_complete(&inp, rot1), 1);
+	assert_eq(input2_complete(&inp, completion_rot1), 1);
 	assert_eq(inp.text[inp.head], ' ');
 	assert_strcmp(input2_write(&inp, buf, sizeof(buf)), " cde ");
 
@@ -300,7 +354,7 @@ test_input_complete(void)
 	assert_eq(input2_cursor(&inp, 0), 1);
 	assert_eq(input2_cursor(&inp, 0), 1);
 	assert_eq(inp.text[inp.head], 'd');
-	assert_eq(input2_complete(&inp, rot1), 1);
+	assert_eq(input2_complete(&inp, completion_rot1), 1);
 	assert_eq(inp.text[inp.head], ' ');
 	assert_strcmp(input2_write(&inp, buf, sizeof(buf)), " def ");
 
@@ -310,7 +364,7 @@ test_input_complete(void)
 	assert_eq(input2_cursor(&inp, 0), 1);
 	assert_eq(input2_cursor(&inp, 0), 1);
 	assert_eq(inp.text[inp.head], 'd');
-	assert_eq(input2_complete(&inp, rot1), 1);
+	assert_eq(input2_complete(&inp, completion_rot1), 1);
 	assert_eq(inp.text[inp.head], ' ');
 	assert_strcmp(input2_write(&inp, buf, sizeof(buf)), " efg ");
 
@@ -321,9 +375,55 @@ test_input_complete(void)
 	assert_eq(input2_cursor(&inp, 0), 1);
 	assert_eq(input2_cursor(&inp, 0), 1);
 	assert_eq(inp.text[inp.head], ' ');
-	assert_eq(input2_complete(&inp, rot1), 0);
+	assert_eq(input2_complete(&inp, completion_rot1), 0);
 	assert_eq(inp.text[inp.head], ' ');
 	assert_strcmp(input2_write(&inp, buf, sizeof(buf)), " efg ");
+	assert_eq(input2_clear(&inp), 1);
+
+	/* Test start of line */
+	assert_eq(input2_insert(&inp, "x abc ", 6), 1);
+	assert_eq(input2_cursor(&inp, 0), 1);
+	assert_eq(input2_cursor(&inp, 0), 1);
+	assert_eq(input2_cursor(&inp, 0), 1);
+	assert_eq(input2_cursor(&inp, 0), 1);
+	assert_eq(input2_cursor(&inp, 0), 1);
+	assert_eq(input2_cursor(&inp, 0), 1);
+	assert_eq(inp.text[inp.head], 'x');
+	assert_eq(input2_complete(&inp, completion_rot1), 1);
+	assert_eq(inp.text[inp.tail], ' ');
+	assert_strcmp(input2_write(&inp, buf, sizeof(buf)), "y!! abc ");
+	assert_eq(input2_clear(&inp), 1);
+
+	/* Test replacement word longer */
+	assert_eq(input2_insert(&inp, " abc ab", 7), 1);
+	assert_eq(input2_cursor(&inp, 0), 1);
+	assert_eq(input2_cursor(&inp, 0), 1);
+	assert_eq(input2_cursor(&inp, 0), 1);
+	assert_eq(input2_cursor(&inp, 0), 1);
+	assert_eq(inp.text[inp.head], 'c');
+	assert_eq(input2_complete(&inp, completion_l), 1);
+	assert_strcmp(input2_write(&inp, buf, sizeof(buf)), " xyxyxy ab");
+	assert_eq(inp.text[inp.tail], ' '); /* points to 'c' */
+	assert_eq(input2_clear(&inp), 1);
+
+	/* Test replacement word shorter */
+	assert_eq(input2_insert(&inp, " abc ab ", 8), 1);
+	assert_eq(input2_cursor(&inp, 0), 1);
+	assert_eq(input2_cursor(&inp, 0), 1);
+	assert_eq(input2_cursor(&inp, 0), 1);
+	assert_eq(input2_cursor(&inp, 0), 1);
+	assert_eq(input2_cursor(&inp, 0), 1);
+	assert_eq(inp.text[inp.head], 'c');
+	assert_eq(input2_complete(&inp, completion_s), 1);
+	assert_strcmp(input2_write(&inp, buf, sizeof(buf)), " z ab ");
+	assert_eq(inp.text[inp.tail], ' ');
+	assert_eq(input2_clear(&inp), 1);
+
+	/* Test writing up to max chars */
+	assert_eq(input2_insert(&inp, "a", 1), 1);
+	assert_eq(input2_complete(&inp, completion_m), 1);
+	assert_strcmp(input2_write(&inp, buf, sizeof(buf)), "xxxxxxxxxxxxxxxx");
+	assert_eq((int)input2_text_size(&inp), INPUT_LEN_MAX);
 
 	input2_free(&inp);
 }

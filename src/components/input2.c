@@ -88,40 +88,32 @@ input2_complete(struct input2 *inp, f_completion_cb cb)
 	 *  - above a space immediately following a word
 	 *  - at the end of a line following a word */
 
-	uint16_t i, len, max, ret;
+	uint16_t head, tail, ret;
 
 	if (input2_text_iszero(inp))
 		return 0;
 
-	uint16_t head = inp->head,
-	         tail = inp->tail;
+	head = inp->head;
+	tail = inp->tail;
 
-	while (inp->head && inp->text[inp->head - 1] != ' ')
-		input2_cursor(inp, 0);
+	while (head && inp->text[head - 1] != ' ')
+		head--;
 
-	/* No word to complete, restore cursor */
-	if (inp->text[inp->head] == ' ') {
-		inp->head = head;
-		inp->tail = tail;
+	if (inp->text[head] == ' ')
 		return 0;
-	}
 
-	i = inp->tail;
+	while (tail < INPUT_LEN_MAX && inp->text[tail] != ' ')
+		tail++;
 
-	while (i < INPUT_LEN_MAX && inp->text[i] != ' ')
-		i++;
+	ret = (*cb)(
+		(inp->text + head),
+		(inp->head - head - inp->tail + tail),
+		(INPUT_LEN_MAX - input2_text_size(inp)),
+		(head == 0));
 
-	len = (i - inp->tail);
-	max = (INPUT_LEN_MAX - input2_text_size(inp));
-
-	ret = (*cb)((inp->text + inp->head), len, max, (inp->head == 0));
-
-	if (ret == 0) {
-		inp->head = head;
+	if (ret) {
+		inp->head = head + ret;
 		inp->tail = tail;
-	} else {
-		inp->head += ret;
-		inp->tail += len;
 	}
 
 	return (ret != 0);
