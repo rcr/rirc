@@ -10,7 +10,7 @@
 #define FROM_LENGTH_MAX 100
 
 #ifndef BUFFER_LINES_MAX
-	#define BUFFER_LINES_MAX (1 << 10)
+#define BUFFER_LINES_MAX (1 << 10)
 #endif
 
 /* Buffer line types, in order of precedence */
@@ -55,7 +55,7 @@ int buffer_page_forw(struct buffer*, unsigned int, unsigned int);
 
 unsigned int buffer_line_rows(struct buffer_line*, unsigned int);
 
-struct buffer buffer(void);
+void buffer(struct buffer*);
 
 struct buffer_line* buffer_head(struct buffer*);
 struct buffer_line* buffer_tail(struct buffer*);

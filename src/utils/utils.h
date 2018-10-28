@@ -33,7 +33,6 @@ int irc_ischanchar(char, int);
 int irc_isnick(const char*);
 int irc_ischan(const char*);
 
-
 //TODO: replace comps to channel / nicks
 int irc_strcmp(const char*, const char*);
 int irc_strncmp(const char*, const char*, size_t);
@@ -83,33 +82,5 @@ extern int fatal_exit;
 #define fatal(M, E) \
 	do { handle_error(E, "ERROR in %s: %s", __func__, M); exit(EXIT_FAILURE); } while (0)
 #endif
-
-//TODO: refactor
-/* Doubly linked list macros */
-#define DLL_NEW(L, N) ((L) = (N)->next = (N)->prev = (N))
-
-#define DLL_ADD(L, N) \
-	do { \
-		if ((L) == NULL) \
-			DLL_NEW(L, N); \
-		else { \
-			((L)->next)->prev = (N); \
-			(N)->next = ((L)->next); \
-			(N)->prev = (L); \
-			(L)->next = (N); \
-		} \
-	} while (0)
-
-#define DLL_DEL(L, N) \
-	do { \
-		if (((N)->next) == (N)) \
-			(L) = NULL; \
-		else { \
-			if ((L) == N) \
-				(L) = ((N)->next); \
-			((N)->next)->prev = ((N)->prev); \
-			((N)->prev)->next = ((N)->next); \
-		} \
-	} while (0)
 
 #endif

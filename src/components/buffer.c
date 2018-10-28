@@ -30,12 +30,12 @@
 
 #include "src/components/buffer.h"
 
-#if (BUFFER_LINES_MAX & (BUFFER_LINES_MAX - 1)) != 0
-	/* Required for proper masking when indexing */
-	#error BUFFER_LINES_MAX must be a power of 2
-#endif
+#define BUFFER_MASK(X) ((X) & (BUFFER_LINES_MAX - 1))
 
-#define MASK(X) ((X) & (BUFFER_LINES_MAX - 1))
+#if BUFFER_MASK(BUFFER_LINES_MAX)
+/* Required for proper masking when indexing */
+#error BUFFER_LINES_MAX must be a power of 2
+#endif
 
 static inline unsigned int buffer_full(struct buffer*);
 static inline unsigned int buffer_size(struct buffer*);
@@ -73,7 +73,7 @@ buffer_push(struct buffer *b)
 		b->tail++;
 	}
 
-	return &b->buffer_lines[MASK(b->head++)];
+	return &b->buffer_lines[BUFFER_MASK(b->head++)];
 }
 
 struct buffer_line*
@@ -81,7 +81,7 @@ buffer_head(struct buffer *b)
 {
 	/* Return the first printable line in a buffer */
 
-	return buffer_size(b) == 0 ? NULL : &b->buffer_lines[MASK(b->head - 1)];
+	return buffer_size(b) == 0 ? NULL : &b->buffer_lines[BUFFER_MASK(b->head - 1)];
 }
 
 struct buffer_line*
@@ -89,7 +89,7 @@ buffer_tail(struct buffer *b)
 {
 	/* Return the last printable line in a buffer */
 
-	return buffer_size(b) == 0 ? NULL : &b->buffer_lines[MASK(b->tail)];
+	return buffer_size(b) == 0 ? NULL : &b->buffer_lines[BUFFER_MASK(b->tail)];
 }
 
 struct buffer_line*
@@ -121,7 +121,7 @@ buffer_line(struct buffer *b, unsigned int i)
 	    ((b->tail > b->head) && (i < b->tail && i >= b->head)))
 		fatal("invalid index", 0);
 
-	return &b->buffer_lines[MASK(i)];
+	return &b->buffer_lines[BUFFER_MASK(i)];
 }
 
 unsigned int
@@ -206,10 +206,10 @@ buffer_scrollback_status(struct buffer *b)
 	return (float)(b->head - b->scrollback) / (float)(buffer_size(b));
 }
 
-struct buffer
-buffer(void)
+void
+buffer(struct buffer *b)
 {
 	/* Initialize a buffer */
 
-	return (struct buffer) {0};
+	memset(b, 0, sizeof(*b));
 }

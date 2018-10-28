@@ -34,7 +34,7 @@ struct channel
 	struct buffer buffer;
 	struct channel *next;
 	struct channel *prev;
-	struct input *input;
+	struct input input;
 	struct mode chanmodes;
 	struct mode_str chanmodes_str;
 	struct server *server;

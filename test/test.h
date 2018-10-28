@@ -4,6 +4,7 @@
 #define TESTING
 
 /* TODO: list the test types at the top of file with usage */
+/* TODO: randomize testcase ordering */
 
 #include <inttypes.h>
 #include <setjmp.h>
@@ -172,7 +173,7 @@ _assert_strncmp(const char *p1, const char *p2, size_t n)
 static void
 _print_testcase_name_(const char *name)
 {
-	/* Print the testcase name only one */
+	/* Print the testcase name once */
 	if (!_failure_printed_) {
 		_failure_printed_ = 1;
 
@@ -186,7 +187,7 @@ _print_testcase_name_(const char *name)
 static int
 _run_tests_(const char *filename, testcase testcases[], size_t len)
 {
-	/* Silence compiler warnings for test functions/vars that are included but not used */
+	/* Silence compiler warnings for unused test functions/vars */
 	((void)(_assert_strcmp));
 	((void)(_assert_strncmp));
 	((void)(_assert_fatal_));
