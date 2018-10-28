@@ -1,6 +1,18 @@
 #ifndef INPUT_H
 #define INPUT_H
 
+/* Buffer input
+ *
+ * Supports line editing, input history, word completion
+ *
+ * The working edit area is implemented as a fixed width
+ * gap buffer for O(1) insertions, deltions and O(n)
+ * cursor movements
+ *
+ * Input history is kept as a ring buffer of strings,
+ * copied into the working area when scrolling
+ */
+
 #include <stdint.h>
 
 /* 410 max characters for input should be sufficient given
@@ -16,14 +28,20 @@
 #define INPUT_HIST_MAX 16
 #endif
 
-/* Input completion callback type */
-typedef uint16_t (*f_completion_cb)(char*, uint16_t, uint16_t, int);
+/* Input completion callback type, returning length
+ * of replacement word, or 0 if no match, with args: */
+typedef uint16_t (*f_completion_cb)(
+	char*,    /* word to replace */
+	uint16_t, /* length of word */
+	uint16_t, /* max length of replacement word */
+	int);     /* flag set if word is start of input */
 
 struct input2
 {
 	char text[INPUT_LEN_MAX];
 	struct {
-		char *buf[INPUT_HIST_MAX];
+		char *ptrs[INPUT_HIST_MAX];
+		char *save;
 		uint16_t current;
 		uint16_t head;
 		uint16_t tail;
@@ -36,10 +54,12 @@ void input2(struct input2*);
 void input2_free(struct input2*);
 
 /* Input manipulation */
-int input2_clear(struct input2*);
-int input2_cursor(struct input2*, int);
-int input2_delete(struct input2*, int);
+int input2_cursor_back(struct input2*);
+int input2_cursor_forw(struct input2*);
+int input2_delete_back(struct input2*);
+int input2_delete_forw(struct input2*);
 int input2_insert(struct input2*, const char*, size_t);
+int input2_reset(struct input2*);
 
 /* Input completion */
 int input2_complete(struct input2*, f_completion_cb);

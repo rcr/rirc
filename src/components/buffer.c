@@ -30,12 +30,12 @@
 
 #include "src/components/buffer.h"
 
-#if (BUFFER_LINES_MAX & (BUFFER_LINES_MAX - 1)) != 0
+#define MASK(X) ((X) & (BUFFER_LINES_MAX - 1))
+
+#if MASK_BUFFER_LINES_MAX
 /* Required for proper masking when indexing */
 #error BUFFER_LINES_MAX must be a power of 2
 #endif
-
-#define MASK(X) ((X) & (BUFFER_LINES_MAX - 1))
 
 static inline unsigned int buffer_full(struct buffer*);
 static inline unsigned int buffer_size(struct buffer*);
