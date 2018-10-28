@@ -5,6 +5,9 @@
 
 /* TODO: list the test types at the top of file with usage */
 /* TODO: randomize testcase ordering */
+/* TODO: colours */
+/* TODO: verbose output */
+/* TODO: number of tests ran, time */
 
 #include <inttypes.h>
 #include <setjmp.h>
@@ -74,9 +77,9 @@ static void _print_testcase_name_(const char*);
  *   in normal operation should fatally exit the program
  *   in testing should be considered a failure but should NOT continue running the testcase */
 #ifdef fatal
-	#error "test.h" should be the first include within testcase files
+#error "test.h" should be the first include within testcase files
 #else
-	#define fatal(M, E) \
+#define fatal(M, E) \
 	do { \
 		if (_assert_fatal_) { \
 			longjmp(_tc_fatal_expected_, 1); \

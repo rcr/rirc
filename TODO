@@ -8,7 +8,6 @@ next iteration
 	- RFC2812 compliance
 
 Continue refactoring:
-	- Untangle headers
 	- Rewrite input DLL as circular buffer of gap buffers, with copy on repeat,
 		use abstractions in _draw_input
 	- Error/warning writing from stateless components, e.g.:
@@ -39,6 +38,7 @@ Testing:
 		- ./test/script.sh ?
 	- Fuzzing handlers (afl)
 	- Try musl C
+	- include-what-you-use for header detangling
 
 buffer performance improvements:
 	- reduce overall size, pack strings in contiguous realloc'ed array
