@@ -104,6 +104,7 @@ input_reset(struct input *inp)
 
 	inp->head = 0;
 	inp->tail = INPUT_LEN_MAX;
+	inp->window = 0;
 
 	return 1;
 }
@@ -192,8 +193,10 @@ input_hist_forw(struct input *inp)
 	else
 		str = inp->hist.ptrs[INPUT_MASK(inp->hist.current)];
 
-	len = strlen(str);
-	memcpy(inp->text, str, len);
+	if (str) {
+		len = strlen(str);
+		memcpy(inp->text, str, len);
+	}
 
 	if (inp->hist.current == inp->hist.head)
 		free(inp->hist.save);
@@ -237,28 +240,42 @@ input_hist_push(struct input *inp)
 	return input_reset(inp);
 }
 
-char*
-input_write(struct input *inp, char *buf, size_t max)
+uint16_t
+input_frame(struct input *inp, uint16_t max)
 {
-	/* Write the input to `buf` as a null terminated string */
+	/*  Keep the input head in view, reframing if the cursor would be
+	 *  drawn outside [A, B] as a function of the given max width
+	 *
+	 * 0       W             W + M
+	 * |-------|---------------|------
+	 * |       |A             B|
+	 *         |<--         -->| : max
+	 *
+	 * The cursor should track the input head, where the next
+	 * character would be entered
+	 *
+	 * In the <= A case: deletions occurred since previous reframe;
+	 * the head is less than or equal to the window
+	 *
+	 * In the >= B case: insertions occurred since previous reframe;
+	 * the distance from window to head is greater than the distance
+	 * from [A, B]
+	 *
+	 * Set the window 2/3 of the text area width backwards from the head
+	 * and returns the cursor position relative to the window */
 
-	/* TODO input framing */
-#if 0
-static inline void
-reframe_line(struct input *in, unsigned int cols)
-{
-	/* Reframe a line's draw window */
+	if (inp->window >= inp->head || (inp->window + max) <= inp->head)
+		inp->window = ((max * 2 / 3) >= inp->head) ? 0 : inp->head - (max * 2 / 3);
 
-	in->head = in->line->end;
-	in->tail = in->line->text + RIRC_MAX_INPUT;
-	in->window = in->head - (2 * cols / 3);
-
-	if (in->window < in->line->text)
-		in->window = in->line->text;
+	return (inp->head - inp->window);
 }
-#endif
 
-	uint16_t i = 0,
+uint16_t
+input_write(struct input *inp, char *buf, uint16_t max)
+{
+	/* Write the framed input to `buf` as a null terminated string */
+
+	uint16_t i = inp->window,
 	         j = 0;
 
 	while (max > 1 && i < inp->head) {
@@ -275,7 +292,7 @@ reframe_line(struct input *in, unsigned int cols)
 
 	buf[j] = 0;
 
-	return buf;
+	return j;
 }
 
 static char*
@@ -285,12 +302,14 @@ input_text_copy(struct input *inp)
 	size_t len;
 
 	if ((len = input_text_size(inp)) == 0)
-		return 0;
+		return NULL;
 
 	if ((str = malloc(len + 1)) == NULL)
 		fatal("malloc", errno);
 
-	return input_write(inp, str, len + 1);
+	input_write(inp, str, len + 1);
+
+	return str;
 }
 
 static int

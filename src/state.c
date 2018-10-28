@@ -165,6 +165,10 @@ static void state_io_dxed(struct server*, const char *);
 static void state_io_ping(struct server*, unsigned int);
 static void state_io_signal(enum io_sig_t);
 
+static int state_input_linef(struct channel*);
+static int state_input_ctrlch(const char*, size_t);
+static int state_input_action(const char*, size_t);
+
 /* Set draw bits */
 #define X(BIT) void draw_##BIT(void) { state.draw.bits.BIT = 1; }
 DRAW_BITS
@@ -358,7 +362,6 @@ channel_clear(struct channel *c)
 #define MAX_ACTION_MESG 256
 char *action_message;
 static int action_close_server(char);
-static int input_action(const char*, size_t);
 /* Action handling */
 static int (*action_handler)(char);
 static char action_buff[MAX_ACTION_MESG];
@@ -393,7 +396,7 @@ search_channels(struct channel *start, char *search)
 	return NULL;
 }
 static int
-input_action(const char *input, size_t len)
+state_input_action(const char *input, size_t len)
 {
 	/* Waiting for user confirmation */
 
@@ -744,11 +747,6 @@ channel_move_next(void)
 	}
 }
 
-
-
-
-
-
 static void
 state_io_cxed(struct server *s)
 {
@@ -924,9 +922,8 @@ send_cmnd(struct channel *c, char *buf)
 	 */
 }
 
-static int input_cchar(const char*, size_t);
 static int
-input_cchar(const char *c, size_t count)
+state_input_ctrlch(const char *c, size_t len)
 {
 	/* Input a control character or escape sequence */
 
@@ -935,55 +932,55 @@ input_cchar(const char *c, size_t count)
 
 		c++;
 
-		if (*c == 0)
+		if (len == 1)
 			return 0;
 
 		/* arrow up */
-		else if (!strncmp(c, "[A", count - 1))
-			return 0; // FIXME: return input_scroll_back(current_channel()->input, io_tty_cols());
+		else if (!strncmp(c, "[A", len - 1))
+			return input_hist_back(&(current_channel()->input));
 
 		/* arrow down */
-		else if (!strncmp(c, "[B", count - 1))
-			return 0; // FIXME: return input_scroll_forw(current_channel()->input, io_tty_cols());
+		else if (!strncmp(c, "[B", len - 1))
+			return input_hist_forw(&(current_channel()->input));
 
 		/* arrow right */
-		else if (!strncmp(c, "[C", count - 1))
-			return 0; // FIXME: return cursor_right(current_channel()->input);
+		else if (!strncmp(c, "[C", len - 1))
+			return input_cursor_forw(&(current_channel()->input));
 
 		/* arrow left */
-		else if (!strncmp(c, "[D", count - 1))
-			return 0; // FIXME: return cursor_left(current_channel()->input);
+		else if (!strncmp(c, "[D", len - 1))
+			return input_cursor_back(&(current_channel()->input));
 
 		/* delete */
-		else if (!strncmp(c, "[3~", count - 1))
-			return 0; // FIXME: return delete_right(current_channel()->input);
+		else if (!strncmp(c, "[3~", len - 1))
+			return input_delete_forw(&(current_channel()->input));
 
 		/* page up */
-		else if (!strncmp(c, "[5~", count - 1))
+		else if (!strncmp(c, "[5~", len - 1))
 			buffer_scrollback_back(current_channel());
 
 		/* page down */
-		else if (!strncmp(c, "[6~", count - 1))
+		else if (!strncmp(c, "[6~", len - 1))
 			buffer_scrollback_forw(current_channel());
 
 	} else switch (*c) {
 
 		/* Backspace */
 		case 0x7F:
-			return 0; // FIXME: return delete_left(current_channel()->input);
+			return input_delete_back(&(current_channel()->input));
 
 		/* Horizontal tab */
 		case 0x09:
 			return 0; // FIXME: return tab_complete(current_channel()->input, &(current_channel()->users));
 
+		/* Line feed */
+		case 0x0A:
+			return state_input_linef(current_channel());
+
 		/* ^C */
 		case 0x03:
 			/* Cancel current input */
-			return 0;
-			// FIXME: current_channel()->input->head = current_channel()->input->line->text;
-			// FIXME: current_channel()->input->tail = current_channel()->input->line->text + RIRC_MAX_INPUT;
-			// FIXME: current_channel()->input->window = current_channel()->input->line->text;
-			// FIXME: return 1;
+			return input_reset(&(current_channel()->input));
 
 		/* ^F */
 		case 0x06:
@@ -1033,23 +1030,46 @@ input_cchar(const char *c, size_t count)
 	return 0;
 }
 
-void
-io_cb_read_inp(char *buf, size_t len)
+static int
+state_input_linef(struct channel *c)
 {
 	/* TODO: cleanup, switch on input type/contents */
 	// input types:
-	//    message
-	//    paste
-	//    key/sequence
+	//    message/paste
 	//    ::message
 	//    :command
 	//    //message
 	//    /command
 
+	char buf[INPUT_LEN_MAX + 1];
+	size_t len;
+
+	if ((len = input_write(&(c->input), buf, sizeof(buf))) == 0)
+		return 0;
+
+	if (buf[0] == ':')
+		send_cmnd(current_channel(), buf + 1);
+	else
+		send_mesg(current_channel()->server, current_channel(), buf);
+
+	input_hist_push(&(c->input));
+
+	return 1;
+}
+
+void
+io_cb_read_inp(char *buf, size_t len)
+{
 	int redraw_input = 0;
 
-	(void)buf;
-	(void)len;
+	if (len == 0)
+		fatal("zero length message", 0);
+	else if (action_message)
+		redraw_input = state_input_action(buf, len);
+	else if (iscntrl(*buf))
+		redraw_input = state_input_ctrlch(buf, len);
+	else
+		redraw_input = input_insert(&current_channel()->input, buf, len);
 
 	if (redraw_input)
 		draw_input();
@@ -1057,54 +1077,17 @@ io_cb_read_inp(char *buf, size_t len)
 	redraw();
 }
 
-#if 0
-	int redraw_input = 0;
-
-	if (action_message) {
-		redraw_input = input_action(buff, count);
-	} else if (*buff == 0x0A) {
-		/* Line feed */
-
-		char sendbuf[INPUT_LEN_MAX + 1];
-
-
-		if (input_empty(state.current_channel->input))
-			return;
-		_send_input(state.current_channel->input, sendbuf);
-
-
-		switch (sendbuf[0]) {
-			case ':':
-				send_cmnd(state.current_channel, sendbuf + 1);
-				break;
-			default:
-				send_mesg(current_channel()->server, current_channel(), sendbuf);
-		}
-		redraw_input = 1;
-
-	} else if (iscntrl(*buff)) {
-		redraw_input = input_cchar(buff, count);
-	} else {
-		redraw_input = input(current_channel()->input, buff, count);
-	}
-
-	if (redraw_input)
-		draw_input();
-
-	redraw();
-#endif
-
 void
-io_cb_read_soc(char *buff, size_t count, const void *cb_obj)
+io_cb_read_soc(char *buf, size_t len, const void *cb_obj)
 {
 	/* TODO: */
-	(void)(count);
+	(void)(len);
 
 	struct channel *c = ((struct server *)cb_obj)->channel;
 
 	struct parsed_mesg p;
 
-	if (!(parse_mesg(&p, buff)))
+	if (!(parse_mesg(&p, buf)))
 		newlinef(c, 0, "-!!-", "failed to parse message");
 	else
 		recv_mesg((struct server *)cb_obj, &p);
