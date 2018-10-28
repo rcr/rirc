@@ -508,13 +508,6 @@ _draw_input(struct input *inp, struct coords coords)
 {
 	/* Draw the input line, or the current action message */
 
-	// FIXME:
-	(void)inp;
-	(void)coords;
-}
-
-#if 0
-
 	check_coords(coords);
 
 	unsigned int cols_t = coords.cN - coords.c1 + 1,
@@ -562,59 +555,8 @@ _draw_input(struct input *inp, struct coords coords)
 		cursor = cols_t - text_n + 1;
 
 	} else {
-
-		/*  Keep the input head in view, reframing if the cursor would be
-		 *  drawn outside [A, B] as a function of input window and head
-		 *
-		 * |  <prefix>     <text area>  |
-		 * |............|---------------|
-		 * |             A             B|
-		 * |                            | : cols_t
-		 *              |               | : text_n
-		 *
-		 * The cursor should track the input head, where the next
-		 * character would be entered
-		 *
-		 * In the <= A case: deletions occurred; the head is less than
-		 * or equal to the window
-		 *
-		 * In the >= B case: insertions occurred; the distance from window
-		 * to head is greater than the distance from [A, B]
-		 *
-		 * Set the window 2/3 of the text area width backwards from the head */
-
-		size_t frame = text_n * 2 / 3;
-
-		char *w1, *w2, *ptr;
-
-		if (in->window >= in->head || (in->window + text_n) <= in->head) {
-
-			w1 = in->line->text,
-			w2 = in->line->text + frame;
-
-			in->window = (w2 >= in->head) ? w1 : in->head - frame;
-		}
-
-		cursor = (cols_t - text_n) + (in->head - in->window + 1);
-
-		for (ptr = in->window; text_n; text_n--) {
-
-			/* Copy characters, x, from the gap buffer, i.e.:
-			 *
-			 *  window   head    tail
-			 *       v      v       v
-			 * |.....xxxxxxx|------|xxxxxxx| */
-
-			if (ptr == in->head)
-				ptr = in->tail;
-
-			if (ptr == in->line->text + RIRC_MAX_INPUT)
-				break;
-
-			*input_ptr++ = *ptr++;
-		}
-
-		*input_ptr = '\0';
+		cursor += input_frame(inp, text_n);
+		input_write(inp, input_ptr, text_n);
 	}
 
 print_input:
@@ -623,7 +565,6 @@ print_input:
 	printf(MOVE(%d, %d), coords.rN, (cursor >= coords.c1 && cursor <= coords.cN) ? cursor : coords.cN);
 	printf(CURSOR_SAVE);
 }
-#endif
 
 static void
 _draw_status(struct channel *c)
@@ -635,7 +576,7 @@ _draw_status(struct channel *c)
 	 *
 	 * channel:
 	 * |-[usermodes]-[chancount chantype chanmodes]/[priv]-(ping)---...|
-	 * */
+	 */
 
 	float sb;
 	int ret;

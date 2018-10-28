@@ -895,12 +895,13 @@ recv_join(struct parsed_mesg *p, struct server *s)
 		fail(s->channel, "JOIN: channel is null");
 
 	if (IS_ME(p->from)) {
-		if ((c = channel_list_get(&s->clist, chan)) == NULL)
-			channel_set_current(new_channel(chan, s, CHANNEL_T_CHANNEL));
-		else {
+		if ((c = channel_list_get(&s->clist, chan)) == NULL) {
+			c = new_channel(chan, s, CHANNEL_T_CHANNEL);
+			channel_set_current(c);
+		} else {
 			c->parted = 0;
-			newlinef(c, 0, ">", "Joined %s", chan);
 		}
+		newlinef(c, 0, ">", "Joined %s", chan);
 		draw_all();
 	} else {
 

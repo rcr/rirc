@@ -1,127 +1,7 @@
-/* TODO: rewrite as completion callbacks */
-#if 0
-#define TAB_COMPLETE_DELIMITER ':'
-
-/* Case insensitive tab complete for commands and nicks */
-static int tab_complete_command(struct input*, char*, size_t);
-static int tab_complete_nick(struct input*, struct user_list*, char*, size_t);
-
-int
-tab_complete(struct input *inp, struct user_list *ul)
-{
-	/* Case insensitive tab complete for commands and nicks */
-
-	char *str = inp->head;
-	size_t len = 0;
-
-	/* Don't tab complete at beginning of line or if previous character is space */
-	if (inp->head == inp->line->text || *(inp->head - 1) == ' ')
-		return 0;
-
-	/* Don't tab complete if cursor is scrolled left and next character isn't space */
-	if (inp->tail < (inp->line->text + RIRC_MAX_INPUT) && *inp->tail != ' ')
-		return 0;
-
-	/* Scan backwards for the point to tab complete from */
-	while (str > inp->line->text && *(str - 1) != ' ')
-		len++, str--;
-
-	if (str == inp->line->text && *str == '/')
-		return tab_complete_command(inp, ++str, --len);
-	else
-		return tab_complete_nick(inp, ul, str, len);
-}
-
-static int
-tab_complete_command(struct input *inp, char *str, size_t len)
-{
-	/* Command tab completion */
-
-	/* List of common IRC commands for tab completion */
-	static char* irc_commands[] = {
-		"admin",    "away",     "clear",   "close",
-		"connect",  "ctcp",     "die",     "disconnect",
-		"encap",    "help",     "ignore",  "info",
-		"invite",   "ison",     "join",    "kick",
-		"kill",     "knock",    "links",   "list",
-		"lusers",   "me",       "mode",    "motd",
-		"msg",      "names",    "namesx",  "nick",
-		"notice",   "oper",     "part",    "pass",
-		"privmsg",  "quit",     "raw",     "rehash",
-		"restart",  "rules",    "server",  "service",
-		"servlist", "setname",  "silence", "squery",
-		"squit",    "stats",    "summon",  "time",
-		"topic",    "trace",    "uhnames", "unignore",
-		"user",     "userhost", "userip",  "users",
-		"version",  "wallops",  "watch",   "who",
-		"whois",    "whowas",
-		NULL
-	};
-
-	char *p, **command = irc_commands;
-
-	while (*command && strncmp(*command, str, len))
-		command++;
-
-	if (*command) {
-
-		p = *command;
-
-		/* Case insensitive matching, delete prefix */
-		while (len--)
-			delete_left(inp);
-
-		while (*p && input_char(inp, *p++))
-			;
-
-		input_char(inp, ' ');
-
-		return 1;
-	} else {
-		return 0;
-	}
-}
-
-static int
-tab_complete_nick(struct input *inp, struct user_list *ul, char *str, size_t len)
-{
-	/* Nick tab completion */
-
-	const char *p;
-
-	struct user *u;
-
-	if ((u = user_list_get(ul, str, len))) {
-
-		p = u->nick.str;
-
-		/* Case insensitive matching, delete prefix */
-		while (len--)
-			delete_left(inp);
-
-		while (*p && input_char(inp, *p++))
-			;
-
-		/* Tab completing first word in input, append delimiter and space */
-		if (str == inp->line->text) {
-			input_char(inp, TAB_COMPLETE_DELIMITER);
-			input_char(inp, ' ');
-		}
-
-		return 1;
-	} else {
-		return 0;
-	}
-}
-#endif
-
 /**
  * state.c
  *
  * All manipulation of global program state
- *
- * TODO: moved keys, actions to this file. needs cleanup
- * TODO: move tab complete to this file, for nicks, /command, :command
  */
 
 #include <ctype.h>
@@ -164,6 +44,28 @@ static void state_io_cxed(struct server*);
 static void state_io_dxed(struct server*, const char *);
 static void state_io_ping(struct server*, unsigned int);
 static void state_io_signal(enum io_sig_t);
+
+static int state_input_linef(struct channel*);
+static int state_input_ctrlch(const char*, size_t);
+static int state_input_action(const char*, size_t);
+
+static uint16_t state_complete(char*, uint16_t, uint16_t, int);
+static uint16_t state_complete_list(char*, uint16_t, uint16_t, const char**);
+static uint16_t state_complete_user(char*, uint16_t, uint16_t, int);
+
+/* List of IRC commands for tab completion */
+static const char *irc_list[] = {
+	"admin",   "connect", "info",     "invite", "join",
+	"kick",    "kill",    "links",    "list",   "lusers",
+	"mode",    "motd",    "names",    "nick",   "notice",
+	"oper",    "part",    "pass",     "ping",   "pong",
+	"privmsg", "quit",    "servlist", "squery", "stats",
+	"time",    "topic",   "trace",    "user",   "version",
+	"who",     "whois",   "whowas",   NULL };
+
+/* List of rirc commands for tab completeion */
+static const char *cmd_list[] = {
+	"clear", "close", "connect", "quit", "set", NULL};
 
 /* Set draw bits */
 #define X(BIT) void draw_##BIT(void) { state.draw.bits.BIT = 1; }
@@ -358,7 +260,6 @@ channel_clear(struct channel *c)
 #define MAX_ACTION_MESG 256
 char *action_message;
 static int action_close_server(char);
-static int input_action(const char*, size_t);
 /* Action handling */
 static int (*action_handler)(char);
 static char action_buff[MAX_ACTION_MESG];
@@ -393,7 +294,7 @@ search_channels(struct channel *start, char *search)
 	return NULL;
 }
 static int
-input_action(const char *input, size_t len)
+state_input_action(const char *input, size_t len)
 {
 	/* Waiting for user confirmation */
 
@@ -744,10 +645,52 @@ channel_move_next(void)
 	}
 }
 
+static uint16_t
+state_complete_list(char *str, uint16_t len, uint16_t max, const char **list)
+{
+	size_t list_len = 0;
 
+	while (*list && strncmp(*list, str, len))
+		list++;
 
+	if (*list == NULL || (list_len = strlen(*list)) > max)
+		return 0;
 
+	memcpy(str, *list, list_len);
 
+	return list_len;
+}
+
+static uint16_t
+state_complete_user(char *str, uint16_t len, uint16_t max, int first)
+{
+	struct user *u;
+
+	if ((u = user_list_get(&(current_channel()->users), str, len)) == NULL)
+		return 0;
+
+	if ((u->nick.len + (first != 0)) > max)
+		return 0;
+
+	memcpy(str, u->nick.str, u->nick.len);
+
+	if (first)
+		str[u->nick.len] = ':';
+
+	return u->nick.len + (first != 0);
+}
+
+static uint16_t
+state_complete(char *str, uint16_t len, uint16_t max, int first)
+{
+	if (first && str[0] == '/')
+		return state_complete_list(str + 1, len - 1, max - 1, irc_list) + 1;
+
+	if (first && str[0] == ':')
+		return state_complete_list(str + 1, len - 1, max - 1, cmd_list) + 1;
+
+	return state_complete_user(str, len, max, first);
+}
 
 static void
 state_io_cxed(struct server *s)
@@ -924,9 +867,8 @@ send_cmnd(struct channel *c, char *buf)
 	 */
 }
 
-static int input_cchar(const char*, size_t);
 static int
-input_cchar(const char *c, size_t count)
+state_input_ctrlch(const char *c, size_t len)
 {
 	/* Input a control character or escape sequence */
 
@@ -935,55 +877,55 @@ input_cchar(const char *c, size_t count)
 
 		c++;
 
-		if (*c == 0)
+		if (len == 1)
 			return 0;
 
 		/* arrow up */
-		else if (!strncmp(c, "[A", count - 1))
-			return 0; // FIXME: return input_scroll_back(current_channel()->input, io_tty_cols());
+		else if (!strncmp(c, "[A", len - 1))
+			return input_hist_back(&(current_channel()->input));
 
 		/* arrow down */
-		else if (!strncmp(c, "[B", count - 1))
-			return 0; // FIXME: return input_scroll_forw(current_channel()->input, io_tty_cols());
+		else if (!strncmp(c, "[B", len - 1))
+			return input_hist_forw(&(current_channel()->input));
 
 		/* arrow right */
-		else if (!strncmp(c, "[C", count - 1))
-			return 0; // FIXME: return cursor_right(current_channel()->input);
+		else if (!strncmp(c, "[C", len - 1))
+			return input_cursor_forw(&(current_channel()->input));
 
 		/* arrow left */
-		else if (!strncmp(c, "[D", count - 1))
-			return 0; // FIXME: return cursor_left(current_channel()->input);
+		else if (!strncmp(c, "[D", len - 1))
+			return input_cursor_back(&(current_channel()->input));
 
 		/* delete */
-		else if (!strncmp(c, "[3~", count - 1))
-			return 0; // FIXME: return delete_right(current_channel()->input);
+		else if (!strncmp(c, "[3~", len - 1))
+			return input_delete_forw(&(current_channel()->input));
 
 		/* page up */
-		else if (!strncmp(c, "[5~", count - 1))
+		else if (!strncmp(c, "[5~", len - 1))
 			buffer_scrollback_back(current_channel());
 
 		/* page down */
-		else if (!strncmp(c, "[6~", count - 1))
+		else if (!strncmp(c, "[6~", len - 1))
 			buffer_scrollback_forw(current_channel());
 
 	} else switch (*c) {
 
 		/* Backspace */
 		case 0x7F:
-			return 0; // FIXME: return delete_left(current_channel()->input);
+			return input_delete_back(&(current_channel()->input));
 
 		/* Horizontal tab */
 		case 0x09:
-			return 0; // FIXME: return tab_complete(current_channel()->input, &(current_channel()->users));
+			return input_complete(&(current_channel()->input), state_complete);
+
+		/* Line feed */
+		case 0x0A:
+			return state_input_linef(current_channel());
 
 		/* ^C */
 		case 0x03:
 			/* Cancel current input */
-			return 0;
-			// FIXME: current_channel()->input->head = current_channel()->input->line->text;
-			// FIXME: current_channel()->input->tail = current_channel()->input->line->text + RIRC_MAX_INPUT;
-			// FIXME: current_channel()->input->window = current_channel()->input->line->text;
-			// FIXME: return 1;
+			return input_reset(&(current_channel()->input));
 
 		/* ^F */
 		case 0x06:
@@ -1033,23 +975,46 @@ input_cchar(const char *c, size_t count)
 	return 0;
 }
 
-void
-io_cb_read_inp(char *buf, size_t len)
+static int
+state_input_linef(struct channel *c)
 {
 	/* TODO: cleanup, switch on input type/contents */
 	// input types:
-	//    message
-	//    paste
-	//    key/sequence
+	//    message/paste
 	//    ::message
 	//    :command
 	//    //message
 	//    /command
 
+	char buf[INPUT_LEN_MAX + 1];
+	size_t len;
+
+	if ((len = input_write(&(c->input), buf, sizeof(buf))) == 0)
+		return 0;
+
+	if (buf[0] == ':')
+		send_cmnd(current_channel(), buf + 1);
+	else
+		send_mesg(current_channel()->server, current_channel(), buf);
+
+	input_hist_push(&(c->input));
+
+	return 1;
+}
+
+void
+io_cb_read_inp(char *buf, size_t len)
+{
 	int redraw_input = 0;
 
-	(void)buf;
-	(void)len;
+	if (len == 0)
+		fatal("zero length message", 0);
+	else if (action_message)
+		redraw_input = state_input_action(buf, len);
+	else if (iscntrl(*buf))
+		redraw_input = state_input_ctrlch(buf, len);
+	else
+		redraw_input = input_insert(&current_channel()->input, buf, len);
 
 	if (redraw_input)
 		draw_input();
@@ -1057,54 +1022,17 @@ io_cb_read_inp(char *buf, size_t len)
 	redraw();
 }
 
-#if 0
-	int redraw_input = 0;
-
-	if (action_message) {
-		redraw_input = input_action(buff, count);
-	} else if (*buff == 0x0A) {
-		/* Line feed */
-
-		char sendbuf[INPUT_LEN_MAX + 1];
-
-
-		if (input_empty(state.current_channel->input))
-			return;
-		_send_input(state.current_channel->input, sendbuf);
-
-
-		switch (sendbuf[0]) {
-			case ':':
-				send_cmnd(state.current_channel, sendbuf + 1);
-				break;
-			default:
-				send_mesg(current_channel()->server, current_channel(), sendbuf);
-		}
-		redraw_input = 1;
-
-	} else if (iscntrl(*buff)) {
-		redraw_input = input_cchar(buff, count);
-	} else {
-		redraw_input = input(current_channel()->input, buff, count);
-	}
-
-	if (redraw_input)
-		draw_input();
-
-	redraw();
-#endif
-
 void
-io_cb_read_soc(char *buff, size_t count, const void *cb_obj)
+io_cb_read_soc(char *buf, size_t len, const void *cb_obj)
 {
 	/* TODO: */
-	(void)(count);
+	(void)(len);
 
 	struct channel *c = ((struct server *)cb_obj)->channel;
 
 	struct parsed_mesg p;
 
-	if (!(parse_mesg(&p, buff)))
+	if (!(parse_mesg(&p, buf)))
 		newlinef(c, 0, "-!!-", "failed to parse message");
 	else
 		recv_mesg((struct server *)cb_obj, &p);

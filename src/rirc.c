@@ -43,32 +43,31 @@ const char *default_realname;
 #endif
 
 static const char *const rirc_usage =
+"\nrirc v"VERSION" ~ Richard C. Robbins <mail@rcr.io>"
 "\n"
-"rirc v"VERSION" ~ Richard C. Robbins <mail@rcr.io>\n"
+"\nUsage:"
+"\n  rirc [-hv] [-s server [-p port] [-w pass] [-n nicks] [-c chans] [-u user] [-r real]], ...]"
 "\n"
-"Usage:\n"
-"  rirc [-hv] [-s server [-p port] [-w pass] [-n nicks] [-c chans] [-u user] [-r real]], ...]\n"
+"\nHelp:"
+"\n  -h, --help            Print this message and exit"
+"\n  -v, --version         Print rirc version and exit"
 "\n"
-"Help:\n"
-"  -h, --help            Print this message and exit\n"
-"  -v, --version         Print rirc version and exit\n"
-"\n"
-"Options:\n"
-"  -s, --server=SERVER      Connect to SERVER\n"
-"  -p, --port=PORT          Connect to SERVER using PORT\n"
-"  -w, --pass=PASS          Connect to SERVER using PASS\n"
-"  -u, --username=USERNAME  Connect to SERVER using USERNAME\n"
-"  -r, --realname=REALNAME  Connect to SERVER using REALNAME\n"
-"  -n, --nicks=NICKS        Comma separated list of nicks to use for SERVER\n"
-"  -c, --chans=CHANNELS     Comma separated list of channels to join for SERVER\n"
-;
+"\nOptions:"
+"\n  -s, --server=SERVER      Connect to SERVER"
+"\n  -p, --port=PORT          Connect to SERVER using PORT"
+"\n  -w, --pass=PASS          Connect to SERVER using PASS"
+"\n  -u, --username=USERNAME  Connect to SERVER using USERNAME"
+"\n  -r, --realname=REALNAME  Connect to SERVER using REALNAME"
+"\n  -n, --nicks=NICKS        Comma separated list of nicks to use for SERVER"
+"\n  -c, --chans=CHANNELS     Comma separated list of channels to join for SERVER"
+"\n";
 
 static const char *const rirc_version =
-"rirc v"VERSION
 #ifdef DEBUG
-" (debug build)"
+"rirc v"VERSION" (debug build)";
+#else
+"rirc v"VERSION;
 #endif
-;
 
 static const char*
 opt_arg_str(char c)

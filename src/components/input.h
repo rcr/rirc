@@ -6,7 +6,7 @@
  * Supports line editing, input history, word completion
  *
  * The working edit area is implemented as a fixed width
- * gap buffer for O(1) insertions, deltions and O(n)
+ * gap buffer for O(1) insertions, deletions and O(n)
  * cursor movements
  *
  * Input history is kept as a ring buffer of strings,
@@ -48,6 +48,7 @@ struct input
 	} hist;
 	uint16_t head;
 	uint16_t tail;
+	uint16_t window; /* Frame window */
 };
 
 void input(struct input*);
@@ -69,7 +70,8 @@ int input_hist_back(struct input*);
 int input_hist_forw(struct input*);
 int input_hist_push(struct input*);
 
-/* Write input to string */
-char* input_write(struct input*, char*, size_t);
+/* Write framed input to string */
+uint16_t input_frame(struct input*, uint16_t);
+uint16_t input_write(struct input*, char*, uint16_t);
 
 #endif
