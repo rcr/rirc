@@ -1,127 +1,7 @@
-/* TODO: rewrite as completion callbacks */
-#if 0
-#define TAB_COMPLETE_DELIMITER ':'
-
-/* Case insensitive tab complete for commands and nicks */
-static int tab_complete_command(struct input*, char*, size_t);
-static int tab_complete_nick(struct input*, struct user_list*, char*, size_t);
-
-int
-tab_complete(struct input *inp, struct user_list *ul)
-{
-	/* Case insensitive tab complete for commands and nicks */
-
-	char *str = inp->head;
-	size_t len = 0;
-
-	/* Don't tab complete at beginning of line or if previous character is space */
-	if (inp->head == inp->line->text || *(inp->head - 1) == ' ')
-		return 0;
-
-	/* Don't tab complete if cursor is scrolled left and next character isn't space */
-	if (inp->tail < (inp->line->text + RIRC_MAX_INPUT) && *inp->tail != ' ')
-		return 0;
-
-	/* Scan backwards for the point to tab complete from */
-	while (str > inp->line->text && *(str - 1) != ' ')
-		len++, str--;
-
-	if (str == inp->line->text && *str == '/')
-		return tab_complete_command(inp, ++str, --len);
-	else
-		return tab_complete_nick(inp, ul, str, len);
-}
-
-static int
-tab_complete_command(struct input *inp, char *str, size_t len)
-{
-	/* Command tab completion */
-
-	/* List of common IRC commands for tab completion */
-	static char* irc_commands[] = {
-		"admin",    "away",     "clear",   "close",
-		"connect",  "ctcp",     "die",     "disconnect",
-		"encap",    "help",     "ignore",  "info",
-		"invite",   "ison",     "join",    "kick",
-		"kill",     "knock",    "links",   "list",
-		"lusers",   "me",       "mode",    "motd",
-		"msg",      "names",    "namesx",  "nick",
-		"notice",   "oper",     "part",    "pass",
-		"privmsg",  "quit",     "raw",     "rehash",
-		"restart",  "rules",    "server",  "service",
-		"servlist", "setname",  "silence", "squery",
-		"squit",    "stats",    "summon",  "time",
-		"topic",    "trace",    "uhnames", "unignore",
-		"user",     "userhost", "userip",  "users",
-		"version",  "wallops",  "watch",   "who",
-		"whois",    "whowas",
-		NULL
-	};
-
-	char *p, **command = irc_commands;
-
-	while (*command && strncmp(*command, str, len))
-		command++;
-
-	if (*command) {
-
-		p = *command;
-
-		/* Case insensitive matching, delete prefix */
-		while (len--)
-			delete_left(inp);
-
-		while (*p && input_char(inp, *p++))
-			;
-
-		input_char(inp, ' ');
-
-		return 1;
-	} else {
-		return 0;
-	}
-}
-
-static int
-tab_complete_nick(struct input *inp, struct user_list *ul, char *str, size_t len)
-{
-	/* Nick tab completion */
-
-	const char *p;
-
-	struct user *u;
-
-	if ((u = user_list_get(ul, str, len))) {
-
-		p = u->nick.str;
-
-		/* Case insensitive matching, delete prefix */
-		while (len--)
-			delete_left(inp);
-
-		while (*p && input_char(inp, *p++))
-			;
-
-		/* Tab completing first word in input, append delimiter and space */
-		if (str == inp->line->text) {
-			input_char(inp, TAB_COMPLETE_DELIMITER);
-			input_char(inp, ' ');
-		}
-
-		return 1;
-	} else {
-		return 0;
-	}
-}
-#endif
-
 /**
  * state.c
  *
  * All manipulation of global program state
- *
- * TODO: moved keys, actions to this file. needs cleanup
- * TODO: move tab complete to this file, for nicks, /command, :command
  */
 
 #include <ctype.h>
@@ -168,6 +48,24 @@ static void state_io_signal(enum io_sig_t);
 static int state_input_linef(struct channel*);
 static int state_input_ctrlch(const char*, size_t);
 static int state_input_action(const char*, size_t);
+
+static uint16_t state_complete(char*, uint16_t, uint16_t, int);
+static uint16_t state_complete_list(char*, uint16_t, uint16_t, const char**);
+static uint16_t state_complete_user(char*, uint16_t, uint16_t, int);
+
+/* List of IRC commands for tab completion */
+static const char *irc_list[] = {
+	"admin",   "connect", "info",     "invite", "join",
+	"kick",    "kill",    "links",    "list",   "lusers",
+	"mode",    "motd",    "names",    "nick",   "notice",
+	"oper",    "part",    "pass",     "ping",   "pong",
+	"privmsg", "quit",    "servlist", "squery", "stats",
+	"time",    "topic",   "trace",    "user",   "version",
+	"who",     "whois",   "whowas",   NULL };
+
+/* List of rirc commands for tab completeion */
+static const char *cmd_list[] = {
+	"clear", "close", "connect", "quit", "set", NULL};
 
 /* Set draw bits */
 #define X(BIT) void draw_##BIT(void) { state.draw.bits.BIT = 1; }
@@ -747,6 +645,53 @@ channel_move_next(void)
 	}
 }
 
+static uint16_t
+state_complete_list(char *str, uint16_t len, uint16_t max, const char **list)
+{
+	size_t list_len = 0;
+
+	while (*list && strncmp(*list, str, len))
+		list++;
+
+	if (*list == NULL || (list_len = strlen(*list)) > max)
+		return 0;
+
+	memcpy(str, *list, list_len);
+
+	return list_len;
+}
+
+static uint16_t
+state_complete_user(char *str, uint16_t len, uint16_t max, int first)
+{
+	struct user *u;
+
+	if ((u = user_list_get(&(current_channel()->users), str, len)) == NULL)
+		return 0;
+
+	if ((u->nick.len + (first != 0)) > max)
+		return 0;
+
+	memcpy(str, u->nick.str, u->nick.len);
+
+	if (first)
+		str[u->nick.len] = ':';
+
+	return u->nick.len + (first != 0);
+}
+
+static uint16_t
+state_complete(char *str, uint16_t len, uint16_t max, int first)
+{
+	if (first && str[0] == '/')
+		return state_complete_list(str + 1, len - 1, max - 1, irc_list) + 1;
+
+	if (first && str[0] == ':')
+		return state_complete_list(str + 1, len - 1, max - 1, cmd_list) + 1;
+
+	return state_complete_user(str, len, max, first);
+}
+
 static void
 state_io_cxed(struct server *s)
 {
@@ -971,7 +916,7 @@ state_input_ctrlch(const char *c, size_t len)
 
 		/* Horizontal tab */
 		case 0x09:
-			return 0; // FIXME: return tab_complete(current_channel()->input, &(current_channel()->users));
+			return input_complete(&(current_channel()->input), state_complete);
 
 		/* Line feed */
 		case 0x0A:
