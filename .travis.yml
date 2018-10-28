@@ -13,7 +13,7 @@ addons:
       description: "Coverity scan of the static_analysis branch"
     notification_email: mail@rcr.io
     build_command_prepend: "make clean"
-    build_command: "make rirc debug test -j2"
+    build_command: "make test debug rirc -j2"
     branch_pattern: static_analysis
 
 matrix:
@@ -32,4 +32,4 @@ before_install:
 
 script:
   - test "${TRAVIS_BRANCH}" != "static_analysis" || exit 0
-  - make test rirc
+  - make test debug rirc
