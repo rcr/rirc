@@ -178,7 +178,7 @@ int
 input_hist_forw(struct input *inp)
 {
 	char *str;
-	size_t len;
+	size_t len = 0;
 
 	if (input_hist_size(inp) == 0 || inp->hist.current == inp->hist.head)
 		return 0;

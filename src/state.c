@@ -731,7 +731,7 @@ state_io_ping(struct server *s, unsigned int ping)
 
 	if (ping != IO_PING_MIN)
 		draw_status();
-	else if ((ret = io_sendf(s->connection, "PING")))
+	else if ((ret = io_sendf(s->connection, "PING :%s", s->host)))
 		newlinef(s->channel, 0, "-!!-", "sendf fail: %s", io_err(ret));
 }
 
