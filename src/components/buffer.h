@@ -10,7 +10,7 @@
 #define FROM_LENGTH_MAX 100
 
 #ifndef BUFFER_LINES_MAX
-	#define BUFFER_LINES_MAX (1 << 10)
+#define BUFFER_LINES_MAX (1 << 10)
 #endif
 
 /* Buffer line types, in order of precedence */

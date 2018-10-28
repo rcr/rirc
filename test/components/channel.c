@@ -1,4 +1,6 @@
 #include "test/test.h"
+
+#include "src/components/buffer.c"
 #include "src/components/channel.c"
 #include "src/components/input.c"
 #include "src/components/mode.c"

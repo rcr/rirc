@@ -19,6 +19,7 @@
 
 #include "config.h"
 #include "src/components/input.h"
+#include "src/components/channel.h"
 #include "src/io.h"
 #include "src/state.h"
 #include "src/utils/utils.h"
@@ -49,9 +50,9 @@
 #define COLOUR_SIZE sizeof(RESET_ATTRIBUTES FG(255) BG(255))
 
 #ifndef BUFFER_PADDING
-	#define BUFFER_PADDING 1
+#define BUFFER_PADDING 1
 #elif BUFFER_PADDING != 0 && BUFFER_PADDING != 1
-	#error "BUFFER_PADDING options are 0 (no pad), 1 (padded)"
+#error "BUFFER_PADDING options are 0 (no pad), 1 (padded)"
 #endif
 
 static int actv_colours[ACTIVITY_T_SIZE] = ACTIVITY_COLOURS
@@ -116,7 +117,7 @@ draw(union draw draw)
 
 	if (draw.bits.nav)    _draw_nav(c);
 
-	if (draw.bits.input)  _draw_input(c->input,
+	if (draw.bits.input)  _draw_input(&c->input,
 		(struct coords) {
 			.c1 = 1,
 			.cN = io_tty_cols(),
@@ -503,9 +504,16 @@ _draw_nav(struct channel *c)
 }
 
 static void
-_draw_input(struct input *in, struct coords coords)
+_draw_input(struct input *inp, struct coords coords)
 {
 	/* Draw the input line, or the current action message */
+
+	// FIXME:
+	(void)inp;
+	(void)coords;
+}
+
+#if 0
 
 	check_coords(coords);
 
@@ -615,6 +623,7 @@ print_input:
 	printf(MOVE(%d, %d), coords.rN, (cursor >= coords.c1 && cursor <= coords.cN) ? cursor : coords.cN);
 	printf(CURSOR_SAVE);
 }
+#endif
 
 static void
 _draw_status(struct channel *c)

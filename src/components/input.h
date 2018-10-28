@@ -1,64 +1,75 @@
 #ifndef INPUT_H
 #define INPUT_H
 
-#include "user.h"
+/* Buffer input
+ *
+ * Supports line editing, input history, word completion
+ *
+ * The working edit area is implemented as a fixed width
+ * gap buffer for O(1) insertions, deltions and O(n)
+ * cursor movements
+ *
+ * Input history is kept as a ring buffer of strings,
+ * copied into the working area when scrolling
+ */
 
-#define SCROLLBACK_INPUT 15
-#define BUFFSIZE 512
-#define RIRC_MAX_INPUT 256 /* FIXME: MAX_INPUT conflicts with limits.h */
+#include <stdint.h>
 
-/* When tab completing a nick at the beginning of the line, append the following char */
-#define TAB_COMPLETE_DELIMITER ':'
-
-/* Compile time checks */
-#if BUFFSIZE < RIRC_MAX_INPUT
-	/* Required so input lines can be safely strcpy'ed into a send buffer */
-	#error BUFFSIZE must be greater than RIRC_MAX_INPUT
+/* 410 max characters for input should be sufficient given
+ * rfc2812 maximum length of 50 characters for channel names,
+ * plus 50 characters for additional message formatting */
+#ifndef INPUT_LEN_MAX
+#define INPUT_LEN_MAX 410
 #endif
 
-/* Channel input line */
-struct input_line
-{
-	char *end;
-	char text[RIRC_MAX_INPUT + 1];
-	struct input_line *next;
-	struct input_line *prev;
-};
+/* Number of history lines to keep for input. For proper
+ * ring buffer masking this must be a power of 2 */
+#ifndef INPUT_HIST_MAX
+#define INPUT_HIST_MAX 16
+#endif
 
-/* Channel input */
+/* Input completion callback type, returning length
+ * of replacement word, or 0 if no match, with args: */
+typedef uint16_t (*f_completion_cb)(
+	char*,    /* word to replace */
+	uint16_t, /* length of word */
+	uint16_t, /* max length of replacement word */
+	int);     /* flag set if word is start of input */
+
 struct input
 {
-	char *head;
-	char *tail;
-	char *window;
-	unsigned int count;
-	struct input_line *line;
-	struct input_line *list_head;
+	char text[INPUT_LEN_MAX];
+	struct {
+		char *ptrs[INPUT_HIST_MAX];
+		char *save;
+		uint16_t current;
+		uint16_t head;
+		uint16_t tail;
+	} hist;
+	uint16_t head;
+	uint16_t tail;
 };
 
-/* TODO: refactor */
-struct input* new_input(void);
-void free_input(struct input*);
+void input(struct input*);
+void input_free(struct input*);
 
-/* TODO: return state altering function */
-int input(struct input*, const char*, size_t);
+/* Input manipulation */
+int input_cursor_back(struct input*);
+int input_cursor_forw(struct input*);
+int input_delete_back(struct input*);
+int input_delete_forw(struct input*);
+int input_insert(struct input*, const char*, size_t);
+int input_reset(struct input*);
 
-/* FIXME: */
-void _send_input(struct input*, char*);
+/* Input completion */
+int input_complete(struct input*, f_completion_cb);
 
+/* Input history */
+int input_hist_back(struct input*);
+int input_hist_forw(struct input*);
+int input_hist_push(struct input*);
 
-
-int input_empty(struct input*);
-
-/* Input line manipulation functions */
-// TODO: rename, input_*
-int cursor_left(struct input*);
-int cursor_right(struct input*);
-int delete_left(struct input*);
-int delete_right(struct input*);
-int input_scroll_back(struct input*, unsigned int);
-int input_scroll_forw(struct input*, unsigned int);
-
-int tab_complete(struct input*, struct user_list*);
+/* Write input to string */
+char* input_write(struct input*, char*, size_t);
 
 #endif

@@ -264,12 +264,12 @@ test_buffer_index_overflow(void)
 	b.scrollback = b.tail;
 
 	assert_eq(buffer_size(&b), 1);
-	assert_eq(MASK(b.head), (BUFFER_LINES_MAX - 1));
+	assert_eq(BUFFER_MASK(b.head), (BUFFER_LINES_MAX - 1));
 
 	_buffer_newline(&b, _fmt_int(0));
 
 	assert_eq(buffer_size(&b), 2);
-	assert_eq(MASK(b.head), 0);
+	assert_eq(BUFFER_MASK(b.head), 0);
 
 	_buffer_newline(&b, _fmt_int(-1));
 
