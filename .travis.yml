@@ -3,7 +3,6 @@ language: c
 
 env:
   global:
-    # COVERITY_SCAN_TOKEN
     - secure: "NXwB/s0ZpQr0kJTESNxuVCrIVgX2ZsivmiODwK2LDFT1Nchdijd/Ope0cHb92FxURLcDetnl69EWlmLD5ROZQ5Qc+XakAdAEfy2ZrrCq14S9fSZzUtLB0wMW/GZ5hVneSnFmbprR3zQbTbcVvpTyvzDEr26Dd+HQNP0QQsOJ7B5kanLwKeiuNy437pjIOm7x4sjaylnA/b6FlV3a26C7eGN2ZiFCGT++9y3YlJAlxNlySSI+phRe0bihna/RygoYAs5efXefAuibEjtG5kL29cKMKzwEdXEFfDZcl0QYjkrAJqXUUC54YqIWnY56mhDzn0nfWIScQYth0ZS/vhteA8x+MYKFgGnqD9LBw+TsvRO3ZQ1iVrI5NBM6P2Ka6mAVv8OODN2EwWpwoqm2PJ36ZZ+2vJHBwHw10i3pDR48Fzw0x9Av6rkI5lS0hFLMogXtTaM2IlWu4VIevVRBICzrEz47LeOvJs17MZPYeOUhCFrG0ZP/8DR9nqJpmHVFA9FYcaalD/SXfDbBJTI+yV37mgfSM1zJ8tApPy4KOZ1wM2F0+COqEdxHqTJp2u9c1VQo1NegsYxxdB3mOYMLrTnAzQ5WOUdDezcFkAT+QE5WVhGUzpT4lzM1kVirJa2y3beh2i7uHfP2X+EtzJvWRbefJYQJNo8nYXXEwpdJ5v/0LyI="
 
 addons:
@@ -15,6 +14,7 @@ addons:
     build_command_prepend: "make clean"
     build_command: "make test debug rirc -j2"
     branch_pattern: static_analysis
+
   sonarcloud:
     organization: "rcr-github"
 
@@ -30,9 +30,14 @@ matrix:
       env: CC=clang
 
 before_install:
-  - test "${TRAVIS_BRANCH}" != "static_analysis" -o "${TRAVIS_JOB_NUMBER##*.}" = "1" || exit 0
+  - test "${TRAVIS_BRANCH}" != "static_analysis" || exit 0
+  - test "${TRAVIS_JOB_NUMBER##*.}" = "1" || exit 0
+  - echo "sonar.projectKey=rirc" > sonar-project.properties
+  - echo "sonar.sources=src" >> sonar-project.properties
+  - echo "sonar.tests=test" >> sonar-project.properties
 
 script:
   - test "${TRAVIS_BRANCH}" != "static_analysis" || exit 0
   - make test debug rirc
+  - test "${TRAVIS_JOB_NUMBER##*.}" = "1" || exit 0
   - sonar-scanner
