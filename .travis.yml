@@ -16,7 +16,7 @@ addons:
     branch_pattern: static_analysis
 
   sonarcloud:
-    organization: "rcr-github"
+    organization: "rcr_rirc"
 
 matrix:
   include:
@@ -31,13 +31,11 @@ matrix:
 
 before_install:
   - test "${TRAVIS_BRANCH}" != "static_analysis" || exit 0
+
+script:
+  - make test debug rirc
   - test "${TRAVIS_JOB_NUMBER##*.}" = "1" || exit 0
   - echo "sonar.projectKey=rirc" > sonar-project.properties
   - echo "sonar.sources=src" >> sonar-project.properties
   - echo "sonar.tests=test" >> sonar-project.properties
-
-script:
-  - test "${TRAVIS_BRANCH}" != "static_analysis" || exit 0
-  - make test debug rirc
-  - test "${TRAVIS_JOB_NUMBER##*.}" = "1" || exit 0
   - sonar-scanner
