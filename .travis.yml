@@ -35,8 +35,8 @@ before_install:
 script:
   - make clean test rirc
   - test "${TRAVIS_JOB_NUMBER##*.}" = "1" || exit 0
-  - build-wrapper-linux-x86-64 --out-dir bw-output make all
-  - make clean test debug
+  - build-wrapper-linux-x86-64 --out-dir bw-output make debug
+  - make test
   - echo "sonar.projectKey=rcr_rirc" > sonar-project.properties
   - echo "sonar.sources=src" >> sonar-project.properties
   - echo "sonar.tests=test" >> sonar-project.properties
