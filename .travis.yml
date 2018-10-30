@@ -33,9 +33,12 @@ before_install:
   - test "${TRAVIS_BRANCH}" != "static_analysis" || exit 0
 
 script:
-  - make test debug rirc
+  - make clean test rirc
   - test "${TRAVIS_JOB_NUMBER##*.}" = "1" || exit 0
+  - build-wrapper-linux-x86-64 --out-dir bw-output make all
+  - make clean test debug
   - echo "sonar.projectKey=rcr_rirc" > sonar-project.properties
   - echo "sonar.sources=src" >> sonar-project.properties
   - echo "sonar.tests=test" >> sonar-project.properties
+  - echo "sonar.cfamily.build-wrapper-output=bw-output" >> sonar-project.properties
   - sonar-scanner
