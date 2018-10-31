@@ -17,7 +17,7 @@ static uint16_t input_hist_size(struct input*);
 static uint16_t input_text_size(struct input*);
 
 void
-input(struct input *inp)
+input_init(struct input *inp)
 {
 	memset(inp, 0, sizeof(*inp));
 

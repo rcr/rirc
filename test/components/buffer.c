@@ -20,10 +20,7 @@ _buffer_newline(struct buffer *b, const char *t)
 {
 	/* Abstract newline with default values */
 
-	struct string from = { .str = "", .len = 0 };
-	struct string text = { .str = t,  .len = strlen(t) };
-
-	buffer_newline(b, BUFFER_LINE_OTHER, from, text, 0);
+	buffer_newline(b, BUFFER_LINE_OTHER, "", t, 0, strlen(t), 0);
 }
 
 static void
@@ -375,17 +372,19 @@ test_buffer_newline_prefix(void)
 
 	buffer(&b);
 
-	struct string from;
-	struct string text;
+	char *from_str;
+	char *text_str;
+	size_t from_len;
+	size_t text_len;
 
 	/* Test adding line with prefix */
-	from.str = "testing";
-	from.len = strlen(from.str);
+	from_str = "testing";
+	from_len = strlen(from_str);
 
-	text.str = "abc";
-	text.len = strlen(text.str);
+	text_str = "abc";
+	text_len = strlen(text_str);
 
-	buffer_newline(&b, BUFFER_LINE_OTHER, from, text, 0);
+	buffer_newline(&b, BUFFER_LINE_OTHER, from_str, text_str, from_len, text_len, 0);
 
 	line = buffer_head(&b);
 
@@ -393,7 +392,7 @@ test_buffer_newline_prefix(void)
 	assert_strcmp(line->from, "testing");
 	assert_eq((int)line->from_len, (int)strlen("testing"));
 
-	buffer_newline(&b, BUFFER_LINE_OTHER, from, text, '@');
+	buffer_newline(&b, BUFFER_LINE_OTHER, from_str, text_str, from_len, text_len, '@');
 
 	line = buffer_head(&b);
 
@@ -415,19 +414,19 @@ test_buffer_newline_prefix(void)
 
 	_from[FROM_LENGTH_MAX - 2] = 'b';
 	_from[FROM_LENGTH_MAX - 1] = 'c';
-	_from[FROM_LENGTH_MAX]     =   0;
+	_from[FROM_LENGTH_MAX]     = 0;
 
-	from.str = _from;
-	from.len = FROM_LENGTH_MAX;
+	from_str = _from;
+	from_len = FROM_LENGTH_MAX;
 
-	buffer_newline(&b, BUFFER_LINE_OTHER, from, text, 0);
+	buffer_newline(&b, BUFFER_LINE_OTHER, from_str, text_str, from_len, text_len, 0);
 
 	line = buffer_head(&b);
 	assert_eq((int)line->from_len, FROM_LENGTH_MAX);
 	assert_eq(line->from[FROM_LENGTH_MAX - 1], 'c');
 
 
-	buffer_newline(&b, BUFFER_LINE_OTHER, from, text, '@');
+	buffer_newline(&b, BUFFER_LINE_OTHER, from_str, text_str, from_len, text_len, '@');
 
 	line = buffer_head(&b);
 	assert_eq((int)line->from_len, FROM_LENGTH_MAX);

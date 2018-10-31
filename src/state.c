@@ -17,6 +17,9 @@
 #include "src/state.h"
 #include "src/utils/utils.h"
 
+// See: https://vt100.net/docs/vt100-ug/chapter3.html
+#define CTRL(k) ((k) & 0x1f)
+
 static struct
 {
 	struct channel *current_channel; /* the current channel being drawn */
@@ -33,7 +36,7 @@ state_server_list(void)
 	return &state.servers;
 }
 
-static void term_state(void);
+static void state_term(void);
 
 static void _newline(struct channel*, enum buffer_line_t, const char*, const char*, va_list);
 
@@ -90,7 +93,7 @@ void
 state_init(void)
 {
 	/* atexit doesn't set errno */
-	if (atexit(term_state) != 0)
+	if (atexit(state_term) != 0)
 		fatal("atexit", 0);
 
 	state.default_channel = state.current_channel = new_channel("rirc", NULL, CHANNEL_T_OTHER);
@@ -114,7 +117,7 @@ state_init(void)
 }
 
 static void
-term_state(void)
+state_term(void)
 {
 	/* Exit handler; must return normally */
 
@@ -129,6 +132,10 @@ term_state(void)
 		channel_free(state.default_channel);
 	}
 #endif
+
+	/* TODO:
+	 * here iterate the server list and quit with some default message,
+	 * call server_free */
 }
 
 void
@@ -160,29 +167,38 @@ _newline(struct channel *c, enum buffer_line_t type, const char *from, const cha
 
 	int len;
 
-	struct string _from,
-	              _text;
+	const char *_from_str;
+	const char *_text_str;
+	size_t _from_len;
+	size_t _text_len;
 
 	struct user *u = NULL;
 
 	if ((len = vsnprintf(buf, sizeof(buf), fmt, ap)) < 0) {
-		_text.str = "newlinef error: vsprintf failure";
-		_text.len = strlen(_text.str);
-		_from.str = "-!!-";
-		_from.len = strlen(_from.str);
+		_text_str = "newlinef error: vsprintf failure";
+		_text_len = strlen(_text_str);
+		_from_str = "-!!-";
+		_from_len = strlen(_from_str);
 	} else {
-		_text.str = buf;
-		_text.len = len;
-		_from.str = from;
+		_text_str = buf;
+		_text_len = len;
+		_from_str = from;
 
 		// FIXME: don't need to get user for many non-user message types
 		if ((u = user_list_get(&(c->users), from, 0)) != NULL)
-			_from.len = u->nick.len;
+			_from_len = u->nick_len;
 		else
-			_from.len = strlen(from);
+			_from_len = strlen(from);
 	}
 
-	buffer_newline(&(c->buffer), type, _from, _text, ((u == NULL) ? 0 : u->prfxmodes.prefix));
+	buffer_newline(
+		&(c->buffer),
+		type,
+		_from_str,
+		_text_str,
+		_from_len,
+		_text_len,
+		((u == NULL) ? 0 : u->prfxmodes.prefix));
 
 	c->activity = MAX(c->activity, ACTIVITY_ACTIVE);
 
@@ -285,7 +301,7 @@ search_channels(struct channel *start, char *search)
 
 	while (c != start) {
 
-		if (strstr(c->name.str, search))
+		if (strstr(c->name, search))
 			return c;
 
 		c = channel_get_next(c);
@@ -298,8 +314,8 @@ state_input_action(const char *input, size_t len)
 {
 	/* Waiting for user confirmation */
 
-	if (len == 1 && (*input == 0x03 || action_handler(*input))) {
-		/* ^C canceled the action, or the action was resolved */
+	if (len == 1 && (*input == CTRL('c') || action_handler(*input))) {
+		/* ^c canceled the action, or the action was resolved */
 
 		action_message = NULL;
 		action_handler = NULL;
@@ -381,14 +397,14 @@ action_find_channel(char c)
 	}
 
 	/* \n, Esc, ^C cancels a search if no results are found */
-	if (c == '\n' || c == 0x1b || c == 0x03) {
+	if (c == '\n' || c == 0x1b || c == CTRL('c')) {
 		*(search_ptr = search_buff) = '\0';
 		return 1;
 	}
 
 	/* ^F repeats the search forward from the current result,
 	 * or resets search criteria if no match */
-	if (c == 0x06) {
+	if (c == CTRL('f')) {
 		if (search_cptr == NULL) {
 			*(search_ptr = search_buff) = '\0';
 			action(action_find_channel, "Find: ");
@@ -421,15 +437,15 @@ action_find_channel(char c)
 		/* Found a channel */
 		if (search_cptr->server == current_channel()->server) {
 			action(action_find_channel, "Find: %s -- %s",
-					search_cptr->name.str, search_buff);
+					search_cptr->name, search_buff);
 		} else {
 			if (!strcmp(search_cptr->server->port, "6667"))
 				action(action_find_channel, "Find: %s/%s -- %s",
-						search_cptr->server->host, search_cptr->name.str, search_buff);
+						search_cptr->server->host, search_cptr->name, search_buff);
 			else
 				action(action_find_channel, "Find: %s:%s/%s -- %s",
 						search_cptr->server->host, search_cptr->server->port,
-						search_cptr->name.str, search_buff);
+						search_cptr->name, search_buff);
 		}
 	}
 
@@ -462,10 +478,9 @@ channel_close(struct channel *c)
 			action(action_close_server, "Close server '%s'?   [y/n]", c->server->host);
 	} else {
 		/* Closing a channel */
-
 		if (c->type == CHANNEL_T_CHANNEL && !c->parted) {
 			int ret;
-			if (0 != (ret = io_sendf(c->server->connection, "PART %s", c->name.str))) {
+			if (0 != (ret = io_sendf(c->server->connection, "PART %s", c->name))) {
 				// FIXME: closing a parted channel when server is disconnected isnt an error
 				newlinef(c->server->channel, 0, "sendf fail", "%s", io_err(ret));
 			}
@@ -669,15 +684,15 @@ state_complete_user(char *str, uint16_t len, uint16_t max, int first)
 	if ((u = user_list_get(&(current_channel()->users), str, len)) == NULL)
 		return 0;
 
-	if ((u->nick.len + (first != 0)) > max)
+	if ((u->nick_len + (first != 0)) > max)
 		return 0;
 
-	memcpy(str, u->nick.str, u->nick.len);
+	memcpy(str, u->nick, u->nick_len);
 
 	if (first)
-		str[u->nick.len] = ':';
+		str[u->nick_len] = ':';
 
-	return u->nick.len + (first != 0);
+	return u->nick_len + (first != 0);
 }
 
 static uint16_t
@@ -717,7 +732,7 @@ static void
 state_io_dxed(struct server *s, const char *reason)
 {
 	for (struct channel *c = s->channel->next; c != s->channel; c = c->next) {
-		newlinef(c, 0, "-!!-", "(disconnected %s)", reason);
+		newlinef(c, 0, "-!!-", "disconnected (%s)", reason);
 		channel_reset(c);
 	}
 }
@@ -922,51 +937,43 @@ state_input_ctrlch(const char *c, size_t len)
 		case 0x0A:
 			return state_input_linef(current_channel());
 
-		/* ^C */
-		case 0x03:
+		case CTRL('c'):
 			/* Cancel current input */
 			return input_reset(&(current_channel()->input));
 
-		/* ^F */
-		case 0x06:
+		case CTRL('f'):
 			/* Find channel */
 			if (current_channel()->server)
 				 action(action_find_channel, "Find: ");
 			break;
 
-		/* ^L */
-		case 0x0C:
+		case CTRL('l'):
 			/* Clear current channel */
 			/* TODO: as action with confirmation */
 			channel_clear(current_channel());
 			break;
 
-		/* ^P */
-		case 0x10:
+		case CTRL('p'):
 			/* Go to previous channel */
 			channel_move_prev();
 			break;
 
-		/* ^N */
-		case 0x0E:
+		case CTRL('n'):
 			/* Go to next channel */
 			channel_move_next();
 			break;
 
-		/* ^X */
-		case 0x18:
+		case CTRL('x'):
 			/* Close current channel */
 			channel_close(current_channel());
 			break;
 
-		/* ^U */
-		case 0x15:
+		case CTRL('u'):
 			/* Scoll buffer up */
 			buffer_scrollback_back(current_channel());
 			break;
 
-		/* ^D */
-		case 0x04:
+		case CTRL('d'):
 			/* Scoll buffer down */
 			buffer_scrollback_forw(current_channel());
 			break;

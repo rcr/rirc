@@ -21,13 +21,6 @@ struct parsed_mesg
 	char *trailing;
 };
 
-/* Dynamically allocated string with cached length */
-struct string
-{
-	const char *str;
-	size_t len;
-};
-
 int irc_isnickchar(char, int);
 int irc_ischanchar(char, int);
 int irc_isnick(const char*);
@@ -46,9 +39,6 @@ void* memdup(const void*, size_t);
 int check_pinged(const char*, const char*);
 int parse_mesg(struct parsed_mesg*, char*);
 int skip_sp(char**);
-
-struct string* string(struct string*, const char*);
-void string_free(struct string*);
 
 void handle_error(int, const char*, ...);
 

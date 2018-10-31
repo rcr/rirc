@@ -421,7 +421,7 @@ _draw_nav(struct channel *c)
 	size_t len, total_len = 0;
 
 	/* Bump the channel frames, if applicable */
-	if ((total_len = (c->name.len + 2)) >= io_tty_cols())
+	if ((total_len = (c->name_len + 2)) >= io_tty_cols())
 		return;
 	else if (c == frame_prev && frame_prev != c_first)
 		frame_prev = channel_get_prev(frame_prev);
@@ -438,14 +438,14 @@ _draw_nav(struct channel *c)
 			/* Pad out nextward */
 
 			tmp = channel_get_next(tmp_next);
-			len = tmp->name.len;
+			len = tmp->name_len;
 
 			while ((total_len += (len + 2)) < io_tty_cols() && tmp != c_first) {
 
 				tmp_next = tmp;
 
 				tmp = channel_get_next(tmp);
-				len = tmp->name.len;
+				len = tmp->name_len;
 			}
 
 			break;
@@ -456,21 +456,21 @@ _draw_nav(struct channel *c)
 			/* Pad out prevward */
 
 			tmp = channel_get_prev(tmp_prev);
-			len = tmp->name.len;
+			len = tmp->name_len;
 
 			while ((total_len += (len + 2)) < io_tty_cols() && tmp != c_last) {
 
 				tmp_prev = tmp;
 
 				tmp = channel_get_prev(tmp);
-				len = tmp->name.len;
+				len = tmp->name_len;
 			}
 
 			break;
 		}
 
 		tmp = nextward ? channel_get_next(tmp_next) : channel_get_prev(tmp_prev);
-		len = tmp->name.len;
+		len = tmp->name_len;
 
 		/* Next channel doesn't fit */
 		if ((total_len += (len + 2)) >= io_tty_cols())
@@ -495,7 +495,7 @@ _draw_nav(struct channel *c)
 		if (fputs(_colour(colour, -1), stdout) < 0)
 			break;
 
-		if (printf(" %s ", tmp->name.str) < 0)
+		if (printf(" %s ", tmp->name) < 0)
 			break;
 
 		if (tmp == frame_next)
@@ -708,7 +708,6 @@ _colour(int fg, int bg)
 	 * */
 
 	static char col_buff[COLOUR_SIZE + 1] = RESET_ATTRIBUTES;
-
 	int ret = 0;
 
 	char *col_buff_ptr = col_buff + sizeof(RESET_ATTRIBUTES) - 1;
@@ -716,15 +715,17 @@ _colour(int fg, int bg)
 	/* Assume any colour sequence begins by resetting all attributes */
 	*(col_buff_ptr = col_buff + sizeof(RESET_ATTRIBUTES) - 1) = '\0';
 
-	/* Set valid foreground colour */
-	if (fg >= 0 && fg <= 255 && ((ret = sprintf(col_buff_ptr, ESC"[38;5;%dm", fg)) < 0))
-		return strcpy(col_buff, RESET_ATTRIBUTES);
+	if (fg >= 0 && fg <= 255) {
+		if ((ret = snprintf(col_buff_ptr, sizeof(col_buff), ESC"[38;5;%dm", fg)) < 0)
+			*col_buff_ptr = 0;
+		else
+			col_buff_ptr += ret;
+	}
 
-	col_buff_ptr += ret;
-
-	/* Set valid background colour */
-	if (bg >= 0 && bg <= 255 && ((ret = sprintf(col_buff_ptr, ESC"[48;5;%dm", bg)) < 0))
-		return strcpy(col_buff, RESET_ATTRIBUTES);
+	if (bg >= 0 && bg <= 255) {
+		if ((ret = snprintf(col_buff_ptr, sizeof(col_buff), ESC"[48;5;%dm", bg)) < 0)
+			*col_buff_ptr = 0;
+	}
 
 	return col_buff;
 }

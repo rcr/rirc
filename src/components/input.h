@@ -32,9 +32,9 @@
  * of replacement word, or 0 if no match, with args: */
 typedef uint16_t (*f_completion_cb)(
 	char*,    /* word to replace */
-	uint16_t, /* length of word */
-	uint16_t, /* max length of replacement word */
-	int);     /* flag set if word is start of input */
+	uint16_t, /* word length */
+	uint16_t, /* word replacement max length */
+	int);     /* word is start of input */
 
 struct input
 {
@@ -42,16 +42,16 @@ struct input
 	struct {
 		char *ptrs[INPUT_HIST_MAX];
 		char *save;
-		uint16_t current;
-		uint16_t head;
-		uint16_t tail;
+		uint16_t current; /* Ring buffer current entry */
+		uint16_t head;    /* Ring buffer head */
+		uint16_t tail;    /* Ring buffer tail */
 	} hist;
-	uint16_t head;
-	uint16_t tail;
-	uint16_t window; /* Frame window */
+	uint16_t head;        /* Gap buffer head */
+	uint16_t tail;        /* Gap buffer tail */
+	uint16_t window;      /* Gap buffer frame window */
 };
 
-void input(struct input*);
+void input_init(struct input*);
 void input_free(struct input*);
 
 /* Input manipulation */

@@ -402,19 +402,6 @@ test_word_wrap(void)
 		fail_test("seg1 should be advanced to end of string");
 }
 
-static void
-test_string(void)
-{
-	struct string s;
-
-	string(&s, "abcde");
-
-	assert_strcmp(s.str, "abcde");
-	assert_eq((int)s.len, 5);
-
-	free((void*)s.str);
-}
-
 int
 main(void)
 {
@@ -426,8 +413,7 @@ main(void)
 		TESTCASE(test_irc_toupper),
 		TESTCASE(test_parse_mesg),
 		TESTCASE(test_skip_sp),
-		TESTCASE(test_word_wrap),
-		TESTCASE(test_string)
+		TESTCASE(test_word_wrap)
 	};
 
 	return run_tests(tests);

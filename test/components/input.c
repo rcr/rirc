@@ -88,11 +88,11 @@ completion_rot1(char *str, uint16_t len, uint16_t max, int first)
 }
 
 static void
-test_input(void)
+test_input_init(void)
 {
 	struct input inp;
 
-	input(&inp);
+	input_init(&inp);
 	assert_eq(input_text_iszero(&inp), 1);
 	input_free(&inp);
 }
@@ -102,7 +102,7 @@ test_input_reset(void)
 {
 	struct input inp;
 
-	input(&inp);
+	input_init(&inp);
 
 	/* Test clearing empty input */
 	assert_eq(input_reset(&inp), 0);
@@ -130,7 +130,7 @@ test_input_ins(void)
 {
 	struct input inp;
 
-	input(&inp);
+	input_init(&inp);
 
 	/* Valid */
 	assert_eq(input_insert(&inp, "a", 1), 1);
@@ -157,7 +157,7 @@ test_input_del(void)
 {
 	struct input inp;
 
-	input(&inp);
+	input_init(&inp);
 
 	/* Deleting back/forw on empty input */
 	assert_strcmp(t_input_write(&inp, 0), "");
@@ -196,7 +196,7 @@ test_input_hist(void)
 {
 	struct input inp;
 
-	input(&inp);
+	input_init(&inp);
 
 	assert_eq(input_hist_push(&inp), 0);
 
@@ -296,7 +296,7 @@ test_input_move(void)
 {
 	struct input inp;
 
-	input(&inp);
+	input_init(&inp);
 
 	/* Test move back */
 	assert_eq(input_insert(&inp, "ab", 2), 1);
@@ -333,7 +333,7 @@ test_input_frame(void)
 {
 	struct input inp;
 
-	input(&inp);
+	input_init(&inp);
 
 	/* Test cursor fits */
 	assert_eq(input_insert(&inp, "1234567890", 10), 1);
@@ -390,7 +390,7 @@ test_input_write(void)
 {
 	struct input inp;
 
-	input(&inp);
+	input_init(&inp);
 
 	/* Test output is written correctly regardless of cursor position */
 	assert_eq(input_insert(&inp, "abcde", 5), 1);
@@ -418,7 +418,7 @@ test_input_complete(void)
 {
 	struct input inp;
 
-	input(&inp);
+	input_init(&inp);
 
 	/* Test empty */
 	assert_eq(input_complete(&inp, completion_rot1), 0);
@@ -535,7 +535,7 @@ test_input_text_size(void)
 {
 	struct input inp;
 
-	input(&inp);
+	input_init(&inp);
 
 	/* Test size is correct from 0 -> max */
 	for (int i = 0; i < INPUT_LEN_MAX; i++) {
@@ -558,7 +558,7 @@ int
 main(void)
 {
 	testcase tests[] = {
-		TESTCASE(test_input),
+		TESTCASE(test_input_init),
 		TESTCASE(test_input_reset),
 		TESTCASE(test_input_ins),
 		TESTCASE(test_input_del),

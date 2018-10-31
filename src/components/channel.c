@@ -10,7 +10,7 @@ static inline int
 channel_cmp(struct channel *c, const char *name)
 {
 	/* TODO: CASEMAPPING, as ftpr held by the server */
-	return irc_strcmp(c->name.str, name);
+	return irc_strcmp(c->name, name);
 }
 
 struct channel*
@@ -24,12 +24,13 @@ channel(const char *name, enum channel_t type)
 		fatal("calloc", errno);
 
 	c->chanmodes_str.type = MODE_STR_CHANMODE;
-	c->name.len = len;
-	c->name.str = memcpy(c->_, name, len + 1);
+	c->name_len = len;
 	c->type = type;
 
+	memcpy(c->name, name, len + 1);
+
 	buffer(&c->buffer);
-	input(&c->input);
+	input_init(&c->input);
 
 	return c;
 }
@@ -42,12 +43,18 @@ channel_free(struct channel *c)
 	free(c);
 }
 
+void
+channel_list_free(struct channel_list *cl)
+{
+	/* TODO */;
+}
+
 struct channel*
 channel_list_add(struct channel_list *cl, struct channel *c)
 {
 	struct channel *tmp;
 
-	if ((tmp = channel_list_get(cl, c->name.str)) != NULL)
+	if ((tmp = channel_list_get(cl, c->name)) != NULL)
 		return tmp;
 
 	if (cl->head == NULL) {

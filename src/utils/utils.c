@@ -112,25 +112,9 @@ memdup(const void *mem, size_t len)
 	if ((ret = malloc(len)) == NULL)
 		fatal("malloc", errno);
 
-	return memcpy(ret, mem, len);
-}
+	memcpy(ret, mem, len);
 
-struct string*
-string(struct string *s, const char *str)
-{
-	/* Return dynamically allocated duplicate string with cached length */
-
-	size_t len = strlen(str) + 1;
-
-	void *ret;
-
-	if ((ret = malloc(len)) == NULL)
-		fatal("malloc", errno);
-
-	s->len = len - 1;
-	s->str = memcpy(ret, str, len);
-
-	return s;
+	return ret;
 }
 
 int

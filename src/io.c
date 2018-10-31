@@ -19,7 +19,7 @@
 #include "src/io.h"
 #include "utils/utils.h"
 
-#define IO_RECV_SIZE 2 << 12
+#define IO_RECV_SIZE 4096
 
 /* RFC 2812, section 2.3 */
 #ifndef IO_MESG_LEN
@@ -284,7 +284,7 @@ connection(const void *obj, const char *host, const char *port)
 int
 io_sendf(struct connection *c, const char *fmt, ...)
 {
-	char sendbuf[512];
+	char sendbuf[IO_MESG_LEN + 2];
 	int ret;
 	size_t len;
 	va_list ap;
@@ -304,13 +304,13 @@ io_sendf(struct connection *c, const char *fmt, ...)
 	if (len >= sizeof(sendbuf) - 2)
 		return IO_ERR_TRUNC;
 
+	DEBUG_MSG("send: (%zu) %s", len, sendbuf);
+
 	sendbuf[len++] = '\r';
 	sendbuf[len++] = '\n';
 
 	if (send(c->soc, sendbuf, len, 0) < 0)
 		return IO_ERR_SEND;
-
-	DEBUG_MSG("send: (%zu) %s", len, sendbuf);
 
 	return IO_ERR_NONE;
 }
@@ -509,7 +509,7 @@ io_state_cxed(struct connection *c)
 	} else if (errno == EPIPE || errno == ECONNRESET) {
 		PT_CB(IO_CB_DXED, c->obj, "Connection closed by peer");
 	} else {
-		PT_CB(IO_CB_DXED, c->obj, "recv error:", io_strerror(c, errno));
+		PT_CB(IO_CB_DXED, c->obj, "recv error: %s", io_strerror(c, errno));
 	}
 
 	io_soc_close(&(c->soc));
@@ -532,15 +532,15 @@ io_state_ping(struct connection *c)
 		}
 
 		if (ret == 0) {
-			PT_CB(IO_CB_DXED, c->obj, "Connection closed");
+			PT_CB(IO_CB_DXED, c->obj, "connection closed");
 		} else if (errno == EAGAIN || errno == EWOULDBLOCK) {
 			if ((ping += IO_PING_REFRESH) < IO_PING_MAX) {
 				PT_CB(IO_CB_PING_N, c->obj, ping);
 				continue;
 			}
-			PT_CB(IO_CB_DXED, c->obj, "Connection timeout (%u)", ping);
+			PT_CB(IO_CB_DXED, c->obj, "connection timeout (%u)", ping);
 		} else {
-			PT_CB(IO_CB_DXED, c->obj, "recv error:", io_strerror(c, errno));
+			PT_CB(IO_CB_DXED, c->obj, "recv error: %s", io_strerror(c, errno));
 		}
 
 		break;
@@ -719,7 +719,7 @@ io_loop(void)
 	io_init_tty();
 
 	for (;;) {
-		char buf[512];
+		char buf[128];
 		ssize_t ret = read(STDIN_FILENO, buf, sizeof(buf));
 
 		if (ret > 0) {
