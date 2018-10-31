@@ -198,8 +198,10 @@ input_hist_forw(struct input *inp)
 		memcpy(inp->text, str, len);
 	}
 
-	if (inp->hist.current == inp->hist.head)
+	if (inp->hist.current == inp->hist.head) {
 		free(inp->hist.save);
+		inp->hist.save = NULL;
+	}
 
 	inp->head = len;
 	inp->tail = INPUT_LEN_MAX;
