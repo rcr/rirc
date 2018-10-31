@@ -85,7 +85,7 @@ static void _print_testcase_name_(const char*);
 		if (_assert_fatal_) { \
 			longjmp(_tc_fatal_expected_, 1); \
 		} else { \
-			snprintf(_tc_errbuf_1, sizeof(_tc_errbuf_1), "%s:%d:%s:", __FILE__, __LINE__, __func__); \
+			snprintf(_tc_errbuf_1, sizeof(_tc_errbuf_1), "FATAL ERROR: %s:%d:%s: ", __FILE__, __LINE__, __func__); \
 			snprintf(_tc_errbuf_2, sizeof(_tc_errbuf_2), __VA_ARGS__); \
 			longjmp(_tc_fatal_unexpected_, 1); \
 		} \
@@ -211,9 +211,9 @@ _run_tests_(const char *filename, testcase testcases[], size_t len)
 
 		if (setjmp(_tc_fatal_unexpected_)) {
 			_print_testcase_name_(tc->tc_str);
-			printf("    Unexpected fatal error:\n");
-			printf("    %s %s\n", _tc_errbuf_1,_tc_errbuf_2);
-			printf("    -- aborting testcase --\n");
+			printf("    %s\n", _tc_errbuf_1);
+			printf("    %s\n", _tc_errbuf_2);
+			printf("    aborting testcase\n");
 			_failures_++;
 		} else
 			(*tc->tc_ptr)();

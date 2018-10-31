@@ -1,4 +1,6 @@
+#include <errno.h>
 #include <string.h>
+#include <stdlib.h>
 
 #include "src/components/input.h"
 #include "src/utils/utils.h"
@@ -307,7 +309,7 @@ input_text_copy(struct input *inp)
 		return NULL;
 
 	if ((str = malloc(len + 1)) == NULL)
-		fatal("malloc", errno);
+		fatal("malloc: %s", strerror(errno));
 
 	input_write(inp, str, len + 1);
 

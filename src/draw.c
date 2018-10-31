@@ -680,10 +680,10 @@ check_coords(struct coords coords)
 	/* Check coordinate validity before drawing, ensure at least one row, column */
 
 	if (coords.r1 > coords.rN)
-		fatal("row coordinates invalid", 0);
+		fatal("row coordinates invalid (%u > %u)", coords.r1, coords.rN);
 
 	if (coords.c1 > coords.cN)
-		fatal("column coordinates invalid", 0);
+		fatal("col coordinates invalid (%u > %u)", coords.c1, coords.cN);
 }
 
 static inline unsigned int

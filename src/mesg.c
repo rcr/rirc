@@ -286,7 +286,7 @@ send_mesg(struct server *s, struct channel *chan, char *mesg)
 		int ret;
 
 		if (*mesg == 0)
-			fatal("message is empty", 0);
+			fatal("message is empty");
 
 		else if (chan->type != CHANNEL_T_CHANNEL && chan->type != CHANNEL_T_PRIVATE)
 			newline(chan, 0, "-!!-", "Error: This is not a channel");

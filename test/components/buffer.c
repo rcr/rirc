@@ -9,7 +9,7 @@ _fmt_int(int i)
 {
 	static char buff[1024];
 
-	if ((snprintf(buff, sizeof(buff) - 1, "%d", i)) < 0)
+	if ((snprintf(buff, sizeof(buff), "%d", i)) < 0)
 		fail_test("snprintf");
 
 	return buff;

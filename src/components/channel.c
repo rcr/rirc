@@ -1,3 +1,4 @@
+#include <errno.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -21,7 +22,7 @@ channel(const char *name, enum channel_t type)
 	size_t len = strlen(name);
 
 	if ((c = calloc(1, sizeof(*c) + len + 1)) == NULL)
-		fatal("calloc", errno);
+		fatal("calloc: %s", strerror(errno));
 
 	c->chanmodes_str.type = MODE_STR_CHANMODE;
 	c->name_len = len;

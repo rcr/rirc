@@ -1,3 +1,4 @@
+#include <errno.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -41,7 +42,7 @@ user(const char *nick)
 	size_t len = strlen(nick);
 
 	if ((u = calloc(1, sizeof(*u) + len + 1)) == NULL)
-		fatal("calloc", errno);
+		fatal("calloc: %s", strerror(errno));
 
 	u->nick_len = len;
 	u->nick = memcpy(u->_, nick, len + 1);

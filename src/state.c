@@ -94,7 +94,7 @@ state_init(void)
 {
 	/* atexit doesn't set errno */
 	if (atexit(state_term) != 0)
-		fatal("atexit", 0);
+		fatal("atexit");
 
 	state.default_channel = state.current_channel = new_channel("rirc", NULL, CHANNEL_T_OTHER);
 
@@ -847,7 +847,7 @@ send_cmnd(struct channel *c, char *buf)
 				newlinef(s->channel, 0, "-!!-", "already connected to %s:%s", host, port);
 			} else {
 				if ((s = server(host, port, pass, user, real)) == NULL)
-					fatal("failed to create server", 0);
+					fatal("failed to create server");
 
 				server_list_add(state_server_list(), s);
 				channel_set_current(s->channel);
@@ -1018,7 +1018,7 @@ io_cb_read_inp(char *buf, size_t len)
 	int redraw_input = 0;
 
 	if (len == 0)
-		fatal("zero length message", 0);
+		fatal("zero length message");
 	else if (action_message)
 		redraw_input = state_input_action(buf, len);
 	else if (iscntrl(*buf))
