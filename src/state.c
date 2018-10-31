@@ -665,6 +665,9 @@ state_complete_list(char *str, uint16_t len, uint16_t max, const char **list)
 {
 	size_t list_len = 0;
 
+	if (len == 0)
+		return 0;
+
 	while (*list && strncmp(*list, str, len))
 		list++;
 
@@ -673,7 +676,7 @@ state_complete_list(char *str, uint16_t len, uint16_t max, const char **list)
 
 	memcpy(str, *list, list_len);
 
-	return list_len;
+	return list_len + 1;
 }
 
 static uint16_t
@@ -699,10 +702,10 @@ static uint16_t
 state_complete(char *str, uint16_t len, uint16_t max, int first)
 {
 	if (first && str[0] == '/')
-		return state_complete_list(str + 1, len - 1, max - 1, irc_list) + 1;
+		return state_complete_list(str + 1, len - 1, max - 1, irc_list);
 
 	if (first && str[0] == ':')
-		return state_complete_list(str + 1, len - 1, max - 1, cmd_list) + 1;
+		return state_complete_list(str + 1, len - 1, max - 1, cmd_list);
 
 	return state_complete_user(str, len, max, first);
 }
