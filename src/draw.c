@@ -555,8 +555,7 @@ _draw_input(struct input *inp, struct coords coords)
 		cursor = cols_t - text_n + 1;
 
 	} else {
-		cursor += input_frame(inp, text_n);
-		input_write(inp, input_ptr, text_n);
+		cursor += input_frame(inp, input_ptr, text_n);
 	}
 
 print_input:

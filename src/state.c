@@ -1007,7 +1007,7 @@ state_input_linef(struct channel *c)
 	char buf[INPUT_LEN_MAX + 1];
 	size_t len;
 
-	if ((len = input_write(&(c->input), buf, sizeof(buf))) == 0)
+	if ((len = input_write(&(c->input), buf, sizeof(buf), 0)) == 0)
 		return 0;
 
 	if (buf[0] == ':')

@@ -6,19 +6,20 @@
 
 #include "src/components/input.c"
 
-static char* t_input_write(struct input*, size_t);
+#define CHECK_INPUT_FRAME(I, S, F, C) \
+	assert_eq(input_frame((I), buf, (F)), (C)); \
+	assert_strcmp(buf, (S));
+
+#define CHECK_INPUT_WRITE(I, S) \
+	assert_eq(input_write((I), buf, sizeof(buf), 0), (int)strlen((S))); \
+	assert_strcmp(buf, (S));
+
 static uint16_t completion_l(char*, uint16_t, uint16_t, int);
 static uint16_t completion_m(char*, uint16_t, uint16_t, int);
 static uint16_t completion_s(char*, uint16_t, uint16_t, int);
 static uint16_t completion_rot1(char*, uint16_t, uint16_t, int);
 
-static char*
-t_input_write(struct input *inp, size_t len)
-{
-	static char buf[INPUT_LEN_MAX + 1];
-	input_write(inp, buf, (len ? len : sizeof(buf)));
-	return buf;
-}
+static char buf[INPUT_LEN_MAX + 1];
 
 static uint16_t
 completion_l(char *str, uint16_t len, uint16_t max, int first)
@@ -134,19 +135,20 @@ test_input_ins(void)
 
 	/* Valid */
 	assert_eq(input_insert(&inp, "a", 1), 1);
-	assert_strcmp(t_input_write(&inp, 0), "a");
+	CHECK_INPUT_WRITE(&inp, "a");
+
 	assert_eq(input_insert(&inp, "bc", 2), 1);
 	assert_eq(input_insert(&inp, "de", 2), 1);
 	assert_eq(input_insert(&inp, "fgh", 3), 1);
 	assert_eq(input_insert(&inp, "i", 1), 1);
 	assert_eq(input_insert(&inp, "j", 1), 1);
 	assert_eq(input_insert(&inp, "klmnop", 6), 1);
-	assert_strcmp(t_input_write(&inp, 0), "abcdefghijklmnop");
+	CHECK_INPUT_WRITE(&inp, "abcdefghijklmnop");
 	assert_eq((int)input_text_size(&inp), INPUT_LEN_MAX);
 
 	/* Full */
 	assert_eq(input_insert(&inp, "z", 1), 0);
-	assert_strcmp(t_input_write(&inp, 0), "abcdefghijklmnop");
+	CHECK_INPUT_WRITE(&inp, "abcdefghijklmnop");
 	assert_eq((int)input_text_size(&inp), INPUT_LEN_MAX);
 
 	input_free(&inp);
@@ -160,7 +162,7 @@ test_input_del(void)
 	input_init(&inp);
 
 	/* Deleting back/forw on empty input */
-	assert_strcmp(t_input_write(&inp, 0), "");
+	CHECK_INPUT_WRITE(&inp, "");
 	assert_eq(input_delete_back(&inp), 0);
 	assert_eq(input_delete_forw(&inp), 0);
 
@@ -172,20 +174,20 @@ test_input_del(void)
 
 	/* Delete left */
 	assert_eq(input_delete_back(&inp), 1);
-	assert_strcmp(t_input_write(&inp, 0), "acefg");
+	CHECK_INPUT_WRITE(&inp, "acefg");
 	assert_eq(input_delete_back(&inp), 1);
-	assert_strcmp(t_input_write(&inp, 0), "cefg");
+	CHECK_INPUT_WRITE(&inp, "cefg");
 	assert_eq(input_delete_back(&inp), 0);
 
 	/* Delete right */
 	assert_eq(input_delete_forw(&inp), 1);
-	assert_strcmp(t_input_write(&inp, 0), "efg");
+	CHECK_INPUT_WRITE(&inp, "efg");
 	assert_eq(input_delete_forw(&inp), 1);
-	assert_strcmp(t_input_write(&inp, 0), "fg");
+	CHECK_INPUT_WRITE(&inp, "fg");
 	assert_eq(input_delete_forw(&inp), 1);
-	assert_strcmp(t_input_write(&inp, 0), "g");
+	CHECK_INPUT_WRITE(&inp, "g");
 	assert_eq(input_delete_forw(&inp), 1);
-	assert_strcmp(t_input_write(&inp, 0), "");
+	CHECK_INPUT_WRITE(&inp, "");
 	assert_eq(input_delete_forw(&inp), 0);
 
 	input_free(&inp);
@@ -206,9 +208,9 @@ test_input_hist(void)
 
 	/* Test pushing clears the working input */
 	assert_eq(input_insert(&inp, "111", 3), 1);
-	assert_strcmp(t_input_write(&inp, 0), "111");
+	CHECK_INPUT_WRITE(&inp, "111");
 	assert_eq(input_hist_push(&inp), 1);
-	assert_strcmp(t_input_write(&inp, 0), "");
+	CHECK_INPUT_WRITE(&inp, "");
 
 	/* Test pushing up to INPUT_HIST_MAX */
 	assert_eq(input_insert(&inp, "222", 3), 1);
@@ -237,25 +239,25 @@ test_input_hist(void)
 
 	/* Test scrolling back to tail */
 	assert_eq(input_hist_back(&inp), 1);
-	assert_strcmp(t_input_write(&inp, 0), "555");
+	CHECK_INPUT_WRITE(&inp, "555");
 	assert_eq(input_hist_back(&inp), 1);
-	assert_strcmp(t_input_write(&inp, 0), "444");
+	CHECK_INPUT_WRITE(&inp, "444");
 	assert_eq(input_hist_back(&inp), 1);
-	assert_strcmp(t_input_write(&inp, 0), "333");
+	CHECK_INPUT_WRITE(&inp, "333");
 	assert_eq(input_hist_back(&inp), 1);
-	assert_strcmp(t_input_write(&inp, 0), "222");
+	CHECK_INPUT_WRITE(&inp, "222");
 	assert_eq(input_hist_back(&inp), 0);
 	assert_strcmp(inp.hist.save, "000");
 
 	/* Test scrolling forw to head */
 	assert_eq(input_hist_forw(&inp), 1);
-	assert_strcmp(t_input_write(&inp, 0), "333");
+	CHECK_INPUT_WRITE(&inp, "333");
 	assert_eq(input_hist_forw(&inp), 1);
-	assert_strcmp(t_input_write(&inp, 0), "444");
+	CHECK_INPUT_WRITE(&inp, "444");
 	assert_eq(input_hist_forw(&inp), 1);
-	assert_strcmp(t_input_write(&inp, 0), "555");
+	CHECK_INPUT_WRITE(&inp, "555");
 	assert_eq(input_hist_forw(&inp), 1);
-	assert_strcmp(t_input_write(&inp, 0), "000");
+	CHECK_INPUT_WRITE(&inp, "000");
 	assert_eq(input_hist_forw(&inp), 0);
 
 	assert_strcmp(INP_HIST_HEAD(inp), "555");
@@ -300,30 +302,30 @@ test_input_move(void)
 
 	/* Test move back */
 	assert_eq(input_insert(&inp, "ab", 2), 1);
-	assert_strcmp(t_input_write(&inp, 0), "ab");
+	CHECK_INPUT_WRITE(&inp, "ab");
 	assert_eq(input_cursor_back(&inp), 1);
-	assert_strcmp(t_input_write(&inp, 0), "ab");
+	CHECK_INPUT_WRITE(&inp, "ab");
 	assert_eq(input_insert(&inp, "c", 1), 1);
-	assert_strcmp(t_input_write(&inp, 0), "acb");
+	CHECK_INPUT_WRITE(&inp, "acb");
 	assert_eq(input_insert(&inp, "d", 1), 1);
-	assert_strcmp(t_input_write(&inp, 0), "acdb");
+	CHECK_INPUT_WRITE(&inp, "acdb");
 	assert_eq(input_cursor_back(&inp), 1);
 	assert_eq(input_cursor_back(&inp), 1);
 	assert_eq(input_cursor_back(&inp), 1);
 	assert_eq(input_cursor_back(&inp), 0);
 	assert_eq(input_insert(&inp, "e", 1), 1);
-	assert_strcmp(t_input_write(&inp, 0), "eacdb");
+	CHECK_INPUT_WRITE(&inp, "eacdb");
 
 	/* Test move forward */
 	assert_eq(input_cursor_forw(&inp), 1);
 	assert_eq(input_cursor_forw(&inp), 1);
 	assert_eq(input_cursor_forw(&inp), 1);
 	assert_eq(input_insert(&inp, "f", 1), 1);
-	assert_strcmp(t_input_write(&inp, 0), "eacdfb");
+	CHECK_INPUT_WRITE(&inp, "eacdfb");
 	assert_eq(input_cursor_forw(&inp), 1);
 	assert_eq(input_cursor_forw(&inp), 0);
 	assert_eq(input_insert(&inp, "g", 1), 1);
-	assert_strcmp(t_input_write(&inp, 0), "eacdfbg");
+	CHECK_INPUT_WRITE(&inp, "eacdfbg");
 
 	input_free(&inp);
 }
@@ -335,52 +337,44 @@ test_input_frame(void)
 
 	input_init(&inp);
 
-	/* Test cursor fits */
 	assert_eq(input_insert(&inp, "1234567890", 10), 1);
-	assert_eq(input_frame(&inp, 11), 10);
-	assert_strcmp(t_input_write(&inp, 0), "1234567890");
+
+	/* Test cursor fits */
+	CHECK_INPUT_FRAME(&inp, "1234567890", 12, 10);
 
 	/* Test cursor doesnt fit */
-	assert_eq(input_frame(&inp, 10), 6);
-	assert_strcmp(t_input_write(&inp, 0), "567890");
+	CHECK_INPUT_FRAME(&inp, "567890", 11, 6);
 
 	/* Test cursor back keeps cursor in view */
-	assert_eq(input_frame(&inp, 5), 3);
-	assert_strcmp(t_input_write(&inp, 6), "890");
+	CHECK_INPUT_FRAME(&inp, "890", 6, 3);
 	assert_eq(input_cursor_back(&inp), 1);
 	assert_eq(input_cursor_back(&inp), 1);
 	assert_eq(input_cursor_back(&inp), 1);
-	assert_eq(input_frame(&inp, 5), 3);
-	assert_strcmp(t_input_write(&inp, 6), "56789");
+	CHECK_INPUT_FRAME(&inp, "56789", 6, 3);
 	assert_eq(input_cursor_back(&inp), 1);
 	assert_eq(input_cursor_back(&inp), 1);
 	assert_eq(input_cursor_back(&inp), 1);
-	assert_eq(input_frame(&inp, 5), 3);
-	assert_strcmp(t_input_write(&inp, 6), "23456");
+	CHECK_INPUT_FRAME(&inp, "23456", 6, 3);
 	assert_eq(input_cursor_back(&inp), 1);
 	assert_eq(input_cursor_back(&inp), 1);
 	assert_eq(input_cursor_back(&inp), 1);
 	assert_eq(input_cursor_back(&inp), 1);
-	assert_eq(input_frame(&inp, 5), 0);
-	assert_strcmp(t_input_write(&inp, 6), "12345");
+	CHECK_INPUT_FRAME(&inp, "12345", 6, 0);
 
 	/* Test cursor forw keeps cursor in view */
 	assert_eq(input_cursor_forw(&inp), 1);
 	assert_eq(input_cursor_forw(&inp), 1);
 	assert_eq(input_cursor_forw(&inp), 1);
-	assert_eq(input_frame(&inp, 5), 3);
-	assert_strcmp(t_input_write(&inp, 6), "12345");
+	CHECK_INPUT_FRAME(&inp, "12345", 6, 3);
 	assert_eq(input_cursor_forw(&inp), 1);
 	assert_eq(input_cursor_forw(&inp), 1);
 	assert_eq(input_cursor_forw(&inp), 1);
-	assert_eq(input_frame(&inp, 5), 3);
-	assert_strcmp(t_input_write(&inp, 6), "45678");
+	CHECK_INPUT_FRAME(&inp, "45678", 6, 3);
 	assert_eq(input_cursor_forw(&inp), 1);
 	assert_eq(input_cursor_forw(&inp), 1);
 	assert_eq(input_cursor_forw(&inp), 1);
 	assert_eq(input_cursor_forw(&inp), 1);
-	assert_eq(input_frame(&inp, 5), 3);
-	assert_strcmp(t_input_write(&inp, 6), "890");
+	CHECK_INPUT_FRAME(&inp, "890", 6, 3);
 
 	input_free(&inp);
 }
@@ -394,21 +388,28 @@ test_input_write(void)
 
 	/* Test output is written correctly regardless of cursor position */
 	assert_eq(input_insert(&inp, "abcde", 5), 1);
-	assert_strcmp(t_input_write(&inp, 0), "abcde");
+	CHECK_INPUT_WRITE(&inp, "abcde");
 	assert_eq(input_cursor_back(&inp), 1);
-	assert_strcmp(t_input_write(&inp, 0), "abcde");
+	CHECK_INPUT_WRITE(&inp, "abcde");
 	assert_eq(input_cursor_back(&inp), 1);
 	assert_eq(input_cursor_back(&inp), 1);
 	assert_eq(input_cursor_back(&inp), 1);
-	assert_strcmp(t_input_write(&inp, 0), "abcde");
+	CHECK_INPUT_WRITE(&inp, "abcde");
 	assert_eq(input_cursor_back(&inp), 1);
 	assert_eq(input_cursor_back(&inp), 0);
-	assert_strcmp(t_input_write(&inp, 0), "abcde");
+	CHECK_INPUT_WRITE(&inp, "abcde");
 
 	/* Test output is always null terminated */
 	assert_eq(input_insert(&inp, "fghijklmno", 10), 1);
-	assert_strcmp(t_input_write(&inp, 0), "fghijklmnoabcde");
-	assert_strcmp(t_input_write(&inp, INPUT_LEN_MAX / 2), "fghijkl");
+	CHECK_INPUT_WRITE(&inp, "fghijklmnoabcde");
+
+	/* Test truncated write */
+	assert_eq(input_write(&inp, buf, 5, 0), 4);
+	assert_strcmp(buf, "fghi");
+
+	/* Test truncated, offset write */
+	assert_eq(input_write(&inp, buf, 5, 3), 4);
+	assert_strcmp(buf, "ijkl");
 
 	input_free(&inp);
 }
@@ -433,7 +434,7 @@ test_input_complete(void)
 	 *             ^ */
 	assert_eq(input_insert(&inp, " abc ", 5), 1);
 	assert_eq(input_complete(&inp, completion_rot1), 0);
-	assert_strcmp(t_input_write(&inp, 0), " abc ");
+	CHECK_INPUT_WRITE(&inp, " abc ");
 
 	/* Test: ` abc `
 	 *            ^ */
@@ -441,7 +442,7 @@ test_input_complete(void)
 	assert_eq(inp.text[inp.head], ' ');
 	assert_eq(input_complete(&inp, completion_rot1), 1);
 	assert_eq(inp.text[inp.head], ' ');
-	assert_strcmp(t_input_write(&inp, 0), " bcd ");
+	CHECK_INPUT_WRITE(&inp, " bcd ");
 
 	/* Test: ` bcd `
 	 *           ^ */
@@ -449,7 +450,7 @@ test_input_complete(void)
 	assert_eq(inp.text[inp.head], 'd');
 	assert_eq(input_complete(&inp, completion_rot1), 1);
 	assert_eq(inp.text[inp.head], ' ');
-	assert_strcmp(t_input_write(&inp, 0), " cde ");
+	CHECK_INPUT_WRITE(&inp, " cde ");
 
 	/* Test: ` cde `
 	 *          ^ */
@@ -458,7 +459,7 @@ test_input_complete(void)
 	assert_eq(inp.text[inp.head], 'd');
 	assert_eq(input_complete(&inp, completion_rot1), 1);
 	assert_eq(inp.text[inp.head], ' ');
-	assert_strcmp(t_input_write(&inp, 0), " def ");
+	CHECK_INPUT_WRITE(&inp, " def ");
 
 	/* Test: ` def `
 	 *         ^ */
@@ -468,7 +469,7 @@ test_input_complete(void)
 	assert_eq(inp.text[inp.head], 'd');
 	assert_eq(input_complete(&inp, completion_rot1), 1);
 	assert_eq(inp.text[inp.head], ' ');
-	assert_strcmp(t_input_write(&inp, 0), " efg ");
+	CHECK_INPUT_WRITE(&inp, " efg ");
 
 	/* Test: ` efg `
 	 *        ^ */
@@ -479,7 +480,7 @@ test_input_complete(void)
 	assert_eq(inp.text[inp.head], ' ');
 	assert_eq(input_complete(&inp, completion_rot1), 0);
 	assert_eq(inp.text[inp.head], ' ');
-	assert_strcmp(t_input_write(&inp, 0), " efg ");
+	CHECK_INPUT_WRITE(&inp, " efg ");
 	assert_eq(input_reset(&inp), 1);
 
 	/* Test start of line */
@@ -493,7 +494,7 @@ test_input_complete(void)
 	assert_eq(inp.text[inp.head], 'x');
 	assert_eq(input_complete(&inp, completion_rot1), 1);
 	assert_eq(inp.text[inp.tail], ' ');
-	assert_strcmp(t_input_write(&inp, 0), "y!! abc ");
+	CHECK_INPUT_WRITE(&inp, "y!! abc ");
 	assert_eq(input_reset(&inp), 1);
 
 	/* Test replacement word longer */
@@ -504,7 +505,7 @@ test_input_complete(void)
 	assert_eq(input_cursor_back(&inp), 1);
 	assert_eq(inp.text[inp.head], 'c');
 	assert_eq(input_complete(&inp, completion_l), 1);
-	assert_strcmp(t_input_write(&inp, 0), " xyxyxy ab");
+	CHECK_INPUT_WRITE(&inp, " xyxyxy ab");
 	assert_eq(inp.text[inp.tail], ' '); /* points to 'c' */
 	assert_eq(input_reset(&inp), 1);
 
@@ -517,14 +518,14 @@ test_input_complete(void)
 	assert_eq(input_cursor_back(&inp), 1);
 	assert_eq(inp.text[inp.head], 'c');
 	assert_eq(input_complete(&inp, completion_s), 1);
-	assert_strcmp(t_input_write(&inp, 0), " z ab ");
+	CHECK_INPUT_WRITE(&inp, " z ab ");
 	assert_eq(inp.text[inp.tail], ' ');
 	assert_eq(input_reset(&inp), 1);
 
 	/* Test writing up to max chars */
 	assert_eq(input_insert(&inp, "a", 1), 1);
 	assert_eq(input_complete(&inp, completion_m), 1);
-	assert_strcmp(t_input_write(&inp, 0), "xxxxxxxxxxxxxxxx");
+	CHECK_INPUT_WRITE(&inp, "xxxxxxxxxxxxxxxx");
 	assert_eq((int)input_text_size(&inp), INPUT_LEN_MAX);
 
 	input_free(&inp);

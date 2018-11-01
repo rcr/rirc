@@ -70,8 +70,8 @@ int input_hist_back(struct input*);
 int input_hist_forw(struct input*);
 int input_hist_push(struct input*);
 
-/* Write framed input to string */
-uint16_t input_frame(struct input*, uint16_t);
-uint16_t input_write(struct input*, char*, uint16_t);
+/* Write input to string */
+uint16_t input_frame(struct input*, char*, uint16_t);
+uint16_t input_write(struct input*, char*, uint16_t, uint16_t);
 
 #endif
