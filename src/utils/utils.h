@@ -2,6 +2,7 @@
 #define UTILS_H
 
 #include <stdio.h>
+#include <stdlib.h>
 
 #define TO_STR(X) #X
 #define STR(X) TO_STR(X)
@@ -31,7 +32,8 @@
 	do { fprintf(stderr, "FATAL ERROR: %s:%d:%s: ", __FILE__, __LINE__, __func__); \
 	     fprintf(stderr, __VA_ARGS__); \
 	     fprintf(stderr, "\n"); \
-	     fatal_internal(); \
+	     fatal_exit = 1; \
+	     exit(EXIT_FAILURE); \
 	} while (0)
 #endif
 
@@ -66,8 +68,6 @@ void* memdup(const void*, size_t);
 int check_pinged(const char*, const char*);
 int parse_mesg(struct parsed_mesg*, char*);
 int skip_sp(char**);
-
-void fatal_internal(void);
 
 extern int fatal_exit;
 

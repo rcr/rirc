@@ -38,14 +38,6 @@ static inline int irc_toupper(int);
 
 int fatal_exit;
 
-void
-fatal_internal(void)
-{
-	fatal_exit = 1;
-	fflush(stdout);
-	exit(EXIT_FAILURE);
-}
-
 char*
 getarg(char **str, const char *sep)
 {
