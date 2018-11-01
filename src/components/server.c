@@ -135,6 +135,15 @@ server_list_del(struct server_list *sl, struct server *s)
 }
 
 void
+server_reset(struct server *s)
+{
+	mode_reset(&(s->usermodes), &(s->mode_str));
+	s->ping = 0;
+	s->quitting = 0;
+	s->nicks.next = 0;
+}
+
+void
 server_free(struct server *s)
 {
 	free((void *)s->host);
@@ -393,10 +402,4 @@ server_nicks_next(struct server *s)
 
 		server_nick_set(s, nick_rand);
 	}
-}
-
-void
-server_nicks_reset(struct server *s)
-{
-	s->nicks.next = 0;
 }

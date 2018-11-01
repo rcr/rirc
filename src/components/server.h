@@ -57,8 +57,8 @@ int server_set_nicks(struct server*, const char*);
 
 void server_nick_set(struct server*, const char*);
 void server_nicks_next(struct server*);
-void server_nicks_reset(struct server*);
 
+void server_reset(struct server*);
 void server_free(struct server*);
 
 #endif

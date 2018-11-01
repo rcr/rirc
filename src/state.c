@@ -714,13 +714,8 @@ state_io_cxed(struct server *s)
 {
 	int ret;
 
-	mode_reset(&(s->usermodes), &(s->mode_str));
-	s->ping = 0;
-	s->quitting = 0;
+	server_reset(s);
 	server_nicks_next(s);
-	server_nicks_reset(s);
-
-	draw_status();
 
 	if (s->pass && (ret = io_sendf(s->connection, "PASS %s", s->pass)))
 		newlinef(s->channel, 0, "-!!-", "sendf fail: %s", io_err(ret));
@@ -730,6 +725,8 @@ state_io_cxed(struct server *s)
 
 	if ((ret = io_sendf(s->connection, "USER %s 8 * :%s", s->username, s->realname)))
 		newlinef(s->channel, 0, "-!!-", "sendf fail: %s", io_err(ret));
+
+	draw_status();
 }
 
 static void
