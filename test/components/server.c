@@ -182,7 +182,7 @@ test_server_set_nicks(void)
 	server_nicks_next(s);
 	assert_strncmp(s->nick, "rirc", 4);
 
-	server_nicks_reset(s);
+	server_reset(s);
 	server_nicks_next(s);
 	assert_strcmp(s->nick, "a_");
 
