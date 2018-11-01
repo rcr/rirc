@@ -559,6 +559,8 @@ send_quit(char *mesg, struct server *s, struct channel *c)
 	if (!s)
 		fail(c, "Error: Not connected to server");
 
+	s->quitting = 1;
+
 	if ((ret = io_sendf(s->connection, "QUIT :%s", (*mesg ? mesg : DEFAULT_QUIT_MESG))))
 		failf(c, "sendf fail: %s", io_err(ret));
 
@@ -865,17 +867,12 @@ recv_ctcp_rpl(struct parsed_mesg *p, struct server *s)
 static int
 recv_error(struct parsed_mesg *p, struct server *s)
 {
-	/* ERROR :<message> */
+	/* ERROR :<message>
+	 *
+	 * Sent to clients before terminating their connection
+	 */
 
-	struct channel *c = s->channel;
-
-	newlinef(c, 0, "ERROR", "%s", (p->trailing ? p->trailing : "Remote hangup"));
-
-	for (c = c->next; c != s->channel; c = c->next) {
-		newlinef(c, 0, "-!!-", "(disconnected)");
-	}
-
-	io_dx(s->connection);
+	newlinef(s->channel, 0, (s->quitting ? "--" : "ERROR"), "%s", p->trailing);
 
 	return 0;
 }

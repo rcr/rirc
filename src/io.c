@@ -506,9 +506,9 @@ io_state_cxed(struct connection *c)
 	}
 
 	if (ret == 0) {
-		PT_CB(IO_CB_DXED, c->obj, "Connection closed");
+		PT_CB(IO_CB_DXED, c->obj, "connection closed");
 	} else if (errno == EPIPE || errno == ECONNRESET) {
-		PT_CB(IO_CB_DXED, c->obj, "Connection closed by peer");
+		PT_CB(IO_CB_DXED, c->obj, "connection closed by peer");
 	} else {
 		PT_CB(IO_CB_DXED, c->obj, "recv error: %s", io_strerror(c, errno));
 	}

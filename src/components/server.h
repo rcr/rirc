@@ -30,6 +30,7 @@ struct server
 	struct server *prev;
 	struct user_list ignore;
 	unsigned ping;
+	unsigned quitting : 1;
 };
 
 struct server_list

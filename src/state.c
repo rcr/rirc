@@ -44,7 +44,7 @@ struct channel* current_channel(void) { return state.current_channel; }
 struct channel* default_channel(void) { return state.default_channel; }
 
 static void state_io_cxed(struct server*);
-static void state_io_dxed(struct server*, const char *);
+static void state_io_dxed(struct server*, va_list);
 static void state_io_ping(struct server*, unsigned int);
 static void state_io_signal(enum io_sig_t);
 
@@ -130,12 +130,11 @@ state_term(void)
 	if (!fatal_exit) {
 		printf("\x1b[H\x1b[J");
 		channel_free(state.default_channel);
+		/* TODO:
+		 * here iterate the server list and quit with some default message,
+		 * call server_free */
 	}
 #endif
-
-	/* TODO:
-	 * here iterate the server list and quit with some default message,
-	 * call server_free */
 }
 
 void
@@ -715,10 +714,12 @@ state_io_cxed(struct server *s)
 {
 	int ret;
 
-	server_nicks_reset(s);
-	server_nicks_next(s);
-
+	mode_reset(&(s->usermodes), &(s->mode_str));
 	s->ping = 0;
+	s->quitting = 0;
+	server_nicks_next(s);
+	server_nicks_reset(s);
+
 	draw_status();
 
 	if (s->pass && (ret = io_sendf(s->connection, "PASS %s", s->pass)))
@@ -732,12 +733,19 @@ state_io_cxed(struct server *s)
 }
 
 static void
-state_io_dxed(struct server *s, const char *reason)
+state_io_dxed(struct server *s, va_list ap)
 {
-	for (struct channel *c = s->channel->next; c != s->channel; c = c->next) {
-		newlinef(c, 0, "-!!-", "disconnected (%s)", reason);
+	struct channel *c = s->channel->next;
+	va_list ap_copy;
+
+	do {
+		va_copy(ap_copy, ap);
+		_newline(s->channel, 0, "-!!-", va_arg(ap_copy, const char *), ap_copy);
+		va_end(ap_copy);
+
 		channel_reset(c);
-	}
+
+	} while (c != s->channel);
 }
 
 static void
@@ -779,7 +787,7 @@ io_cb(enum io_cb_t type, const void *cb_obj, ...)
 			_newline(s->channel, 0, "--", va_arg(ap, const char *), ap);
 			break;
 		case IO_CB_DXED:
-			state_io_dxed(s, va_arg(ap, const char*));
+			state_io_dxed(s, ap);
 			break;
 		case IO_CB_PING_0:
 		case IO_CB_PING_1:
