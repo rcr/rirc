@@ -29,8 +29,9 @@ enum channel_t
 
 struct channel
 {
-	enum channel_t type;
 	enum activity_t activity;
+	enum channel_t type;
+	size_t name_len;
 	struct buffer buffer;
 	struct channel *next;
 	struct channel *prev;
@@ -38,10 +39,9 @@ struct channel
 	struct mode chanmodes;
 	struct mode_str chanmodes_str;
 	struct server *server;
-	struct string name;
 	struct user_list users;
 	unsigned int parted : 1;
-	char _[];
+	char name[];
 };
 
 struct channel_list
@@ -73,5 +73,6 @@ void channel_part(struct channel*);
 void channel_reset(struct channel*);
 
 void channel_free(struct channel*);
+void channel_list_free(struct channel_list*);
 
 #endif

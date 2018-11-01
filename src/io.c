@@ -19,7 +19,7 @@
 #include "src/io.h"
 #include "utils/utils.h"
 
-#define IO_RECV_SIZE 2 << 12
+#define IO_RECV_SIZE 4096
 
 /* RFC 2812, section 2.3 */
 #ifndef IO_MESG_LEN
@@ -62,7 +62,7 @@
 #error "IO_RECONNECT_BACKOFF_MAX: [0, 86400]"
 #endif
 
-#define PT_CF(X) do { int ret; if ((ret = (X)) < 0) fatal((#X), ret); } while (0)
+#define PT_CF(X) do { int ret; if ((ret = (X)) < 0) fatal("%s: %s", (#X), strerror(ret)); } while (0)
 #define PT_LK(X) PT_CF(pthread_mutex_lock((X)))
 #define PT_UL(X) PT_CF(pthread_mutex_unlock((X)))
 #define PT_CB(R, ...) \
@@ -159,7 +159,7 @@ static void
 io_soc_close(int *soc)
 {
 	if (*soc >= 0 && close(*soc) < 0) {
-		fatal("close", errno);
+		fatal("close: %s", strerror(errno));
 	}
 	*soc = -1;
 }
@@ -168,7 +168,7 @@ static void
 io_soc_shutdown(int soc)
 {
 	if (soc >= 0 && shutdown(soc, SHUT_RDWR) < 0) {
-		fatal("shutdown", errno);
+		fatal("shutdown: %s", strerror(errno));
 	}
 }
 
@@ -182,8 +182,9 @@ io_init(void)
 	PT_CF(pthread_mutex_init(&cb_mutex, &m_attr));
 	PT_CF(pthread_mutexattr_destroy(&m_attr));
 
+	/* atexit doesn't set errno */
 	if (atexit(io_term) != 0)
-		fatal("atexit", 0);
+		fatal("atexit");
 }
 
 static void
@@ -192,7 +193,7 @@ io_term(void)
 	int ret;
 
 	if ((ret = pthread_mutex_trylock(&cb_mutex)) < 0 && ret != EBUSY)
-		fatal("pthread_mutex_trylock", ret);
+		fatal("pthread_mutex_trylock: %s", strerror(ret));
 
 	PT_UL(&cb_mutex);
 	PT_CF(pthread_mutex_destroy(&cb_mutex));
@@ -237,7 +238,7 @@ io_lock_wait(struct io_lock *lock, struct timespec *timeout)
 	}
 
 	if (ret && (timeout == NULL || ret != ETIMEDOUT))
-		fatal("io_lock_wait", ret);
+		fatal("io_lock_wait: %s", strerror(ret));
 
 	lock->predicate = 0;
 
@@ -259,7 +260,7 @@ connection(const void *obj, const char *host, const char *port)
 	struct connection *c;
 
 	if ((c = calloc(1U, sizeof(*c))) == NULL)
-		fatal("malloc", errno);
+		fatal("malloc: %s", strerror(errno));
 
 	c->obj = obj;
 	c->host = strdup(host);
@@ -284,7 +285,7 @@ connection(const void *obj, const char *host, const char *port)
 int
 io_sendf(struct connection *c, const char *fmt, ...)
 {
-	char sendbuf[512];
+	char sendbuf[IO_MESG_LEN + 2];
 	int ret;
 	size_t len;
 	va_list ap;
@@ -304,13 +305,13 @@ io_sendf(struct connection *c, const char *fmt, ...)
 	if (len >= sizeof(sendbuf) - 2)
 		return IO_ERR_TRUNC;
 
+	DEBUG_MSG("send: (%zu) %s", len, sendbuf);
+
 	sendbuf[len++] = '\r';
 	sendbuf[len++] = '\n';
 
 	if (send(c->soc, sendbuf, len, 0) < 0)
 		return IO_ERR_SEND;
-
-	DEBUG_MSG("send: (%zu) %s", len, sendbuf);
 
 	return IO_ERR_NONE;
 }
@@ -389,7 +390,7 @@ io_state_force(struct connection *c, enum io_state_t st_f)
 		case IO_ST_TERM:
 			break;
 		default:
-			fatal("Unknown net state", 0);
+			fatal("Unknown net state: %d", c->st_c);
 	}
 }
 
@@ -420,7 +421,7 @@ io_state_rxng(struct connection *c)
 		(c->rx_backoff % 60));
 
 	if (clock_gettime(CLOCK_REALTIME, &ts) < 0)
-		fatal("clock_gettime", errno);
+		fatal("clock_gettime: %s", strerror(errno));
 
 	ts.tv_sec += c->rx_backoff;
 
@@ -505,11 +506,11 @@ io_state_cxed(struct connection *c)
 	}
 
 	if (ret == 0) {
-		PT_CB(IO_CB_DXED, c->obj, "Connection closed");
+		PT_CB(IO_CB_DXED, c->obj, "connection closed");
 	} else if (errno == EPIPE || errno == ECONNRESET) {
-		PT_CB(IO_CB_DXED, c->obj, "Connection closed by peer");
+		PT_CB(IO_CB_DXED, c->obj, "connection closed by peer");
 	} else {
-		PT_CB(IO_CB_DXED, c->obj, "recv error:", io_strerror(c, errno));
+		PT_CB(IO_CB_DXED, c->obj, "recv error: %s", io_strerror(c, errno));
 	}
 
 	io_soc_close(&(c->soc));
@@ -532,15 +533,15 @@ io_state_ping(struct connection *c)
 		}
 
 		if (ret == 0) {
-			PT_CB(IO_CB_DXED, c->obj, "Connection closed");
+			PT_CB(IO_CB_DXED, c->obj, "connection closed");
 		} else if (errno == EAGAIN || errno == EWOULDBLOCK) {
 			if ((ping += IO_PING_REFRESH) < IO_PING_MAX) {
 				PT_CB(IO_CB_PING_N, c->obj, ping);
 				continue;
 			}
-			PT_CB(IO_CB_DXED, c->obj, "Connection timeout (%u)", ping);
+			PT_CB(IO_CB_DXED, c->obj, "connection timeout (%u)", ping);
 		} else {
-			PT_CB(IO_CB_DXED, c->obj, "recv error:", io_strerror(c, errno));
+			PT_CB(IO_CB_DXED, c->obj, "recv error: %s", io_strerror(c, errno));
 		}
 
 		break;
@@ -574,7 +575,7 @@ io_thread(void *arg)
 			case IO_ST_CXED: st_fn = io_state_cxed; break;
 			case IO_ST_PING: st_fn = io_state_ping; break;
 			default:
-				fatal("invalid state", 0);
+				fatal("invalid state: %d", c->st_c);
 		}
 
 		st_f = c->st_c;
@@ -655,7 +656,7 @@ io_net_set_timeout(struct connection *c, unsigned timeout)
 	};
 
 	if (setsockopt(c->soc, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) < 0)
-		fatal("setsockopt", errno);
+		fatal("setsockopt: %s", strerror(errno));
 }
 
 static void
@@ -677,7 +678,7 @@ io_init_sig(void)
 	sigemptyset(&sa.sa_mask);
 
 	if (sigaction(SIGWINCH, &sa, NULL) < 0)
-		fatal("sigaction - SIGWINCH", errno);
+		fatal("sigaction - SIGWINCH: %s", strerror(errno));
 }
 
 static void
@@ -686,10 +687,10 @@ io_init_tty(void)
 	struct termios nterm;
 
 	if (isatty(STDIN_FILENO) == 0)
-		fatal("isatty", errno);
+		fatal("isatty: %s", strerror(errno));
 
 	if (tcgetattr(STDIN_FILENO, &term) < 0)
-		fatal("tcgetattr", errno);
+		fatal("tcgetattr: %s", strerror(errno));
 
 	nterm = term;
 	nterm.c_lflag &= ~(ECHO | ICANON | ISIG);
@@ -697,17 +698,18 @@ io_init_tty(void)
 	nterm.c_cc[VTIME] = 0;
 
 	if (tcsetattr(STDIN_FILENO, TCSANOW, &nterm) < 0)
-		fatal("tcsetattr", errno);
+		fatal("tcsetattr: %s", strerror(errno));
 
+	/* atexit doesn't set errno */
 	if (atexit(io_term_tty) < 0)
-		fatal("atexit", 0);
+		fatal("atexit");
 }
 
 static void
 io_term_tty(void)
 {
 	if (tcsetattr(STDIN_FILENO, TCSADRAIN, &term) < 0)
-		fatal("tcsetattr", errno);
+		fatal("tcsetattr: %s", strerror(errno));
 }
 
 void
@@ -719,7 +721,7 @@ io_loop(void)
 	io_init_tty();
 
 	for (;;) {
-		char buf[512];
+		char buf[128];
 		ssize_t ret = read(STDIN_FILENO, buf, sizeof(buf));
 
 		if (ret > 0) {
@@ -735,7 +737,7 @@ io_loop(void)
 					PT_CB(IO_CB_SIGNAL, NULL, IO_SIGWINCH);
 				}
 			} else {
-				fatal("read", ret ? errno : 0);
+				fatal("read: %s", ret ? strerror(errno) : "EOF");
 			}
 		}
 	}
@@ -748,7 +750,7 @@ io_tty_winsize(void)
 		flag_tty_resized = 1;
 
 		if (ioctl(0, TIOCGWINSZ, &tty_ws) < 0)
-			fatal("ioctl", errno);
+			fatal("ioctl: %s", strerror(errno));
 	}
 }
 

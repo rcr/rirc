@@ -1,3 +1,4 @@
+#include <errno.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -36,29 +37,6 @@
 static inline int irc_toupper(int);
 
 int fatal_exit;
-
-void
-handle_error(int errnum, const char *fmt, ...)
-{
-	/* Report an error and exit the program */
-
-	va_list ap;
-
-	fflush(stdout);
-
-	fputs("\n\nrirc: ", stderr);
-
-	va_start(ap, fmt);
-	vfprintf(stderr, fmt, ap);
-	va_end(ap);
-
-	if (errnum)
-		fprintf(stderr, " (errno: %s)\n", strerror(errnum));
-	else
-		fprintf(stderr, "\n");
-
-	fatal_exit = 1;
-}
 
 char*
 getarg(char **str, const char *sep)
@@ -110,27 +88,11 @@ memdup(const void *mem, size_t len)
 	void *ret;
 
 	if ((ret = malloc(len)) == NULL)
-		fatal("malloc", errno);
+		fatal("malloc: %s", strerror(errno));
 
-	return memcpy(ret, mem, len);
-}
+	memcpy(ret, mem, len);
 
-struct string*
-string(struct string *s, const char *str)
-{
-	/* Return dynamically allocated duplicate string with cached length */
-
-	size_t len = strlen(str) + 1;
-
-	void *ret;
-
-	if ((ret = malloc(len)) == NULL)
-		fatal("malloc", errno);
-
-	s->len = len - 1;
-	s->str = memcpy(ret, str, len);
-
-	return s;
+	return ret;
 }
 
 int
@@ -453,7 +415,7 @@ word_wrap(int n, char **str, char *end)
 	char *ret, *tmp;
 
 	if (n < 1)
-		fatal("insufficient columns", 0);
+		fatal("insufficient columns: %d", n);
 
 	/* All fits */
 	if ((end - *str) <= n)

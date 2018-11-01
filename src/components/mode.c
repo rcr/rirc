@@ -157,7 +157,7 @@ mode_cfg(struct mode_cfg *cfg, const char *cfg_str, enum mode_cfg_t cfg_type)
 			return mode_cfg_modes(cfg, cfg_str);
 
 		default:
-			fatal("mode configuration type unknown", 0);
+			fatal("mode configuration type unknown: %d", cfg_type);
 	}
 
 	return MODE_ERR_NONE;
@@ -414,14 +414,15 @@ mode_str(const struct mode *m, struct mode_str *m_str)
 	switch (m_str->type) {
 		case MODE_STR_CHANMODE:
 			skip = "sp";
+			break;
 		case MODE_STR_USERMODE:
 		case MODE_STR_PRFXMODE:
 			break;
 		case MODE_STR_UNSET:
-			fatal("mode_str type not set", 0);
+			fatal("mode_str type not set");
 			break;
 		default:
-			fatal("mode_str type unknown", 0);
+			fatal("mode_str type unknown");
 	}
 
 	for (c = 'a'; c <= 'z' && lower; c++, lower >>= 1)
@@ -443,7 +444,7 @@ mode_reset(struct mode *m, struct mode_str *s)
 	/* Set mode and mode_str to initial state */
 
 	if (!m || !s)
-		fatal("mode or mode_str is null", 0);
+		fatal("mode or mode_str is null");
 
 	enum mode_str_t type = s->type;
 

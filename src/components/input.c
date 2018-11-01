@@ -1,4 +1,6 @@
+#include <errno.h>
 #include <string.h>
+#include <stdlib.h>
 
 #include "src/components/input.h"
 #include "src/utils/utils.h"
@@ -17,7 +19,7 @@ static uint16_t input_hist_size(struct input*);
 static uint16_t input_text_size(struct input*);
 
 void
-input(struct input *inp)
+input_init(struct input *inp)
 {
 	memset(inp, 0, sizeof(*inp));
 
@@ -198,8 +200,10 @@ input_hist_forw(struct input *inp)
 		memcpy(inp->text, str, len);
 	}
 
-	if (inp->hist.current == inp->hist.head)
+	if (inp->hist.current == inp->hist.head) {
 		free(inp->hist.save);
+		inp->hist.save = NULL;
+	}
 
 	inp->head = len;
 	inp->tail = INPUT_LEN_MAX;
@@ -241,7 +245,7 @@ input_hist_push(struct input *inp)
 }
 
 uint16_t
-input_frame(struct input *inp, uint16_t max)
+input_frame(struct input *inp, char *buf, uint16_t max)
 {
 	/*  Keep the input head in view, reframing if the cursor would be
 	 *  drawn outside [A, B] as a function of the given max width
@@ -264,18 +268,18 @@ input_frame(struct input *inp, uint16_t max)
 	 * Set the window 2/3 of the text area width backwards from the head
 	 * and returns the cursor position relative to the window */
 
-	if (inp->window >= inp->head || (inp->window + max) <= inp->head)
-		inp->window = ((max * 2 / 3) >= inp->head) ? 0 : inp->head - (max * 2 / 3);
+	if (inp->window >= inp->head || (inp->window + (max - 1)) <= inp->head)
+		inp->window = (((max - 1) * 2 / 3) >= inp->head) ? 0 : inp->head - ((max - 1) * 2 / 3);
+
+	input_write(inp, buf, max, inp->window);
 
 	return (inp->head - inp->window);
 }
 
 uint16_t
-input_write(struct input *inp, char *buf, uint16_t max)
+input_write(struct input *inp, char *buf, uint16_t max, uint16_t pos)
 {
-	/* Write the framed input to `buf` as a null terminated string */
-
-	uint16_t i = inp->window,
+	uint16_t i = pos,
 	         j = 0;
 
 	while (max > 1 && i < inp->head) {
@@ -305,9 +309,9 @@ input_text_copy(struct input *inp)
 		return NULL;
 
 	if ((str = malloc(len + 1)) == NULL)
-		fatal("malloc", errno);
+		fatal("malloc: %s", strerror(errno));
 
-	input_write(inp, str, len + 1);
+	input_write(inp, str, len + 1, 0);
 
 	return str;
 }

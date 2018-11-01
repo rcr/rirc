@@ -286,7 +286,7 @@ send_mesg(struct server *s, struct channel *chan, char *mesg)
 		int ret;
 
 		if (*mesg == 0)
-			fatal("message is empty", 0);
+			fatal("message is empty");
 
 		else if (chan->type != CHANNEL_T_CHANNEL && chan->type != CHANNEL_T_PRIVATE)
 			newline(chan, 0, "-!!-", "Error: This is not a channel");
@@ -294,7 +294,7 @@ send_mesg(struct server *s, struct channel *chan, char *mesg)
 		else if (chan->parted)
 			newline(chan, 0, "-!!-", "Error: Parted from channel");
 
-		else if ((ret = io_sendf(s->connection, "PRIVMSG %s :%s", chan->name.str, mesg)))
+		else if ((ret = io_sendf(s->connection, "PRIVMSG %s :%s", chan->name, mesg)))
 			newlinef(chan, 0, "-!!-", "sendf fail: %s", io_err(ret));
 
 		else
@@ -343,7 +343,7 @@ send_me(char *mesg, struct server *s, struct channel *c)
 	if (c->parted)
 		fail(c, "Error: Parted from channel");
 
-	if ((ret= io_sendf(s->connection, "PRIVMSG %s :\x01""ACTION %s\x01", c->name.str, mesg)))
+	if ((ret= io_sendf(s->connection, "PRIVMSG %s :\x01""ACTION %s\x01", c->name, mesg)))
 		failf(c, "sendf fail: %s", io_err(ret));
 
 	newlinef(c, 0, "*", "%s %s", s->nick, mesg);
@@ -400,7 +400,7 @@ send_join(char *mesg, struct server *s, struct channel *c)
 		if (!c->parted)
 			fail(c, "Error: Not parted from channel");
 
-		if ((ret = io_sendf(s->connection, "JOIN %s", c->name.str)))
+		if ((ret = io_sendf(s->connection, "JOIN %s", c->name)))
 			failf(c, "sendf fail: %s", io_err(ret));
 	}
 
@@ -456,7 +456,7 @@ send_part(char *mesg, struct server *s, struct channel *c)
 		if (c->parted)
 			fail(c, "Error: Already parted from channel");
 
-		if ((ret = io_sendf(s->connection, "PART %s :%s", c->name.str, DEFAULT_QUIT_MESG)))
+		if ((ret = io_sendf(s->connection, "PART %s :%s", c->name, DEFAULT_QUIT_MESG)))
 			failf(c, "sendf fail: %s", io_err(ret));
 	}
 
@@ -516,10 +516,10 @@ send_topic(char *mesg, struct server *s, struct channel *c)
 		mesg++;
 
 	if (*mesg == '\0') {
-		if ((ret = io_sendf(s->connection, "TOPIC %s", c->name.str)))
+		if ((ret = io_sendf(s->connection, "TOPIC %s", c->name)))
 			failf(c, "sendf fail: %s", io_err(ret));
 	} else {
-		if ((ret = io_sendf(s->connection, "TOPIC %s :%s", c->name.str, mesg)))
+		if ((ret = io_sendf(s->connection, "TOPIC %s :%s", c->name, mesg)))
 			failf(c, "sendf fail: %s", io_err(ret));
 	}
 
@@ -558,6 +558,8 @@ send_quit(char *mesg, struct server *s, struct channel *c)
 
 	if (!s)
 		fail(c, "Error: Not connected to server");
+
+	s->quitting = 1;
 
 	if ((ret = io_sendf(s->connection, "QUIT :%s", (*mesg ? mesg : DEFAULT_QUIT_MESG))))
 		failf(c, "sendf fail: %s", io_err(ret));
@@ -865,17 +867,12 @@ recv_ctcp_rpl(struct parsed_mesg *p, struct server *s)
 static int
 recv_error(struct parsed_mesg *p, struct server *s)
 {
-	/* ERROR :<message> */
+	/* ERROR :<message>
+	 *
+	 * Sent to clients before terminating their connection
+	 */
 
-	struct channel *c = s->channel;
-
-	newlinef(c, 0, "ERROR", "%s", (p->trailing ? p->trailing : "Remote hangup"));
-
-	for (c = c->next; c != s->channel; c = c->next) {
-		newlinef(c, 0, "-!!-", "(disconnected)");
-	}
-
-	io_dx(s->connection);
+	newlinef(s->channel, 0, (s->quitting ? "--" : "ERROR"), "%s", p->trailing);
 
 	return 0;
 }
@@ -909,7 +906,7 @@ recv_join(struct parsed_mesg *p, struct server *s)
 			failf(s->channel, "JOIN: channel '%s' not found", chan);
 
 		if (user_list_add(&(c->users), p->from, MODE_EMPTY) == USER_ERR_DUPLICATE)
-			failf(s->channel, "Error: user '%s' alread on channel '%s'", p->from, c->name.str);
+			failf(s->channel, "Error: user '%s' alread on channel '%s'", p->from, c->name);
 
 		if (c->users.count <= jpq_threshold)
 			newlinef(c, 0, ">", "%s!%s has joined %s", p->from, p->host, chan);
@@ -1058,7 +1055,7 @@ recv_mode_chanmodes(struct parsed_mesg *p, const struct mode_cfg *cfg, struct ch
 						newlinef(c, 0, "--", "%s%s%s mode: %c%c",
 								(p->from ? p->from : ""),
 								(p->from ? " set " : ""),
-								c->name.str,
+								c->name,
 								(mode_set == MODE_SET_ON ? '+' : '-'),
 								flag);
 					}
@@ -1078,7 +1075,7 @@ recv_mode_chanmodes(struct parsed_mesg *p, const struct mode_cfg *cfg, struct ch
 						newlinef(c, 0, "--", "%s%s%s mode: %c%c %s",
 								(p->from ? p->from : ""),
 								(p->from ? " set " : ""),
-								c->name.str,
+								c->name,
 								(mode_set == MODE_SET_ON ? '+' : '-'),
 								flag,
 								modearg);
@@ -1230,7 +1227,7 @@ recv_nick(struct parsed_mesg *p, struct server *s)
 			newlinef(c, 0, "--", "%s  >>  %s", p->from, nick);
 
 		else if (ret == USER_ERR_DUPLICATE)
-			newlinef(c, 0, "-!!-", "Error: user '%s' alread on channel '%s'", p->from, c->name.str);
+			newlinef(c, 0, "-!!-", "Error: user '%s' alread on channel '%s'", p->from, c->name);
 
 	} while ((c = c->next) != s->channel);
 
@@ -1318,7 +1315,7 @@ recv_numeric(struct parsed_mesg *p, struct server *s)
 		do {
 			//TODO: channel_list_foreach
 			if (c->type == CHANNEL_T_CHANNEL && !c->parted) {
-				if ((ret = io_sendf(s->connection, "JOIN %s", c->name.str)))
+				if ((ret = io_sendf(s->connection, "JOIN %s", c->name)))
 					failf(s->channel, "sendf fail: %s", io_err(ret));
 			}
 			c = c->next;

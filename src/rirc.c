@@ -1,5 +1,9 @@
+#include <errno.h>
 #include <getopt.h>
 #include <pwd.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
 
 #include "config.h"
@@ -12,7 +16,7 @@
 	     fprintf(stderr, "\n"); \
 	     fprintf(stderr, "%s --help for usage\n", runtime_name); \
 	     exit(EXIT_FAILURE); \
-	} while (0);
+	} while (0)
 
 static const char* opt_arg_str(char);
 static const char* getpwuid_pw_name(void);
@@ -81,8 +85,9 @@ opt_arg_str(char c)
 		case 'u': return "-u/--username";
 		case 'r': return "-r/--realname";
 		default:
-			fatal("unknown option flag", 0);
+			fatal("unknown option flag '%c'", c);
 	}
+	return NULL;
 }
 
 static const char*
@@ -93,7 +98,7 @@ getpwuid_pw_name(void)
 	errno = 0;
 
 	if (!passwd && !(passwd = getpwuid(geteuid())))
-		fatal("getpwuid", (errno ? errno : ENOENT));
+		fatal("getpwuid: %s", strerror((errno ? errno : ENOENT)));
 
 	return passwd->pw_name;
 }

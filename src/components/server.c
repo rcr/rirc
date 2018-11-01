@@ -1,4 +1,5 @@
 #include <ctype.h>
+#include <errno.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -31,7 +32,7 @@ server(const char *host, const char *port, const char *pass, const char *user, c
 	struct server *s;
 
 	if ((s = calloc(1, sizeof(*s))) == NULL)
-		fatal("calloc", errno);
+		fatal("calloc: %s", strerror(errno));
 
 	s->host = strdup(host);
 	s->port = strdup(port);
@@ -131,6 +132,15 @@ server_list_del(struct server_list *sl, struct server *s)
 	s->prev = NULL;
 
 	return s;
+}
+
+void
+server_reset(struct server *s)
+{
+	mode_reset(&(s->usermodes), &(s->mode_str));
+	s->ping = 0;
+	s->quitting = 0;
+	s->nicks.next = 0;
 }
 
 void
@@ -235,7 +245,7 @@ server_set_nicks(struct server *s, const char *nicks)
 	s->nicks.base = base;
 
 	if ((s->nicks.set = malloc(sizeof(*s->nicks.set) * n)) == NULL)
-		fatal("malloc", errno);
+		fatal("malloc: %s", strerror(errno));
 
 	for (const char **set = s->nicks.set; n; n--, set++) {
 		*set = base;
@@ -392,10 +402,4 @@ server_nicks_next(struct server *s)
 
 		server_nick_set(s, nick_rand);
 	}
-}
-
-void
-server_nicks_reset(struct server *s)
-{
-	s->nicks.next = 0;
 }
