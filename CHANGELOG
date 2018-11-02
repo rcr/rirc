@@ -2,10 +2,15 @@
 Summary of notable changes and features
 
 ## Unreleased (dev)
+### Refactor
  - input module complete rewrite
    - generic word completion API
    - add full test coverage
    - performance and memory usage improvements
+### Fixes
+ - fix error in sending PING
+ - fix error messages on socket disconnect
+ - close/cleanup servers on :quit
 
 ## [0.1.0]
 ### Initial release

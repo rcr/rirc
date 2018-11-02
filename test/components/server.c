@@ -1,7 +1,11 @@
 #include "test/test.h"
 #include "src/components/server.c"
-#include "src/components/mode.c"   /* mode_config_defaults */
-#include "src/utils/utils.c"       /* skip_sp */
+#include "src/components/channel.c"
+#include "src/components/user.c"
+#include "src/components/mode.c"
+#include "src/components/input.c"
+#include "src/components/buffer.c"
+#include "src/utils/utils.c"
 
 void
 channel_set_current(struct channel *c)
@@ -31,11 +35,25 @@ connection(const void *s, const char *h, const char *p)
 	return (void *)(s);
 }
 
+int
+io_dx(struct connection *c)
+{
+	/* Mock */
+	UNUSED(c);
+	return 0;
+}
+
+void
+io_free(struct connection *c)
+{
+	/* Mock */
+	UNUSED(c);
+}
+
 void
 newline(struct channel *c, enum buffer_line_t t, const char *f, const char *m)
 {
 	/* Mock */
-
 	UNUSED(c);
 	UNUSED(t);
 	UNUSED(f);
@@ -46,7 +64,6 @@ void
 newlinef(struct channel *c, enum buffer_line_t t, const char *f, const char *m, ...)
 {
 	/* Mock */
-
 	UNUSED(c);
 	UNUSED(t);
 	UNUSED(f);

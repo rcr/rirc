@@ -34,26 +34,23 @@ server(const char *host, const char *port, const char *pass, const char *user, c
 	if ((s = calloc(1, sizeof(*s))) == NULL)
 		fatal("calloc: %s", strerror(errno));
 
+	if ((s->connection = connection(s, host, port)) == NULL) {
+		free(s);
+		return NULL;
+	}
+
 	s->host = strdup(host);
 	s->port = strdup(port);
 	s->pass = pass ? strdup(pass) : NULL;
 	s->username = strdup(user);
 	s->realname = strdup(real);
-
+	s->channel = channel(host, CHANNEL_T_SERVER);
 	s->mode_str.type = MODE_STR_USERMODE;
 
 	mode_cfg(&(s->mode_cfg), NULL, MODE_CFG_DEFAULTS);
 
-	// FIXME: channel()
-	s->channel = new_channel(host, s, CHANNEL_T_SERVER);
-
-	// move this to the state_new_server
+	// FIXME: move this to state_add_server, remove state.h dependancy
 	channel_set_current(s->channel);
-
-	if ((s->connection = connection(s, host, port)) == NULL) {
-		server_free(s);
-		return NULL;
-	}
 
 	return s;
 }
@@ -154,7 +151,20 @@ server_free(struct server *s)
 	free((void *)s->nick);
 	free((void *)s->nicks.base);
 	free((void *)s->nicks.set);
+
+	channel_free(s->channel);
+	channel_list_free(&(s->clist));
+	user_list_free(&(s->ignore));
+
+	// FIXME:
+	// io_dx first? free will fatal, need
+	// to ensure that the connection wasn't
+	// open at closing time?
+	io_dx(s->connection);
+	io_free(s->connection);
+
 	free(s);
+
 }
 
 void
