@@ -167,7 +167,7 @@ io_soc_close(int *soc)
 static void
 io_soc_shutdown(int soc)
 {
-	if (soc >= 0 && shutdown(soc, SHUT_RDWR) < 0) {
+	if (soc >= 0 && shutdown(soc, SHUT_RDWR) < 0 && errno != ENOTCONN) {
 		fatal("shutdown: %s", strerror(errno));
 	}
 }
