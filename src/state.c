@@ -20,29 +20,8 @@
 // See: https://vt100.net/docs/vt100-ug/chapter3.html
 #define CTRL(k) ((k) & 0x1f)
 
-static struct
-{
-	struct channel *current_channel; /* the current channel being drawn */
-	struct channel *default_channel; /* the default rirc channel at startup */
-
-	struct server_list servers;
-
-	union draw draw;
-} state;
-
-struct server_list*
-state_server_list(void)
-{
-	return &state.servers;
-}
-
 static void state_term(void);
-
 static void _newline(struct channel*, enum buffer_line_t, const char*, const char*, va_list);
-
-struct channel* current_channel(void) { return state.current_channel; }
-struct channel* default_channel(void) { return state.default_channel; }
-
 static void state_io_cxed(struct server*);
 static void state_io_dxed(struct server*, va_list);
 static void state_io_ping(struct server*, unsigned int);
@@ -55,6 +34,26 @@ static int state_input_action(const char*, size_t);
 static uint16_t state_complete(char*, uint16_t, uint16_t, int);
 static uint16_t state_complete_list(char*, uint16_t, uint16_t, const char**);
 static uint16_t state_complete_user(char*, uint16_t, uint16_t, int);
+
+static struct
+{
+	struct channel *current_channel; /* the current channel being drawn */
+	struct channel *default_channel; /* the default rirc channel at startup */
+	struct server_list servers;
+	union draw draw;
+} state;
+
+struct server_list*
+state_server_list(void)
+{
+	return &state.servers;
+}
+
+struct channel*
+current_channel(void)
+{
+	return state.current_channel;
+}
 
 /* List of IRC commands for tab completion */
 static const char *irc_list[] = {
@@ -121,19 +120,27 @@ state_term(void)
 {
 	/* Exit handler; must return normally */
 
+	struct server *s1, *s2;
+
+	channel_free(state.default_channel);
+
+	if ((s1 = state_server_list()->head) == NULL)
+		return;
+
+	do {
+		s2 = s1;
+		s1 = s2->next;
+		server_free(s2);
+	} while (s1 != state_server_list()->head);
+
 	/* Reset terminal colours */
 	printf("\x1b[38;0;m");
 	printf("\x1b[48;0;m");
 
 #ifndef DEBUG
 	/* Clear screen */
-	if (!fatal_exit) {
+	if (!fatal_exit)
 		printf("\x1b[H\x1b[J");
-		channel_free(state.default_channel);
-		/* TODO:
-		 * here iterate the server list and quit with some default message,
-		 * call server_free */
-	}
 #endif
 }
 
@@ -342,9 +349,13 @@ action_close_server(char c)
 		if ((state.current_channel = c->server->next->channel) == c->server->channel)
 			state.current_channel = state.default_channel;
 
-		if ((ret = io_sendf(s->connection, "QUIT %s", DEFAULT_QUIT_MESG)))
+		if ((ret = io_sendf(s->connection, "QUIT :%s", DEFAULT_QUIT_MESG)))
 			newlinef(s->channel, 0, "-!!-", "sendf fail: %s", io_err(ret));
 
+		// FIXME:
+		// - state_server_free shouldn't have to call io/dx/free.
+		// - server objects can have void* connections and remove
+		//   the dependancy on io.h
 		io_dx(s->connection);
 		server_list_del(state_server_list(), s);
 		io_free(s->connection);
@@ -821,7 +832,6 @@ send_cmnd(struct channel *c, char *buf)
 	}
 
 	if (!strcasecmp(cmnd, "quit")) {
-		/* TODO: send optional quit message, close servers, free */
 		exit(EXIT_SUCCESS);
 	}
 

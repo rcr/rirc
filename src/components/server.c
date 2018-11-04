@@ -148,6 +148,13 @@ server_reset(struct server *s)
 void
 server_free(struct server *s)
 {
+	// FIXME: add this back when removing it from
+	// server's channel_list
+	// channel_free(s->channel);
+	channel_list_free(&(s->clist));
+	user_list_free(&(s->ignore));
+	io_free(s->connection);
+
 	free((void *)s->host);
 	free((void *)s->port);
 	free((void *)s->pass);
@@ -156,23 +163,7 @@ server_free(struct server *s)
 	free((void *)s->nick);
 	free((void *)s->nicks.base);
 	free((void *)s->nicks.set);
-
-	// FIXME: add this back when removing it from
-	// server's channel_list
-	// channel_free(s->channel);
-
-	channel_list_free(&(s->clist));
-	user_list_free(&(s->ignore));
-
-	// FIXME:
-	// io_dx first? free will fatal, need
-	// to ensure that the connection wasn't
-	// open at closing time?
-	io_dx(s->connection);
-	io_free(s->connection);
-
 	free(s);
-
 }
 
 void
