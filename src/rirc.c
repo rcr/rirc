@@ -245,8 +245,7 @@ parse_args(int argc, char **argv)
 			(cli_servers[i].realname ? cli_servers[i].realname : default_realname)
 		);
 
-		if (s == NULL)
-			arg_error("failed to create: %s:%s", cli_servers[i].host, cli_servers[i].port);
+		s->connection = connection(s, cli_servers[i].host, cli_servers[i].port);
 
 		if (server_list_add(state_server_list(), s))
 			arg_error("duplicate server: %s:%s", cli_servers[i].host, cli_servers[i].port);
@@ -258,6 +257,8 @@ parse_args(int argc, char **argv)
 			arg_error("invalid nicks: '%s'", cli_servers[i].nicks);
 
 		cli_servers[i].s = s;
+
+		channel_set_current(s->channel);
 	}
 
 	for (size_t i = 0; i < n_servers; i++)

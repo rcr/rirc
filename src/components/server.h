@@ -4,7 +4,6 @@
 #include "src/components/buffer.h"
 #include "src/components/channel.h"
 #include "src/components/mode.h"
-#include "src/io.h"
 
 struct server
 {
@@ -22,7 +21,6 @@ struct server
 	} nicks;
 	struct channel *channel;
 	struct channel_list clist;
-	struct connection *connection;
 	struct mode usermodes;
 	struct mode_str mode_str;
 	struct mode_cfg mode_cfg;
@@ -31,6 +29,7 @@ struct server
 	struct user_list ignore;
 	unsigned ping;
 	unsigned quitting : 1;
+	void *connection;
 };
 
 struct server_list

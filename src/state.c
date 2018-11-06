@@ -130,6 +130,7 @@ state_term(void)
 	do {
 		s2 = s1;
 		s1 = s2->next;
+		io_free(s2->connection);
 		server_free(s2);
 	} while (s1 != state_server_list()->head);
 
@@ -861,9 +862,9 @@ send_cmnd(struct channel *c, char *buf)
 				channel_set_current(s->channel);
 				newlinef(s->channel, 0, "-!!-", "already connected to %s:%s", host, port);
 			} else {
-				if ((s = server(host, port, pass, user, real)) == NULL)
-					fatal("failed to create server");
 
+				s = server(host, port, pass, user, real);
+				s->connection = connection(s, host, port);
 				server_list_add(state_server_list(), s);
 				channel_set_current(s->channel);
 				io_cx(s->connection);

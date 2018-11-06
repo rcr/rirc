@@ -8,49 +8,6 @@
 #include "src/utils/utils.c"
 
 void
-channel_set_current(struct channel *c)
-{
-	UNUSED(c);
-}
-
-struct channel*
-new_channel(const char *n, struct server *s, enum channel_t t)
-{
-	/* FIXME: mock new_channel until channel() is implemented */
-
-	UNUSED(n);
-	UNUSED(s);
-	UNUSED(t);
-	return NULL;
-}
-
-struct connection*
-connection(const void *s, const char *h, const char *p)
-{
-	/* Mock */
-
-	UNUSED(s);
-	UNUSED(h);
-	UNUSED(p);
-	return (void *)(s);
-}
-
-int
-io_dx(struct connection *c)
-{
-	/* Mock */
-	UNUSED(c);
-	return 0;
-}
-
-void
-io_free(struct connection *c)
-{
-	/* Mock */
-	UNUSED(c);
-}
-
-void
 newline(struct channel *c, enum buffer_line_t t, const char *f, const char *m)
 {
 	/* Mock */

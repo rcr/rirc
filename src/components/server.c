@@ -34,11 +34,6 @@ server(const char *host, const char *port, const char *pass, const char *user, c
 	if ((s = calloc(1, sizeof(*s))) == NULL)
 		fatal("calloc: %s", strerror(errno));
 
-	if ((s->connection = connection(s, host, port)) == NULL) {
-		free(s);
-		return NULL;
-	}
-
 	s->host = strdup(host);
 	s->port = strdup(port);
 	s->pass = pass ? strdup(pass) : NULL;
@@ -46,16 +41,11 @@ server(const char *host, const char *port, const char *pass, const char *user, c
 	s->realname = strdup(real);
 	s->channel = channel(host, CHANNEL_T_SERVER);
 	s->mode_str.type = MODE_STR_USERMODE;
-
 	mode_cfg(&(s->mode_cfg), NULL, MODE_CFG_DEFAULTS);
-
-	/* FIXME: remove server pointer from channel, remove server's channel
-	 * from clist*/
+	/* FIXME: remove server pointer from channel, remove
+	 * server's channel from clist */
 	s->channel->server = s;
 	channel_list_add(&(s->clist), s->channel);
-
-	// FIXME: move this to state_add_server, remove state.h dependancy
-	channel_set_current(s->channel);
 
 	return s;
 }
@@ -153,7 +143,6 @@ server_free(struct server *s)
 	// channel_free(s->channel);
 	channel_list_free(&(s->clist));
 	user_list_free(&(s->ignore));
-	io_free(s->connection);
 
 	free((void *)s->host);
 	free((void *)s->port);

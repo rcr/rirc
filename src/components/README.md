@@ -9,6 +9,8 @@ Stateful component hierarchy
        |   |
        |   |__*buffer_line
        |
+       |__channel
+       |
        |__channel_list
        |   |
        |   |__*channel
