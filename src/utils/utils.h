@@ -15,26 +15,23 @@
 
 #define UNUSED(X) ((void)(X))
 
+#define message(TYPE, ...) \
+	fprintf(stderr, "%s %s:%d:%s ", (TYPE), __FILE__, __LINE__, __func__); \
+	fprintf(stderr, __VA_ARGS__); \
+	fprintf(stderr, "\n");
+
 #if (defined DEBUG) && !(defined TESTING)
-#define DEBUG_MSG(...) \
-	do { fprintf(stderr, "%s:%d:%-12s\t", __FILE__, __LINE__, __func__); \
-	     fprintf(stderr,  __VA_ARGS__); \
-	     fprintf(stderr, "\n"); \
-	} while (0)
+#define debug(...) \
+	do { message("DEBUG", __VA_ARGS__); } while (0)
 #else
-#define DEBUG_MSG(...)
+#define debug(...)
 #endif
 
-/* Irrecoverable error
- *   precluded in test.h to aggregate fatal errors in testcases */
 #ifndef fatal
 #define fatal(...) \
-	do { fprintf(stderr, "FATAL ERROR: %s:%d:%s: ", __FILE__, __LINE__, __func__); \
-	     fprintf(stderr, __VA_ARGS__); \
-	     fprintf(stderr, "\n"); \
-	     fatal_exit = 1; \
-	     exit(EXIT_FAILURE); \
-	} while (0)
+	do { message("FATAL", __VA_ARGS__); exit(EXIT_FAILURE); } while (0)
+#define fatal_noexit(...) \
+	do { message("FATAL", __VA_ARGS__); } while (0)
 #endif
 
 /* FIXME: don't seperate trailing from params
@@ -68,7 +65,5 @@ void* memdup(const void*, size_t);
 int check_pinged(const char*, const char*);
 int parse_mesg(struct parsed_mesg*, char*);
 int skip_sp(char**);
-
-extern int fatal_exit;
 
 #endif

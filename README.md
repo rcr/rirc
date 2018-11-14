@@ -1,9 +1,8 @@
 [![Coverity Scan Build](https://scan.coverity.com/projects/4940/badge.svg)](https://scan.coverity.com/projects/4940)
 ![Sonarcloud](https://sonarcloud.io/api/project_badges/measure?project=rcr_rirc&metric=ncloc)
+<p align="center"><img src="https://raw.githubusercontent.com/rcr/rirc/master/docs/birb.jpg" alt="birb"/></p>
 
 # rirc
-![rirc](docs/birb.jpg?raw=true "rirc")
-
 A minimalistic irc client written in C.
 
 While still under development, it currently supports

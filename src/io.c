@@ -62,14 +62,13 @@
 #error "IO_RECONNECT_BACKOFF_MAX: [0, 86400]"
 #endif
 
-#define PT_CF(X) do { int ret; if ((ret = (X)) < 0) fatal("%s: %s", (#X), strerror(ret)); } while (0)
+#define PT_CF(X) do { io_check_fatal((#X), (X)); } while (0)
 #define PT_LK(X) PT_CF(pthread_mutex_lock((X)))
 #define PT_UL(X) PT_CF(pthread_mutex_unlock((X)))
-#define PT_CB(R, ...) \
-	do { \
-		PT_LK(&cb_mutex); \
-		io_cb((R), __VA_ARGS__); \
-		PT_UL(&cb_mutex); \
+#define PT_CB(...) \
+	do { PT_LK(&cb_mutex); \
+	     io_cb(__VA_ARGS__); \
+	     PT_UL(&cb_mutex); \
 	} while (0)
 
 enum io_err_t
@@ -80,13 +79,12 @@ enum io_err_t
 	IO_ERR_DXED,
 	IO_ERR_FMT,
 	IO_ERR_SEND,
-	IO_ERR_TERM,
 	IO_ERR_TRUNC,
 };
 
 struct io_lock
 {
-	pthread_cond_t  cnd;
+	pthread_cond_t cnd;
 	pthread_mutex_t mtx;
 	volatile int predicate;
 };
@@ -103,7 +101,6 @@ struct connection
 		IO_ST_CXNG, /* Socket connection in progress */
 		IO_ST_CXED, /* Socket connected */
 		IO_ST_PING, /* Socket connected, network state in question */
-		IO_ST_TERM /* Terminal thread state */
 	} st_c, /* current thread state */
 	  st_f; /* forced thread state */
 	char ip[INET6_ADDRSTRLEN];
@@ -116,6 +113,7 @@ struct connection
 	} read;
 	struct io_lock lock;
 	unsigned rx_backoff;
+	pthread_t pt_tid;
 };
 
 static const char* io_strerror(struct connection*, int);
@@ -124,29 +122,31 @@ static enum io_state_t io_state_cxng(struct connection*);
 static enum io_state_t io_state_dxed(struct connection*);
 static enum io_state_t io_state_ping(struct connection*);
 static enum io_state_t io_state_rxng(struct connection*);
-static void io_init(void);
-static void io_init_sig(void);
-static void io_init_tty(void);
-static void io_lock_init(struct io_lock*);
-static void io_lock_term(struct io_lock*);
+static void io_check_fatal(const char*, int);
 static void io_lock_wait(struct io_lock*, struct timespec*);
-static void io_lock_wake(struct io_lock*);
 static void io_net_set_timeout(struct connection*, unsigned);
 static void io_recv(struct connection*, const char*, size_t);
+static void io_sig_init(void);
 static void io_soc_close(int*);
 static void io_soc_shutdown(int);
 static void io_state_force(struct connection*, enum io_state_t);
-static void io_term(void);
-static void io_term_tty(void);
-static void io_tty_winsize(void);
+static void io_tty_init(void);
+static void io_tty_term(void);
+static void io_tty_winsize(unsigned*, unsigned*);
 static void* io_thread(void*);
 
-static pthread_mutex_t cb_mutex;
-static pthread_once_t init_once = PTHREAD_ONCE_INIT;
+static int io_running;
+static pthread_mutex_t cb_mutex = PTHREAD_MUTEX_INITIALIZER;
 static struct termios term;
-static struct winsize tty_ws;
 static volatile sig_atomic_t flag_sigwinch_cb; /* sigwinch callback */
 static volatile sig_atomic_t flag_tty_resized; /* sigwinch ws resize */
+
+static void
+io_check_fatal(const char *f, int ret)
+{
+	if (ret < 0)
+		fatal("%s: %s", f, strerror(ret));
+}
 
 static const char*
 io_strerror(struct connection *c, int errnum)
@@ -173,56 +173,6 @@ io_soc_shutdown(int soc)
 }
 
 static void
-io_init(void)
-{
-	pthread_mutexattr_t m_attr;
-
-	PT_CF(pthread_mutexattr_init(&m_attr));
-	PT_CF(pthread_mutexattr_settype(&m_attr, PTHREAD_MUTEX_ERRORCHECK));
-	PT_CF(pthread_mutex_init(&cb_mutex, &m_attr));
-	PT_CF(pthread_mutexattr_destroy(&m_attr));
-
-	/* atexit doesn't set errno */
-	if (atexit(io_term) != 0)
-		fatal("atexit");
-}
-
-static void
-io_term(void)
-{
-	int ret;
-
-	if ((ret = pthread_mutex_trylock(&cb_mutex)) < 0 && ret != EBUSY)
-		fatal("pthread_mutex_trylock: %s", strerror(ret));
-
-	PT_UL(&cb_mutex);
-	PT_CF(pthread_mutex_destroy(&cb_mutex));
-}
-
-static void
-io_lock_init(struct io_lock *lock)
-{
-	pthread_mutexattr_t m_attr;
-
-	PT_CF(pthread_mutexattr_init(&m_attr));
-	PT_CF(pthread_mutexattr_settype(&m_attr, PTHREAD_MUTEX_RECURSIVE));
-
-	PT_CF(pthread_cond_init(&(lock->cnd), NULL));
-	PT_CF(pthread_mutex_init(&(lock->mtx), &m_attr));
-
-	PT_CF(pthread_mutexattr_destroy(&m_attr));
-
-	lock->predicate = 0;
-}
-
-static void
-io_lock_term(struct io_lock *lock)
-{
-	PT_CF(pthread_cond_destroy(&(lock->cnd)));
-	PT_CF(pthread_mutex_destroy(&(lock->mtx)));
-}
-
-static void
 io_lock_wait(struct io_lock *lock, struct timespec *timeout)
 {
 	PT_LK(&(lock->mtx));
@@ -245,15 +195,6 @@ io_lock_wait(struct io_lock *lock, struct timespec *timeout)
 	PT_UL(&(lock->mtx));
 }
 
-static void
-io_lock_wake(struct io_lock *lock)
-{
-	PT_LK(&(lock->mtx));
-	lock->predicate = 1;
-	PT_CF(pthread_cond_signal(&(lock->cnd)));
-	PT_UL(&(lock->mtx));
-}
-
 struct connection*
 connection(const void *obj, const char *host, const char *port)
 {
@@ -267,17 +208,9 @@ connection(const void *obj, const char *host, const char *port)
 	c->port = strdup(port);
 	c->st_c = IO_ST_DXED;
 	c->st_f = IO_ST_INVALID;
-	io_lock_init(&(c->lock));
-
-	PT_CF(pthread_once(&init_once, io_init));
-
-	pthread_attr_t pt_attr;
-	pthread_t pt_tid;
-
-	PT_CF(pthread_attr_init(&pt_attr));
-	PT_CF(pthread_attr_setdetachstate(&pt_attr, PTHREAD_CREATE_DETACHED));
-	PT_CF(pthread_create(&pt_tid, &pt_attr, io_thread, c));
-	PT_CF(pthread_attr_destroy(&pt_attr));
+	PT_CF(pthread_cond_init(&(c->lock.cnd), NULL));
+	PT_CF(pthread_mutex_init(&(c->lock.mtx), NULL));
+	PT_CF(pthread_create(&c->pt_tid, NULL, io_thread, c));
 
 	return c;
 }
@@ -305,7 +238,7 @@ io_sendf(struct connection *c, const char *fmt, ...)
 	if (len >= sizeof(sendbuf) - 2)
 		return IO_ERR_TRUNC;
 
-	DEBUG_MSG("send: (%zu) %s", len, sendbuf);
+	debug("send: (%zu) %s", len, sendbuf);
 
 	sendbuf[len++] = '\r';
 	sendbuf[len++] = '\n';
@@ -329,7 +262,6 @@ io_cx(struct connection *c)
 		case IO_ST_CXNG: err = IO_ERR_CXNG; break;
 		case IO_ST_CXED: err = IO_ERR_CXED; break;
 		case IO_ST_PING: err = IO_ERR_CXED; break;
-		case IO_ST_TERM: err = IO_ERR_TERM; break;
 		default:
 			io_state_force(c, IO_ST_CXNG);
 	}
@@ -350,7 +282,6 @@ io_dx(struct connection *c)
 
 	switch (c->st_c) {
 		case IO_ST_DXED: err = IO_ERR_DXED; break;
-		case IO_ST_TERM: err = IO_ERR_TERM; break;
 		default:
 			io_state_force(c, IO_ST_DXED);
 	}
@@ -363,11 +294,16 @@ io_dx(struct connection *c)
 void
 io_free(struct connection *c)
 {
-	/* Force a socket thread into the IO_ST_TERM state */
+	pthread_t pt_tid = c->pt_tid;
 
-	PT_LK(&(c->lock.mtx));
-	io_state_force(c, IO_ST_TERM);
-	PT_UL(&(c->lock.mtx));
+	PT_CF(pthread_cancel(pt_tid));
+	PT_CF(pthread_join(pt_tid, NULL));
+	PT_CF(pthread_cond_destroy(&(c->lock.cnd)));
+	PT_CF(pthread_mutex_destroy(&(c->lock.mtx)));
+	io_soc_close(&(c->soc));
+	free((void*)c->host);
+	free((void*)c->port);
+	free(c);
 }
 
 static void
@@ -380,14 +316,13 @@ io_state_force(struct connection *c, enum io_state_t st_f)
 	switch (c->st_c) {
 		case IO_ST_DXED: /* io_lock_wait() */
 		case IO_ST_RXNG: /* io_lock_wait() */
-			io_lock_wake(&(c->lock));
+			c->lock.predicate = 1;
+			PT_CF(pthread_cond_signal(&(c->lock.cnd)));
 			break;
 		case IO_ST_CXNG: /* connect() */
 		case IO_ST_CXED: /* recv() */
 		case IO_ST_PING: /* recv() */
 			io_soc_shutdown(c->soc);
-			break;
-		case IO_ST_TERM:
 			break;
 		default:
 			fatal("Unknown net state: %d", c->st_c);
@@ -437,6 +372,7 @@ io_state_cxng(struct connection *c)
 	/* TODO: mutex should protect access to c->soc, else race condition
 	 *       when the main thread tries to shutdown() for cancel */
 	/* TODO: how to cancel getaddrinfo/getnameinfo? */
+	/* FIXME: addrinfo leak if canceled during connection */
 
 	int ret, soc = -1;
 
@@ -592,9 +528,6 @@ io_thread(void *arg)
 
 		PT_UL(&(c->lock.mtx));
 
-		if (c->st_c == IO_ST_TERM)
-			break;
-
 		if (st_f == IO_ST_PING && st_t == IO_ST_CXED)
 			PT_CB(IO_CB_PING_0, c->obj, 0);
 
@@ -607,14 +540,6 @@ io_thread(void *arg)
 		if (st_t == IO_ST_DXED || (st_f == IO_ST_CXNG && st_t == IO_ST_CXED))
 			c->rx_backoff = 0;
 	}
-
-	io_soc_shutdown(c->soc);
-	io_soc_close(&(c->soc));
-	io_lock_term(&(c->lock));
-
-	free((void*)c->host);
-	free((void*)c->port);
-	free(c);
 
 	return NULL;
 }
@@ -632,7 +557,7 @@ io_recv(struct connection *c, const char *buf, size_t n)
 
 			c->read.buf[ci] = 0;
 
-			DEBUG_MSG("recv: (%zu) %s", ci, c->read.buf);
+			debug("recv: (%zu) %s", ci, c->read.buf);
 
 			PT_LK(&cb_mutex);
 			io_cb_read_soc(c->read.buf, ci, c->obj);
@@ -669,7 +594,7 @@ sigaction_sigwinch(int sig)
 }
 
 static void
-io_init_sig(void)
+io_sig_init(void)
 {
 	struct sigaction sa;
 
@@ -682,7 +607,7 @@ io_init_sig(void)
 }
 
 static void
-io_init_tty(void)
+io_tty_init(void)
 {
 	struct termios nterm;
 
@@ -700,27 +625,29 @@ io_init_tty(void)
 	if (tcsetattr(STDIN_FILENO, TCSANOW, &nterm) < 0)
 		fatal("tcsetattr: %s", strerror(errno));
 
-	/* atexit doesn't set errno */
-	if (atexit(io_term_tty) < 0)
+	if (atexit(io_tty_term) != 0)
 		fatal("atexit");
 }
 
 static void
-io_term_tty(void)
+io_tty_term(void)
 {
+	/* Exit handler, must return normally */
+
 	if (tcsetattr(STDIN_FILENO, TCSADRAIN, &term) < 0)
-		fatal("tcsetattr: %s", strerror(errno));
+		fatal_noexit("tcsetattr: %s", strerror(errno));
 }
 
 void
-io_loop(void)
+io_init(void)
 {
-	PT_CF(pthread_once(&init_once, io_init));
+	io_sig_init();
+	io_tty_init();
 
-	io_init_sig();
-	io_init_tty();
+	io_running = 1;
 
-	for (;;) {
+	while (io_running) {
+
 		char buf[128];
 		ssize_t ret = read(STDIN_FILENO, buf, sizeof(buf));
 
@@ -743,29 +670,42 @@ io_loop(void)
 	}
 }
 
-static void
-io_tty_winsize(void)
+void
+io_term(void)
 {
+	io_running = 0;
+}
+
+static void
+io_tty_winsize(unsigned *rows, unsigned *cols)
+{
+	static struct winsize tty_ws;
+
 	if (flag_tty_resized == 0) {
 		flag_tty_resized = 1;
 
 		if (ioctl(0, TIOCGWINSZ, &tty_ws) < 0)
 			fatal("ioctl: %s", strerror(errno));
 	}
+
+	*rows = tty_ws.ws_row;
+	*cols = tty_ws.ws_col;
 }
 
 unsigned
 io_tty_cols(void)
 {
-	io_tty_winsize();
-	return tty_ws.ws_col;
+	unsigned rows, cols;
+	io_tty_winsize(&rows, &cols);
+	return cols;
 }
 
 unsigned
 io_tty_rows(void)
 {
-	io_tty_winsize();
-	return tty_ws.ws_row;
+	unsigned rows, cols;
+	io_tty_winsize(&rows, &cols);
+	return rows;
 }
 
 const char*
@@ -778,7 +718,6 @@ io_err(int err)
 		case IO_ERR_DXED:  return "socket not connected";
 		case IO_ERR_FMT:   return "failed to format message";
 		case IO_ERR_SEND:  return "failed to send message";
-		case IO_ERR_TERM:  return "thread is terminating";
 		case IO_ERR_TRUNC: return "data truncated";
 		default:
 			return "unknown error";

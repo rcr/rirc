@@ -141,7 +141,9 @@ server_free(struct server *s)
 	// FIXME: add this back when removing it from
 	// server's channel_list
 	// channel_free(s->channel);
+
 	channel_list_free(&(s->clist));
+	channel_list_free(&(s->ulist));
 	user_list_free(&(s->ignore));
 
 	free((void *)s->host);
@@ -181,7 +183,7 @@ server_set_004(struct server *s, char *str)
 
 	if (user_modes) {
 
-		DEBUG_MSG("Setting numeric 004 user_modes: %s", user_modes);
+		debug("Setting numeric 004 user_modes: %s", user_modes);
 
 		if (mode_cfg(&(s->mode_cfg), user_modes, MODE_CFG_USERMODES) != MODE_ERR_NONE)
 			newlinef(c, 0, "-!!-", "invalid numeric 004 user_modes: %s", user_modes);
@@ -189,7 +191,7 @@ server_set_004(struct server *s, char *str)
 
 	if (chan_modes) {
 
-		DEBUG_MSG("Setting numeric 004 chan_modes: %s", chan_modes);
+		debug("Setting numeric 004 chan_modes: %s", chan_modes);
 
 		if (mode_cfg(&(s->mode_cfg), chan_modes, MODE_CFG_CHANMODES) != MODE_ERR_NONE)
 			newlinef(c, 0, "-!!-", "invalid numeric 004 chan_modes: %s", chan_modes);
@@ -350,7 +352,7 @@ server_set_CASEMAPPING(struct server *s, char *val)
 static int
 server_set_CHANMODES(struct server *s, char *val)
 {
-	DEBUG_MSG("Setting numeric 005 CHANMODES: %s", val);
+	debug("Setting numeric 005 CHANMODES: %s", val);
 
 	return (mode_cfg(&(s->mode_cfg), val, MODE_CFG_SUBTYPES) != MODE_ERR_NONE);
 }
@@ -358,7 +360,7 @@ server_set_CHANMODES(struct server *s, char *val)
 static int
 server_set_MODES(struct server *s, char *val)
 {
-	DEBUG_MSG("Setting numeric 005 MODES: %s", val);
+	debug("Setting numeric 005 MODES: %s", val);
 
 	return (mode_cfg(&(s->mode_cfg), val, MODE_CFG_MODES) != MODE_ERR_NONE);
 }
@@ -366,7 +368,7 @@ server_set_MODES(struct server *s, char *val)
 static int
 server_set_PREFIX(struct server *s, char *val)
 {
-	DEBUG_MSG("Setting numeric 005 PREFIX: %s", val);
+	debug("Setting numeric 005 PREFIX: %s", val);
 
 	return (mode_cfg(&(s->mode_cfg), val, MODE_CFG_PREFIX) != MODE_ERR_NONE);
 }
@@ -374,7 +376,7 @@ server_set_PREFIX(struct server *s, char *val)
 void
 server_nick_set(struct server *s, const char *nick)
 {
-	DEBUG_MSG("Setting server nick: %s", nick);
+	debug("Setting server nick: %s", nick);
 
 	if (s->nick)
 		free((void *)s->nick);

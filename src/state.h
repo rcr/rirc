@@ -22,6 +22,7 @@ struct channel* current_channel(void);
 struct server_list* state_server_list(void);
 
 void state_init(void);
+void state_term(void);
 
 // TODO: most of this stuff can be static
 //TODO: move to channel.c, function of server's channel list

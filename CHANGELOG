@@ -10,6 +10,7 @@ Summary of notable changes and features
 ### Fixes
  - fix error in sending PING
  - fix error messages on socket disconnect
+ - fix fatal error on /quit
  - close/cleanup servers on :quit
 
 ## [0.1.0]

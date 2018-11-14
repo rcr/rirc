@@ -36,8 +36,6 @@
 
 static inline int irc_toupper(int);
 
-int fatal_exit;
-
 char*
 getarg(char **str, const char *sep)
 {

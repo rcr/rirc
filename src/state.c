@@ -20,7 +20,6 @@
 // See: https://vt100.net/docs/vt100-ug/chapter3.html
 #define CTRL(k) ((k) & 0x1f)
 
-static void state_term(void);
 static void _newline(struct channel*, enum buffer_line_t, const char*, const char*, va_list);
 static void state_io_cxed(struct server*);
 static void state_io_dxed(struct server*, va_list);
@@ -91,10 +90,6 @@ redraw(void)
 void
 state_init(void)
 {
-	/* atexit doesn't set errno */
-	if (atexit(state_term) != 0)
-		fatal("atexit");
-
 	state.default_channel = state.current_channel = new_channel("rirc", NULL, CHANNEL_T_OTHER);
 
 	/* Splashscreen */
@@ -115,7 +110,7 @@ state_init(void)
 	redraw();
 }
 
-static void
+void
 state_term(void)
 {
 	/* Exit handler; must return normally */
@@ -123,6 +118,13 @@ state_term(void)
 	struct server *s1, *s2;
 
 	channel_free(state.default_channel);
+
+	/* Reset terminal colours */
+	printf("\x1b[38;0;m");
+	printf("\x1b[48;0;m");
+
+	/* Clear screen */
+	printf("\x1b[H\x1b[J");
 
 	if ((s1 = state_server_list()->head) == NULL)
 		return;
@@ -133,16 +135,6 @@ state_term(void)
 		io_free(s2->connection);
 		server_free(s2);
 	} while (s1 != state_server_list()->head);
-
-	/* Reset terminal colours */
-	printf("\x1b[38;0;m");
-	printf("\x1b[48;0;m");
-
-#ifndef DEBUG
-	/* Clear screen */
-	if (!fatal_exit)
-		printf("\x1b[H\x1b[J");
-#endif
 }
 
 void
@@ -598,8 +590,12 @@ buffer_scrollback_forw(struct channel *c)
 	draw_status();
 }
 
-/* Usefull server/channel structure abstractions for drawing */
-
+/* FIXME:
+ *  - These abstractions should take into account the new component hierarchy
+ *    and have the backwards pointer from channel to server removed, in favour
+ *    of passing a current_server() to handlers
+ *  - The server's channel should not be part of the server's channel_list
+ */
 struct channel*
 channel_get_first(void)
 {
@@ -833,7 +829,7 @@ send_cmnd(struct channel *c, char *buf)
 	}
 
 	if (!strcasecmp(cmnd, "quit")) {
-		exit(EXIT_SUCCESS);
+		io_term();
 	}
 
 	if (!strcasecmp(cmnd, "connect")) {
@@ -865,7 +861,10 @@ send_cmnd(struct channel *c, char *buf)
 
 				s = server(host, port, pass, user, real);
 				s->connection = connection(s, host, port);
+
+				// TODO: here just get/set the connection object
 				server_list_add(state_server_list(), s);
+
 				channel_set_current(s->channel);
 				io_cx(s->connection);
 				draw_all();
