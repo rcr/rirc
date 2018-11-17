@@ -740,16 +740,15 @@ state_io_cxed(struct server *s)
 static void
 state_io_dxed(struct server *s, va_list ap)
 {
-	struct channel *c = s->channel->next;
+	struct channel *c = s->channel;
 	va_list ap_copy;
 
 	do {
 		va_copy(ap_copy, ap);
-		_newline(s->channel, 0, "-!!-", va_arg(ap_copy, const char *), ap_copy);
+		_newline(c, 0, "-!!-", va_arg(ap_copy, const char *), ap_copy);
 		va_end(ap_copy);
-
 		channel_reset(c);
-
+		c = c->next;
 	} while (c != s->channel);
 }
 
