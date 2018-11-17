@@ -62,6 +62,12 @@
 #error "IO_RECONNECT_BACKOFF_MAX: [0, 86400]"
 #endif
 
+#if EAGAIN == EWOULDBLOCK
+#define CHECK_BLOCK(X) ((X) == EAGAIN)
+#else
+#define CHECK_BLOCK(X) ((X) == EAGAIN || (X) == EWOULDBLOCK)
+#endif
+
 #define PT_CF(X) do { io_check_fatal((#X), (X)); } while (0)
 #define PT_LK(X) PT_CF(pthread_mutex_lock((X)))
 #define PT_UL(X) PT_CF(pthread_mutex_unlock((X)))
@@ -437,7 +443,7 @@ io_state_cxed(struct connection *c)
 	while ((ret = recv(c->soc, c->read.tmp, sizeof(c->read.tmp), 0)) > 0)
 		io_recv(c, c->read.tmp, (size_t) ret);
 
-	if (errno == EAGAIN || errno == EWOULDBLOCK) {
+	if (CHECK_BLOCK(errno)) {
 		return IO_ST_PING;
 	}
 
@@ -470,7 +476,7 @@ io_state_ping(struct connection *c)
 
 		if (ret == 0) {
 			PT_CB(IO_CB_DXED, c->obj, "connection closed");
-		} else if (errno == EAGAIN || errno == EWOULDBLOCK) {
+		} else if (CHECK_BLOCK(errno)) {
 			if ((ping += IO_PING_REFRESH) < IO_PING_MAX) {
 				PT_CB(IO_CB_PING_N, c->obj, ping);
 				continue;
