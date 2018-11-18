@@ -285,8 +285,8 @@ static int action_find_channel(char);
  * It can be cleaned up, and input.c is probably not the most ideal place for this */
 #define MAX_SEARCH 128
 struct channel *search_cptr; /* Used for iterative searching, before setting the current channel */
-static char search_buff[MAX_SEARCH];
-static char *search_ptr = search_buff;
+static char search_buf[MAX_SEARCH + 1];
+static size_t search_i;
 
 static struct channel* search_channels(struct channel*, char*);
 static struct channel*
@@ -390,18 +390,16 @@ action_find_channel(char c)
 {
 	/* Incremental channel search */
 
-	/* \n confirms selecting the current match */
-	if (c == '\n' && search_cptr) {
-		*(search_ptr = search_buff) = '\0';
-		channel_set_current(search_cptr);
-		search_cptr = NULL;
-		draw_all();
-		return 1;
-	}
-
 	/* \n, Esc, ^C cancels a search if no results are found */
 	if (c == '\n' || c == 0x1b || c == CTRL('c')) {
-		*(search_ptr = search_buff) = '\0';
+
+		/* Confirm non-empty match */
+		if (c == '\n' && search_cptr)
+			channel_set_current(search_cptr);
+
+		search_buf[0] = 0;
+		search_i = 0;
+		search_cptr = NULL;
 		return 1;
 	}
 
@@ -409,46 +407,44 @@ action_find_channel(char c)
 	 * or resets search criteria if no match */
 	if (c == CTRL('f')) {
 		if (search_cptr == NULL) {
-			*(search_ptr = search_buff) = '\0';
+			search_buf[0] = 0;
+			search_i = 0;
 			action(action_find_channel, "Find: ");
 			return 0;
 		}
 
-		search_cptr = search_channels(search_cptr, search_buff);
-	} else if (c == 0x7f && search_ptr > search_buff) {
+		search_cptr = search_channels(search_cptr, search_buf);
+	} else if (c == 0x7f && search_i) {
 		/* Backspace */
+		search_buf[--search_i] = 0;
+		search_cptr = search_channels(current_channel(), search_buf);
 
-		*(--search_ptr) = '\0';
-
-		search_cptr = search_channels(current_channel(), search_buff);
-	} else if (isprint(c) && search_ptr < search_buff + MAX_SEARCH && (search_cptr != NULL || *search_buff == '\0')) {
+	} else if (isprint(c) && search_i < MAX_SEARCH) {
 		/* All other input */
-
-		*(search_ptr++) = c;
-		*search_ptr = '\0';
-
-		search_cptr = search_channels(current_channel(), search_buff);
+		search_buf[search_i++] = c;
+		search_buf[search_i] = 0;
+		search_cptr = search_channels(current_channel(), search_buf);
 	}
 
 	/* Reprint the action message */
 	if (search_cptr == NULL) {
-		if (*search_buff)
-			action(action_find_channel, "Find: NO MATCH -- %s", search_buff);
+		if (*search_buf)
+			action(action_find_channel, "Find: NO MATCH -- %s", search_buf);
 		else
 			action(action_find_channel, "Find: ");
 	} else {
 		/* Found a channel */
 		if (search_cptr->server == current_channel()->server) {
 			action(action_find_channel, "Find: %s -- %s",
-					search_cptr->name, search_buff);
+					search_cptr->name, search_buf);
 		} else {
 			if (!strcmp(search_cptr->server->port, "6667"))
 				action(action_find_channel, "Find: %s/%s -- %s",
-						search_cptr->server->host, search_cptr->name, search_buff);
+						search_cptr->server->host, search_cptr->name, search_buf);
 			else
 				action(action_find_channel, "Find: %s:%s/%s -- %s",
 						search_cptr->server->host, search_cptr->server->port,
-						search_cptr->name, search_buff);
+						search_cptr->name, search_buf);
 		}
 	}
 
