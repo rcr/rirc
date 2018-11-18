@@ -33,9 +33,9 @@ before_install:
   - test "${TRAVIS_BRANCH}" != "static_analysis" -o "${TRAVIS_JOB_NUMBER##*.}" = "1" || exit 0
 
 script:
-  - test "${TRAVIS_BRANCH}" != "static_analysis" || exit 0
+  - set -e
   - make clean test rirc
-  - test "${TRAVIS_JOB_NUMBER##*.}" = "1" || exit $?
+  - test "${TRAVIS_JOB_NUMBER##*.}" = "1" || exit 0
   - make clean
   - build-wrapper-linux-x86-64 --out-dir bw-output make debug
   - make test
