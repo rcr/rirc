@@ -1,15 +1,39 @@
 FIXME:
-UNHANDLED ~ 461 PING :Not enough parameters
+ - add basic ssl support, with ifdef guards, see lessandro's patch
+ - remove server channel from channel list? does this break searching?
+   what benefit is there to this? s->channel can then just be s->clist.head
+ - are join/part/quit messages working with the threshold?
+ - server: channel/ulist/clist
+ - posix 2001 with removal of recusive mutex?
+ - fatal/error/debug macros with reusage
 
+ - when reconnecting, if cant rejoin channel (e.g. archlinux) and bumped
+   to -unregistered... closing it causes 442: not on that channel...
+   what happens to messages sent to it?
+	If in ##channel that requires authentication (ie bumps you to ##channel-unauthorized
+	or similar), /disconnect, /connect, rirc attempts to join ##channel, can't, and is
+	bumped to ##channel-unauthorized, but ##channel buffer remains open and not flagged
+	as parted, ie could potentially send messages to the channel, but won't receive any
+		- or it returns 403, and cant /join the channel because it's not parted
 
-TODO
+TODO:
+ - Make sure all the thread related code is using thread-safe functions,
+   and that proper cancellation points are used. Make sure no resources
+   can be left hanging (eg: sockets left open when a thread is canceled?)
+
 ---------------------------
 next iteration
 	- RFC2812 compliance
+	- Split and prototype:
+		src/handlers
+		  \ recv
+		  \ send
+		  \ command
+		  \ numeric
+		  \ ctcp
+		  \ sasl
 
 Continue refactoring:
-	- Rewrite input DLL as circular buffer of gap buffers, with copy on repeat,
-		use abstractions in _draw_input
 	- Error/warning writing from stateless components, e.g.:
 		- mode.c should be able to call err("...") on some passed parameter
 		  and have it written to the appropriate buffer with the appropriate
@@ -21,6 +45,7 @@ Continue refactoring:
 		  be added
 	- more debug information, levels, for various events, a debug pannel as a new channel
 	  type when debug flag is set
+	- split action handling out
 
 action_error
 display error to user for confirmation, e.g. :connect <server>
@@ -39,13 +64,14 @@ Testing:
 	- Fuzzing handlers (afl)
 	- Try musl C
 	- include-what-you-use for header detangling
+	- clang tidy, .clang-tidy config
 
 buffer performance improvements:
 	- reduce overall size, pack strings in contiguous realloc'ed array
 	- cache line breaks
 	- pre-format time
 
-abstract list.h from channel/server/input lists
+abstract list.h from channel/server
 
 SASL auth:
 	- cli -a/--auth
@@ -452,10 +478,6 @@ show disconnected/parted in status bar for channels instead of 0 user count
 
 Keep state of tab complete for successively getting the next nick lexicographically
 
-Make sure all the thread related code is using thread-safe functions,
-and that proper cancellation points are used. Make sure no resources
-can be left hanging (eg: sockets left open when a thread is canceled?)
-
 Empty trailing should be null, e.g.:
 ":nick!~user@host PART #channel :" -> "< ~ nick!~user@host has left #channel ()"
 
@@ -469,12 +491,6 @@ is set to NULL in this case, the result is strtok(NULL, " "), so strtok attemps 
 parsing whatever it last parsed. Instead, a function like strsep should be implemented
 which correctly handles NULL input in this case
 	-> replace stringtok/stringtok_r with getarg
-
-If in ##channel that requires authentication (ie bumps you to ##channel-unauthorized
-or similar), /disconnect, /connect, rirc attempts to join ##channel, can't, and is
-bumped to ##channel-unauthorized, but ##channel buffer remains open and not flagged
-as parted, ie could potentially send messages to the channel, but won't receive any
-	- or it returns 403, and cant /join the channel because it's not parted
 
 use the alternate screen buffer to restore screen when rirc exits
 

@@ -4,7 +4,6 @@
 #include "src/components/buffer.h"
 #include "src/components/channel.h"
 #include "src/components/mode.h"
-#include "src/io.h"
 
 struct server
 {
@@ -22,7 +21,7 @@ struct server
 	} nicks;
 	struct channel *channel;
 	struct channel_list clist;
-	struct connection *connection;
+	struct channel_list ulist; // TODO: seperate privmsg
 	struct mode usermodes;
 	struct mode_str mode_str;
 	struct mode_cfg mode_cfg;
@@ -31,6 +30,7 @@ struct server
 	struct user_list ignore;
 	unsigned ping;
 	unsigned quitting : 1;
+	void *connection;
 };
 
 struct server_list
@@ -49,7 +49,7 @@ struct server* server(
 
 struct server* server_list_add(struct server_list*, struct server*);
 struct server* server_list_del(struct server_list*, struct server*);
-struct server* server_list_get(struct server_list*, const char *, const char*);
+struct server* server_list_get(struct server_list*, const char*, const char*);
 
 void server_set_004(struct server*, char*);
 void server_set_005(struct server*, char*);

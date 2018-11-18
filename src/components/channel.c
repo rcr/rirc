@@ -47,7 +47,16 @@ channel_free(struct channel *c)
 void
 channel_list_free(struct channel_list *cl)
 {
-	/* TODO */;
+	struct channel *c1, *c2;
+
+	if ((c1 = cl->head) == NULL)
+		return;
+
+	do {
+		c2 = c1;
+		c1 = c2->next;
+		channel_free(c2);
+	} while (c1 != cl->head);
 }
 
 struct channel*
@@ -71,8 +80,6 @@ channel_list_add(struct channel_list *cl, struct channel *c)
 
 	return NULL;
 }
-
-// TODO: segault when deleting the tail and try to `prev` the head
 
 struct channel*
 channel_list_del(struct channel_list *cl, struct channel *c)

@@ -20,29 +20,7 @@
 // See: https://vt100.net/docs/vt100-ug/chapter3.html
 #define CTRL(k) ((k) & 0x1f)
 
-static struct
-{
-	struct channel *current_channel; /* the current channel being drawn */
-	struct channel *default_channel; /* the default rirc channel at startup */
-
-	struct server_list servers;
-
-	union draw draw;
-} state;
-
-struct server_list*
-state_server_list(void)
-{
-	return &state.servers;
-}
-
-static void state_term(void);
-
 static void _newline(struct channel*, enum buffer_line_t, const char*, const char*, va_list);
-
-struct channel* current_channel(void) { return state.current_channel; }
-struct channel* default_channel(void) { return state.default_channel; }
-
 static void state_io_cxed(struct server*);
 static void state_io_dxed(struct server*, va_list);
 static void state_io_ping(struct server*, unsigned int);
@@ -55,6 +33,26 @@ static int state_input_action(const char*, size_t);
 static uint16_t state_complete(char*, uint16_t, uint16_t, int);
 static uint16_t state_complete_list(char*, uint16_t, uint16_t, const char**);
 static uint16_t state_complete_user(char*, uint16_t, uint16_t, int);
+
+static struct
+{
+	struct channel *current_channel; /* the current channel being drawn */
+	struct channel *default_channel; /* the default rirc channel at startup */
+	struct server_list servers;
+	union draw draw;
+} state;
+
+struct server_list*
+state_server_list(void)
+{
+	return &state.servers;
+}
+
+struct channel*
+current_channel(void)
+{
+	return state.current_channel;
+}
 
 /* List of IRC commands for tab completion */
 static const char *irc_list[] = {
@@ -92,10 +90,6 @@ redraw(void)
 void
 state_init(void)
 {
-	/* atexit doesn't set errno */
-	if (atexit(state_term) != 0)
-		fatal("atexit");
-
 	state.default_channel = state.current_channel = new_channel("rirc", NULL, CHANNEL_T_OTHER);
 
 	/* Splashscreen */
@@ -116,25 +110,31 @@ state_init(void)
 	redraw();
 }
 
-static void
+void
 state_term(void)
 {
 	/* Exit handler; must return normally */
+
+	struct server *s1, *s2;
+
+	channel_free(state.default_channel);
 
 	/* Reset terminal colours */
 	printf("\x1b[38;0;m");
 	printf("\x1b[48;0;m");
 
-#ifndef DEBUG
 	/* Clear screen */
-	if (!fatal_exit) {
-		printf("\x1b[H\x1b[J");
-		channel_free(state.default_channel);
-		/* TODO:
-		 * here iterate the server list and quit with some default message,
-		 * call server_free */
-	}
-#endif
+	printf("\x1b[H\x1b[J");
+
+	if ((s1 = state_server_list()->head) == NULL)
+		return;
+
+	do {
+		s2 = s1;
+		s1 = s2->next;
+		io_free(s2->connection);
+		server_free(s2);
+	} while (s1 != state_server_list()->head);
 }
 
 void
@@ -285,8 +285,8 @@ static int action_find_channel(char);
  * It can be cleaned up, and input.c is probably not the most ideal place for this */
 #define MAX_SEARCH 128
 struct channel *search_cptr; /* Used for iterative searching, before setting the current channel */
-static char search_buff[MAX_SEARCH];
-static char *search_ptr = search_buff;
+static char search_buf[MAX_SEARCH + 1];
+static size_t search_i;
 
 static struct channel* search_channels(struct channel*, char*);
 static struct channel*
@@ -342,9 +342,13 @@ action_close_server(char c)
 		if ((state.current_channel = c->server->next->channel) == c->server->channel)
 			state.current_channel = state.default_channel;
 
-		if ((ret = io_sendf(s->connection, "QUIT %s", DEFAULT_QUIT_MESG)))
+		if ((ret = io_sendf(s->connection, "QUIT :%s", DEFAULT_QUIT_MESG)))
 			newlinef(s->channel, 0, "-!!-", "sendf fail: %s", io_err(ret));
 
+		// FIXME:
+		// - state_server_free shouldn't have to call io/dx/free.
+		// - server objects can have void* connections and remove
+		//   the dependancy on io.h
 		io_dx(s->connection);
 		server_list_del(state_server_list(), s);
 		io_free(s->connection);
@@ -386,18 +390,16 @@ action_find_channel(char c)
 {
 	/* Incremental channel search */
 
-	/* \n confirms selecting the current match */
-	if (c == '\n' && search_cptr) {
-		*(search_ptr = search_buff) = '\0';
-		channel_set_current(search_cptr);
-		search_cptr = NULL;
-		draw_all();
-		return 1;
-	}
-
 	/* \n, Esc, ^C cancels a search if no results are found */
 	if (c == '\n' || c == 0x1b || c == CTRL('c')) {
-		*(search_ptr = search_buff) = '\0';
+
+		/* Confirm non-empty match */
+		if (c == '\n' && search_cptr)
+			channel_set_current(search_cptr);
+
+		search_buf[0] = 0;
+		search_i = 0;
+		search_cptr = NULL;
 		return 1;
 	}
 
@@ -405,46 +407,44 @@ action_find_channel(char c)
 	 * or resets search criteria if no match */
 	if (c == CTRL('f')) {
 		if (search_cptr == NULL) {
-			*(search_ptr = search_buff) = '\0';
+			search_buf[0] = 0;
+			search_i = 0;
 			action(action_find_channel, "Find: ");
 			return 0;
 		}
 
-		search_cptr = search_channels(search_cptr, search_buff);
-	} else if (c == 0x7f && search_ptr > search_buff) {
+		search_cptr = search_channels(search_cptr, search_buf);
+	} else if (c == 0x7f && search_i) {
 		/* Backspace */
+		search_buf[--search_i] = 0;
+		search_cptr = search_channels(current_channel(), search_buf);
 
-		*(--search_ptr) = '\0';
-
-		search_cptr = search_channels(current_channel(), search_buff);
-	} else if (isprint(c) && search_ptr < search_buff + MAX_SEARCH && (search_cptr != NULL || *search_buff == '\0')) {
+	} else if (isprint(c) && search_i < MAX_SEARCH) {
 		/* All other input */
-
-		*(search_ptr++) = c;
-		*search_ptr = '\0';
-
-		search_cptr = search_channels(current_channel(), search_buff);
+		search_buf[search_i++] = c;
+		search_buf[search_i] = 0;
+		search_cptr = search_channels(current_channel(), search_buf);
 	}
 
 	/* Reprint the action message */
 	if (search_cptr == NULL) {
-		if (*search_buff)
-			action(action_find_channel, "Find: NO MATCH -- %s", search_buff);
+		if (*search_buf)
+			action(action_find_channel, "Find: NO MATCH -- %s", search_buf);
 		else
 			action(action_find_channel, "Find: ");
 	} else {
 		/* Found a channel */
 		if (search_cptr->server == current_channel()->server) {
 			action(action_find_channel, "Find: %s -- %s",
-					search_cptr->name, search_buff);
+					search_cptr->name, search_buf);
 		} else {
 			if (!strcmp(search_cptr->server->port, "6667"))
 				action(action_find_channel, "Find: %s/%s -- %s",
-						search_cptr->server->host, search_cptr->name, search_buff);
+						search_cptr->server->host, search_cptr->name, search_buf);
 			else
 				action(action_find_channel, "Find: %s:%s/%s -- %s",
 						search_cptr->server->host, search_cptr->server->port,
-						search_cptr->name, search_buff);
+						search_cptr->name, search_buf);
 		}
 	}
 
@@ -586,8 +586,12 @@ buffer_scrollback_forw(struct channel *c)
 	draw_status();
 }
 
-/* Usefull server/channel structure abstractions for drawing */
-
+/* FIXME:
+ *  - These abstractions should take into account the new component hierarchy
+ *    and have the backwards pointer from channel to server removed, in favour
+ *    of passing a current_server() to handlers
+ *  - The server's channel should not be part of the server's channel_list
+ */
 struct channel*
 channel_get_first(void)
 {
@@ -732,16 +736,15 @@ state_io_cxed(struct server *s)
 static void
 state_io_dxed(struct server *s, va_list ap)
 {
-	struct channel *c = s->channel->next;
+	struct channel *c = s->channel;
 	va_list ap_copy;
 
 	do {
 		va_copy(ap_copy, ap);
-		_newline(s->channel, 0, "-!!-", va_arg(ap_copy, const char *), ap_copy);
+		_newline(c, 0, "-!!-", va_arg(ap_copy, const char *), ap_copy);
 		va_end(ap_copy);
-
 		channel_reset(c);
-
+		c = c->next;
 	} while (c != s->channel);
 }
 
@@ -821,8 +824,7 @@ send_cmnd(struct channel *c, char *buf)
 	}
 
 	if (!strcasecmp(cmnd, "quit")) {
-		/* TODO: send optional quit message, close servers, free */
-		exit(EXIT_SUCCESS);
+		io_term();
 	}
 
 	if (!strcasecmp(cmnd, "connect")) {
@@ -851,10 +853,13 @@ send_cmnd(struct channel *c, char *buf)
 				channel_set_current(s->channel);
 				newlinef(s->channel, 0, "-!!-", "already connected to %s:%s", host, port);
 			} else {
-				if ((s = server(host, port, pass, user, real)) == NULL)
-					fatal("failed to create server");
 
+				s = server(host, port, pass, user, real);
+				s->connection = connection(s, host, port);
+
+				// TODO: here just get/set the connection object
 				server_list_add(state_server_list(), s);
+
 				channel_set_current(s->channel);
 				io_cx(s->connection);
 				draw_all();

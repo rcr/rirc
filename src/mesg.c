@@ -277,7 +277,7 @@ send_mesg(struct server *s, struct channel *chan, char *mesg)
 		const struct send_handler* handler = send_handler_lookup(cmd_str, strlen(cmd_str));
 
 		if (handler) {
-			handler->func(mesg, chan->server, chan);
+			handler->func(mesg, s, chan);
 		} else if ((ret = io_sendf(s->connection, "%s %s", cmd_str, mesg)))
 			newlinef(chan, 0, "-!!-", "sendf fail: %s", io_err(ret));
 
@@ -298,7 +298,7 @@ send_mesg(struct server *s, struct channel *chan, char *mesg)
 			newlinef(chan, 0, "-!!-", "sendf fail: %s", io_err(ret));
 
 		else
-			newline(chan, BUFFER_LINE_CHAT, chan->server->nick, mesg);
+			newline(chan, BUFFER_LINE_CHAT, s->nick, mesg);
 	}
 }
 
@@ -858,6 +858,10 @@ recv_ctcp_rpl(struct parsed_mesg *p, struct server *s)
 	/* Markup is valid, get command */
 	if (!(cmd = getarg(&mesg, " ")))
 		fail(s->channel, "CTCP: command is null");
+
+	// FIXME: CTCP PING replies should come back with the same
+	// <second> <millisecond> value that was sent out, and is
+	// used to calculate the ping here
 
 	newlinef(s->channel, 0, p->from, "CTCP %s reply: %s", cmd, mesg);
 

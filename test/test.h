@@ -80,7 +80,7 @@ static void _print_testcase_name_(const char*);
 #ifdef fatal
 #error "test.h" should be the first include within testcase files
 #else
-#define fatal(...) \
+#define _fatal(...) \
 	do { \
 		if (_assert_fatal_) { \
 			longjmp(_tc_fatal_expected_, 1); \
@@ -90,6 +90,8 @@ static void _print_testcase_name_(const char*);
 			longjmp(_tc_fatal_unexpected_, 1); \
 		} \
 	} while (0)
+#define fatal        _fatal
+#define fatal_noexit _fatal
 #endif
 
 #define assert_fatal(X) \

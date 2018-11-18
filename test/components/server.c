@@ -1,41 +1,16 @@
 #include "test/test.h"
 #include "src/components/server.c"
-#include "src/components/mode.c"   /* mode_config_defaults */
-#include "src/utils/utils.c"       /* skip_sp */
-
-void
-channel_set_current(struct channel *c)
-{
-	UNUSED(c);
-}
-
-struct channel*
-new_channel(const char *n, struct server *s, enum channel_t t)
-{
-	/* FIXME: mock new_channel until channel() is implemented */
-
-	UNUSED(n);
-	UNUSED(s);
-	UNUSED(t);
-	return NULL;
-}
-
-struct connection*
-connection(const void *s, const char *h, const char *p)
-{
-	/* Mock */
-
-	UNUSED(s);
-	UNUSED(h);
-	UNUSED(p);
-	return (void *)(s);
-}
+#include "src/components/channel.c"
+#include "src/components/user.c"
+#include "src/components/mode.c"
+#include "src/components/input.c"
+#include "src/components/buffer.c"
+#include "src/utils/utils.c"
 
 void
 newline(struct channel *c, enum buffer_line_t t, const char *f, const char *m)
 {
 	/* Mock */
-
 	UNUSED(c);
 	UNUSED(t);
 	UNUSED(f);
@@ -46,7 +21,6 @@ void
 newlinef(struct channel *c, enum buffer_line_t t, const char *f, const char *m, ...)
 {
 	/* Mock */
-
 	UNUSED(c);
 	UNUSED(t);
 	UNUSED(f);
