@@ -13,7 +13,6 @@
  * Interface for retrieving and altering global state of the program */
 
 int state_server_set_chans(struct server*, const char*);
-struct channel* new_channel(const char*, struct server*, enum channel_t);
 
 
 /* state.c */
