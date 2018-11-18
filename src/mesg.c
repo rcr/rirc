@@ -481,8 +481,10 @@ send_privmsg(char *mesg, struct server *s, struct channel *c)
 	if ((ret = io_sendf(s->connection, "PRIVMSG %s :%s", targ, mesg)))
 		failf(c, "sendf fail: %s", io_err(ret));
 
-	if ((cc = channel_list_get(&s->clist, targ)) == NULL)
-		cc = new_channel(targ, s, CHANNEL_T_PRIVATE);
+	if ((cc = channel_list_get(&s->clist, targ)) == NULL) {
+		cc = channel(targ, CHANNEL_T_PRIVATE);
+		channel_list_add(&s->clist, cc);
+	}
 
 	newline(cc, BUFFER_LINE_CHAT, s->nick, mesg);
 
@@ -746,8 +748,10 @@ recv_ctcp_req(struct parsed_mesg *p, struct server *s)
 		if (IS_ME(targ)) {
 			/* Sending emote to private channel */
 
-			if ((c = channel_list_get(&s->clist, p->from)) == NULL)
-				c = new_channel(p->from, s, CHANNEL_T_PRIVATE);
+			if ((c = channel_list_get(&s->clist, p->from)) == NULL) {
+				c = channel(p->from, CHANNEL_T_PRIVATE);
+				channel_list_add(&s->clist, c);
+			}
 
 			if (c != current_channel()) {
 				c->activity = ACTIVITY_PINGED;
@@ -897,7 +901,8 @@ recv_join(struct parsed_mesg *p, struct server *s)
 
 	if (IS_ME(p->from)) {
 		if ((c = channel_list_get(&s->clist, chan)) == NULL) {
-			c = new_channel(chan, s, CHANNEL_T_CHANNEL);
+			c = channel(chan, CHANNEL_T_CHANNEL);
+			channel_list_add(&s->clist, c);
 			channel_set_current(c);
 		} else {
 			c->parted = 0;
@@ -1683,8 +1688,10 @@ recv_privmsg(struct parsed_mesg *p, struct server *s)
 	/* Find the target channel */
 	if (IS_ME(targ)) {
 
-		if ((c = channel_list_get(&s->clist, p->from)) == NULL)
-			c = new_channel(p->from, s, CHANNEL_T_PRIVATE);
+		if ((c = channel_list_get(&s->clist, p->from)) == NULL) {
+			c = channel(p->from, CHANNEL_T_PRIVATE);
+			channel_list_add(&s->clist, c);
+		}
 
 		if (c != current_channel()) {
 			c->activity = ACTIVITY_PINGED;

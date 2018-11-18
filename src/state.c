@@ -90,7 +90,7 @@ redraw(void)
 void
 state_init(void)
 {
-	state.default_channel = state.current_channel = new_channel("rirc", NULL, CHANNEL_T_OTHER);
+	state.default_channel = state.current_channel = channel("rirc", CHANNEL_T_OTHER);
 
 	/* Splashscreen */
 	newline(state.default_channel, 0, "--", "      _");
@@ -207,23 +207,6 @@ _newline(struct channel *c, enum buffer_line_t type, const char *from, const cha
 		draw_nav();
 }
 
-struct channel*
-new_channel(const char *name, struct server *s, enum channel_t type)
-{
-	struct channel *c = channel(name, type);
-
-	/* TODO: deprecated, move to channel.c */
-
-	if (s) {
-		c->server = s;
-		channel_list_add(&s->clist, c);
-	}
-
-	draw_all();
-
-	return c;
-}
-
 int
 state_server_set_chans(struct server *s, const char *chans)
 {
@@ -248,7 +231,8 @@ state_server_set_chans(struct server *s, const char *chans)
 	} while (p2);
 
 	for (const char *chan = base; n; n--) {
-		new_channel(chan, s, CHANNEL_T_CHANNEL);
+		struct channel *c = channel(chan, CHANNEL_T_CHANNEL);
+		channel_list_add(&s->clist, c);
 		chan = strchr(chan, 0) + 1;
 	}
 
@@ -370,16 +354,20 @@ action(int (*a_handler)(char), const char *fmt, ...)
 	 * expected to return a non-zero value when the action is resolved
 	 * */
 
+	int len;
 	va_list ap;
 
 	va_start(ap, fmt);
-	vsnprintf(action_buff, MAX_ACTION_MESG, fmt, ap);
+	len = vsnprintf(action_buff, MAX_ACTION_MESG, fmt, ap);
 	va_end(ap);
 
-	action_handler = a_handler;
-	action_message = action_buff;
-
-	draw_input();
+	if (len < 0) {
+		debug("vsnprintf failed");
+	} else {
+		action_handler = a_handler;
+		action_message = action_buff;
+		draw_input();
+	}
 }
 /* Action line should be:
  *

@@ -706,27 +706,23 @@ _colour(int fg, int bg)
 	 * Background(B): ESC"[48;5;Bm"
 	 * */
 
-	static char col_buff[COLOUR_SIZE + 1] = RESET_ATTRIBUTES;
+	static char buf[COLOUR_SIZE + 1] = RESET_ATTRIBUTES;
+	size_t len = sizeof(RESET_ATTRIBUTES) - 1;
 	int ret = 0;
 
-	char *col_buff_ptr = col_buff + sizeof(RESET_ATTRIBUTES) - 1;
-
-	/* Assume any colour sequence begins by resetting all attributes */
-	*(col_buff_ptr = col_buff + sizeof(RESET_ATTRIBUTES) - 1) = '\0';
-
 	if (fg >= 0 && fg <= 255) {
-		if ((ret = snprintf(col_buff_ptr, sizeof(col_buff), ESC"[38;5;%dm", fg)) < 0)
-			*col_buff_ptr = 0;
+		if ((ret = snprintf(buf + len, sizeof(buf) - len, ESC"[38;5;%dm", fg)) < 0)
+			buf[len] = 0;
 		else
-			col_buff_ptr += ret;
+			len += ret;
 	}
 
 	if (bg >= 0 && bg <= 255) {
-		if ((ret = snprintf(col_buff_ptr, sizeof(col_buff), ESC"[48;5;%dm", bg)) < 0)
-			*col_buff_ptr = 0;
+		if ((ret = snprintf(buf + len, sizeof(buf) - len, ESC"[48;5;%dm", bg)) < 0)
+			buf[len] = 0;
 	}
 
-	return col_buff;
+	return buf;
 }
 
 static int
