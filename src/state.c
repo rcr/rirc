@@ -354,16 +354,20 @@ action(int (*a_handler)(char), const char *fmt, ...)
 	 * expected to return a non-zero value when the action is resolved
 	 * */
 
+	int len;
 	va_list ap;
 
 	va_start(ap, fmt);
-	vsnprintf(action_buff, MAX_ACTION_MESG, fmt, ap);
+	len = vsnprintf(action_buff, MAX_ACTION_MESG, fmt, ap);
 	va_end(ap);
 
-	action_handler = a_handler;
-	action_message = action_buff;
-
-	draw_input();
+	if (len < 0) {
+		debug("vsnprintf failed");
+	} else {
+		action_handler = a_handler;
+		action_message = action_buff;
+		draw_input();
+	}
 }
 /* Action line should be:
  *
