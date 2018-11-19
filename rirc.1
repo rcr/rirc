@@ -11,14 +11,14 @@ rirc \- a minimalistic irc client written in C
 .IR port ]
 .RB [ -w
 .IR pass ]
+.RB [ -u
+.IR username ]
+.RB [ -r
+.IR realname ]
 .RB [ -n
 .IR nicks ]
 .RB [ -c
-.IR chans "]
-.RB [ -u
-.IR username "]
-.RB [ -r
-.IR realname "]], ...]"
+.IR chans "]], ...]"
 .SH DESCRIPTION
 .P
 rirc is a lightweight Internet Relay Chat client.
@@ -93,6 +93,10 @@ Keys:
   ^X;close current channel
   ^U;scroll current buffer up
   ^D;scroll current buffer down
+   >;input cursor back
+   <;input cursor forward
+   ^;input history back
+   v;input history forward
 .TE
 
 .TS

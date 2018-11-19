@@ -30,12 +30,12 @@
 
 #include "src/components/buffer.h"
 
-#if (BUFFER_LINES_MAX & (BUFFER_LINES_MAX - 1)) != 0
-	/* Required for proper masking when indexing */
-	#error BUFFER_LINES_MAX must be a power of 2
-#endif
+#define BUFFER_MASK(X) ((X) & (BUFFER_LINES_MAX - 1))
 
-#define MASK(X) ((X) & (BUFFER_LINES_MAX - 1))
+#if BUFFER_MASK(BUFFER_LINES_MAX)
+/* Required for proper masking when indexing */
+#error BUFFER_LINES_MAX must be a power of 2
+#endif
 
 static inline unsigned int buffer_full(struct buffer*);
 static inline unsigned int buffer_size(struct buffer*);
@@ -73,7 +73,7 @@ buffer_push(struct buffer *b)
 		b->tail++;
 	}
 
-	return &b->buffer_lines[MASK(b->head++)];
+	return &b->buffer_lines[BUFFER_MASK(b->head++)];
 }
 
 struct buffer_line*
@@ -81,7 +81,7 @@ buffer_head(struct buffer *b)
 {
 	/* Return the first printable line in a buffer */
 
-	return buffer_size(b) == 0 ? NULL : &b->buffer_lines[MASK(b->head - 1)];
+	return buffer_size(b) == 0 ? NULL : &b->buffer_lines[BUFFER_MASK(b->head - 1)];
 }
 
 struct buffer_line*
@@ -89,7 +89,7 @@ buffer_tail(struct buffer *b)
 {
 	/* Return the last printable line in a buffer */
 
-	return buffer_size(b) == 0 ? NULL : &b->buffer_lines[MASK(b->tail)];
+	return buffer_size(b) == 0 ? NULL : &b->buffer_lines[BUFFER_MASK(b->tail)];
 }
 
 struct buffer_line*
@@ -119,9 +119,9 @@ buffer_line(struct buffer *b, unsigned int i)
 
 	if (((b->head > b->tail) && (i < b->tail || i >= b->head)) ||
 	    ((b->tail > b->head) && (i < b->tail && i >= b->head)))
-		fatal("invalid index", 0);
+		fatal("invalid index: %d", i);
 
-	return &b->buffer_lines[MASK(i)];
+	return &b->buffer_lines[BUFFER_MASK(i)];
 }
 
 unsigned int
@@ -132,7 +132,7 @@ buffer_line_rows(struct buffer_line *line, unsigned int w)
 	char *p;
 
 	if (w == 0)
-		fatal("width is zero", 0);
+		fatal("width is zero");
 
 	/* Empty lines are considered to occupy a row */
 	if (!*line->text)
@@ -152,28 +152,30 @@ void
 buffer_newline(
 		struct buffer *b,
 		enum buffer_line_t type,
-		struct string from,
-		struct string text,
+		const char *from_str,
+		const char *text_str,
+		size_t from_len,
+		size_t text_len,
 		char prefix)
 {
 	struct buffer_line *line;
 
-	if (from.str == NULL)
-		fatal("from string is NULL", 0);
+	if (from_str == NULL)
+		fatal("from string is NULL");
 
-	if (text.str == NULL)
-		fatal("text string is NULL", 0);
+	if (text_str == NULL)
+		fatal("text string is NULL");
 
 	line = memset(buffer_push(b), 0, sizeof(*line));
 
-	line->from_len = MIN(from.len + (!!prefix), FROM_LENGTH_MAX);
-	line->text_len = MIN(text.len,              TEXT_LENGTH_MAX);
+	line->from_len = MIN(from_len + (!!prefix), FROM_LENGTH_MAX);
+	line->text_len = MIN(text_len,              TEXT_LENGTH_MAX);
 
 	if (prefix)
 		*line->from = prefix;
 
-	memcpy(line->from + (!!prefix), from.str, line->from_len);
-	memcpy(line->text,              text.str, line->text_len);
+	memcpy(line->from + (!!prefix), from_str, line->from_len);
+	memcpy(line->text,              text_str, line->text_len);
 
 	*(line->from + line->from_len) = '\0';
 	*(line->text + line->text_len) = '\0';
@@ -184,14 +186,14 @@ buffer_newline(
 	if (line->from_len > b->pad)
 		b->pad = line->from_len;
 
-	if (text.len > TEXT_LENGTH_MAX) {
-
-		struct string _text = {
-			.str = text.str + TEXT_LENGTH_MAX,
-			.len = text.len - TEXT_LENGTH_MAX
-		};
-
-		buffer_newline(b, type, from, _text, prefix);
+	if (text_len > TEXT_LENGTH_MAX) {
+		buffer_newline(b,
+				type,
+				from_str,
+				text_str + TEXT_LENGTH_MAX,
+				from_len,
+				text_len - TEXT_LENGTH_MAX,
+				prefix);
 	}
 }
 
@@ -206,10 +208,10 @@ buffer_scrollback_status(struct buffer *b)
 	return (float)(b->head - b->scrollback) / (float)(buffer_size(b));
 }
 
-struct buffer
-buffer(void)
+void
+buffer(struct buffer *b)
 {
 	/* Initialize a buffer */
 
-	return (struct buffer) {0};
+	memset(b, 0, sizeof(*b));
 }

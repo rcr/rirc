@@ -13,7 +13,6 @@
  * Interface for retrieving and altering global state of the program */
 
 int state_server_set_chans(struct server*, const char*);
-struct channel* new_channel(const char*, struct server*, enum channel_t);
 
 
 /* state.c */
@@ -22,6 +21,7 @@ struct channel* current_channel(void);
 struct server_list* state_server_list(void);
 
 void state_init(void);
+void state_term(void);
 
 // TODO: most of this stuff can be static
 //TODO: move to channel.c, function of server's channel list
@@ -54,5 +54,7 @@ DRAW_BITS
 void draw_all(void);
 
 void redraw(void);
+
+extern char *action_message;
 
 #endif

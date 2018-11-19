@@ -3,7 +3,6 @@
 
 #include "src/components/mode.h"
 #include "src/utils/tree.h"
-#include "src/utils/utils.h"
 
 enum user_err
 {
@@ -15,8 +14,9 @@ enum user_err
 struct user
 {
 	AVL_NODE(user) ul;
+	size_t nick_len;
 	struct mode prfxmodes;
-	struct string nick;
+	const char *nick;
 	char _[];
 };
 

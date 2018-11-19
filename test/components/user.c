@@ -37,9 +37,9 @@ test_user_list(void)
 	if ((u3 = user_list_get(&ulist, "ccc", 0)) == NULL)
 		abort_test("Failed to retrieve u3");
 
-	assert_strcmp(u1->nick.str, "aaa");
-	assert_strcmp(u2->nick.str, "bbb");
-	assert_strcmp(u3->nick.str, "ccc");
+	assert_strcmp(u1->nick, "aaa");
+	assert_strcmp(u2->nick, "bbb");
+	assert_strcmp(u3->nick, "ccc");
 
 	/* Test retrieving by name prefix, failure */
 	assert_null(user_list_get(&ulist, "z",  1));
@@ -54,9 +54,9 @@ test_user_list(void)
 	if ((u3 = user_list_get(&ulist, "ccc", 3)) == NULL)
 		abort_test("Failed to retrieve u3 by prefix");
 
-	assert_strcmp(u1->nick.str, "aaa");
-	assert_strcmp(u2->nick.str, "bbb");
-	assert_strcmp(u3->nick.str, "ccc");
+	assert_strcmp(u1->nick, "aaa");
+	assert_strcmp(u2->nick, "bbb");
+	assert_strcmp(u3->nick, "ccc");
 
 	/* Test replacing user in list, failure */
 	assert_eq(user_list_rpl(&ulist, "zzz", "yyy"), USER_ERR_NOT_FOUND);
@@ -76,7 +76,7 @@ test_user_list(void)
 	assert_eq(u4->prfxmodes.upper, 0x456);
 	assert_eq(u4->prfxmodes.prefix, '*');
 
-	assert_strcmp(u4->nick.str, "ddd");
+	assert_strcmp(u4->nick, "ddd");
 
 	assert_null(user_list_get(&ulist, "ccc",  0));
 

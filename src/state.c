@@ -2,8 +2,6 @@
  * state.c
  *
  * All manipulation of global program state
- *
- * TODO: moved keys, actions to this file. needs cleanup
  */
 
 #include <ctype.h>
@@ -19,13 +17,28 @@
 #include "src/state.h"
 #include "src/utils/utils.h"
 
+// See: https://vt100.net/docs/vt100-ug/chapter3.html
+#define CTRL(k) ((k) & 0x1f)
+
+static void _newline(struct channel*, enum buffer_line_t, const char*, const char*, va_list);
+static void state_io_cxed(struct server*);
+static void state_io_dxed(struct server*, va_list);
+static void state_io_ping(struct server*, unsigned int);
+static void state_io_signal(enum io_sig_t);
+
+static int state_input_linef(struct channel*);
+static int state_input_ctrlch(const char*, size_t);
+static int state_input_action(const char*, size_t);
+
+static uint16_t state_complete(char*, uint16_t, uint16_t, int);
+static uint16_t state_complete_list(char*, uint16_t, uint16_t, const char**);
+static uint16_t state_complete_user(char*, uint16_t, uint16_t, int);
+
 static struct
 {
 	struct channel *current_channel; /* the current channel being drawn */
 	struct channel *default_channel; /* the default rirc channel at startup */
-
 	struct server_list servers;
-
 	union draw draw;
 } state;
 
@@ -35,17 +48,25 @@ state_server_list(void)
 	return &state.servers;
 }
 
-static void term_state(void);
+struct channel*
+current_channel(void)
+{
+	return state.current_channel;
+}
 
-static void _newline(struct channel*, enum buffer_line_t, const char*, const char*, va_list);
+/* List of IRC commands for tab completion */
+static const char *irc_list[] = {
+	"admin",   "connect", "info",     "invite", "join",
+	"kick",    "kill",    "links",    "list",   "lusers",
+	"mode",    "motd",    "names",    "nick",   "notice",
+	"oper",    "part",    "pass",     "ping",   "pong",
+	"privmsg", "quit",    "servlist", "squery", "stats",
+	"time",    "topic",   "trace",    "user",   "version",
+	"who",     "whois",   "whowas",   NULL };
 
-struct channel* current_channel(void) { return state.current_channel; }
-struct channel* default_channel(void) { return state.default_channel; }
-
-static void state_io_cxed(struct server*);
-static void state_io_dxed(struct server*, const char *);
-static void state_io_ping(struct server*, unsigned int);
-static void state_io_signal(enum io_sig_t);
+/* List of rirc commands for tab completeion */
+static const char *cmd_list[] = {
+	"clear", "close", "connect", "quit", "set", NULL};
 
 /* Set draw bits */
 #define X(BIT) void draw_##BIT(void) { state.draw.bits.BIT = 1; }
@@ -69,11 +90,7 @@ redraw(void)
 void
 state_init(void)
 {
-	/* atexit doesn't set errno */
-	if (atexit(term_state) != 0)
-		fatal("atexit", 0);
-
-	state.default_channel = state.current_channel = new_channel("rirc", NULL, CHANNEL_T_OTHER);
+	state.default_channel = state.current_channel = channel("rirc", CHANNEL_T_OTHER);
 
 	/* Splashscreen */
 	newline(state.default_channel, 0, "--", "      _");
@@ -93,22 +110,31 @@ state_init(void)
 	redraw();
 }
 
-static void
-term_state(void)
+void
+state_term(void)
 {
 	/* Exit handler; must return normally */
+
+	struct server *s1, *s2;
+
+	channel_free(state.default_channel);
 
 	/* Reset terminal colours */
 	printf("\x1b[38;0;m");
 	printf("\x1b[48;0;m");
 
-#ifndef DEBUG
 	/* Clear screen */
-	if (!fatal_exit) {
-		printf("\x1b[H\x1b[J");
-		channel_free(state.default_channel);
-	}
-#endif
+	printf("\x1b[H\x1b[J");
+
+	if ((s1 = state_server_list()->head) == NULL)
+		return;
+
+	do {
+		s2 = s1;
+		s1 = s2->next;
+		io_free(s2->connection);
+		server_free(s2);
+	} while (s1 != state_server_list()->head);
 }
 
 void
@@ -136,33 +162,42 @@ _newline(struct channel *c, enum buffer_line_t type, const char *from, const cha
 {
 	/* Static function for handling inserting new lines into buffers */
 
-	char buf[BUFFSIZE];
+	char buf[TEXT_LENGTH_MAX];
 
 	int len;
 
-	struct string _from,
-	              _text;
+	const char *_from_str;
+	const char *_text_str;
+	size_t _from_len;
+	size_t _text_len;
 
 	struct user *u = NULL;
 
-	if ((len = vsnprintf(buf, BUFFSIZE, fmt, ap)) < 0) {
-		_text.str = "newlinef error: vsprintf failure";
-		_text.len = strlen(_text.str);
-		_from.str = "-!!-";
-		_from.len = strlen(_from.str);
+	if ((len = vsnprintf(buf, sizeof(buf), fmt, ap)) < 0) {
+		_text_str = "newlinef error: vsprintf failure";
+		_text_len = strlen(_text_str);
+		_from_str = "-!!-";
+		_from_len = strlen(_from_str);
 	} else {
-		_text.str = buf;
-		_text.len = len;
-		_from.str = from;
+		_text_str = buf;
+		_text_len = len;
+		_from_str = from;
 
 		// FIXME: don't need to get user for many non-user message types
 		if ((u = user_list_get(&(c->users), from, 0)) != NULL)
-			_from.len = u->nick.len;
+			_from_len = u->nick_len;
 		else
-			_from.len = strlen(from);
+			_from_len = strlen(from);
 	}
 
-	buffer_newline(&(c->buffer), type, _from, _text, ((u == NULL) ? 0 : u->prfxmodes.prefix));
+	buffer_newline(
+		&(c->buffer),
+		type,
+		_from_str,
+		_text_str,
+		_from_len,
+		_text_len,
+		((u == NULL) ? 0 : u->prfxmodes.prefix));
 
 	c->activity = MAX(c->activity, ACTIVITY_ACTIVE);
 
@@ -170,23 +205,6 @@ _newline(struct channel *c, enum buffer_line_t type, const char *from, const cha
 		draw_buffer();
 	else
 		draw_nav();
-}
-
-struct channel*
-new_channel(const char *name, struct server *s, enum channel_t type)
-{
-	struct channel *c = channel(name, type);
-
-	/* TODO: deprecated, move to channel.c */
-
-	if (s) {
-		c->server = s;
-		channel_list_add(&s->clist, c);
-	}
-
-	draw_all();
-
-	return c;
 }
 
 int
@@ -213,7 +231,8 @@ state_server_set_chans(struct server *s, const char *chans)
 	} while (p2);
 
 	for (const char *chan = base; n; n--) {
-		new_channel(chan, s, CHANNEL_T_CHANNEL);
+		struct channel *c = channel(chan, CHANNEL_T_CHANNEL);
+		channel_list_add(&s->clist, c);
 		chan = strchr(chan, 0) + 1;
 	}
 
@@ -240,7 +259,6 @@ channel_clear(struct channel *c)
 #define MAX_ACTION_MESG 256
 char *action_message;
 static int action_close_server(char);
-static int input_action(const char*, size_t);
 /* Action handling */
 static int (*action_handler)(char);
 static char action_buff[MAX_ACTION_MESG];
@@ -251,8 +269,8 @@ static int action_find_channel(char);
  * It can be cleaned up, and input.c is probably not the most ideal place for this */
 #define MAX_SEARCH 128
 struct channel *search_cptr; /* Used for iterative searching, before setting the current channel */
-static char search_buff[MAX_SEARCH];
-static char *search_ptr = search_buff;
+static char search_buf[MAX_SEARCH + 1];
+static size_t search_i;
 
 static struct channel* search_channels(struct channel*, char*);
 static struct channel*
@@ -266,7 +284,7 @@ search_channels(struct channel *start, char *search)
 
 	while (c != start) {
 
-		if (strstr(c->name.str, search))
+		if (strstr(c->name, search))
 			return c;
 
 		c = channel_get_next(c);
@@ -275,12 +293,12 @@ search_channels(struct channel *start, char *search)
 	return NULL;
 }
 static int
-input_action(const char *input, size_t len)
+state_input_action(const char *input, size_t len)
 {
 	/* Waiting for user confirmation */
 
-	if (len == 1 && (*input == 0x03 || action_handler(*input))) {
-		/* ^C canceled the action, or the action was resolved */
+	if (len == 1 && (*input == CTRL('c') || action_handler(*input))) {
+		/* ^c canceled the action, or the action was resolved */
 
 		action_message = NULL;
 		action_handler = NULL;
@@ -308,9 +326,13 @@ action_close_server(char c)
 		if ((state.current_channel = c->server->next->channel) == c->server->channel)
 			state.current_channel = state.default_channel;
 
-		if ((ret = io_sendf(s->connection, "QUIT %s", DEFAULT_QUIT_MESG)))
+		if ((ret = io_sendf(s->connection, "QUIT :%s", DEFAULT_QUIT_MESG)))
 			newlinef(s->channel, 0, "-!!-", "sendf fail: %s", io_err(ret));
 
+		// FIXME:
+		// - state_server_free shouldn't have to call io/dx/free.
+		// - server objects can have void* connections and remove
+		//   the dependancy on io.h
 		io_dx(s->connection);
 		server_list_del(state_server_list(), s);
 		io_free(s->connection);
@@ -332,16 +354,20 @@ action(int (*a_handler)(char), const char *fmt, ...)
 	 * expected to return a non-zero value when the action is resolved
 	 * */
 
+	int len;
 	va_list ap;
 
 	va_start(ap, fmt);
-	vsnprintf(action_buff, MAX_ACTION_MESG, fmt, ap);
+	len = vsnprintf(action_buff, MAX_ACTION_MESG, fmt, ap);
 	va_end(ap);
 
-	action_handler = a_handler;
-	action_message = action_buff;
-
-	draw_input();
+	if (len < 0) {
+		debug("vsnprintf failed");
+	} else {
+		action_handler = a_handler;
+		action_message = action_buff;
+		draw_input();
+	}
 }
 /* Action line should be:
  *
@@ -352,65 +378,61 @@ action_find_channel(char c)
 {
 	/* Incremental channel search */
 
-	/* \n confirms selecting the current match */
-	if (c == '\n' && search_cptr) {
-		*(search_ptr = search_buff) = '\0';
-		channel_set_current(search_cptr);
-		search_cptr = NULL;
-		draw_all();
-		return 1;
-	}
-
 	/* \n, Esc, ^C cancels a search if no results are found */
-	if (c == '\n' || c == 0x1b || c == 0x03) {
-		*(search_ptr = search_buff) = '\0';
+	if (c == '\n' || c == 0x1b || c == CTRL('c')) {
+
+		/* Confirm non-empty match */
+		if (c == '\n' && search_cptr)
+			channel_set_current(search_cptr);
+
+		search_buf[0] = 0;
+		search_i = 0;
+		search_cptr = NULL;
 		return 1;
 	}
 
 	/* ^F repeats the search forward from the current result,
 	 * or resets search criteria if no match */
-	if (c == 0x06) {
+	if (c == CTRL('f')) {
 		if (search_cptr == NULL) {
-			*(search_ptr = search_buff) = '\0';
+			search_buf[0] = 0;
+			search_i = 0;
 			action(action_find_channel, "Find: ");
 			return 0;
 		}
 
-		search_cptr = search_channels(search_cptr, search_buff);
-	} else if (c == 0x7f && search_ptr > search_buff) {
+		search_cptr = search_channels(search_cptr, search_buf);
+	} else if (c == 0x7f && search_i) {
 		/* Backspace */
+		search_buf[--search_i] = 0;
+		search_cptr = search_channels(current_channel(), search_buf);
 
-		*(--search_ptr) = '\0';
-
-		search_cptr = search_channels(current_channel(), search_buff);
-	} else if (isprint(c) && search_ptr < search_buff + MAX_SEARCH && (search_cptr != NULL || *search_buff == '\0')) {
+	} else if (isprint(c) && search_i < MAX_SEARCH) {
 		/* All other input */
-
-		*(search_ptr++) = c;
-		*search_ptr = '\0';
-
-		search_cptr = search_channels(current_channel(), search_buff);
+		search_buf[search_i++] = c;
+		search_buf[search_i] = 0;
+		search_cptr = search_channels(current_channel(), search_buf);
 	}
 
 	/* Reprint the action message */
 	if (search_cptr == NULL) {
-		if (*search_buff)
-			action(action_find_channel, "Find: NO MATCH -- %s", search_buff);
+		if (*search_buf)
+			action(action_find_channel, "Find: NO MATCH -- %s", search_buf);
 		else
 			action(action_find_channel, "Find: ");
 	} else {
 		/* Found a channel */
 		if (search_cptr->server == current_channel()->server) {
 			action(action_find_channel, "Find: %s -- %s",
-					search_cptr->name.str, search_buff);
+					search_cptr->name, search_buf);
 		} else {
 			if (!strcmp(search_cptr->server->port, "6667"))
 				action(action_find_channel, "Find: %s/%s -- %s",
-						search_cptr->server->host, search_cptr->name.str, search_buff);
+						search_cptr->server->host, search_cptr->name, search_buf);
 			else
 				action(action_find_channel, "Find: %s:%s/%s -- %s",
 						search_cptr->server->host, search_cptr->server->port,
-						search_cptr->name.str, search_buff);
+						search_cptr->name, search_buf);
 		}
 	}
 
@@ -443,10 +465,9 @@ channel_close(struct channel *c)
 			action(action_close_server, "Close server '%s'?   [y/n]", c->server->host);
 	} else {
 		/* Closing a channel */
-
 		if (c->type == CHANNEL_T_CHANNEL && !c->parted) {
 			int ret;
-			if (0 != (ret = io_sendf(c->server->connection, "PART %s", c->name.str))) {
+			if (0 != (ret = io_sendf(c->server->connection, "PART %s", c->name))) {
 				// FIXME: closing a parted channel when server is disconnected isnt an error
 				newlinef(c->server->channel, 0, "sendf fail", "%s", io_err(ret));
 			}
@@ -553,8 +574,12 @@ buffer_scrollback_forw(struct channel *c)
 	draw_status();
 }
 
-/* Usefull server/channel structure abstractions for drawing */
-
+/* FIXME:
+ *  - These abstractions should take into account the new component hierarchy
+ *    and have the backwards pointer from channel to server removed, in favour
+ *    of passing a current_server() to handlers
+ *  - The server's channel should not be part of the server's channel_list
+ */
 struct channel*
 channel_get_first(void)
 {
@@ -626,21 +651,63 @@ channel_move_next(void)
 	}
 }
 
+static uint16_t
+state_complete_list(char *str, uint16_t len, uint16_t max, const char **list)
+{
+	size_t list_len = 0;
 
+	if (len == 0)
+		return 0;
 
+	while (*list && strncmp(*list, str, len))
+		list++;
 
+	if (*list == NULL || (list_len = strlen(*list)) > max)
+		return 0;
 
+	memcpy(str, *list, list_len);
+
+	return list_len + 1;
+}
+
+static uint16_t
+state_complete_user(char *str, uint16_t len, uint16_t max, int first)
+{
+	struct user *u;
+
+	if ((u = user_list_get(&(current_channel()->users), str, len)) == NULL)
+		return 0;
+
+	if ((u->nick_len + (first != 0)) > max)
+		return 0;
+
+	memcpy(str, u->nick, u->nick_len);
+
+	if (first)
+		str[u->nick_len] = ':';
+
+	return u->nick_len + (first != 0);
+}
+
+static uint16_t
+state_complete(char *str, uint16_t len, uint16_t max, int first)
+{
+	if (first && str[0] == '/')
+		return state_complete_list(str + 1, len - 1, max - 1, irc_list);
+
+	if (first && str[0] == ':')
+		return state_complete_list(str + 1, len - 1, max - 1, cmd_list);
+
+	return state_complete_user(str, len, max, first);
+}
 
 static void
 state_io_cxed(struct server *s)
 {
 	int ret;
 
-	server_nicks_reset(s);
+	server_reset(s);
 	server_nicks_next(s);
-
-	s->ping = 0;
-	draw_status();
 
 	if (s->pass && (ret = io_sendf(s->connection, "PASS %s", s->pass)))
 		newlinef(s->channel, 0, "-!!-", "sendf fail: %s", io_err(ret));
@@ -650,15 +717,23 @@ state_io_cxed(struct server *s)
 
 	if ((ret = io_sendf(s->connection, "USER %s 8 * :%s", s->username, s->realname)))
 		newlinef(s->channel, 0, "-!!-", "sendf fail: %s", io_err(ret));
+
+	draw_status();
 }
 
 static void
-state_io_dxed(struct server *s, const char *reason)
+state_io_dxed(struct server *s, va_list ap)
 {
-	for (struct channel *c = s->channel->next; c != s->channel; c = c->next) {
-		newlinef(c, 0, "-!!-", "(disconnected %s)", reason);
+	struct channel *c = s->channel;
+	va_list ap_copy;
+
+	do {
+		va_copy(ap_copy, ap);
+		_newline(c, 0, "-!!-", va_arg(ap_copy, const char *), ap_copy);
+		va_end(ap_copy);
 		channel_reset(c);
-	}
+		c = c->next;
+	} while (c != s->channel);
 }
 
 static void
@@ -670,7 +745,7 @@ state_io_ping(struct server *s, unsigned int ping)
 
 	if (ping != IO_PING_MIN)
 		draw_status();
-	else if ((ret = io_sendf(s->connection, "PING")))
+	else if ((ret = io_sendf(s->connection, "PING :%s", s->host)))
 		newlinef(s->channel, 0, "-!!-", "sendf fail: %s", io_err(ret));
 }
 
@@ -700,7 +775,7 @@ io_cb(enum io_cb_t type, const void *cb_obj, ...)
 			_newline(s->channel, 0, "--", va_arg(ap, const char *), ap);
 			break;
 		case IO_CB_DXED:
-			state_io_dxed(s, va_arg(ap, const char*));
+			state_io_dxed(s, ap);
 			break;
 		case IO_CB_PING_0:
 		case IO_CB_PING_1:
@@ -737,8 +812,7 @@ send_cmnd(struct channel *c, char *buf)
 	}
 
 	if (!strcasecmp(cmnd, "quit")) {
-		/* TODO: send optional quit message, close servers, free */
-		exit(EXIT_SUCCESS);
+		io_term();
 	}
 
 	if (!strcasecmp(cmnd, "connect")) {
@@ -767,10 +841,13 @@ send_cmnd(struct channel *c, char *buf)
 				channel_set_current(s->channel);
 				newlinef(s->channel, 0, "-!!-", "already connected to %s:%s", host, port);
 			} else {
-				if ((s = server(host, port, pass, user, real)) == NULL)
-					fatal("failed to create server", 0);
 
+				s = server(host, port, pass, user, real);
+				s->connection = connection(s, host, port);
+
+				// TODO: here just get/set the connection object
 				server_list_add(state_server_list(), s);
+
 				channel_set_current(s->channel);
 				io_cx(s->connection);
 				draw_all();
@@ -800,12 +877,14 @@ send_cmnd(struct channel *c, char *buf)
 	 * unignore
 	 * version
 	 * find
+	 * buffers
+	 * b#
+	 * b<num>
 	 */
 }
 
-static int input_cchar(const char*, size_t);
 static int
-input_cchar(const char *c, size_t count)
+state_input_ctrlch(const char *c, size_t len)
 {
 	/* Input a control character or escape sequence */
 
@@ -814,95 +893,88 @@ input_cchar(const char *c, size_t count)
 
 		c++;
 
-		if (*c == 0)
+		if (len == 1)
 			return 0;
 
 		/* arrow up */
-		else if (!strncmp(c, "[A", count - 1))
-			return input_scroll_back(current_channel()->input, io_tty_cols());
+		else if (!strncmp(c, "[A", len - 1))
+			return input_hist_back(&(current_channel()->input));
 
 		/* arrow down */
-		else if (!strncmp(c, "[B", count - 1))
-			return input_scroll_forw(current_channel()->input, io_tty_cols());
+		else if (!strncmp(c, "[B", len - 1))
+			return input_hist_forw(&(current_channel()->input));
 
 		/* arrow right */
-		else if (!strncmp(c, "[C", count - 1))
-			return cursor_right(current_channel()->input);
+		else if (!strncmp(c, "[C", len - 1))
+			return input_cursor_forw(&(current_channel()->input));
 
 		/* arrow left */
-		else if (!strncmp(c, "[D", count - 1))
-			return cursor_left(current_channel()->input);
+		else if (!strncmp(c, "[D", len - 1))
+			return input_cursor_back(&(current_channel()->input));
 
 		/* delete */
-		else if (!strncmp(c, "[3~", count - 1))
-			return delete_right(current_channel()->input);
+		else if (!strncmp(c, "[3~", len - 1))
+			return input_delete_forw(&(current_channel()->input));
 
 		/* page up */
-		else if (!strncmp(c, "[5~", count - 1))
+		else if (!strncmp(c, "[5~", len - 1))
 			buffer_scrollback_back(current_channel());
 
 		/* page down */
-		else if (!strncmp(c, "[6~", count - 1))
+		else if (!strncmp(c, "[6~", len - 1))
 			buffer_scrollback_forw(current_channel());
 
 	} else switch (*c) {
 
 		/* Backspace */
 		case 0x7F:
-			return delete_left(current_channel()->input);
+			return input_delete_back(&(current_channel()->input));
 
 		/* Horizontal tab */
 		case 0x09:
-			return tab_complete(current_channel()->input, &(current_channel()->users));
+			return input_complete(&(current_channel()->input), state_complete);
 
-		/* ^C */
-		case 0x03:
+		/* Line feed */
+		case 0x0A:
+			return state_input_linef(current_channel());
+
+		case CTRL('c'):
 			/* Cancel current input */
-			current_channel()->input->head = current_channel()->input->line->text;
-			current_channel()->input->tail = current_channel()->input->line->text + RIRC_MAX_INPUT;
-			current_channel()->input->window = current_channel()->input->line->text;
-			return 1;
+			return input_reset(&(current_channel()->input));
 
-		/* ^F */
-		case 0x06:
+		case CTRL('f'):
 			/* Find channel */
 			if (current_channel()->server)
 				 action(action_find_channel, "Find: ");
 			break;
 
-		/* ^L */
-		case 0x0C:
+		case CTRL('l'):
 			/* Clear current channel */
 			/* TODO: as action with confirmation */
 			channel_clear(current_channel());
 			break;
 
-		/* ^P */
-		case 0x10:
+		case CTRL('p'):
 			/* Go to previous channel */
 			channel_move_prev();
 			break;
 
-		/* ^N */
-		case 0x0E:
+		case CTRL('n'):
 			/* Go to next channel */
 			channel_move_next();
 			break;
 
-		/* ^X */
-		case 0x18:
+		case CTRL('x'):
 			/* Close current channel */
 			channel_close(current_channel());
 			break;
 
-		/* ^U */
-		case 0x15:
+		case CTRL('u'):
 			/* Scoll buffer up */
 			buffer_scrollback_back(current_channel());
 			break;
 
-		/* ^D */
-		case 0x04:
+		case CTRL('d'):
 			/* Scoll buffer down */
 			buffer_scrollback_forw(current_channel());
 			break;
@@ -911,38 +983,46 @@ input_cchar(const char *c, size_t count)
 	return 0;
 }
 
-void
-io_cb_read_inp(char *buff, size_t count)
+static int
+state_input_linef(struct channel *c)
 {
 	/* TODO: cleanup, switch on input type/contents */
+	// input types:
+	//    message/paste
+	//    ::message
+	//    :command
+	//    //message
+	//    /command
 
+	char buf[INPUT_LEN_MAX + 1];
+	size_t len;
+
+	if ((len = input_write(&(c->input), buf, sizeof(buf), 0)) == 0)
+		return 0;
+
+	if (buf[0] == ':')
+		send_cmnd(current_channel(), buf + 1);
+	else
+		send_mesg(current_channel()->server, current_channel(), buf);
+
+	input_hist_push(&(c->input));
+
+	return 1;
+}
+
+void
+io_cb_read_inp(char *buf, size_t len)
+{
 	int redraw_input = 0;
 
-	if (action_message) {
-		redraw_input = input_action(buff, count);
-	} else if (*buff == 0x0A) {
-		/* Line feed */
-		char sendbuf[BUFFSIZE];
-
-		if (input_empty(state.current_channel->input))
-			return;
-
-		_send_input(state.current_channel->input, sendbuf);
-
-		switch (sendbuf[0]) {
-			case ':':
-				send_cmnd(state.current_channel, sendbuf + 1);
-				break;
-			default:
-				send_mesg(current_channel()->server, current_channel(), sendbuf);
-		}
-		redraw_input = 1;
-
-	} else if (iscntrl(*buff)) {
-		redraw_input = input_cchar(buff, count);
-	} else {
-		redraw_input = input(current_channel()->input, buff, count);
-	}
+	if (len == 0)
+		fatal("zero length message");
+	else if (action_message)
+		redraw_input = state_input_action(buf, len);
+	else if (iscntrl(*buf))
+		redraw_input = state_input_ctrlch(buf, len);
+	else
+		redraw_input = input_insert(&current_channel()->input, buf, len);
 
 	if (redraw_input)
 		draw_input();
@@ -951,16 +1031,16 @@ io_cb_read_inp(char *buff, size_t count)
 }
 
 void
-io_cb_read_soc(char *buff, size_t count, const void *cb_obj)
+io_cb_read_soc(char *buf, size_t len, const void *cb_obj)
 {
 	/* TODO: */
-	(void)(count);
+	(void)(len);
 
 	struct channel *c = ((struct server *)cb_obj)->channel;
 
 	struct parsed_mesg p;
 
-	if (!(parse_mesg(&p, buff)))
+	if (!(parse_mesg(&p, buf)))
 		newlinef(c, 0, "-!!-", "failed to parse message");
 	else
 		recv_mesg((struct server *)cb_obj, &p);

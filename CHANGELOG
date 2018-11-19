@@ -2,11 +2,27 @@
 Summary of notable changes and features
 
 ## Unreleased (dev)
-merged
+
+## [0.1.1]
+### Features
+ - tab completion for :commands
+### Refactor
+ - input module complete rewrite
+   - generic word completion API
+   - add full test coverage
+   - performance and memory usage improvements
+   - tab completion as generic callbacks
+### Fixes
+ - fix error in sending PING
+ - fix error messages on socket disconnect
+ - fix fatal error on /quit
+ - close/cleanup servers on :quit
+ - print message on channel re-join
+ - fix recursive exit() calls on fatal
 
 ## [0.1.0]
 ### Initial release
-Started in 2014 as a hobby project, rirc has been a fully useable,
+Started in 2013 as a hobby project, rirc has been a fully useable,
 albeit basic, IRC client since it's early inception. This version
 marks an initial release supporting a basic subset of the IRC
 protocol and client management features one would expect in everyday

@@ -19,6 +19,7 @@
 
 #include "config.h"
 #include "src/components/input.h"
+#include "src/components/channel.h"
 #include "src/io.h"
 #include "src/state.h"
 #include "src/utils/utils.h"
@@ -49,9 +50,9 @@
 #define COLOUR_SIZE sizeof(RESET_ATTRIBUTES FG(255) BG(255))
 
 #ifndef BUFFER_PADDING
-	#define BUFFER_PADDING 1
+#define BUFFER_PADDING 1
 #elif BUFFER_PADDING != 0 && BUFFER_PADDING != 1
-	#error "BUFFER_PADDING options are 0 (no pad), 1 (padded)"
+#error "BUFFER_PADDING options are 0 (no pad), 1 (padded)"
 #endif
 
 static int actv_colours[ACTIVITY_T_SIZE] = ACTIVITY_COLOURS
@@ -116,7 +117,7 @@ draw(union draw draw)
 
 	if (draw.bits.nav)    _draw_nav(c);
 
-	if (draw.bits.input)  _draw_input(c->input,
+	if (draw.bits.input)  _draw_input(&c->input,
 		(struct coords) {
 			.c1 = 1,
 			.cN = io_tty_cols(),
@@ -420,7 +421,7 @@ _draw_nav(struct channel *c)
 	size_t len, total_len = 0;
 
 	/* Bump the channel frames, if applicable */
-	if ((total_len = (c->name.len + 2)) >= io_tty_cols())
+	if ((total_len = (c->name_len + 2)) >= io_tty_cols())
 		return;
 	else if (c == frame_prev && frame_prev != c_first)
 		frame_prev = channel_get_prev(frame_prev);
@@ -437,14 +438,14 @@ _draw_nav(struct channel *c)
 			/* Pad out nextward */
 
 			tmp = channel_get_next(tmp_next);
-			len = tmp->name.len;
+			len = tmp->name_len;
 
 			while ((total_len += (len + 2)) < io_tty_cols() && tmp != c_first) {
 
 				tmp_next = tmp;
 
 				tmp = channel_get_next(tmp);
-				len = tmp->name.len;
+				len = tmp->name_len;
 			}
 
 			break;
@@ -455,21 +456,21 @@ _draw_nav(struct channel *c)
 			/* Pad out prevward */
 
 			tmp = channel_get_prev(tmp_prev);
-			len = tmp->name.len;
+			len = tmp->name_len;
 
 			while ((total_len += (len + 2)) < io_tty_cols() && tmp != c_last) {
 
 				tmp_prev = tmp;
 
 				tmp = channel_get_prev(tmp);
-				len = tmp->name.len;
+				len = tmp->name_len;
 			}
 
 			break;
 		}
 
 		tmp = nextward ? channel_get_next(tmp_next) : channel_get_prev(tmp_prev);
-		len = tmp->name.len;
+		len = tmp->name_len;
 
 		/* Next channel doesn't fit */
 		if ((total_len += (len + 2)) >= io_tty_cols())
@@ -494,7 +495,7 @@ _draw_nav(struct channel *c)
 		if (fputs(_colour(colour, -1), stdout) < 0)
 			break;
 
-		if (printf(" %s ", tmp->name.str) < 0)
+		if (printf(" %s ", tmp->name) < 0)
 			break;
 
 		if (tmp == frame_next)
@@ -503,7 +504,7 @@ _draw_nav(struct channel *c)
 }
 
 static void
-_draw_input(struct input *in, struct coords coords)
+_draw_input(struct input *inp, struct coords coords)
 {
 	/* Draw the input line, or the current action message */
 
@@ -554,59 +555,7 @@ _draw_input(struct input *in, struct coords coords)
 		cursor = cols_t - text_n + 1;
 
 	} else {
-
-		/*  Keep the input head in view, reframing if the cursor would be
-		 *  drawn outside [A, B] as a function of input window and head
-		 *
-		 * |  <prefix>     <text area>  |
-		 * |............|---------------|
-		 * |             A             B|
-		 * |                            | : cols_t
-		 *              |               | : text_n
-		 *
-		 * The cursor should track the input head, where the next
-		 * character would be entered
-		 *
-		 * In the <= A case: deletions occurred; the head is less than
-		 * or equal to the window
-		 *
-		 * In the >= B case: insertions occurred; the distance from window
-		 * to head is greater than the distance from [A, B]
-		 *
-		 * Set the window 2/3 of the text area width backwards from the head */
-
-		size_t frame = text_n * 2 / 3;
-
-		char *w1, *w2, *ptr;
-
-		if (in->window >= in->head || (in->window + text_n) <= in->head) {
-
-			w1 = in->line->text,
-			w2 = in->line->text + frame;
-
-			in->window = (w2 >= in->head) ? w1 : in->head - frame;
-		}
-
-		cursor = (cols_t - text_n) + (in->head - in->window + 1);
-
-		for (ptr = in->window; text_n; text_n--) {
-
-			/* Copy characters, x, from the gap buffer, i.e.:
-			 *
-			 *  window   head    tail
-			 *       v      v       v
-			 * |.....xxxxxxx|------|xxxxxxx| */
-
-			if (ptr == in->head)
-				ptr = in->tail;
-
-			if (ptr == in->line->text + RIRC_MAX_INPUT)
-				break;
-
-			*input_ptr++ = *ptr++;
-		}
-
-		*input_ptr = '\0';
+		cursor += input_frame(inp, input_ptr, text_n);
 	}
 
 print_input:
@@ -626,7 +575,7 @@ _draw_status(struct channel *c)
 	 *
 	 * channel:
 	 * |-[usermodes]-[chancount chantype chanmodes]/[priv]-(ping)---...|
-	 * */
+	 */
 
 	float sb;
 	int ret;
@@ -730,10 +679,10 @@ check_coords(struct coords coords)
 	/* Check coordinate validity before drawing, ensure at least one row, column */
 
 	if (coords.r1 > coords.rN)
-		fatal("row coordinates invalid", 0);
+		fatal("row coordinates invalid (%u > %u)", coords.r1, coords.rN);
 
 	if (coords.c1 > coords.cN)
-		fatal("column coordinates invalid", 0);
+		fatal("col coordinates invalid (%u > %u)", coords.c1, coords.cN);
 }
 
 static inline unsigned int
@@ -757,26 +706,23 @@ _colour(int fg, int bg)
 	 * Background(B): ESC"[48;5;Bm"
 	 * */
 
-	static char col_buff[COLOUR_SIZE + 1] = RESET_ATTRIBUTES;
-
+	static char buf[COLOUR_SIZE + 1] = RESET_ATTRIBUTES;
+	size_t len = sizeof(RESET_ATTRIBUTES) - 1;
 	int ret = 0;
 
-	char *col_buff_ptr = col_buff + sizeof(RESET_ATTRIBUTES) - 1;
+	if (fg >= 0 && fg <= 255) {
+		if ((ret = snprintf(buf + len, sizeof(buf) - len, ESC"[38;5;%dm", fg)) < 0)
+			buf[len] = 0;
+		else
+			len += ret;
+	}
 
-	/* Assume any colour sequence begins by resetting all attributes */
-	*(col_buff_ptr = col_buff + sizeof(RESET_ATTRIBUTES) - 1) = '\0';
+	if (bg >= 0 && bg <= 255) {
+		if ((ret = snprintf(buf + len, sizeof(buf) - len, ESC"[48;5;%dm", bg)) < 0)
+			buf[len] = 0;
+	}
 
-	/* Set valid foreground colour */
-	if (fg >= 0 && fg <= 255 && ((ret = sprintf(col_buff_ptr, ESC"[38;5;%dm", fg)) < 0))
-		return strcpy(col_buff, RESET_ATTRIBUTES);
-
-	col_buff_ptr += ret;
-
-	/* Set valid background colour */
-	if (bg >= 0 && bg <= 255 && ((ret = sprintf(col_buff_ptr, ESC"[48;5;%dm", bg)) < 0))
-		return strcpy(col_buff, RESET_ATTRIBUTES);
-
-	return col_buff;
+	return buf;
 }
 
 static int

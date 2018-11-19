@@ -1,5 +1,9 @@
+#include <errno.h>
 #include <getopt.h>
 #include <pwd.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
 
 #include "config.h"
@@ -9,14 +13,13 @@
 #define arg_error(...) \
 	do { fprintf(stderr, "%s: ", runtime_name); \
 	     fprintf(stderr, __VA_ARGS__); \
-	     fprintf(stderr, "\n"); \
-	     fprintf(stderr, "%s --help for usage\n", runtime_name); \
-	     exit(EXIT_FAILURE); \
-	} while (0);
+	     fprintf(stderr, "\n%s --help for usage\n", runtime_name); \
+	     return 1; \
+	} while (0)
 
 static const char* opt_arg_str(char);
 static const char* getpwuid_pw_name(void);
-static void parse_args(int, char**);
+static int parse_args(int, char**);
 
 #ifndef DEBUG
 const char *runtime_name = "rirc";
@@ -43,32 +46,31 @@ const char *default_realname;
 #endif
 
 static const char *const rirc_usage =
+"\nrirc v"VERSION" ~ Richard C. Robbins <mail@rcr.io>"
 "\n"
-"rirc v"VERSION" ~ Richard C. Robbins <mail@rcr.io>\n"
+"\nUsage:"
+"\n  rirc [-hv] [-s server [-p port] [-w pass] [-n nicks] [-c chans] [-u user] [-r real]], ...]"
 "\n"
-"Usage:\n"
-"  rirc [-hv] [-s server [-p port] [-w pass] [-n nicks] [-c chans] [-u user] [-r real]], ...]\n"
+"\nHelp:"
+"\n  -h, --help            Print this message and exit"
+"\n  -v, --version         Print rirc version and exit"
 "\n"
-"Help:\n"
-"  -h, --help            Print this message and exit\n"
-"  -v, --version         Print rirc version and exit\n"
-"\n"
-"Options:\n"
-"  -s, --server=SERVER      Connect to SERVER\n"
-"  -p, --port=PORT          Connect to SERVER using PORT\n"
-"  -w, --pass=PASS          Connect to SERVER using PASS\n"
-"  -u, --username=USERNAME  Connect to SERVER using USERNAME\n"
-"  -r, --realname=REALNAME  Connect to SERVER using REALNAME\n"
-"  -n, --nicks=NICKS        Comma separated list of nicks to use for SERVER\n"
-"  -c, --chans=CHANNELS     Comma separated list of channels to join for SERVER\n"
-;
+"\nOptions:"
+"\n  -s, --server=SERVER      Connect to SERVER"
+"\n  -p, --port=PORT          Connect to SERVER using PORT"
+"\n  -w, --pass=PASS          Connect to SERVER using PASS"
+"\n  -u, --username=USERNAME  Connect to SERVER using USERNAME"
+"\n  -r, --realname=REALNAME  Connect to SERVER using REALNAME"
+"\n  -n, --nicks=NICKS        Comma separated list of nicks to use for SERVER"
+"\n  -c, --chans=CHANNELS     Comma separated list of channels to join for SERVER"
+"\n";
 
 static const char *const rirc_version =
-"rirc v"VERSION
 #ifdef DEBUG
-" (debug build)"
+"rirc v"VERSION" (debug build)";
+#else
+"rirc v"VERSION;
 #endif
-;
 
 static const char*
 opt_arg_str(char c)
@@ -82,8 +84,9 @@ opt_arg_str(char c)
 		case 'u': return "-u/--username";
 		case 'r': return "-r/--realname";
 		default:
-			fatal("unknown option flag", 0);
+			fatal("unknown option flag '%c'", c);
 	}
+	return NULL;
 }
 
 static const char*
@@ -94,12 +97,12 @@ getpwuid_pw_name(void)
 	errno = 0;
 
 	if (!passwd && !(passwd = getpwuid(geteuid())))
-		fatal("getpwuid", (errno ? errno : ENOENT));
+		fatal("getpwuid: %s", strerror((errno ? errno : ENOENT)));
 
 	return passwd->pw_name;
 }
 
-static void
+static int
 parse_args(int argc, char **argv)
 {
 	int opt_c = 0,
@@ -122,8 +125,8 @@ parse_args(int argc, char **argv)
 		{"chans",    required_argument, 0, 'c'},
 		{"username", required_argument, 0, 'u'},
 		{"realname", required_argument, 0, 'r'},
-		{"version",  no_argument,       0, 'v'},
 		{"help",     no_argument,       0, 'h'},
+		{"version",  no_argument,       0, 'v'},
 		{0, 0, 0, 0}
 	};
 
@@ -139,7 +142,7 @@ parse_args(int argc, char **argv)
 	} cli_servers[IO_MAX_CONNECTIONS];
 
 	/* FIXME: getopt_long is a GNU extension */
-	while (0 < (opt_c = getopt_long(argc, argv, ":s:p:w:n:c:r:u:vh", long_opts, &opt_i))) {
+	while (0 < (opt_c = getopt_long(argc, argv, ":s:p:w:n:c:r:u:hv", long_opts, &opt_i))) {
 
 		switch (opt_c) {
 
@@ -198,12 +201,12 @@ parse_args(int argc, char **argv)
 
 			#undef CHECK_SERVER_OPTARG
 
-			case 'v':
-				puts(rirc_version);
-				exit(EXIT_SUCCESS);
-
 			case 'h':
 				puts(rirc_usage);
+				exit(EXIT_SUCCESS);
+
+			case 'v':
+				puts(rirc_version);
 				exit(EXIT_SUCCESS);
 
 			case '?':
@@ -241,8 +244,7 @@ parse_args(int argc, char **argv)
 			(cli_servers[i].realname ? cli_servers[i].realname : default_realname)
 		);
 
-		if (s == NULL)
-			arg_error("failed to create: %s:%s", cli_servers[i].host, cli_servers[i].port);
+		s->connection = connection(s, cli_servers[i].host, cli_servers[i].port);
 
 		if (server_list_add(state_server_list(), s))
 			arg_error("duplicate server: %s:%s", cli_servers[i].host, cli_servers[i].port);
@@ -254,15 +256,25 @@ parse_args(int argc, char **argv)
 			arg_error("invalid nicks: '%s'", cli_servers[i].nicks);
 
 		cli_servers[i].s = s;
+
+		channel_set_current(s->channel);
 	}
 
 	for (size_t i = 0; i < n_servers; i++)
 		io_cx(cli_servers[i].s->connection);
+
+	return 0;
 }
 
 int
 main(int argc, char **argv)
 {
-	parse_args(argc, argv);
-	io_loop();
+	int ret;
+
+	if ((ret = parse_args(argc, argv)) == 0)
+		io_init();
+
+	state_term();
+
+	return ret;
 }

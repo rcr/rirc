@@ -4,6 +4,10 @@
 #define TESTING
 
 /* TODO: list the test types at the top of file with usage */
+/* TODO: randomize testcase ordering */
+/* TODO: colours */
+/* TODO: verbose output */
+/* TODO: number of tests ran, time */
 
 #include <inttypes.h>
 #include <setjmp.h>
@@ -27,7 +31,8 @@ static jmp_buf _tc_fatal_expected_,
                _tc_fatal_unexpected_;
 
 static int _assert_fatal_, _failures_, _failures_t_, _failure_printed_;
-static char _tc_errbuf_[512];
+static char _tc_errbuf_1[512];
+static char _tc_errbuf_2[512];
 
 static int _assert_strcmp(const char*, const char*);
 static int _assert_strncmp(const char*, const char*, size_t);
@@ -73,17 +78,20 @@ static void _print_testcase_name_(const char*);
  *   in normal operation should fatally exit the program
  *   in testing should be considered a failure but should NOT continue running the testcase */
 #ifdef fatal
-	#error "test.h" should be the first include within testcase files
+#error "test.h" should be the first include within testcase files
 #else
-	#define fatal(M, E) \
+#define _fatal(...) \
 	do { \
 		if (_assert_fatal_) { \
 			longjmp(_tc_fatal_expected_, 1); \
 		} else { \
-			snprintf(_tc_errbuf_, sizeof(_tc_errbuf_) - 1, "FATAL in "__FILE__":%d - %s : '%s'", __LINE__, __func__, M); \
+			snprintf(_tc_errbuf_1, sizeof(_tc_errbuf_1), "%s:%d:%s:", __FILE__, __LINE__, __func__); \
+			snprintf(_tc_errbuf_2, sizeof(_tc_errbuf_2), __VA_ARGS__); \
 			longjmp(_tc_fatal_unexpected_, 1); \
 		} \
 	} while (0)
+#define fatal        _fatal
+#define fatal_noexit _fatal
 #endif
 
 #define assert_fatal(X) \
@@ -172,7 +180,7 @@ _assert_strncmp(const char *p1, const char *p2, size_t n)
 static void
 _print_testcase_name_(const char *name)
 {
-	/* Print the testcase name only one */
+	/* Print the testcase name once */
 	if (!_failure_printed_) {
 		_failure_printed_ = 1;
 
@@ -186,7 +194,7 @@ _print_testcase_name_(const char *name)
 static int
 _run_tests_(const char *filename, testcase testcases[], size_t len)
 {
-	/* Silence compiler warnings for test functions/vars that are included but not used */
+	/* Silence compiler warnings for unused test functions/vars */
 	((void)(_assert_strcmp));
 	((void)(_assert_strncmp));
 	((void)(_assert_fatal_));
@@ -205,7 +213,9 @@ _run_tests_(const char *filename, testcase testcases[], size_t len)
 
 		if (setjmp(_tc_fatal_unexpected_)) {
 			_print_testcase_name_(tc->tc_str);
-			printf("    %s - aborting testcase\n", _tc_errbuf_);
+			printf("    Unexpected fatal error:\n");
+			printf("    %s %s\n", _tc_errbuf_1,_tc_errbuf_2);
+			printf("    -- aborting testcase --\n");
 			_failures_++;
 		} else
 			(*tc->tc_ptr)();

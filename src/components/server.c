@@ -1,4 +1,5 @@
 #include <ctype.h>
+#include <errno.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -31,28 +32,20 @@ server(const char *host, const char *port, const char *pass, const char *user, c
 	struct server *s;
 
 	if ((s = calloc(1, sizeof(*s))) == NULL)
-		fatal("calloc", errno);
+		fatal("calloc: %s", strerror(errno));
 
 	s->host = strdup(host);
 	s->port = strdup(port);
 	s->pass = pass ? strdup(pass) : NULL;
 	s->username = strdup(user);
 	s->realname = strdup(real);
-
+	s->channel = channel(host, CHANNEL_T_SERVER);
 	s->mode_str.type = MODE_STR_USERMODE;
-
 	mode_cfg(&(s->mode_cfg), NULL, MODE_CFG_DEFAULTS);
-
-	// FIXME: channel()
-	s->channel = new_channel(host, s, CHANNEL_T_SERVER);
-
-	// move this to the state_new_server
-	channel_set_current(s->channel);
-
-	if ((s->connection = connection(s, host, port)) == NULL) {
-		server_free(s);
-		return NULL;
-	}
+	/* FIXME: remove server pointer from channel, remove
+	 * server's channel from clist */
+	s->channel->server = s;
+	channel_list_add(&(s->clist), s->channel);
 
 	return s;
 }
@@ -134,8 +127,25 @@ server_list_del(struct server_list *sl, struct server *s)
 }
 
 void
+server_reset(struct server *s)
+{
+	mode_reset(&(s->usermodes), &(s->mode_str));
+	s->ping = 0;
+	s->quitting = 0;
+	s->nicks.next = 0;
+}
+
+void
 server_free(struct server *s)
 {
+	// FIXME: add this back when removing it from
+	// server's channel_list
+	// channel_free(s->channel);
+
+	channel_list_free(&(s->clist));
+	channel_list_free(&(s->ulist));
+	user_list_free(&(s->ignore));
+
 	free((void *)s->host);
 	free((void *)s->port);
 	free((void *)s->pass);
@@ -173,7 +183,7 @@ server_set_004(struct server *s, char *str)
 
 	if (user_modes) {
 
-		DEBUG_MSG("Setting numeric 004 user_modes: %s", user_modes);
+		debug("Setting numeric 004 user_modes: %s", user_modes);
 
 		if (mode_cfg(&(s->mode_cfg), user_modes, MODE_CFG_USERMODES) != MODE_ERR_NONE)
 			newlinef(c, 0, "-!!-", "invalid numeric 004 user_modes: %s", user_modes);
@@ -181,7 +191,7 @@ server_set_004(struct server *s, char *str)
 
 	if (chan_modes) {
 
-		DEBUG_MSG("Setting numeric 004 chan_modes: %s", chan_modes);
+		debug("Setting numeric 004 chan_modes: %s", chan_modes);
 
 		if (mode_cfg(&(s->mode_cfg), chan_modes, MODE_CFG_CHANMODES) != MODE_ERR_NONE)
 			newlinef(c, 0, "-!!-", "invalid numeric 004 chan_modes: %s", chan_modes);
@@ -235,7 +245,7 @@ server_set_nicks(struct server *s, const char *nicks)
 	s->nicks.base = base;
 
 	if ((s->nicks.set = malloc(sizeof(*s->nicks.set) * n)) == NULL)
-		fatal("malloc", errno);
+		fatal("malloc: %s", strerror(errno));
 
 	for (const char **set = s->nicks.set; n; n--, set++) {
 		*set = base;
@@ -342,7 +352,7 @@ server_set_CASEMAPPING(struct server *s, char *val)
 static int
 server_set_CHANMODES(struct server *s, char *val)
 {
-	DEBUG_MSG("Setting numeric 005 CHANMODES: %s", val);
+	debug("Setting numeric 005 CHANMODES: %s", val);
 
 	return (mode_cfg(&(s->mode_cfg), val, MODE_CFG_SUBTYPES) != MODE_ERR_NONE);
 }
@@ -350,7 +360,7 @@ server_set_CHANMODES(struct server *s, char *val)
 static int
 server_set_MODES(struct server *s, char *val)
 {
-	DEBUG_MSG("Setting numeric 005 MODES: %s", val);
+	debug("Setting numeric 005 MODES: %s", val);
 
 	return (mode_cfg(&(s->mode_cfg), val, MODE_CFG_MODES) != MODE_ERR_NONE);
 }
@@ -358,7 +368,7 @@ server_set_MODES(struct server *s, char *val)
 static int
 server_set_PREFIX(struct server *s, char *val)
 {
-	DEBUG_MSG("Setting numeric 005 PREFIX: %s", val);
+	debug("Setting numeric 005 PREFIX: %s", val);
 
 	return (mode_cfg(&(s->mode_cfg), val, MODE_CFG_PREFIX) != MODE_ERR_NONE);
 }
@@ -366,7 +376,7 @@ server_set_PREFIX(struct server *s, char *val)
 void
 server_nick_set(struct server *s, const char *nick)
 {
-	DEBUG_MSG("Setting server nick: %s", nick);
+	debug("Setting server nick: %s", nick);
 
 	if (s->nick)
 		free((void *)s->nick);
@@ -392,10 +402,4 @@ server_nicks_next(struct server *s)
 
 		server_nick_set(s, nick_rand);
 	}
-}
-
-void
-server_nicks_reset(struct server *s)
-{
-	s->nicks.next = 0;
 }

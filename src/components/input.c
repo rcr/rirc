@@ -1,396 +1,341 @@
-/* TODO:
- * complete rewrite and unit test
- */
-
+#include <errno.h>
 #include <string.h>
+#include <stdlib.h>
 
 #include "src/components/input.h"
-#include "src/state.h"
 #include "src/utils/utils.h"
 
-/* List of common IRC commands for tab completion */
-static char* irc_commands[] = {
-	"admin",    "away",     "clear",   "close",
-	"connect",  "ctcp",     "die",     "disconnect",
-	"encap",    "help",     "ignore",  "info",
-	"invite",   "ison",     "join",    "kick",
-	"kill",     "knock",    "links",   "list",
-	"lusers",   "me",       "mode",    "motd",
-	"msg",      "names",    "namesx",  "nick",
-	"notice",   "oper",     "part",    "pass",
-	"privmsg",  "quit",     "raw",     "rehash",
-	"restart",  "rules",    "server",  "service",
-	"servlist", "setname",  "silence", "squery",
-	"squit",    "stats",    "summon",  "time",
-	"topic",    "trace",    "uhnames", "unignore",
-	"user",     "userhost", "userip",  "users",
-	"version",  "wallops",  "watch",   "who",
-	"whois",    "whowas",
-	NULL
-};
+#define INPUT_MASK(X) ((X) & (INPUT_HIST_MAX - 1))
 
-/* User input handlers */
-static int input_char(struct input*, char);
+#if INPUT_MASK(INPUT_HIST_MAX)
+/* Required for proper masking when indexing */
+#error INPUT_HIST_MAX must be a power of 2
+#endif
 
-/* Case insensitive tab complete for commands and nicks */
-static int tab_complete_command(struct input*, char*, size_t);
-static int tab_complete_nick(struct input*, struct user_list*, char*, size_t);
+static char *input_text_copy(struct input*);
+static int input_text_isfull(struct input*);
+static int input_text_iszero(struct input*);
+static uint16_t input_hist_size(struct input*);
+static uint16_t input_text_size(struct input*);
 
-/* Input line util functions */
-static inline void reset_line(struct input*);
-static inline void reframe_line(struct input*, unsigned int);
-
-static void new_list_head(struct input*);
-
-//TODO: struct input input(struct input*)
-struct input*
-new_input(void)
-{
-	struct input *i;
-
-	if ((i = calloc(1, sizeof(*i))) == NULL)
-		fatal("calloc", errno);
-
-	new_list_head(i);
-
-	return i;
-}
-
-/* TODO: ideally inputs shouldnt require being freed */
 void
-free_input(struct input *i)
+input_init(struct input *inp)
 {
-	/* Free an input and all of it's lines */
+	memset(inp, 0, sizeof(*inp));
 
-	struct input_line *t, *l = i->list_head;
-
-	do {
-		t = l;
-		l = l->next;
-		free(t);
-	} while (l != i->list_head);
-
-	free(i);
+	inp->tail = INPUT_LEN_MAX;
 }
 
-static void
-new_list_head(struct input *i)
+void
+input_free(struct input *inp)
 {
-	/* Append a new line as the list_head */
+	free(inp->hist.save);
 
-	struct input_line *l;
-
-	if ((l = calloc(1, sizeof(*l))) == NULL)
-		fatal("calloc", errno);
-
-	DLL_ADD(i->list_head, l);
-
-	i->line = i->list_head = l;
-
-	/* Gap buffer pointers */
-	i->head = l->text;
-	i->tail = l->text + RIRC_MAX_INPUT;
-
-	i->window = l->text;
+	while (inp->hist.tail != inp->hist.head)
+		free(inp->hist.ptrs[INPUT_MASK(inp->hist.tail++)]);
 }
 
 int
-input(struct input *inp, const char *buff, size_t count)
+input_cursor_back(struct input *inp)
 {
-	/* Handle input, checking for control character or escape
-	 * sequence. Otherwise copy all characters to the input struct
-	 * of the current context */
-
-	size_t start = count;
-
-	while (count && input_char(inp, *buff)) {
-		buff++;
-		count--;
-	}
-
-	/* returns zero if no characters added */
-	return (start != count);
-}
-
-/*
- * User input handlers
- * */
-
-static int
-input_char(struct input *inp, char c)
-{
-	/* Input a single character */
-
-	if (inp->head >= inp->tail)
-		/* Gap buffer is full */
+	if (inp->head == 0)
 		return 0;
 
-	*inp->head++ = c;
-	return 1;
-}
-
-/*
- * Input line manipulation functions
- * */
-
-int
-cursor_left(struct input *in)
-{
-	/* Move the cursor left */
-
-	if (in->head > in->line->text) {
-		*(--in->tail) = *(--in->head);
-		return 1;
-	}
-
-	return 0;
-}
-
-int
-cursor_right(struct input *in)
-{
-	/* Move the cursor right */
-
-	if (in->tail < in->line->text + RIRC_MAX_INPUT) {
-		*(in->head++) = *(in->tail++);
-		return 1;
-	}
-
-	return 0;
-}
-
-int
-delete_left(struct input *in)
-{
-	/* Delete the character left of the cursor */
-
-	if (in->head > in->line->text) {
-		in->head--;
-		return 1;
-	}
-
-	return 0;
-}
-
-int
-delete_right(struct input *in)
-{
-	/* Delete the character right of the cursor */
-
-	if (in->tail < in->line->text + RIRC_MAX_INPUT) {
-		in->tail++;
-		return 1;
-	}
-
-	return 0;
-}
-
-int
-input_scroll_back(struct input *in, unsigned int cols)
-{
-	/* Scroll backwards through the input history */
-
-	/* Scrolling backwards on the last line */
-	if (in->line->prev == in->list_head)
-		return 0;
-
-	reset_line(in);
-	in->line = in->line->prev;
-	reframe_line(in, cols);
+	inp->text[--inp->tail] = inp->text[--inp->head];
 
 	return 1;
 }
 
 int
-input_scroll_forw(struct input *in, unsigned int cols)
+input_cursor_forw(struct input *inp)
 {
-	/* Scroll forwards through the input history */
-
-	/* Scrolling forward on the first line */
-	if (in->line == in->list_head)
+	if (inp->tail == INPUT_LEN_MAX)
 		return 0;
 
-	reset_line(in);
-	in->line = in->line->next;
-	reframe_line(in, cols);
+	inp->text[inp->head++] = inp->text[inp->tail++];
 
 	return 1;
 }
 
-/*
- * Input line util functions
- * */
-
-static inline void
-reset_line(struct input *in)
+int
+input_delete_back(struct input *inp)
 {
-	/* Reset a line's gap buffer pointers such that new chars are inserted at the gap head */
+	if (inp->head == 0)
+		return 0;
 
-	char *h_tmp = in->head, *t_tmp = in->tail;
+	inp->head--;
 
-	while (t_tmp < (in->line->text + RIRC_MAX_INPUT))
-		*h_tmp++ = *t_tmp++;
-
-	*h_tmp = '\0';
-
-	in->line->end = h_tmp;
-}
-
-static inline void
-reframe_line(struct input *in, unsigned int cols)
-{
-	/* Reframe a line's draw window */
-
-	in->head = in->line->end;
-	in->tail = in->line->text + RIRC_MAX_INPUT;
-	in->window = in->head - (2 * cols / 3);
-
-	if (in->window < in->line->text)
-		in->window = in->line->text;
+	return 1;
 }
 
 int
-tab_complete(struct input *inp, struct user_list *ul)
+input_delete_forw(struct input *inp)
 {
-	/* Case insensitive tab complete for commands and nicks */
+	if (inp->tail == INPUT_LEN_MAX)
+		return 0;
 
-	char *str = inp->head;
+	inp->tail++;
+
+	return 1;
+}
+
+int
+input_insert(struct input *inp, const char *c, size_t count)
+{
+	/* TODO: may want to discard control characters */
+
+	size_t i = count;
+
+	while (!input_text_isfull(inp) && i--) {
+		inp->text[inp->head++] = *c++;
+	}
+
+	return (i != count);
+}
+
+int
+input_reset(struct input *inp)
+{
+	if (input_text_iszero(inp))
+		return 0;
+
+	free(inp->hist.save);
+
+	inp->hist.current = inp->hist.head;
+	inp->hist.save = NULL;
+
+	inp->head = 0;
+	inp->tail = INPUT_LEN_MAX;
+	inp->window = 0;
+
+	return 1;
+}
+
+int
+input_complete(struct input *inp, f_completion_cb cb)
+{
+	/* Completion is valid when the cursor is:
+	 *  - above any character in a word
+	 *  - above a space immediately following a word
+	 *  - at the end of a line following a word */
+
+	uint16_t head, tail, ret;
+
+	if (input_text_iszero(inp))
+		return 0;
+
+	head = inp->head;
+	tail = inp->tail;
+
+	while (head && inp->text[head - 1] != ' ')
+		head--;
+
+	if (inp->text[head] == ' ')
+		return 0;
+
+	while (tail < INPUT_LEN_MAX && inp->text[tail] != ' ')
+		tail++;
+
+	ret = (*cb)(
+		(inp->text + head),
+		(inp->head - head - inp->tail + tail),
+		(INPUT_LEN_MAX - input_text_size(inp)),
+		(head == 0));
+
+	if (ret) {
+		inp->head = head + ret;
+		inp->tail = tail;
+	}
+
+	return (ret != 0);
+}
+
+int
+input_hist_back(struct input *inp)
+{
+	size_t len;
+
+	if (input_hist_size(inp) == 0 || inp->hist.current == inp->hist.tail)
+		return 0;
+
+	if (inp->hist.current == inp->hist.head) {
+		inp->hist.save = input_text_copy(inp);
+	} else {
+		free(inp->hist.ptrs[INPUT_MASK(inp->hist.current)]);
+		inp->hist.ptrs[INPUT_MASK(inp->hist.current)] = input_text_copy(inp);
+	}
+
+	inp->hist.current--;
+
+	len = strlen(inp->hist.ptrs[INPUT_MASK(inp->hist.current)]);
+	memcpy(inp->text, inp->hist.ptrs[INPUT_MASK(inp->hist.current)], len);
+
+	inp->head = len;
+	inp->tail = INPUT_LEN_MAX;
+
+	return 1;
+}
+
+int
+input_hist_forw(struct input *inp)
+{
+	char *str;
 	size_t len = 0;
 
-	/* Don't tab complete at beginning of line or if previous character is space */
-	if (inp->head == inp->line->text || *(inp->head - 1) == ' ')
+	if (input_hist_size(inp) == 0 || inp->hist.current == inp->hist.head)
 		return 0;
 
-	/* Don't tab complete if cursor is scrolled left and next character isn't space */
-	if (inp->tail < (inp->line->text + RIRC_MAX_INPUT) && *inp->tail != ' ')
-		return 0;
+	free(inp->hist.ptrs[INPUT_MASK(inp->hist.current)]);
+	inp->hist.ptrs[INPUT_MASK(inp->hist.current)] = input_text_copy(inp);
 
-	/* Scan backwards for the point to tab complete from */
-	while (str > inp->line->text && *(str - 1) != ' ')
-		len++, str--;
+	inp->hist.current++;
 
-	if (str == inp->line->text && *str == '/')
-		return tab_complete_command(inp, ++str, --len);
+	if (inp->hist.current == inp->hist.head)
+		str = inp->hist.save;
 	else
-		return tab_complete_nick(inp, ul, str, len);
-}
+		str = inp->hist.ptrs[INPUT_MASK(inp->hist.current)];
 
-static int
-tab_complete_command(struct input *inp, char *str, size_t len)
-{
-	/* Command tab completion */
-
-	char *p, **command = irc_commands;
-
-	while (*command && strncmp(*command, str, len))
-		command++;
-
-	if (*command) {
-
-		p = *command;
-
-		/* Case insensitive matching, delete prefix */
-		while (len--)
-			delete_left(inp);
-
-		while (*p && input_char(inp, *p++))
-			;
-
-		input_char(inp, ' ');
-
-		return 1;
-	} else {
-		return 0;
+	if (str) {
+		len = strlen(str);
+		memcpy(inp->text, str, len);
 	}
-}
 
-static int
-tab_complete_nick(struct input *inp, struct user_list *ul, char *str, size_t len)
-{
-	/* Nick tab completion */
-
-	const char *p;
-
-	struct user *u;
-
-	if ((u = user_list_get(ul, str, len))) {
-
-		p = u->nick.str;
-
-		/* Case insensitive matching, delete prefix */
-		while (len--)
-			delete_left(inp);
-
-		while (*p && input_char(inp, *p++))
-			;
-
-		/* Tab completing first word in input, append delimiter and space */
-		if (str == inp->line->text) {
-			input_char(inp, TAB_COMPLETE_DELIMITER);
-			input_char(inp, ' ');
-		}
-
-		return 1;
-	} else {
-		return 0;
+	if (inp->hist.current == inp->hist.head) {
+		free(inp->hist.save);
+		inp->hist.save = NULL;
 	}
-}
 
-/*
- * Input sending functions
- * */
+	inp->head = len;
+	inp->tail = INPUT_LEN_MAX;
 
-void
-_send_input(struct input *in, char *buf)
-{
-	/* FIXME: refactoring WIP */
-
-	/* Before sending, copy the tail of the gap buffer back to the head */
-	reset_line(in);
-
-	/* Pass a copy of the message to the send handler, since it may modify the contents */
-	strcpy(buf, in->line->text);
-
-	/* Now check if the sent line was 'new' or was resent input scrollback
-	 *
-	 * If a new line was sent:
-	 *   append a blank input as the new list head
-	 *
-	 * If scrollback was sent:
-	 *   move it to the front of the input scrollback
-	 */
-	if (in->line == in->list_head) {
-
-		if (in->count == SCROLLBACK_INPUT) {
-			/* Reached maximum input scrollback lines, delete the tail */
-			struct input_line *t = in->list_head->next;
-
-			DLL_DEL(in->list_head, t);
-			free(t);
-		} else {
-			in->count++;
-		}
-
-		new_list_head(in);
-	} else {
-		/* TODO: the DLL macros don't seem to handle this task well...
-		 * Maybe they should be replaced with generic DLL functions in utils */
-
-		in->line->next->prev = in->line->prev;
-		in->line->prev->next = in->line->next;
-
-		in->list_head->prev->next = in->line;
-		in->line->prev = in->list_head->prev;
-		in->list_head->prev = in->line;
-		in->line->next = in->list_head;
-
-		in->line = in->list_head;
-	}
+	return 1;
 }
 
 int
-input_empty(struct input *in)
+input_hist_push(struct input *inp)
 {
-	/* FIXME: if cursor is 0 this is wrong */
-	return (in->head == in->line->text);
+	char *save;
+
+	if ((save = input_text_copy(inp)) == NULL)
+		return 0;
+
+	if (inp->hist.current < inp->hist.head) {
+
+		uint16_t i;
+
+		free(inp->hist.ptrs[INPUT_MASK(inp->hist.current)]);
+
+		for (i = inp->hist.current; i < inp->hist.head - 1; i++)
+			inp->hist.ptrs[INPUT_MASK(i)] = inp->hist.ptrs[INPUT_MASK(i + 1)];
+
+		inp->hist.current = i;
+		inp->hist.ptrs[INPUT_MASK(inp->hist.current)] = save;
+
+	} else if (input_hist_size(inp) == INPUT_HIST_MAX) {
+
+		free(inp->hist.ptrs[INPUT_MASK(inp->hist.tail++)]);
+		inp->hist.ptrs[INPUT_MASK(inp->hist.head++)] = save;
+
+	} else {
+
+		inp->hist.ptrs[INPUT_MASK(inp->hist.head++)] = save;
+	}
+
+	return input_reset(inp);
+}
+
+uint16_t
+input_frame(struct input *inp, char *buf, uint16_t max)
+{
+	/*  Keep the input head in view, reframing if the cursor would be
+	 *  drawn outside [A, B] as a function of the given max width
+	 *
+	 * 0       W             W + M
+	 * |-------|---------------|------
+	 * |       |A             B|
+	 *         |<--         -->| : max
+	 *
+	 * The cursor should track the input head, where the next
+	 * character would be entered
+	 *
+	 * In the <= A case: deletions occurred since previous reframe;
+	 * the head is less than or equal to the window
+	 *
+	 * In the >= B case: insertions occurred since previous reframe;
+	 * the distance from window to head is greater than the distance
+	 * from [A, B]
+	 *
+	 * Set the window 2/3 of the text area width backwards from the head
+	 * and returns the cursor position relative to the window */
+
+	if (inp->window >= inp->head || (inp->window + (max - 1)) <= inp->head)
+		inp->window = (((max - 1) * 2 / 3) >= inp->head) ? 0 : inp->head - ((max - 1) * 2 / 3);
+
+	input_write(inp, buf, max, inp->window);
+
+	return (inp->head - inp->window);
+}
+
+uint16_t
+input_write(struct input *inp, char *buf, uint16_t max, uint16_t pos)
+{
+	uint16_t i = pos,
+	         j = 0;
+
+	while (max > 1 && i < inp->head) {
+		buf[j++] = inp->text[i++];
+		max--;
+	}
+
+	i = inp->tail;
+
+	while (max > 1 && i < INPUT_LEN_MAX) {
+		buf[j++] = inp->text[i++];
+		max--;
+	}
+
+	buf[j] = 0;
+
+	return j;
+}
+
+static char*
+input_text_copy(struct input *inp)
+{
+	char *str;
+	size_t len;
+
+	if ((len = input_text_size(inp)) == 0)
+		return NULL;
+
+	if ((str = malloc(len + 1)) == NULL)
+		fatal("malloc: %s", strerror(errno));
+
+	input_write(inp, str, len + 1, 0);
+
+	return str;
+}
+
+static int
+input_text_isfull(struct input *inp)
+{
+	return (input_text_size(inp) == INPUT_LEN_MAX);
+}
+
+static int
+input_text_iszero(struct input *inp)
+{
+	return (input_text_size(inp) == 0);
+}
+
+static uint16_t
+input_text_size(struct input *inp)
+{
+	return (inp->head + (INPUT_LEN_MAX - inp->tail));
+}
+
+static uint16_t
+input_hist_size(struct input *inp)
+{
+	return (inp->hist.head - inp->hist.tail);
 }

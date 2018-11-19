@@ -1,3 +1,4 @@
+#include <errno.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -17,14 +18,14 @@ static inline int
 user_cmp(struct user *u1, struct user *u2)
 {
 	/* TODO: CASEMAPPING */
-	return irc_strcmp(u1->nick.str, u2->nick.str);
+	return irc_strcmp(u1->nick, u2->nick);
 }
 
 static inline int
 user_ncmp(struct user *u1, struct user *u2, size_t n)
 {
 	/* TODO: CASEMAPPING */
-	return irc_strncmp(u1->nick.str, u2->nick.str, n);
+	return irc_strncmp(u1->nick, u2->nick, n);
 }
 
 static inline void
@@ -41,10 +42,10 @@ user(const char *nick)
 	size_t len = strlen(nick);
 
 	if ((u = calloc(1, sizeof(*u) + len + 1)) == NULL)
-		fatal("calloc", errno);
+		fatal("calloc: %s", strerror(errno));
 
-	u->nick.len = len;
-	u->nick.str = memcpy(u->_, nick, len + 1);
+	u->nick_len = len;
+	u->nick = memcpy(u->_, nick, len + 1);
 
 	return u;
 }
@@ -113,12 +114,12 @@ user_list_rpl(struct user_list *ul, const char *nick_old, const char *nick_new)
 struct user*
 user_list_get(struct user_list *ul, const char *nick, size_t prefix_len)
 {
-	struct user u = { .nick = { .str = nick } };
+	struct user u2 = { .nick = nick };
 
 	if (prefix_len == 0)
-		return AVL_GET(user_list, ul, &u);
+		return AVL_GET(user_list, ul, &u2);
 	else
-		return AVL_NGET(user_list, ul, &u, prefix_len);
+		return AVL_NGET(user_list, ul, &u2, prefix_len);
 }
 
 void

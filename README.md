@@ -1,9 +1,27 @@
-[![Coverity Scan Build](https://scan.coverity.com/projects/4940/badge.svg)](https://scan.coverity.com/projects/4940)
-![Sonarcloud](https://sonarcloud.io/api/project_badges/measure?project=rcr_rirc&metric=ncloc)
+<p align="center">
+  <img src="https://raw.githubusercontent.com/rcr/rirc/master/docs/birb.jpg" alt="birb"/>
+</p>
+
+---
+
+<p align="center">
+  <a href="https://sonarcloud.io/dashboard?id=rcr_rirc">
+    <img alt="sonarcloud" src="https://sonarcloud.io/api/project_badges/measure?project=rcr_rirc&metric=ncloc"/>
+  </a>
+  <a href="https://scan.coverity.com/projects/4940">
+    <img alt="coverity" src="https://scan.coverity.com/projects/4940/badge.svg"/>
+  </a>
+  <a href="https://sonarcloud.io/dashboard?id=rcr_rirc">
+    <img alt="sonarcloud" src="https://sonarcloud.io/api/project_badges/measure?project=rcr_rirc&metric=sqale_rating"/>
+  </a>
+  <a href="https://sonarcloud.io/dashboard?id=rcr_rirc">
+    <img alt="sonarcloud" src="https://sonarcloud.io/api/project_badges/measure?project=rcr_rirc&metric=security_rating"/>
+  </a>
+</p>
+
+---
 
 # rirc
-![rirc](docs/birb.jpg?raw=true "rirc")
-
 A minimalistic irc client written in C.
 
 While still under development, it currently supports
@@ -26,7 +44,7 @@ make install
 
 ## Usage:
 ```
-  rirc [-hv] [-s server [-p port] [-w pass] [-n nicks] [-c chans] [-u user] [-r real]], ...]
+  rirc [-hv] [-s server [-p port] [-w pass] [-u user] [-r real] [-n nicks] [-c chans]], ...]
 
 Help:
   -h, --help            Print this message and exit
@@ -60,6 +78,10 @@ Keys:
   ^C : cancel input/action
   ^U : scroll buffer up
   ^D : scroll buffer down
+   ← : input cursor back
+   → : input cursor forward
+   ↑ : input history back
+   ↓ : input history forward
 ```
 
 ## More info:

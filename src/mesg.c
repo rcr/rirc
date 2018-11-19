@@ -261,7 +261,9 @@ send_mesg(struct server *s, struct channel *chan, char *mesg)
 
 	char *p, *cmd_str;
 
-	if (*mesg == '/' && *(++mesg) != '/') {
+	if (s == NULL) {
+		newline(chan, 0, "-!!-", "This is not a server");
+	} else if (*mesg == '/' && *(++mesg) != '/') {
 
 		int ret;
 
@@ -277,7 +279,7 @@ send_mesg(struct server *s, struct channel *chan, char *mesg)
 		const struct send_handler* handler = send_handler_lookup(cmd_str, strlen(cmd_str));
 
 		if (handler) {
-			handler->func(mesg, chan->server, chan);
+			handler->func(mesg, s, chan);
 		} else if ((ret = io_sendf(s->connection, "%s %s", cmd_str, mesg)))
 			newlinef(chan, 0, "-!!-", "sendf fail: %s", io_err(ret));
 
@@ -286,7 +288,7 @@ send_mesg(struct server *s, struct channel *chan, char *mesg)
 		int ret;
 
 		if (*mesg == 0)
-			fatal("message is empty", 0);
+			fatal("message is empty");
 
 		else if (chan->type != CHANNEL_T_CHANNEL && chan->type != CHANNEL_T_PRIVATE)
 			newline(chan, 0, "-!!-", "Error: This is not a channel");
@@ -294,11 +296,11 @@ send_mesg(struct server *s, struct channel *chan, char *mesg)
 		else if (chan->parted)
 			newline(chan, 0, "-!!-", "Error: Parted from channel");
 
-		else if ((ret = io_sendf(s->connection, "PRIVMSG %s :%s", chan->name.str, mesg)))
+		else if ((ret = io_sendf(s->connection, "PRIVMSG %s :%s", chan->name, mesg)))
 			newlinef(chan, 0, "-!!-", "sendf fail: %s", io_err(ret));
 
 		else
-			newline(chan, BUFFER_LINE_CHAT, chan->server->nick, mesg);
+			newline(chan, BUFFER_LINE_CHAT, s->nick, mesg);
 	}
 }
 
@@ -343,7 +345,7 @@ send_me(char *mesg, struct server *s, struct channel *c)
 	if (c->parted)
 		fail(c, "Error: Parted from channel");
 
-	if ((ret= io_sendf(s->connection, "PRIVMSG %s :\x01""ACTION %s\x01", c->name.str, mesg)))
+	if ((ret= io_sendf(s->connection, "PRIVMSG %s :\x01""ACTION %s\x01", c->name, mesg)))
 		failf(c, "sendf fail: %s", io_err(ret));
 
 	newlinef(c, 0, "*", "%s %s", s->nick, mesg);
@@ -400,7 +402,7 @@ send_join(char *mesg, struct server *s, struct channel *c)
 		if (!c->parted)
 			fail(c, "Error: Not parted from channel");
 
-		if ((ret = io_sendf(s->connection, "JOIN %s", c->name.str)))
+		if ((ret = io_sendf(s->connection, "JOIN %s", c->name)))
 			failf(c, "sendf fail: %s", io_err(ret));
 	}
 
@@ -456,7 +458,7 @@ send_part(char *mesg, struct server *s, struct channel *c)
 		if (c->parted)
 			fail(c, "Error: Already parted from channel");
 
-		if ((ret = io_sendf(s->connection, "PART %s :%s", c->name.str, DEFAULT_QUIT_MESG)))
+		if ((ret = io_sendf(s->connection, "PART %s :%s", c->name, DEFAULT_QUIT_MESG)))
 			failf(c, "sendf fail: %s", io_err(ret));
 	}
 
@@ -481,8 +483,10 @@ send_privmsg(char *mesg, struct server *s, struct channel *c)
 	if ((ret = io_sendf(s->connection, "PRIVMSG %s :%s", targ, mesg)))
 		failf(c, "sendf fail: %s", io_err(ret));
 
-	if ((cc = channel_list_get(&s->clist, targ)) == NULL)
-		cc = new_channel(targ, s, CHANNEL_T_PRIVATE);
+	if ((cc = channel_list_get(&s->clist, targ)) == NULL) {
+		cc = channel(targ, CHANNEL_T_PRIVATE);
+		channel_list_add(&s->clist, cc);
+	}
 
 	newline(cc, BUFFER_LINE_CHAT, s->nick, mesg);
 
@@ -516,10 +520,10 @@ send_topic(char *mesg, struct server *s, struct channel *c)
 		mesg++;
 
 	if (*mesg == '\0') {
-		if ((ret = io_sendf(s->connection, "TOPIC %s", c->name.str)))
+		if ((ret = io_sendf(s->connection, "TOPIC %s", c->name)))
 			failf(c, "sendf fail: %s", io_err(ret));
 	} else {
-		if ((ret = io_sendf(s->connection, "TOPIC %s :%s", c->name.str, mesg)))
+		if ((ret = io_sendf(s->connection, "TOPIC %s :%s", c->name, mesg)))
 			failf(c, "sendf fail: %s", io_err(ret));
 	}
 
@@ -558,6 +562,8 @@ send_quit(char *mesg, struct server *s, struct channel *c)
 
 	if (!s)
 		fail(c, "Error: Not connected to server");
+
+	s->quitting = 1;
 
 	if ((ret = io_sendf(s->connection, "QUIT :%s", (*mesg ? mesg : DEFAULT_QUIT_MESG))))
 		failf(c, "sendf fail: %s", io_err(ret));
@@ -744,8 +750,10 @@ recv_ctcp_req(struct parsed_mesg *p, struct server *s)
 		if (IS_ME(targ)) {
 			/* Sending emote to private channel */
 
-			if ((c = channel_list_get(&s->clist, p->from)) == NULL)
-				c = new_channel(p->from, s, CHANNEL_T_PRIVATE);
+			if ((c = channel_list_get(&s->clist, p->from)) == NULL) {
+				c = channel(p->from, CHANNEL_T_PRIVATE);
+				channel_list_add(&s->clist, c);
+			}
 
 			if (c != current_channel()) {
 				c->activity = ACTIVITY_PINGED;
@@ -857,6 +865,10 @@ recv_ctcp_rpl(struct parsed_mesg *p, struct server *s)
 	if (!(cmd = getarg(&mesg, " ")))
 		fail(s->channel, "CTCP: command is null");
 
+	// FIXME: CTCP PING replies should come back with the same
+	// <second> <millisecond> value that was sent out, and is
+	// used to calculate the ping here
+
 	newlinef(s->channel, 0, p->from, "CTCP %s reply: %s", cmd, mesg);
 
 	return 0;
@@ -865,17 +877,12 @@ recv_ctcp_rpl(struct parsed_mesg *p, struct server *s)
 static int
 recv_error(struct parsed_mesg *p, struct server *s)
 {
-	/* ERROR :<message> */
+	/* ERROR :<message>
+	 *
+	 * Sent to clients before terminating their connection
+	 */
 
-	struct channel *c = s->channel;
-
-	newlinef(c, 0, "ERROR", "%s", (p->trailing ? p->trailing : "Remote hangup"));
-
-	for (c = c->next; c != s->channel; c = c->next) {
-		newlinef(c, 0, "-!!-", "(disconnected)");
-	}
-
-	io_dx(s->connection);
+	newlinef(s->channel, 0, (s->quitting ? "--" : "ERROR"), "%s", p->trailing);
 
 	return 0;
 }
@@ -895,12 +902,14 @@ recv_join(struct parsed_mesg *p, struct server *s)
 		fail(s->channel, "JOIN: channel is null");
 
 	if (IS_ME(p->from)) {
-		if ((c = channel_list_get(&s->clist, chan)) == NULL)
-			channel_set_current(new_channel(chan, s, CHANNEL_T_CHANNEL));
-		else {
+		if ((c = channel_list_get(&s->clist, chan)) == NULL) {
+			c = channel(chan, CHANNEL_T_CHANNEL);
+			channel_list_add(&s->clist, c);
+			channel_set_current(c);
+		} else {
 			c->parted = 0;
-			newlinef(c, 0, ">", "Joined %s", chan);
 		}
+		newlinef(c, 0, ">", "Joined %s", chan);
 		draw_all();
 	} else {
 
@@ -908,7 +917,7 @@ recv_join(struct parsed_mesg *p, struct server *s)
 			failf(s->channel, "JOIN: channel '%s' not found", chan);
 
 		if (user_list_add(&(c->users), p->from, MODE_EMPTY) == USER_ERR_DUPLICATE)
-			failf(s->channel, "Error: user '%s' alread on channel '%s'", p->from, c->name.str);
+			failf(s->channel, "Error: user '%s' alread on channel '%s'", p->from, c->name);
 
 		if (c->users.count <= jpq_threshold)
 			newlinef(c, 0, ">", "%s!%s has joined %s", p->from, p->host, chan);
@@ -1057,7 +1066,7 @@ recv_mode_chanmodes(struct parsed_mesg *p, const struct mode_cfg *cfg, struct ch
 						newlinef(c, 0, "--", "%s%s%s mode: %c%c",
 								(p->from ? p->from : ""),
 								(p->from ? " set " : ""),
-								c->name.str,
+								c->name,
 								(mode_set == MODE_SET_ON ? '+' : '-'),
 								flag);
 					}
@@ -1077,7 +1086,7 @@ recv_mode_chanmodes(struct parsed_mesg *p, const struct mode_cfg *cfg, struct ch
 						newlinef(c, 0, "--", "%s%s%s mode: %c%c %s",
 								(p->from ? p->from : ""),
 								(p->from ? " set " : ""),
-								c->name.str,
+								c->name,
 								(mode_set == MODE_SET_ON ? '+' : '-'),
 								flag,
 								modearg);
@@ -1229,7 +1238,7 @@ recv_nick(struct parsed_mesg *p, struct server *s)
 			newlinef(c, 0, "--", "%s  >>  %s", p->from, nick);
 
 		else if (ret == USER_ERR_DUPLICATE)
-			newlinef(c, 0, "-!!-", "Error: user '%s' alread on channel '%s'", p->from, c->name.str);
+			newlinef(c, 0, "-!!-", "Error: user '%s' alread on channel '%s'", p->from, c->name);
 
 	} while ((c = c->next) != s->channel);
 
@@ -1317,7 +1326,7 @@ recv_numeric(struct parsed_mesg *p, struct server *s)
 		do {
 			//TODO: channel_list_foreach
 			if (c->type == CHANNEL_T_CHANNEL && !c->parted) {
-				if ((ret = io_sendf(s->connection, "JOIN %s", c->name.str)))
+				if ((ret = io_sendf(s->connection, "JOIN %s", c->name)))
 					failf(s->channel, "sendf fail: %s", io_err(ret));
 			}
 			c = c->next;
@@ -1681,8 +1690,10 @@ recv_privmsg(struct parsed_mesg *p, struct server *s)
 	/* Find the target channel */
 	if (IS_ME(targ)) {
 
-		if ((c = channel_list_get(&s->clist, p->from)) == NULL)
-			c = new_channel(p->from, s, CHANNEL_T_PRIVATE);
+		if ((c = channel_list_get(&s->clist, p->from)) == NULL) {
+			c = channel(p->from, CHANNEL_T_PRIVATE);
+			channel_list_add(&s->clist, c);
+		}
 
 		if (c != current_channel()) {
 			c->activity = ACTIVITY_PINGED;

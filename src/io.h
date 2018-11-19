@@ -15,16 +15,16 @@
  *                            +--------+
  *                 +----(B)-- |  rxng  |
  *                 |          +--------+
- *  INIT           |           |      ^
- *    v            |         (A,C)    |
- *    |            |           |     (E)
+ *                 |           |      ^
+ *   INIT          |         (A,C)    |
+ *    v            |           |     (E)
  *    |            v           v      |
- *    +--> +--------+ --(A)-> +--------+
- *         |  dxed  |         |  cxng  | <--+
- *    +--< +--------+ <-(B)-- +--------+    |
- *    |     ^      ^           |      ^    (F)
- *    v     |      |          (D)     |     |
- *  TERM    |      |           |     (F)    |
+ *    |    +--------+ --(A)-> +--------+
+ *    +--> |  dxed  |         |  cxng  | <--+
+ *         +--------+ <-(B)-- +--------+    |
+ *          ^      ^           |      ^    (F)
+ *          |      |          (D)     |     |
+ *          |      |           |     (F)    |
  *          |      |           v      |     |
  *          |      |          +--------+    |
  *          |      +----(B)-- |  cxed  |    |
@@ -69,7 +69,7 @@
  *   t(n) = t(n - 1) * factor
  *   t(0) = base
  *
- * Calling io_loop starts the io context and never returns
+ * Calling io_init starts the io context and doesn't return until io_term
  */
 
 #define IO_MAX_CONNECTIONS 8
@@ -119,8 +119,9 @@ void io_cb(enum io_cb_t, const void*, ...);
 void io_cb_read_inp(char*, size_t);
 void io_cb_read_soc(char*, size_t, const void*);
 
-/* Start non-returning IO context */
-void io_loop(void);
+/* Start/stop IO context */
+void io_init(void);
+void io_term(void);
 
 /* Get tty dimensions */
 unsigned io_tty_cols(void);
