@@ -1,6 +1,6 @@
 .POSIX:
 
-VERSION = 0.1.0
+VERSION = 0.1.1
 
 # Release and debug build executable names
 EXE_R := rirc
