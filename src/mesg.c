@@ -261,7 +261,9 @@ send_mesg(struct server *s, struct channel *chan, char *mesg)
 
 	char *p, *cmd_str;
 
-	if (*mesg == '/' && *(++mesg) != '/') {
+	if (s == NULL) {
+		newline(chan, 0, "-!!-", "This is not a server");
+	} else if (*mesg == '/' && *(++mesg) != '/') {
 
 		int ret;
 

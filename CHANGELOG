@@ -2,16 +2,23 @@
 Summary of notable changes and features
 
 ## Unreleased (dev)
+
+## [0.1.1]
+### Features
+ - tab completion for :commands
 ### Refactor
  - input module complete rewrite
    - generic word completion API
    - add full test coverage
    - performance and memory usage improvements
+   - tab completion as generic callbacks
 ### Fixes
  - fix error in sending PING
  - fix error messages on socket disconnect
  - fix fatal error on /quit
  - close/cleanup servers on :quit
+ - print message on channel re-join
+ - fix recursive exit() calls on fatal
 
 ## [0.1.0]
 ### Initial release
