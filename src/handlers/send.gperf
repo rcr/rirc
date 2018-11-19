@@ -1,0 +1,19 @@
+%enum
+%null-strings
+%readonly-tables
+%struct-type
+%define word-array-name      send_handlers
+%define hash-function-name   send_handler_hash
+%define lookup-function-name send_handler_lookup
+struct send_handler;
+%%
+CTCP,       send_ctcp
+JOIN,       send_join
+ME,         send_me
+MSG,        send_msg
+NICK,       send_nick
+PART,       send_part
+PRIVMSG,    send_privmsg
+QUIT,       send_quit
+TOPIC,      send_topic
+VERSION,    send_version
