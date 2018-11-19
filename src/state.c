@@ -117,14 +117,9 @@ state_term(void)
 
 	struct server *s1, *s2;
 
+	draw_term();
+
 	channel_free(state.default_channel);
-
-	/* Reset terminal colours */
-	printf("\x1b[38;0;m");
-	printf("\x1b[48;0;m");
-
-	/* Clear screen */
-	printf("\x1b[H\x1b[J");
 
 	if ((s1 = state_server_list()->head) == NULL)
 		return;
@@ -231,7 +226,9 @@ state_server_set_chans(struct server *s, const char *chans)
 	} while (p2);
 
 	for (const char *chan = base; n; n--) {
-		struct channel *c = channel(chan, CHANNEL_T_CHANNEL);
+		struct channel *c;
+		c = channel(chan, CHANNEL_T_CHANNEL);
+		c->server = s;
 		channel_list_add(&s->clist, c);
 		chan = strchr(chan, 0) + 1;
 	}
@@ -269,7 +266,7 @@ static int action_find_channel(char);
  * It can be cleaned up, and input.c is probably not the most ideal place for this */
 #define MAX_SEARCH 128
 struct channel *search_cptr; /* Used for iterative searching, before setting the current channel */
-static char search_buf[MAX_SEARCH + 1];
+static char search_buf[MAX_SEARCH];
 static size_t search_i;
 
 static struct channel* search_channels(struct channel*, char*);
@@ -407,7 +404,7 @@ action_find_channel(char c)
 		search_buf[--search_i] = 0;
 		search_cptr = search_channels(current_channel(), search_buf);
 
-	} else if (isprint(c) && search_i < MAX_SEARCH) {
+	} else if (isprint(c) && search_i < (sizeof(search_buf) - 1)) {
 		/* All other input */
 		search_buf[search_i++] = c;
 		search_buf[search_i] = 0;

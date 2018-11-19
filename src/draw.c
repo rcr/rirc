@@ -136,10 +136,17 @@ no_draw:
 }
 
 void
-bell(void)
+draw_bell(void)
 {
 	if (BELL_ON_PINGED)
 		putchar('\a');
+}
+
+void
+draw_term(void)
+{
+	printf(RESET_ATTRIBUTES);
+	printf(CLEAR_FULL);
 }
 
 /* FIXME: works except when it doesn't.
