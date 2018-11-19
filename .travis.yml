@@ -39,7 +39,7 @@ before_install:
 
 script:
   - set -e
-  - make clean test rirc
+  - make clean test rirc debug
   - test "${TRAVIS_JOB_NUMBER##*.}" = "1" || exit 0
   - make clean
   - build-wrapper-linux-x86-64 --out-dir bw-output make debug

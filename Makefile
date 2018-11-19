@@ -85,7 +85,7 @@ $(DIR_B):
 
 default: $(EXE_R)
 debug:   $(EXE_D)
-test:    $(DIR_B) $(OBJS_T)
+test:    $(DIR_B) $(OBJS_G) $(OBJS_T)
 
 clean:
 	rm -rf $(DIR_B) $(EXE_R) $(EXE_D)
