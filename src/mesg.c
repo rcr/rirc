@@ -115,7 +115,6 @@ enum numeric {
 	ERR_NOCHANMODES      = 477
 };
 
-
 /*
  * Message sending handlers
  */
@@ -1705,7 +1704,7 @@ recv_privmsg(struct parsed_mesg *p, struct server *s)
 
 	if (check_pinged(p->trailing, s->nick)) {
 
-		bell();
+		draw_bell();
 
 		if (c != current_channel()) {
 			c->activity = ACTIVITY_PINGED;

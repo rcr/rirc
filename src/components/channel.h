@@ -5,7 +5,6 @@
 #include "src/components/input.h"
 #include "src/components/mode.h"
 #include "src/components/user.h"
-#include "src/utils/tree.h"
 
 /* Channel activity types, in order of precedence */
 enum activity_t
@@ -68,6 +67,9 @@ struct channel* channel_list_get(struct channel_list*, const char*);
  *
  * input shouldn't be a pointer, and thus shouldn't require being freed
  */
+
+/* TODO: abstract list.h, test, add list foreach, replace
+ * channel list iteration everywhere */
 
 void channel_part(struct channel*);
 void channel_reset(struct channel*);
