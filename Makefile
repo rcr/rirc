@@ -11,16 +11,16 @@ EXE_DIR = /usr/local/bin
 MAN_DIR = /usr/local/share/man/man1
 
 STANDARDS = -std=c99 \
- -D_POSIX_C_SOURCE=200812L \
- -D_DARWIN_C_SOURCE=200812L \
+ -D_POSIX_C_SOURCE=200112L \
+ -D_DARWIN_C_SOURCE=200112L \
  -D_BSD_VISIBLE=1
 
 CC = cc
 PP = cc -E
 CFLAGS    = -I. $(STANDARDS) -DVERSION=\"$(VERSION)\" $(D_EXT) -Wall -Wextra -pedantic -O2 -flto
 CFLAGS_D  = -I. $(STANDARDS) -DVERSION=\"$(VERSION)\" $(D_EXT) -Wall -Wextra -pedantic -O0 -g -DDEBUG
-LDFLAGS   = -pthread
-LDFLAGS_D = -pthread
+LDFLAGS   = $(L_EXT) -pthread
+LDFLAGS_D = $(L_EXT) -pthread
 
 # Build, source, test source directories
 DIR_B := bld

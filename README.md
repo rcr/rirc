@@ -1,5 +1,9 @@
-[![Coverity Scan Build](https://scan.coverity.com/projects/4940/badge.svg)](https://scan.coverity.com/projects/4940)
+<p align="center">
 ![Sonarcloud](https://sonarcloud.io/api/project_badges/measure?project=rcr_rirc&metric=ncloc)
+[![Coverity Scan Build](https://scan.coverity.com/projects/4940/badge.svg)](https://scan.coverity.com/projects/4940)
+[![Sonarcloud](https://sonarcloud.io/api/project_badges/measure?project=rcr_rirc&metric=sqale_rating)](https://sonarcloud.io/dashboard?id=rcr_rirc)
+[![Sonarcloud](https://sonarcloud.io/api/project_badges/measure?project=rcr_rirc&metric=security_rating)](https://sonarcloud.io/dashboard?id=rcr_rirc)
+</p>
 <p align="center"><img src="https://raw.githubusercontent.com/rcr/rirc/master/docs/birb.jpg" alt="birb"/></p>
 
 # rirc
