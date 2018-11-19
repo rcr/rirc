@@ -484,6 +484,7 @@ send_privmsg(char *mesg, struct server *s, struct channel *c)
 
 	if ((cc = channel_list_get(&s->clist, targ)) == NULL) {
 		cc = channel(targ, CHANNEL_T_PRIVATE);
+		cc->server = s;
 		channel_list_add(&s->clist, cc);
 	}
 
@@ -751,6 +752,7 @@ recv_ctcp_req(struct parsed_mesg *p, struct server *s)
 
 			if ((c = channel_list_get(&s->clist, p->from)) == NULL) {
 				c = channel(p->from, CHANNEL_T_PRIVATE);
+				c->server = s;
 				channel_list_add(&s->clist, c);
 			}
 
@@ -903,6 +905,7 @@ recv_join(struct parsed_mesg *p, struct server *s)
 	if (IS_ME(p->from)) {
 		if ((c = channel_list_get(&s->clist, chan)) == NULL) {
 			c = channel(chan, CHANNEL_T_CHANNEL);
+			c->server = s;
 			channel_list_add(&s->clist, c);
 			channel_set_current(c);
 		} else {
@@ -1691,6 +1694,7 @@ recv_privmsg(struct parsed_mesg *p, struct server *s)
 
 		if ((c = channel_list_get(&s->clist, p->from)) == NULL) {
 			c = channel(p->from, CHANNEL_T_PRIVATE);
+			c->server = s;
 			channel_list_add(&s->clist, c);
 		}
 

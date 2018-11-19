@@ -226,7 +226,9 @@ state_server_set_chans(struct server *s, const char *chans)
 	} while (p2);
 
 	for (const char *chan = base; n; n--) {
-		struct channel *c = channel(chan, CHANNEL_T_CHANNEL);
+		struct channel *c;
+		c = channel(chan, CHANNEL_T_CHANNEL);
+		c->server = s;
 		channel_list_add(&s->clist, c);
 		chan = strchr(chan, 0) + 1;
 	}
