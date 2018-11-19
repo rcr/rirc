@@ -4,8 +4,8 @@ FIXME:
    what benefit is there to this? s->channel can then just be s->clist.head
  - are join/part/quit messages working with the threshold?
  - server: channel/ulist/clist
- - posix 2001 with removal of recusive mutex?
- - fatal/error/debug macros with reusage
+
+
 
  - when reconnecting, if cant rejoin channel (e.g. archlinux) and bumped
    to -unregistered... closing it causes 442: not on that channel...

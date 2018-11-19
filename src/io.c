@@ -447,6 +447,9 @@ io_state_cxed(struct connection *c)
 		return IO_ST_PING;
 	}
 
+	// FIXME:
+	// EINTR when coming back from sleep?
+
 	if (ret == 0) {
 		PT_CB(IO_CB_DXED, c->obj, "connection closed");
 	} else if (errno == EPIPE || errno == ECONNRESET) {
