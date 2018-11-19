@@ -18,6 +18,11 @@ addons:
   sonarcloud:
     organization: "rcr-github"
 
+  apt:
+    packages: gperf
+  homebrew:
+    packages: gperf
+
 matrix:
   include:
     - os: linux

@@ -29,6 +29,9 @@ many features which you would expect from a basic
 irc client.
 
 ## Building:
+rirc requires the latest version of GNU gperf to compile.
+
+See: https://www.gnu.org/software/gperf/
 
 ```
 make

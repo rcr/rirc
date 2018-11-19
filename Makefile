@@ -27,24 +27,30 @@ DIR_B := bld
 DIR_S := src
 DIR_T := test
 
-SRC     := $(shell find $(DIR_S) -iname '*.c')
-SRCDIRS := $(shell find $(DIR_S) -iname '*.c' -exec dirname {} \; | sort -u)
+SRC     := $(shell find $(DIR_S) -name '*.c')
+SRCDIRS := $(shell find $(DIR_S) -name '*.c' -exec dirname {} \; | sort -u)
 
-SRC_T     := $(shell find $(DIR_T) -iname '*.c')
-SRCDIRS_T := $(shell find $(DIR_T) -iname '*.c' -exec dirname {} \; | sort -u)
+SRC_G     := $(shell find $(DIR_S) -name '*.gperf')
+SRCDIRS_G := $(shell find $(DIR_S) -name '*.gperf' -exec dirname {} \; | sort -u)
 
-# Release, debug, testcase objects
-OBJS_R := $(patsubst %.c, $(DIR_B)/%.o,    $(SRC))
-OBJS_D := $(patsubst %.c, $(DIR_B)/%.db.o, $(SRC))
-OBJS_T := $(patsubst %.c, $(DIR_B)/%.t,    $(SRC_T))
+SRC_T     := $(shell find $(DIR_T) -name '*.c')
+SRCDIRS_T := $(shell find $(DIR_T) -name '*.c' -exec dirname {} \; | sort -u)
+
+# Release, debug, testcase build objects
+OBJS_R := $(patsubst %.c,  $(DIR_B)/%.o,    $(SRC))
+OBJS_D := $(patsubst %.c,  $(DIR_B)/%.db.o, $(SRC))
+OBJS_T := $(patsubst %.c,  $(DIR_B)/%.t,    $(SRC_T))
+
+# Gperf generated source files
+OBJS_G := $(patsubst %.gperf, %.gperf.h, $(SRC_G))
 
 # Release build executable
-$(EXE_R): $(DIR_B) $(OBJS_R)
+$(EXE_R): $(DIR_B) $(OBJS_G) $(OBJS_R)
 	@echo cc $@
 	@$(CC) $(LDFLAGS) -o $@ $(OBJS_R)
 
 # Debug build executable
-$(EXE_D): $(DIR_B) $(OBJS_D)
+$(EXE_D): $(DIR_B) $(OBJS_G) $(OBJS_D)
 	@echo cc $@
 	@$(CC) $(LDFLAGS_D) -o $@ $(OBJS_D)
 
@@ -59,6 +65,10 @@ $(DIR_B)/%.db.o: %.c
 	@echo "cc $<..."
 	@$(PP) $(CFLAGS_D) -MM -MP -MT $@ -MF $(@:.o=.d) $<
 	@$(CC) $(CFLAGS_D) -c -o $@ $<
+
+# Gperf generated source
+%.gperf.h: %.gperf
+	gperf --output-file=$(@) $<
 
 # Testcase files
 $(DIR_B)/%.t: %.c
@@ -81,7 +91,7 @@ clean:
 	rm -rf $(DIR_B) $(EXE_R) $(EXE_D)
 
 define make-dirs
-	for dir in $(SRCDIRS) $(SRCDIRS_T); do mkdir -p $(DIR_B)/$$dir; done
+	for dir in $(SRCDIRS) $(SRCDIRS_T) $(SRCDIRS_G); do mkdir -p $(DIR_B)/$$dir; done
 endef
 
 install: $(EXE_R)

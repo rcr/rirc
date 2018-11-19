@@ -5,3 +5,4 @@ bld
 tags
 rirc
 rirc.debug
+gperf.h

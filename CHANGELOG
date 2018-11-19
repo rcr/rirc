@@ -2,6 +2,8 @@
 Summary of notable changes and features
 
 ## Unreleased (dev)
+### Refactor
+ - generate gperf files at compile time
 
 ## [0.1.1]
 ### Features
