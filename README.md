@@ -1,7 +1,9 @@
 <p align="center">
   <img src="https://raw.githubusercontent.com/rcr/rirc/master/docs/birb.jpg" alt="birb"/>
 </p>
+
 ---
+
 <p align="center">
   <a href="https://sonarcloud.io/dashboard?id=rcr_rirc">
     <img alt="sonarcloud" src="https://sonarcloud.io/api/project_badges/measure?project=rcr_rirc&metric=ncloc"/>
@@ -16,6 +18,7 @@
     <img alt="sonarcloud" src="https://sonarcloud.io/api/project_badges/measure?project=rcr_rirc&metric=security_rating"/>
   </a>
 </p>
+
 ---
 
 # rirc
