@@ -1,3 +1,27 @@
+%{
+#define SEND_HANDLERS \
+	X(ctcp) \
+	X(join) \
+	X(me) \
+	X(msg) \
+	X(nick) \
+	X(part) \
+	X(privmsg) \
+	X(quit) \
+	X(topic) \
+	X(version)
+
+#define X(cmd) static int send_##cmd(char*, struct server*, struct channel*);
+SEND_HANDLERS
+#undef X
+
+struct send_handler
+{
+	char *name;
+	int (*func)(char*, struct server*, struct channel*);
+};
+%}
+
 %enum
 %null-strings
 %readonly-tables

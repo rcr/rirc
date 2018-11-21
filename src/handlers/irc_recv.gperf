@@ -1,3 +1,29 @@
+%{
+#define RECV_HANDLERS \
+	X(error) \
+	X(join) \
+	X(kick) \
+	X(mode) \
+	X(nick) \
+	X(notice) \
+	X(part) \
+	X(ping) \
+	X(pong) \
+	X(privmsg) \
+	X(quit) \
+	X(topic)
+
+#define X(cmd) static int recv_##cmd(struct parsed_mesg*, struct server*);
+RECV_HANDLERS
+#undef X
+
+struct recv_handler
+{
+	char *name;
+	int (*func)(struct parsed_mesg*, struct server*);
+};
+%}
+
 %enum
 %null-strings
 %readonly-tables

@@ -42,7 +42,7 @@ OBJS_D := $(patsubst %.c,  $(DIR_B)/%.db.o, $(SRC))
 OBJS_T := $(patsubst %.c,  $(DIR_B)/%.t,    $(SRC_T))
 
 # Gperf generated source files
-OBJS_G := $(patsubst %.gperf, %.gperf.h, $(SRC_G))
+OBJS_G := $(patsubst %.gperf, %.gperf.out, $(SRC_G))
 
 # Release build executable
 $(EXE_R): $(DIR_B) $(OBJS_G) $(OBJS_R)
@@ -67,7 +67,7 @@ $(DIR_B)/%.db.o: %.c
 	@$(CC) $(CFLAGS_D) -c -o $@ $<
 
 # Gperf generated source
-%.gperf.h: %.gperf
+%.gperf.out: %.gperf
 	gperf --output-file=$(@) $<
 
 # Testcase files

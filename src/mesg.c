@@ -10,6 +10,9 @@
 #include "src/state.h"
 #include "src/utils/utils.h"
 
+#include "src/handlers/irc_recv.gperf.out"
+#include "src/handlers/irc_send.gperf.out"
+
 /* Fail macros used in message sending/receiving handlers */
 #define fail(C, M) \
 	do { newline((C), 0, "-!!-", (M)); return 0; } while (0)
@@ -19,59 +22,6 @@
 	do { newlinef((C), 0, "-!!-", (M), __VA_ARGS__); return 0; } while (0)
 
 #define IS_ME(X) !strcmp((X), s->nick)
-
-/* Must be kept in sync with mesg.gperf hash table */
-#define SEND_HANDLERS \
-	X(ctcp) \
-	X(join) \
-	X(me) \
-	X(msg) \
-	X(nick) \
-	X(part) \
-	X(privmsg) \
-	X(quit) \
-	X(topic) \
-	X(version)
-
-/* Send handler prototypes */
-#define X(cmd) static int send_##cmd(char*, struct server*, struct channel*);
-SEND_HANDLERS
-#undef X
-
-/* Must be kept in sync with mesg.gperf hash table */
-#define RECV_HANDLERS \
-	X(error) \
-	X(join) \
-	X(kick) \
-	X(mode) \
-	X(nick) \
-	X(notice) \
-	X(part) \
-	X(ping) \
-	X(pong) \
-	X(privmsg) \
-	X(quit) \
-	X(topic)
-
-/* Recv handler prototypes */
-#define X(cmd) static int recv_##cmd(struct parsed_mesg*, struct server*);
-RECV_HANDLERS
-#undef X
-
-struct recv_handler
-{
-	char *name;
-	int (*func)(struct parsed_mesg*, struct server*);
-};
-
-struct send_handler
-{
-	char *name;
-	int (*func)(char*, struct server*, struct channel*);
-};
-
-#include "src/handlers/recv.gperf.h"
-#include "src/handlers/send.gperf.h"
 
 #ifdef JPQ_THRESHOLD
 static const unsigned int jpq_threshold = JPQ_THRESHOLD;
