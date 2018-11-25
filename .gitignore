@@ -6,4 +6,4 @@ tags
 rirc
 rirc.debug
 rirc.out
-*.gperf.h
+*.gperf.out

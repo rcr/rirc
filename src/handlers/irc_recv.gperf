@@ -1,6 +1,9 @@
 %{
+#include <string.h>
+
 #define RECV_HANDLERS \
 	X(error) \
+	X(invite) \
 	X(join) \
 	X(kick) \
 	X(mode) \
@@ -13,14 +16,14 @@
 	X(quit) \
 	X(topic)
 
-#define X(cmd) static int recv_##cmd(struct parsed_mesg*, struct server*);
+#define X(cmd) static int recv_##cmd(struct server*, struct parsed_mesg*);
 RECV_HANDLERS
 #undef X
 
 struct recv_handler
 {
-	char *name;
-	int (*func)(struct parsed_mesg*, struct server*);
+	char *key;
+	int (*f)(struct server*, struct parsed_mesg*);
 };
 %}
 
@@ -28,12 +31,14 @@ struct recv_handler
 %null-strings
 %readonly-tables
 %struct-type
+%define slot-name key
 %define word-array-name      recv_handlers
 %define hash-function-name   recv_handler_hash
 %define lookup-function-name recv_handler_lookup
 struct recv_handler;
 %%
 ERROR,   recv_error
+INVITE,  recv_invite
 JOIN,    recv_join
 KICK,    recv_kick
 MODE,    recv_mode

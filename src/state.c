@@ -16,6 +16,8 @@
 #include "src/rirc.h"
 #include "src/state.h"
 #include "src/utils/utils.h"
+#include "src/handlers/irc_recv.h"
+#include "src/handlers/irc_send.h"
 
 // See: https://vt100.net/docs/vt100-ug/chapter3.html
 #define CTRL(k) ((k) & 0x1f)
@@ -56,6 +58,7 @@ current_channel(void)
 
 /* List of IRC commands for tab completion */
 static const char *irc_list[] = {
+	"ctcp-action", "ctcp-clientinfo", "ctcp-ping", "ctcp-time", "ctcp-version",
 	"admin",   "connect", "info",     "invite", "join",
 	"kick",    "kill",    "links",    "list",   "lusers",
 	"mode",    "motd",    "names",    "nick",   "notice",
@@ -64,6 +67,7 @@ static const char *irc_list[] = {
 	"time",    "topic",   "trace",    "user",   "version",
 	"who",     "whois",   "whowas",   NULL };
 
+// TODO: from command handler list
 /* List of rirc commands for tab completeion */
 static const char *cmd_list[] = {
 	"clear", "close", "connect", "quit", "set", NULL};
@@ -1000,7 +1004,7 @@ state_input_linef(struct channel *c)
 	if (buf[0] == ':')
 		send_cmnd(current_channel(), buf + 1);
 	else
-		send_mesg(current_channel()->server, current_channel(), buf);
+		irc_send(current_channel()->server, current_channel(), buf);
 
 	input_hist_push(&(c->input));
 
@@ -1040,7 +1044,7 @@ io_cb_read_soc(char *buf, size_t len, const void *cb_obj)
 	if (!(parse_mesg(&p, buf)))
 		newlinef(c, 0, "-!!-", "failed to parse message");
 	else
-		recv_mesg((struct server *)cb_obj, &p);
+		irc_recv((struct server *)cb_obj, &p);
 
 	redraw();
 }

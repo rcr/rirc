@@ -1,0 +1,54 @@
+%{
+#include <string.h>
+
+#define CTCP_HANDLERS \
+	X(action) \
+	X(clientinfo) \
+	X(errmsg) \
+	X(finger) \
+	X(ping) \
+	X(source) \
+	X(time) \
+	X(userinfo) \
+	X(version)
+
+#define X(cmd) static int recv_ctcp_request_##cmd(struct server*, struct parsed_mesg*);
+CTCP_HANDLERS
+#undef X
+
+#define X(cmd) static int recv_ctcp_response_##cmd(struct server*, struct parsed_mesg*);
+CTCP_HANDLERS
+#undef X
+
+#define X(cmd) static int send_ctcp_##cmd(struct server*, struct channel*, char*);
+CTCP_HANDLERS
+#undef X
+
+struct ctcp_handler
+{
+	const char *key;
+	int (*f1)(struct server*, struct parsed_mesg*);
+	int (*f2)(struct server*, struct parsed_mesg*);
+	int (*f3)(struct server*, struct channel*, char*);
+};
+%}
+
+%enum
+%null-strings
+%readonly-tables
+%struct-type
+%define slot-name key
+%define word-array-name      ctcp_handlers
+%define hash-function-name   ctcp_handler_hash
+%define lookup-function-name ctcp_handler_lookup
+struct ctcp_handler;
+%%
+ACTION,     recv_ctcp_request_action,     recv_ctcp_response_action,     send_ctcp_action
+CLIENTINFO, recv_ctcp_request_clientinfo, recv_ctcp_response_clientinfo, send_ctcp_clientinfo
+ERRMSG,     recv_ctcp_request_errmsg,     recv_ctcp_response_errmsg,     send_ctcp_errmsg
+FINGER,     recv_ctcp_request_finger,     recv_ctcp_response_finger,     send_ctcp_finger
+PING,       recv_ctcp_request_ping,       recv_ctcp_response_ping,       send_ctcp_ping
+SOURCE,     recv_ctcp_request_source,     recv_ctcp_response_source,     send_ctcp_source
+TIME,       recv_ctcp_request_time,       recv_ctcp_response_time,       send_ctcp_time
+UNSERINFO,  recv_ctcp_request_userinfo,   recv_ctcp_response_userinfo,   send_ctcp_userinfo
+VERSION,    recv_ctcp_request_version,    recv_ctcp_response_version,    send_ctcp_version

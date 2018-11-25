@@ -6,7 +6,6 @@
 #include "src/components/input.h"
 #include "src/components/server.h"
 #include "src/draw.h"
-#include "src/mesg.h"
 
 /* state.h
  *

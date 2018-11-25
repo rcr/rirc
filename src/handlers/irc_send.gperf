@@ -1,8 +1,8 @@
 %{
+#include <string.h>
+
 #define SEND_HANDLERS \
-	X(ctcp) \
 	X(join) \
-	X(me) \
 	X(msg) \
 	X(nick) \
 	X(part) \
@@ -11,14 +11,14 @@
 	X(topic) \
 	X(version)
 
-#define X(cmd) static int send_##cmd(char*, struct server*, struct channel*);
+#define X(cmd) static int send_##cmd(struct server*, struct channel*, char*);
 SEND_HANDLERS
 #undef X
 
 struct send_handler
 {
-	char *name;
-	int (*func)(char*, struct server*, struct channel*);
+	char *key;
+	int (*f)(struct server*, struct channel*, char*);
 };
 %}
 
@@ -26,18 +26,17 @@ struct send_handler
 %null-strings
 %readonly-tables
 %struct-type
+%define slot-name key
 %define word-array-name      send_handlers
 %define hash-function-name   send_handler_hash
 %define lookup-function-name send_handler_lookup
 struct send_handler;
 %%
-CTCP,       send_ctcp
-JOIN,       send_join
-ME,         send_me
-MSG,        send_msg
-NICK,       send_nick
-PART,       send_part
-PRIVMSG,    send_privmsg
-QUIT,       send_quit
-TOPIC,      send_topic
-VERSION,    send_version
+JOIN,            send_join
+MSG,             send_msg
+NICK,            send_nick
+PART,            send_part
+PRIVMSG,         send_privmsg
+QUIT,            send_quit
+TOPIC,           send_topic
+VERSION,         send_version
