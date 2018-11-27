@@ -20,10 +20,12 @@
 RECV_HANDLERS
 #undef X
 
+typedef int (*irc_recv_f)(struct server*, struct parsed_mesg*);
+
 struct recv_handler
 {
 	char *key;
-	int (*f)(struct server*, struct parsed_mesg*);
+	irc_recv_f f;
 };
 %}
 
@@ -35,6 +37,7 @@ struct recv_handler
 %define word-array-name      recv_handlers
 %define hash-function-name   recv_handler_hash
 %define lookup-function-name recv_handler_lookup
+%define initializer-suffix ,(irc_recv_f)0
 struct recv_handler;
 %%
 ERROR,   recv_error
@@ -50,3 +53,4 @@ PONG,    recv_pong
 PRIVMSG, recv_privmsg
 QUIT,    recv_quit
 TOPIC,   recv_topic
+%%

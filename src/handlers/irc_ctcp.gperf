@@ -24,12 +24,15 @@ CTCP_HANDLERS
 CTCP_HANDLERS
 #undef X
 
+typedef int (*ctcp_recv_f)(struct server*, struct parsed_mesg*);
+typedef int (*ctcp_send_f)(struct server*, struct channel*, char*);
+
 struct ctcp_handler
 {
 	const char *key;
-	int (*f1)(struct server*, struct parsed_mesg*);
-	int (*f2)(struct server*, struct parsed_mesg*);
-	int (*f3)(struct server*, struct channel*, char*);
+	ctcp_recv_f f1;
+	ctcp_recv_f f2;
+	ctcp_send_f f3;
 };
 %}
 
@@ -41,6 +44,7 @@ struct ctcp_handler
 %define word-array-name      ctcp_handlers
 %define hash-function-name   ctcp_handler_hash
 %define lookup-function-name ctcp_handler_lookup
+%define initializer-suffix ,(ctcp_recv_f)0,(ctcp_recv_f)0,(ctcp_send_f)0
 struct ctcp_handler;
 %%
 ACTION,     recv_ctcp_request_action,     recv_ctcp_response_action,     send_ctcp_action

@@ -15,10 +15,12 @@
 SEND_HANDLERS
 #undef X
 
+typedef int (*irc_send_f)(struct server*, struct channel*, char*);
+
 struct send_handler
 {
 	char *key;
-	int (*f)(struct server*, struct channel*, char*);
+	irc_send_f f;
 };
 %}
 
@@ -30,6 +32,7 @@ struct send_handler
 %define word-array-name      send_handlers
 %define hash-function-name   send_handler_hash
 %define lookup-function-name send_handler_lookup
+%define initializer-suffix ,(irc_send_f)0
 struct send_handler;
 %%
 JOIN,            send_join
@@ -40,3 +43,4 @@ PRIVMSG,         send_privmsg
 QUIT,            send_quit
 TOPIC,           send_topic
 VERSION,         send_version
+%%
