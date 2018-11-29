@@ -1,4 +1,4 @@
 #!/bin/sh
 
-make -e D_EXT=-fstack-usage clean debug
-find . -iname "*.su" -exec cat "{}" \; | sort -n -k2 | column -t
+CC="gcc" CC_EXT="-fstack-usage" make -e clean debug
+find . -name "*.su" -exec cat "{}" \; | sort -n -k2 | column -t

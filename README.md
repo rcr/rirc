@@ -24,9 +24,8 @@
 # rirc
 A minimalistic irc client written in C.
 
-While still under development, it currently supports
-many features which you would expect from a basic
-irc client.
+While still under development, it currently supports many
+features which you would expect from a basic irc client.
 
 ## Building:
 rirc requires the latest version of GNU gperf to compile.
@@ -41,6 +40,13 @@ Or
 make debug
 ```
 
+## Installing:
+Default install path:
+```
+EXE_DIR = /usr/local/bin
+MAN_DIR = /usr/local/share/man/man1
+```
+Edit `Makefile` to alter install path if needed, then:
 ```
 make install
 ```
@@ -50,17 +56,17 @@ make install
   rirc [-hv] [-s server [-p port] [-w pass] [-u user] [-r real] [-n nicks] [-c chans]], ...]
 
 Help:
-  -h, --help            Print this message and exit
-  -v, --version         Print rirc version and exit
+  -h, --help      Print this message and exit
+  -v, --version   Print rirc version and exit
 
 Options:
-  -s, --server=SERVER      Connect to SERVER
-  -p, --port=PORT          Connect to SERVER using PORT
-  -w, --pass=PASS          Connect to SERVER using PASS
-  -u, --username=USERNAME  Connect to SERVER using USERNAME
-  -r, --realname=REALNAME  Connect to SERVER using REALNAME
-  -n, --nicks=NICKS        Comma separated list of nicks to use for SERVER
-  -c, --chans=CHANNELS     Comma separated list of channels to join for SERVER
+  -s, --server=SERVER       Connect to SERVER
+  -p, --port=PORT           Connect to SERVER using PORT
+  -w, --pass=PASS           Connect to SERVER using PASS
+  -u, --username=USERNAME   Connect to SERVER using USERNAME
+  -r, --realname=REALNAME   Connect to SERVER using REALNAME
+  -n, --nicks=NICKS         Comma separated list of nicks to use for SERVER
+  -c, --chans=CHANNELS      Comma separated list of channels to join for SERVER
 ```
 
 Commands:
