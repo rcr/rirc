@@ -1,9 +1,13 @@
+*.gcda
+*.gcno
+*.gcov
+*.gperf.out
 *.o
 *.t
 *.td
 bld
-tags
+coverage
 rirc
 rirc.debug
 rirc.out
-*.gperf.out
+tags

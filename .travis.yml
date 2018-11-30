@@ -44,6 +44,7 @@ script:
   - make clean
   - build-wrapper-linux-x86-64 --out-dir bw-output make debug
   - make test
+  - ./scripts/coverage.sh
   - echo "sonar.projectKey=rcr_rirc" > sonar-project.properties
   - echo "sonar.sources=src" >> sonar-project.properties
   - echo "sonar.tests=test" >> sonar-project.properties
