@@ -45,6 +45,7 @@ script:
   - ./scripts/coverage.sh
   - echo "" > sonar-project.properties
   - echo "sonar.cfamily.build-wrapper-output=bw-output" >> sonar-project.properties
+  - echo "sonar.cfamily.gcov.reportsPath=." >> sonar-project.properties
   - echo "sonar.coverage.exclusions=test" >> sonar-project.properties
   - echo "sonar.projectKey=rcr_rirc" >> sonar-project.properties
   - echo "sonar.sources=src" >> sonar-project.properties
