@@ -19,3 +19,5 @@ find . -name "*.gcda" -print0 | xargs -r0 mv -t $CDIR
 find . -name "*.gcno" -print0 | xargs -r0 mv -t $CDIR
 
 gcov -pr $CDIR/*.gcno
+
+find . -name "*gperf.gcov" -print0 | xargs -r0 rm
