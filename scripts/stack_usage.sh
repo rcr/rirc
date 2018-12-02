@@ -3,9 +3,9 @@
 set -x
 set -e
 
-ENV=
-ENV+=" CC=\"gcc\""
-ENV+=" CC_EXT=\"-fstack-usage\""
+ENV=""
+ENV="$ENV CC=\"gcc\""
+ENV="$ENV CC_EXT=\"-fstack-usage\""
 
 eval $ENV make clean debug
 

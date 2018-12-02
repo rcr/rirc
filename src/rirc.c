@@ -266,6 +266,7 @@ parse_args(int argc, char **argv)
 	return 0;
 }
 
+#ifndef TESTING
 int
 main(int argc, char **argv)
 {
@@ -278,3 +279,4 @@ main(int argc, char **argv)
 
 	return ret;
 }
+#endif

@@ -3,14 +3,21 @@
 set -x
 set -e
 
-rm -rf coverage
-mkdir coverage
+CDIR="coverage"
 
-ENV=
+rm -rf $CDIR
+mkdir $CDIR
+
+ENV=""
 ENV="$ENV CC=\"gcc\""
-ENV="$ENV CC_EXT=\"-fprofile-arcs -ftest-coverage -fprofile-abs-path\""
+ENV="$ENV CC_EXT=\"-fprofile-arcs -ftest-coverage\""
 ENV="$ENV LD_EXT=\"-fprofile-arcs\""
 
-eval $ENV make clean debug test
-find . -name "*.gcno" -print0 | xargs -r0 gcov -prs $(pwd)/src 2>/dev/null
-find . -name "*.gcov" -print0 | xargs -r0 mv -t coverage
+eval $ENV make clean test
+
+find . -name "*.gcda" -print0 | xargs -r0 mv -t $CDIR
+find . -name "*.gcno" -print0 | xargs -r0 mv -t $CDIR
+
+gcov -pr $CDIR/*.gcno
+
+find . -name "*.gcov" -print0 | xargs -r0 mv -t $CDIR
