@@ -65,7 +65,7 @@ $(DIR_B)/%.db.o: $(DIR_S)/%.c
 
 # Gperf generated source
 %.gperf.out: %.gperf
-	gperf --output-file=$(@) $<
+	gperf --output-file=$@ $<
 
 # Testcase files
 $(DIR_B)/%.t: $(DIR_T)/%.c
@@ -79,6 +79,7 @@ $(DIR_B):
 
 clean:
 	rm -rf $(DIR_B) $(EXE_R) $(EXE_D)
+	find . -name "*gperf.out" -print0 | xargs -0 -I % rm %
 
 install: $(EXE_R)
 	@echo installing executable to $(EXE_DIR)
@@ -101,4 +102,4 @@ test:  $(DIR_B) $(OBJS_G) $(OBJS_T)
 -include $(OBJS_D:.o=.d)
 -include $(OBJS_T:.t=.d)
 
-.PHONY: all clean default install uninstall options test
+.PHONY: all clean default install uninstall test
