@@ -36,6 +36,8 @@ static uint16_t state_complete(char*, uint16_t, uint16_t, int);
 static uint16_t state_complete_list(char*, uint16_t, uint16_t, const char**);
 static uint16_t state_complete_user(char*, uint16_t, uint16_t, int);
 
+static void command(struct channel*, char*);
+
 static struct
 {
 	struct channel *current_channel; /* the current channel being drawn */
@@ -58,7 +60,14 @@ current_channel(void)
 
 /* List of IRC commands for tab completion */
 static const char *irc_list[] = {
-	"ctcp-action", "ctcp-clientinfo", "ctcp-ping", "ctcp-time", "ctcp-version",
+	"ctcp-action",
+	"ctcp-clientinfo",
+	"ctcp-finger",
+	"ctcp-ping",
+	"ctcp-source",
+	"ctcp-time",
+	"ctcp-userinfo",
+	"ctcp-version",
 	"admin",   "connect", "info",     "invite", "join",
 	"kick",    "kill",    "links",    "list",   "lusers",
 	"mode",    "motd",    "names",    "nick",   "notice",
@@ -330,13 +339,9 @@ action_close_server(char c)
 		if ((ret = io_sendf(s->connection, "QUIT :%s", DEFAULT_QUIT_MESG)))
 			newlinef(s->channel, 0, "-!!-", "sendf fail: %s", io_err(ret));
 
-		// FIXME:
-		// - state_server_free shouldn't have to call io/dx/free.
-		// - server objects can have void* connections and remove
-		//   the dependancy on io.h
 		io_dx(s->connection);
-		server_list_del(state_server_list(), s);
 		io_free(s->connection);
+		server_list_del(state_server_list(), s);
 		server_free(s);
 
 		draw_all();
@@ -802,7 +807,7 @@ io_cb(enum io_cb_t type, const void *cb_obj, ...)
 }
 
 static void
-send_cmnd(struct channel *c, char *buf)
+command(struct channel *c, char *buf)
 {
 	const char *cmnd;
 	int err;
@@ -842,13 +847,9 @@ send_cmnd(struct channel *c, char *buf)
 				channel_set_current(s->channel);
 				newlinef(s->channel, 0, "-!!-", "already connected to %s:%s", host, port);
 			} else {
-
 				s = server(host, port, pass, user, real);
 				s->connection = connection(s, host, port);
-
-				// TODO: here just get/set the connection object
 				server_list_add(state_server_list(), s);
-
 				channel_set_current(s->channel);
 				io_cx(s->connection);
 				draw_all();
@@ -987,13 +988,7 @@ state_input_ctrlch(const char *c, size_t len)
 static int
 state_input_linef(struct channel *c)
 {
-	/* TODO: cleanup, switch on input type/contents */
-	// input types:
-	//    message/paste
-	//    ::message
-	//    :command
-	//    //message
-	//    /command
+	/* Handle line feed */
 
 	char buf[INPUT_LEN_MAX + 1];
 	size_t len;
@@ -1001,10 +996,22 @@ state_input_linef(struct channel *c)
 	if ((len = input_write(&(c->input), buf, sizeof(buf), 0)) == 0)
 		return 0;
 
-	if (buf[0] == ':')
-		send_cmnd(current_channel(), buf + 1);
-	else
-		irc_send(current_channel()->server, current_channel(), buf);
+	switch (buf[0]) {
+		case ':':
+			if (len > 1 && buf[1] == ':')
+				irc_send_privmsg(current_channel()->server, current_channel(), buf + 1);
+			else
+				command(current_channel(), buf + 1);
+			break;
+		case '/':
+			if (len > 1 && buf[1] == '/')
+				irc_send_privmsg(current_channel()->server, current_channel(), buf + 1);
+			else
+				irc_send_command(current_channel()->server, current_channel(), buf + 1);
+			break;
+		default:
+			irc_send_privmsg(current_channel()->server, current_channel(), buf);
+	}
 
 	input_hist_push(&(c->input));
 

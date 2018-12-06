@@ -56,14 +56,18 @@ void io_term(void) { ; }
 #define INP_C(C) io_cb_read_inp((char[]){(C)}, 1)
 #define CURRENT_LINE (buffer_head(&current_channel()->buffer)->text)
 
+// TODO: tests for
+// sending certain /commands to private buffer, server buffer
+
 static void
 test_state(void)
 {
 	state_init();
 
-#if 0
-	/* FIXME: mesg.c refactor */
+	/* Test splash message */
+	assert_strcmp(CURRENT_LINE, " - compiled with DEBUG flags");
 
+	/* Test messages sent to the default rirc buffer */
 	INP_S("/");
 	INP_C(0x0A);
 	assert_strcmp(CURRENT_LINE, "This is not a server");
@@ -71,24 +75,21 @@ test_state(void)
 	INP_S("//");
 	INP_C(0x0A);
 	assert_strcmp(CURRENT_LINE, "This is not a server");
-#endif
-
-	INP_S(":");
-	INP_C(0x0A);
-	assert_strcmp(CURRENT_LINE, "Messages beginning with ':' require a command");
 
 	INP_S("::");
 	INP_C(0x0A);
-	assert_strcmp(CURRENT_LINE, "Messages beginning with ':' require a command");
-
-#if 0
-	/* FIXME: mesg.c refactor */
+	assert_strcmp(CURRENT_LINE, "This is not a server");
 
 	INP_S("test");
 	INP_C(0x0A);
 	assert_strcmp(CURRENT_LINE, "This is not a server");
-#endif
 
+	/* Test empty command */
+	INP_S(":");
+	INP_C(0x0A);
+	assert_strcmp(CURRENT_LINE, "Messages beginning with ':' require a command");
+
+	/* Test control characters */
 	INP_C(CTRL('c'));
 	INP_C(CTRL('p'));
 	INP_C(CTRL('x'));
@@ -97,6 +98,7 @@ test_state(void)
 	INP_C(CTRL('l'));
 	assert_null(buffer_head(&current_channel()->buffer));
 
+	/* Test adding servers */
 	struct server *s1 = server("h1", "p1", NULL, "u1", "r1");
 	struct server *s2 = server("h2", "p2", NULL, "u2", "r2");
 	struct server *s3 = server("h3", "p3", NULL, "u3", "r3");

@@ -38,5 +38,3 @@ gcov -pr $CDIR/*.gcno | perl -ne "$FILTER" | grep -v 'gperf' | sort
 
 find . -name "*gperf*.gcov" -print0 | xargs -0 -I % rm %
 find . -name "*test#*.gcov" -print0 | xargs -0 -I % rm %
-
-find . -name "*.gcov" -print0 | xargs -0 -I % mv % $CDIR

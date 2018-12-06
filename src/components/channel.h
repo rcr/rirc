@@ -40,6 +40,7 @@ struct channel
 	struct server *server;
 	struct user_list users;
 	unsigned int parted : 1;
+	unsigned int joined : 1; // TODO
 	char name[];
 };
 

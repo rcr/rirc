@@ -37,24 +37,6 @@ recv_ctcp_response(struct server *s, struct parsed_mesg *m)
 	return 0;
 }
 
-int
-send_ctcp(struct server *s, struct channel *c, char *m)
-{
-	(void)s;
-	(void)c;
-	(void)m;
-	(void)send_ctcp_action;
-	(void)send_ctcp_clientinfo;
-	(void)send_ctcp_errmsg;
-	(void)send_ctcp_finger;
-	(void)send_ctcp_ping;
-	(void)send_ctcp_source;
-	(void)send_ctcp_time;
-	(void)send_ctcp_userinfo;
-	(void)send_ctcp_version;
-	return 0;
-}
-
 static int recv_ctcp_request_action(struct server *s, struct parsed_mesg *m) { (void)s; (void)m; return 0; }
 static int recv_ctcp_request_clientinfo(struct server *s, struct parsed_mesg *m) { (void)s; (void)m; return 0; }
 static int recv_ctcp_request_errmsg(struct server *s, struct parsed_mesg *m) { (void)s; (void)m; return 0; }
@@ -74,13 +56,3 @@ static int recv_ctcp_response_source(struct server *s, struct parsed_mesg *m) { 
 static int recv_ctcp_response_time(struct server *s, struct parsed_mesg *m) { (void)s; (void)m; return 0; }
 static int recv_ctcp_response_userinfo(struct server *s, struct parsed_mesg *m) { (void)s; (void)m; return 0; }
 static int recv_ctcp_response_version(struct server *s, struct parsed_mesg *m) { (void)s; (void)m; return 0; }
-
-static int send_ctcp_action(struct server *s, struct channel *c, char *m) { (void)s; (void)c; (void)m; return 0; }
-static int send_ctcp_clientinfo(struct server *s, struct channel *c, char *m) { (void)s; (void)c; (void)m; return 0; }
-static int send_ctcp_errmsg(struct server *s, struct channel *c, char *m) { (void)s; (void)c; (void)m; return 0; }
-static int send_ctcp_finger(struct server *s, struct channel *c, char *m) { (void)s; (void)c; (void)m; return 0; }
-static int send_ctcp_ping(struct server *s, struct channel *c, char *m) { (void)s; (void)c; (void)m; return 0; }
-static int send_ctcp_source(struct server *s, struct channel *c, char *m) { (void)s; (void)c; (void)m; return 0; }
-static int send_ctcp_time(struct server *s, struct channel *c, char *m) { (void)s; (void)c; (void)m; return 0; }
-static int send_ctcp_userinfo(struct server *s, struct channel *c, char *m) { (void)s; (void)c; (void)m; return 0; }
-static int send_ctcp_version(struct server *s, struct channel *c, char *m) { (void)s; (void)c; (void)m; return 0; }
