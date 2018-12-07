@@ -133,55 +133,6 @@ send_mesg(struct server *s, struct channel *chan, char *mesg)
 }
 
 static int
-send_ctcp(char *mesg, struct server *s, struct channel *c)
-{
-	/* /ctcp <target> <message> */
-
-	int ret;
-	char *targ, *p;
-
-	if (!(targ = getarg(&mesg, " ")))
-		fail(c, "Error: /ctcp <target> <command> [arguments]");
-
-	/* Crude to check that at least some ctcp command exists */
-	while (*mesg == ' ')
-		mesg++;
-
-	if (*mesg == '\0')
-		fail(c, "Error: /ctcp <target> <command> [arguments]");
-
-	/* Ensure the command is uppercase */
-	for (p = mesg; *p && *p != ' '; p++)
-		*p = toupper(*p);
-
-	if ((ret = io_sendf(s->connection, "PRIVMSG %s :\x01""%s\x01", targ, mesg)))
-		failf(c, "sendf fail: %s", io_err(ret));
-
-	return 0;
-}
-
-static int
-send_me(char *mesg, struct server *s, struct channel *c)
-{
-	/* /me <message> */
-
-	int ret;
-
-	if (c->type == CHANNEL_T_SERVER)
-		fail(c, "Error: This is not a channel");
-
-	if (c->parted)
-		fail(c, "Error: Parted from channel");
-
-	if ((ret= io_sendf(s->connection, "PRIVMSG %s :\x01""ACTION %s\x01", c->name, mesg)))
-		failf(c, "sendf fail: %s", io_err(ret));
-
-	newlinef(c, 0, "*", "%s %s", s->nick, mesg);
-
-	return 0;
-}
-
-static int
 send_join(char *mesg, struct server *s, struct channel *c)
 {
 	/* /join [target[,targets]*] */
@@ -339,7 +290,6 @@ send_quit(char *mesg, struct server *s, struct channel *c)
 	return 0;
 }
 
-// TODO: :version
 static int
 send_version(char *mesg, struct server *s, struct channel *c)
 {
@@ -347,12 +297,6 @@ send_version(char *mesg, struct server *s, struct channel *c)
 
 	int ret;
 	char *targ;
-
-	if (s == NULL) {
-		newline(c, 0, "--", "rirc v"VERSION);
-		newline(c, 0, "--", "http://rcr.io/rirc");
-		return 0;
-	}
 
 	if ((targ = getarg(&mesg, " "))) {
 		if ((ret = io_sendf(s->connection, "VERSION %s", targ)))
