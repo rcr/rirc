@@ -166,15 +166,6 @@ send_join(char *mesg, struct server *s, struct channel *c)
 }
 
 static int
-send_msg(char *mesg, struct server *s, struct channel *c)
-{
-	/* Alias for /priv */
-	send_privmsg(mesg, s, c);
-
-	return 0;
-}
-
-static int
 send_nick(char *mesg, struct server *s, struct channel *c)
 {
 	/* /nick [nick] */
@@ -215,94 +206,6 @@ send_part(char *mesg, struct server *s, struct channel *c)
 			fail(c, "Error: Already parted from channel");
 
 		if ((ret = io_sendf(s->connection, "PART %s :%s", c->name, DEFAULT_QUIT_MESG)))
-			failf(c, "sendf fail: %s", io_err(ret));
-	}
-
-	return 0;
-}
-
-static int
-send_privmsg(char *mesg, struct server *s, struct channel *c)
-{
-	/* /(priv | msg) <target> <message> */
-
-	char *targ;
-	int ret;
-	struct channel *cc;
-
-	if (!(targ = getarg(&mesg, " ")))
-		fail(c, "Error: Private messages require a target");
-
-	if (*mesg == '\0')
-		fail(c, "Error: Private messages was null");
-
-	if ((ret = io_sendf(s->connection, "PRIVMSG %s :%s", targ, mesg)))
-		failf(c, "sendf fail: %s", io_err(ret));
-
-	if ((cc = channel_list_get(&s->clist, targ)) == NULL) {
-		cc = channel(targ, CHANNEL_T_PRIVATE);
-		cc->server = s;
-		channel_list_add(&s->clist, cc);
-	}
-
-	newline(cc, BUFFER_LINE_CHAT, s->nick, mesg);
-
-	return 0;
-}
-
-static int
-send_topic(char *mesg, struct server *s, struct channel *c)
-{
-	/* /topic [topic] */
-
-	int ret;
-
-	/* If no actual message is given, retrieve the current topic */
-	while (*mesg == ' ')
-		mesg++;
-
-	if (*mesg == '\0') {
-		if ((ret = io_sendf(s->connection, "TOPIC %s", c->name)))
-			failf(c, "sendf fail: %s", io_err(ret));
-	} else {
-		if ((ret = io_sendf(s->connection, "TOPIC %s :%s", c->name, mesg)))
-			failf(c, "sendf fail: %s", io_err(ret));
-	}
-
-	return 0;
-}
-
-static int
-send_quit(char *mesg, struct server *s, struct channel *c)
-{
-	/* /quit :[quit message] */
-
-	int ret;
-
-	if (!s)
-		fail(c, "Error: Not connected to server");
-
-	s->quitting = 1;
-
-	if ((ret = io_sendf(s->connection, "QUIT :%s", (*mesg ? mesg : DEFAULT_QUIT_MESG))))
-		failf(c, "sendf fail: %s", io_err(ret));
-
-	return 0;
-}
-
-static int
-send_version(char *mesg, struct server *s, struct channel *c)
-{
-	/* /version [target] */
-
-	int ret;
-	char *targ;
-
-	if ((targ = getarg(&mesg, " "))) {
-		if ((ret = io_sendf(s->connection, "VERSION %s", targ)))
-			failf(c, "sendf fail: %s", io_err(ret));
-	} else {
-		if ((ret = io_sendf(s->connection, "VERSION")))
 			failf(c, "sendf fail: %s", io_err(ret));
 	}
 
