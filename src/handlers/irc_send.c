@@ -1,4 +1,5 @@
 #include <ctype.h>
+#include <sys/time.h>
 
 #include "src/components/channel.h"
 #include "src/components/server.h"
@@ -11,6 +12,7 @@
 #define failf(C, ...) \
 	do { newlinef((C), 0, "-!!-", __VA_ARGS__); return 1; } while (0)
 
+static const char* targ_or_private(struct channel *c, char *m);
 static int default_send_handler(
 	struct server*,
 	struct channel*,
@@ -58,6 +60,20 @@ irc_send_privmsg(struct server *s, struct channel *c, char *m)
 	return 0;
 }
 
+static const char*
+targ_or_private(struct channel *c, char *m)
+{
+	const char *targ;
+
+	if ((targ = getarg(&m, " ")))
+		return targ;
+
+	if (c->type == CHANNEL_T_PRIVATE)
+		return c->name;
+
+	return NULL;
+}
+
 static int
 default_send_handler(struct server *s, struct channel *c, const char *cmnd, const char *args)
 {
@@ -81,55 +97,121 @@ static int send_version(struct server *s, struct channel *c, char *m) { (void)s;
 static int
 send_ctcp_action(struct server *s, struct channel *c, char *m)
 {
-	(void)s; (void)c; (void)m;
+	int ret;
+
+	if (!(c->type == CHANNEL_T_CHANNEL || c->type == CHANNEL_T_PRIVATE))
+		failf(c, "This is not a channel");
+
+	if ((ret = io_sendf(s->connection, "PRIVMSG %s :\001""ACTION %s\001", c->name, m)))
+		failf(c, "Send fail: %s", io_err(ret));
+
 	return 0;
 }
 
 static int
 send_ctcp_clientinfo(struct server *s, struct channel *c, char *m)
 {
-	(void)s; (void)c; (void)m;
+	const char *targ;
+	int ret;
+
+	if (!(targ = targ_or_private(c, m)))
+		failf(c, "usage: /ctcp-clientinfo <target>");
+
+	if ((ret = io_sendf(s->connection, "PRIVMSG %s :\001CLIENTINFO\001", targ)))
+		failf(c, "Send fail: %s", io_err(ret));
+
 	return 0;
 }
 
 static int
 send_ctcp_finger(struct server *s, struct channel *c, char *m)
 {
-	(void)s; (void)c; (void)m;
+	const char *targ;
+	int ret;
+
+	if (!(targ = targ_or_private(c, m)))
+		failf(c, "usage: /ctcp-finger <target>");
+
+	if ((ret = io_sendf(s->connection, "PRIVMSG %s :\001FINGER\001", targ)))
+		failf(c, "Send fail: %s", io_err(ret));
+
 	return 0;
 }
 
 static int
 send_ctcp_ping(struct server *s, struct channel *c, char *m)
 {
-	(void)s; (void)c; (void)m;
+	const char *targ;
+	int ret;
+	struct timeval t;
+
+	if (!(targ = targ_or_private(c, m)))
+		failf(c, "usage: /ctcp-ping <target>");
+
+	(void) gettimeofday(&t, NULL);
+
+	if ((ret = io_sendf(s->connection, "PRIVMSG %s :\001PING %llu %llu\001", t.tv_sec, t.tv_usec)))
+		failf(c, "Send fail: %s", io_err(ret));
+
 	return 0;
 }
 
 static int
 send_ctcp_source(struct server *s, struct channel *c, char *m)
 {
-	(void)s; (void)c; (void)m;
+	const char *targ;
+	int ret;
+
+	if (!(targ = targ_or_private(c, m)))
+		failf(c, "usage: /ctcp-source <target>");
+
+	if ((ret = io_sendf(s->connection, "PRIVMSG %s :\001SOURCE\001", targ)))
+		failf(c, "Send fail: %s", io_err(ret));
+
 	return 0;
 }
 
 static int
 send_ctcp_time(struct server *s, struct channel *c, char *m)
 {
-	(void)s; (void)c; (void)m;
+	const char *targ;
+	int ret;
+
+	if (!(targ = targ_or_private(c, m)))
+		failf(c, "usage: /ctcp-time <target>");
+
+	if ((ret = io_sendf(s->connection, "PRIVMSG %s :\001TIME\001", targ)))
+		failf(c, "Send fail: %s", io_err(ret));
+
 	return 0;
 }
 
 static int
 send_ctcp_userinfo(struct server *s, struct channel *c, char *m)
 {
-	(void)s; (void)c; (void)m;
+	const char *targ;
+	int ret;
+
+	if (!(targ = targ_or_private(c, m)))
+		failf(c, "usage: /ctcp-userinfo <target>");
+
+	if ((ret = io_sendf(s->connection, "PRIVMSG %s :\001USERINFO\001", targ)))
+		failf(c, "Send fail: %s", io_err(ret));
+
 	return 0;
 }
 
 static int
 send_ctcp_version(struct server *s, struct channel *c, char *m)
 {
-	(void)s; (void)c; (void)m;
+	const char *targ;
+	int ret;
+
+	if (!(targ = targ_or_private(c, m)))
+		failf(c, "usage: /ctcp-version <target>");
+
+	if ((ret = io_sendf(s->connection, "PRIVMSG %s :\001VERSION\001", targ)))
+		failf(c, "Send fail: %s", io_err(ret));
+
 	return 0;
 }

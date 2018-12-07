@@ -581,6 +581,7 @@ recv_join(struct parsed_mesg *p, struct server *s)
 			c->server = s;
 			channel_list_add(&s->clist, c);
 			channel_set_current(c);
+			// FIXME: send MODE here
 		} else {
 			c->parted = 0;
 		}

@@ -332,6 +332,7 @@
  *     RPL_LOCALUSERS        265 -- extension
  *     RPL_GLOBALUSERS       266 -- extension
  *     RPL_CHANNEL_URL       328 -- extension
+ *     RPL_CREATIONTIME      329 -- extension
  *     ERR_NOSUCHSERVICE     408
  *     ERR_BADMASK           415
  *     ERR_UNKNOWNCOMMAND    421
