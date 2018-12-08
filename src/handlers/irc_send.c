@@ -123,7 +123,7 @@ send_ctcp_ping(struct server *s, struct channel *c, char *m)
 
 	(void) gettimeofday(&t, NULL);
 
-	sendf(s, c, "PRIVMSG %s :\001PING %llu %llu\001", t.tv_sec, t.tv_usec);
+	sendf(s, c, "PRIVMSG %s :\001PING %llu %llu\001", targ, t.tv_sec, t.tv_usec);
 }
 
 static int
@@ -184,29 +184,25 @@ send_notice(struct server *s, struct channel *c, char *m)
 {
 	const char *targ;
 
-	if ((targ = getarg(&m, " ")) || *m == 0)
+	if (!(targ = getarg(&m, " ")))
 		failf(c, "Usage: /notice <target> <message>");
 
-	sendf(s, c, "NOTICE %s :%s", m);
+	if (*m == 0)
+		failf(c, "Usage: /notice <target> <message>");
+
+	sendf(s, c, "NOTICE %s :%s", targ, m);
 }
 
 static int
 send_part(struct server *s, struct channel *c, char *m)
 {
-	const char *targ;
-
-	if (!str_trim(&m) && c->type != CHANNEL_T_CHANNEL)
+	if (c->type != CHANNEL_T_CHANNEL)
 		failf(c, "This is not a channel");
 
-	if (irc_ischanchar(*m, 1))
-		targ = getarg(&m, " ");
+	if (str_trim(&m))
+		sendf(s, c, "PART %s :%s",c->name, m);
 	else
-		targ = c->name;
-
-	if (!str_trim(&m))
-		sendf(s, c, "PART %s :%s", targ, DEFAULT_QUIT_MESG);
-	else
-		sendf(s, c, "PART %s :%s", targ, m);
+		sendf(s, c, "PART %s :%s", c->name, DEFAULT_PART_MESG);
 }
 
 static int
@@ -214,10 +210,13 @@ send_privmsg(struct server *s, struct channel *c, char *m)
 {
 	const char *targ;
 
-	if ((targ = getarg(&m, " ")) || *m == 0)
+	if (!(targ = getarg(&m, " ")))
 		failf(c, "Usage: /privmsg <target> <message>");
 
-	sendf(s, c, "PRIVMESG %s :%s", m);
+	if (*m == 0)
+		failf(c, "Usage: /privmsg <target> <message>");
+
+	sendf(s, c, "PRIVMSG %s :%s", targ, m);
 }
 
 static int
@@ -225,22 +224,20 @@ send_quit(struct server *s, struct channel *c, char *m)
 {
 	s->quitting = 1;
 
-	if (!str_trim(&m))
-		sendf(s, c, "QUIT :%s", DEFAULT_QUIT_MESG);
-	else
+	if (str_trim(&m))
 		sendf(s, c, "QUIT :%s", m);
+	else
+		sendf(s, c, "QUIT :%s", DEFAULT_PART_MESG);
 }
 
 static int
 send_topic(struct server *s, struct channel *c, char *m)
 {
-	const char *targ;
-
-	if (!(targ = targ_or_type(c, m, CHANNEL_T_CHANNEL)))
+	if (c->type != CHANNEL_T_CHANNEL)
 		failf(c, "This is not a channel");
 
-	if (!str_trim(&m))
-		sendf(s, c, "TOPIC %s", targ);
+	if (str_trim(&m))
+		sendf(s, c, "TOPIC %s :%s", c->name, m);
 	else
-		sendf(s, c, "TOPIC %s :%s", targ, m);
+		sendf(s, c, "TOPIC %s", c->name);
 }

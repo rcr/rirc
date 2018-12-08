@@ -23,6 +23,7 @@
 
 /* Message sent for PART and QUIT by default */
 #define DEFAULT_QUIT_MESG "rirc v" VERSION
+#define DEFAULT_PART_MESG "rirc v" VERSION
 
 #define BUFFER_LINE_HEADER_FG_NEUTRAL 239
 
