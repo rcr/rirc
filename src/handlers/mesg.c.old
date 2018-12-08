@@ -73,64 +73,6 @@ enum numeric {
 	ERR_NOCHANMODES      = 477
 };
 
-/*
- * Message sending handlers
- */
-
-void
-send_mesg(struct server *s, struct channel *chan, char *mesg)
-{
-	/* Handle the input to a channel, ie:
-	 *  - a default message to the channel
-	 *  - a default message to the channel beginning with '/'
-	 *  - a handled command beginning with '/'
-	 *  - an unhandled command beginning with '/'
-	 */
-
-	char *p, *cmd_str;
-
-	if (s == NULL) {
-		newline(chan, 0, "-!!-", "This is not a server");
-	} else if (*mesg == '/' && *(++mesg) != '/') {
-
-		int ret;
-
-		if (!(cmd_str = getarg(&mesg, " "))) {
-			newline(chan, 0, "-!!-", "Messages beginning with '/' require a command");
-			return;
-		}
-
-		/* command -> COMMAND */
-		for (p = cmd_str; *p; p++)
-			*p = toupper(*p);
-
-		const struct send_handler* handler = send_handler_lookup(cmd_str, strlen(cmd_str));
-
-		if (handler) {
-			handler->func(mesg, s, chan);
-		} else if ((ret = io_sendf(s->connection, "%s %s", cmd_str, mesg)))
-			newlinef(chan, 0, "-!!-", "sendf fail: %s", io_err(ret));
-
-	} else {
-		/* Send to current channel */
-		int ret;
-
-		if (*mesg == 0)
-			fatal("message is empty");
-
-		else if (chan->type != CHANNEL_T_CHANNEL && chan->type != CHANNEL_T_PRIVATE)
-			newline(chan, 0, "-!!-", "Error: This is not a channel");
-
-		else if (chan->parted)
-			newline(chan, 0, "-!!-", "Error: Parted from channel");
-
-		else if ((ret = io_sendf(s->connection, "PRIVMSG %s :%s", chan->name, mesg)))
-			newlinef(chan, 0, "-!!-", "sendf fail: %s", io_err(ret));
-
-		else
-			newline(chan, BUFFER_LINE_CHAT, s->nick, mesg);
-	}
-}
 
 static int
 send_join(char *mesg, struct server *s, struct channel *c)
@@ -159,25 +101,6 @@ send_join(char *mesg, struct server *s, struct channel *c)
 			fail(c, "Error: Not parted from channel");
 
 		if ((ret = io_sendf(s->connection, "JOIN %s", c->name)))
-			failf(c, "sendf fail: %s", io_err(ret));
-	}
-
-	return 0;
-}
-
-static int
-send_nick(char *mesg, struct server *s, struct channel *c)
-{
-	/* /nick [nick] */
-
-	int ret;
-	char *nick;
-
-	if ((nick = getarg(&mesg, " "))) {
-		if ((ret = io_sendf(s->connection, "NICK %s", nick)))
-			failf(c, "sendf fail: %s", io_err(ret));
-	} else {
-		if ((ret = io_sendf(s->connection, "NICK")))
 			failf(c, "sendf fail: %s", io_err(ret));
 	}
 

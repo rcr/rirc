@@ -9,6 +9,7 @@
 #include "src/state.h"
 #include "src/io.h"
 
+// TODO: should privmsg/notice open a PRIVATE/CHANNEL buffer for the target?
 // TODO: override these macros in testing, decouple from state/io
 
 #define failf(C, ...) \
@@ -94,8 +95,24 @@ send_notice(struct server *s, struct channel *c, char *m)
 	sendf(s, c, "NOTICE %s :%s", m);
 }
 
-// TODO:
-static int send_part(struct server *s, struct channel *c, char *m) { (void)s; (void)c; (void)m; return 0; }
+static int
+send_part(struct server *s, struct channel *c, char *m)
+{
+	const char *targ;
+
+	if (!str_trim(&m) && c->type != CHANNEL_T_CHANNEL)
+		failf(c, "This is not a channel");
+
+	if (irc_ischanchar(*m, 1))
+		targ = getarg(&m, " ");
+	else
+		targ = c->name;
+
+	if (!str_trim(&m))
+		sendf(s, c, "PART %s :%s", targ, DEFAULT_QUIT_MESG);
+	else
+		sendf(s, c, "PART %s :%s", targ, m);
+}
 
 static int
 send_privmsg(struct server *s, struct channel *c, char *m)
@@ -114,9 +131,9 @@ send_quit(struct server *s, struct channel *c, char *m)
 	s->quitting = 1;
 
 	if (!str_trim(&m))
-		sendf(s, c, "QUIT :%s", m);
-	else
 		sendf(s, c, "QUIT :%s", DEFAULT_QUIT_MESG);
+	else
+		sendf(s, c, "QUIT :%s", m);
 }
 
 static int
