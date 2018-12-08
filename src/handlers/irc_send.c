@@ -174,15 +174,6 @@ send_ctcp_version(struct server *s, struct channel *c, char *m)
 }
 
 static int
-send_join(struct server *s, struct channel *c, char *m)
-{
-	(void)s;
-	(void)c;
-	(void)m;
-	return 0;
-}
-
-static int
 send_notice(struct server *s, struct channel *c, char *m)
 {
 	const char *targ;

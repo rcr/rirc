@@ -28,7 +28,7 @@ channel(const char *name, enum channel_t type)
 	c->name_len = len;
 	c->type = type;
 
-	memcpy(c->name, name, len + 1);
+	c->name = memcpy(c->_, name, len + 1);
 
 	buffer(&c->buffer);
 	input_init(&c->input);

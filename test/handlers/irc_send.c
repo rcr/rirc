@@ -9,14 +9,6 @@
 #include "src/handlers/irc_send.c"
 #include "src/utils/utils.c"
 
-#define X(cmd) static void test_send_##cmd(void);
-SEND_HANDLERS
-#undef X
-
-#define X(cmd) static void test_send_ctcp_##cmd(void);
-SEND_CTCP_HANDLERS
-#undef X
-
 #define CHECK_SEND_PRIVMSG(C, M, R, F, S) \
 	do { \
 	    send_buf[0] = 0; \
@@ -34,6 +26,14 @@ SEND_CTCP_HANDLERS
 	    assert_strcmp(fail_buf, (F)); \
 	    assert_strcmp(send_buf, (S)); \
 	} while (0)
+
+#define X(cmd) static void test_send_##cmd(void);
+SEND_HANDLERS
+#undef X
+
+#define X(cmd) static void test_send_ctcp_##cmd(void);
+SEND_CTCP_HANDLERS
+#undef X
 
 static char send_buf[1024];
 static char fail_buf[1024];
@@ -279,13 +279,6 @@ test_send_ctcp_version(void)
 	CHECK_SEND_COMMAND(c_serv, m2, 1, "Usage: /ctcp-version <target>", "");
 	CHECK_SEND_COMMAND(c_priv, m3, 0, "", "PRIVMSG priv :\001VERSION\001");
 	CHECK_SEND_COMMAND(c_priv, m4, 0, "", "PRIVMSG targ :\001VERSION\001");
-}
-
-static void
-test_send_join(void)
-{
-	/* TODO */
-	;
 }
 
 static void
