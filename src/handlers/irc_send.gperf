@@ -3,13 +3,11 @@
 
 #define SEND_HANDLERS \
 	X(join) \
-	X(nick) \
 	X(notice) \
 	X(part) \
 	X(privmsg) \
 	X(quit) \
-	X(topic) \
-	X(version)
+	X(topic)
 
 #define SEND_CTCP_HANDLERS \
 	X(action) \
@@ -58,11 +56,9 @@ CTCP-TIME,       send_ctcp_time
 CTCP-USERINFO,   send_ctcp_userinfo
 CTCP-VERSION,    send_ctcp_version
 JOIN,            send_join
-NICK,            send_nick
 NOTICE,          send_notice
 PART,            send_part
 PRIVMSG,         send_privmsg
 QUIT,            send_quit
 TOPIC,           send_topic
-VERSION,         send_version
 %%

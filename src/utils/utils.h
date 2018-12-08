@@ -64,6 +64,6 @@ void* memdup(const void*, size_t);
 
 int check_pinged(const char*, const char*);
 int parse_mesg(struct parsed_mesg*, char*);
-int skip_sp(char**);
+int str_trim(char**);
 
 #endif

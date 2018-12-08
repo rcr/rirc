@@ -314,7 +314,7 @@ parse_opt(struct opt *opt, char **str)
 	opt->arg = NULL;
 	opt->val = NULL;
 
-	if (!skip_sp(&p))
+	if (!str_trim(&p))
 		return 0;
 
 	if (!isalnum(*p))

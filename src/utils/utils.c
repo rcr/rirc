@@ -67,7 +67,7 @@ memdup(const void *mem, size_t len)
 }
 
 int
-skip_sp(char **str)
+str_trim(char **str)
 {
 	char *p;
 
@@ -301,7 +301,7 @@ parse_mesg(struct parsed_mesg *pm, char *mesg)
 
 	int param_count = 0;
 
-	while (skip_sp(&mesg)) {
+	while (str_trim(&mesg)) {
 
 		/* Maximum number of parameters found */
 		if (param_count == 14) {

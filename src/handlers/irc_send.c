@@ -12,7 +12,9 @@
 // TODO: override these macros in testing, decouple from state/io
 
 #define failf(C, ...) \
-	do { newlinef((C), 0, "-!!-", __VA_ARGS__); return 1; } while (0)
+	do { newlinef((C), 0, "-!!-", __VA_ARGS__); \
+	     return 1; \
+	} while (0)
 
 #define sendf(S, C, ...) \
 	do { int ret; \
@@ -78,29 +80,40 @@ targ_or_type(struct channel *c, char *m, enum channel_t type)
 	return NULL;
 }
 
-// TODO: move to utils
-static char* trim(char*);
-static char*
-trim(char *m)
-{
-	while (*m == ' ')
-		m++;
+// TODO:
+static int send_join(struct server *s, struct channel *c, char *m) { (void)s; (void)c; (void)m; return 0; }
 
-	return (*m ? m : NULL);
+static int
+send_notice(struct server *s, struct channel *c, char *m)
+{
+	const char *targ;
+
+	if ((targ = getarg(&m, " ")) || *m == 0)
+		failf(c, "Usage: /notice <target> <message>");
+
+	sendf(s, c, "NOTICE %s :%s", m);
 }
 
-static int send_join(struct server *s, struct channel *c, char *m) { (void)s; (void)c; (void)m; return 0; }
-static int send_nick(struct server *s, struct channel *c, char *m) { (void)s; (void)c; (void)m; return 0; }
-static int send_notice(struct server *s, struct channel *c, char *m) { (void)s; (void)c; (void)m; return 0; }
+// TODO:
 static int send_part(struct server *s, struct channel *c, char *m) { (void)s; (void)c; (void)m; return 0; }
-static int send_privmsg(struct server *s, struct channel *c, char *m) { (void)s; (void)c; (void)m; return 0; }
+
+static int
+send_privmsg(struct server *s, struct channel *c, char *m)
+{
+	const char *targ;
+
+	if ((targ = getarg(&m, " ")) || *m == 0)
+		failf(c, "Usage: /privmsg <target> <message>");
+
+	sendf(s, c, "PRIVMESG %s :%s", m);
+}
 
 static int
 send_quit(struct server *s, struct channel *c, char *m)
 {
 	s->quitting = 1;
 
-	if (!(m = trim(m)))
+	if (!str_trim(&m))
 		sendf(s, c, "QUIT :%s", m);
 	else
 		sendf(s, c, "QUIT :%s", DEFAULT_QUIT_MESG);
@@ -114,21 +127,10 @@ send_topic(struct server *s, struct channel *c, char *m)
 	if (!(targ = targ_or_type(c, m, CHANNEL_T_CHANNEL)))
 		failf(c, "This is not a channel");
 
-	if (!(m = trim(m)))
+	if (!str_trim(&m))
 		sendf(s, c, "TOPIC %s", targ);
 	else
 		sendf(s, c, "TOPIC %s :%s", targ, m);
-}
-
-static int
-send_version(struct server *s, struct channel *c, char *m)
-{
-	const char *targ;
-
-	if ((targ = getarg(&m, " ")))
-		sendf(s, c, "VERSION %s", targ);
-	else
-		sendf(s, c, "VERSION");
 }
 
 static int
