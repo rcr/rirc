@@ -35,16 +35,19 @@ irc_send_command(struct server *s, struct channel *c, char *m)
 	if (!s)
 		failf(c, "This is not a server");
 
-	if (!(command = getarg(&m, " ")))
+	if (*m == ' ' || !(command = getarg(&m, " ")))
 		failf(c, "Messages beginning with '/' require a command");
 
 	for (p = command; *p; p++)
 		*p = toupper(*p);
 
-	if (!(send = send_handler_lookup(command, strlen(command))))
-		sendf(s, c, "%s %s", command, m);
+	if ((send = send_handler_lookup(command, strlen(command))))
+		return send->f(s, c, m);
 
-	return send->f(s, c, m);
+	if (str_trim(&m))
+		sendf(s, c, "%s %s", command, m);
+	else
+		sendf(s, c, "%s", command);
 }
 
 int
@@ -56,7 +59,7 @@ irc_send_privmsg(struct server *s, struct channel *c, char *m)
 	if (!(c->type == CHANNEL_T_CHANNEL || c->type == CHANNEL_T_PRIVATE))
 		failf(c, "This is not a channel");
 
-	if (!c->joined || c->parted)
+	if (c->type == CHANNEL_T_CHANNEL && (!c->joined || c->parted))
 		failf(c, "Not on channel");
 
 	if (*m == 0)
