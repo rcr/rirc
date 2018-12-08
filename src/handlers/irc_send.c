@@ -2,6 +2,7 @@
 #include <sys/time.h>
 
 #include "config.h"
+#include "src/components/buffer.h"
 #include "src/components/channel.h"
 #include "src/components/server.h"
 #include "src/handlers/irc_send.gperf.out"
@@ -10,7 +11,6 @@
 #include "src/io.h"
 
 // TODO: should privmsg/notice open a PRIVATE/CHANNEL buffer for the target?
-// TODO: override these macros in testing, decouple from state/io
 
 #define failf(C, ...) \
 	do { newlinef((C), 0, "-!!-", __VA_ARGS__); \
@@ -81,82 +81,13 @@ targ_or_type(struct channel *c, char *m, enum channel_t type)
 	return NULL;
 }
 
-// TODO:
-static int send_join(struct server *s, struct channel *c, char *m) { (void)s; (void)c; (void)m; return 0; }
-
-static int
-send_notice(struct server *s, struct channel *c, char *m)
-{
-	const char *targ;
-
-	if ((targ = getarg(&m, " ")) || *m == 0)
-		failf(c, "Usage: /notice <target> <message>");
-
-	sendf(s, c, "NOTICE %s :%s", m);
-}
-
-static int
-send_part(struct server *s, struct channel *c, char *m)
-{
-	const char *targ;
-
-	if (!str_trim(&m) && c->type != CHANNEL_T_CHANNEL)
-		failf(c, "This is not a channel");
-
-	if (irc_ischanchar(*m, 1))
-		targ = getarg(&m, " ");
-	else
-		targ = c->name;
-
-	if (!str_trim(&m))
-		sendf(s, c, "PART %s :%s", targ, DEFAULT_QUIT_MESG);
-	else
-		sendf(s, c, "PART %s :%s", targ, m);
-}
-
-static int
-send_privmsg(struct server *s, struct channel *c, char *m)
-{
-	const char *targ;
-
-	if ((targ = getarg(&m, " ")) || *m == 0)
-		failf(c, "Usage: /privmsg <target> <message>");
-
-	sendf(s, c, "PRIVMESG %s :%s", m);
-}
-
-static int
-send_quit(struct server *s, struct channel *c, char *m)
-{
-	s->quitting = 1;
-
-	if (!str_trim(&m))
-		sendf(s, c, "QUIT :%s", DEFAULT_QUIT_MESG);
-	else
-		sendf(s, c, "QUIT :%s", m);
-}
-
-static int
-send_topic(struct server *s, struct channel *c, char *m)
-{
-	const char *targ;
-
-	if (!(targ = targ_or_type(c, m, CHANNEL_T_CHANNEL)))
-		failf(c, "This is not a channel");
-
-	if (!str_trim(&m))
-		sendf(s, c, "TOPIC %s", targ);
-	else
-		sendf(s, c, "TOPIC %s :%s", targ, m);
-}
-
 static int
 send_ctcp_action(struct server *s, struct channel *c, char *m)
 {
 	if (!(c->type == CHANNEL_T_CHANNEL || c->type == CHANNEL_T_PRIVATE))
 		failf(c, "This is not a channel");
 
-	sendf(s, c, "PRIVMSG %s :\001""ACTION %s\001", c->name, m);
+	sendf(s, c, "PRIVMSG %s :\001ACTION %s\001", c->name, m);
 }
 
 static int
@@ -237,4 +168,79 @@ send_ctcp_version(struct server *s, struct channel *c, char *m)
 		failf(c, "Usage: /ctcp-version <target>");
 
 	sendf(s, c, "PRIVMSG %s :\001VERSION\001", targ);
+}
+
+static int
+send_join(struct server *s, struct channel *c, char *m)
+{
+	(void)s;
+	(void)c;
+	(void)m;
+	return 0;
+}
+
+static int
+send_notice(struct server *s, struct channel *c, char *m)
+{
+	const char *targ;
+
+	if ((targ = getarg(&m, " ")) || *m == 0)
+		failf(c, "Usage: /notice <target> <message>");
+
+	sendf(s, c, "NOTICE %s :%s", m);
+}
+
+static int
+send_part(struct server *s, struct channel *c, char *m)
+{
+	const char *targ;
+
+	if (!str_trim(&m) && c->type != CHANNEL_T_CHANNEL)
+		failf(c, "This is not a channel");
+
+	if (irc_ischanchar(*m, 1))
+		targ = getarg(&m, " ");
+	else
+		targ = c->name;
+
+	if (!str_trim(&m))
+		sendf(s, c, "PART %s :%s", targ, DEFAULT_QUIT_MESG);
+	else
+		sendf(s, c, "PART %s :%s", targ, m);
+}
+
+static int
+send_privmsg(struct server *s, struct channel *c, char *m)
+{
+	const char *targ;
+
+	if ((targ = getarg(&m, " ")) || *m == 0)
+		failf(c, "Usage: /privmsg <target> <message>");
+
+	sendf(s, c, "PRIVMESG %s :%s", m);
+}
+
+static int
+send_quit(struct server *s, struct channel *c, char *m)
+{
+	s->quitting = 1;
+
+	if (!str_trim(&m))
+		sendf(s, c, "QUIT :%s", DEFAULT_QUIT_MESG);
+	else
+		sendf(s, c, "QUIT :%s", m);
+}
+
+static int
+send_topic(struct server *s, struct channel *c, char *m)
+{
+	const char *targ;
+
+	if (!(targ = targ_or_type(c, m, CHANNEL_T_CHANNEL)))
+		failf(c, "This is not a channel");
+
+	if (!str_trim(&m))
+		sendf(s, c, "TOPIC %s", targ);
+	else
+		sendf(s, c, "TOPIC %s :%s", targ, m);
 }
