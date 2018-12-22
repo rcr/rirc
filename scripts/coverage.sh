@@ -25,7 +25,7 @@ FILTER=$(cat <<'EOF'
 		my @s1 = split / /, $file;
 		my @s2 = split /:/, $_;
 		my @s3 = split / /, $s2[1];
-		printf("%-28s%5s: %6s\n", $s1[1], $s3[2], $s3[0]);
+		printf("%-28s%5s: %7s\n", $s1[1], $s3[2], $s3[0]);
 		$p = 0;
 	}
 	$p++ if /^File.*src/;

@@ -342,6 +342,7 @@
  *     ERR_YOUWILLBEBANNED   466
  *     ERR_BANLISTFULL       478
  *     ERR_UNIQOPPRIVSNEEDED 485
+ *     RPL_HELPSTART         704 -- extension
  *     RPL_HELP              705 -- extension
  *     RPL_ENDOFHELP         706 -- extension
  *

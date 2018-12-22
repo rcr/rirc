@@ -148,6 +148,7 @@ enum irc_numerics
 	ERR_NOOPERHOST          = 491,
 	ERR_UMODEUNKNOWNFLAG    = 501,
 	ERR_USERSDONTMATCH      = 502,
+	RPL_HELPSTART           = 704,
 	RPL_HELP                = 705,
 	RPL_ENDOFHELP           = 706,
 };

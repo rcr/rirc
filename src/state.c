@@ -207,12 +207,12 @@ _newline(struct channel *c, enum buffer_line_t type, const char *from, const cha
 		_text_len,
 		((u == NULL) ? 0 : u->prfxmodes.prefix));
 
-	c->activity = MAX(c->activity, ACTIVITY_ACTIVE);
-
-	if (c == current_channel())
+	if (c == current_channel()) {
 		draw_buffer();
-	else
+	} else {
+		c->activity = MAX(c->activity, ACTIVITY_ACTIVE);
 		draw_nav();
+	}
 }
 
 int

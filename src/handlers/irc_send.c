@@ -65,6 +65,7 @@ irc_send_privmsg(struct server *s, struct channel *c, char *m)
 	if (*m == 0)
 		failf(c, "Message is empty");
 
+	// FIXME: move this to state.c?
 	newline(c, BUFFER_LINE_CHAT, s->nick, m);
 
 	sendf(s, c, "PRIVMSG %s :%s", c->name, m);

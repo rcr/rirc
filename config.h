@@ -19,7 +19,9 @@
 /* User count in channel before filtering JOIN/PART/QUIT messages
  *   Integer
  *   (0: no filtering) */
-#define JPQ_THRESHOLD 0
+#define JOIN_THRESHOLD 0
+#define PART_THRESHOLD 0
+#define QUIT_THRESHOLD 0
 
 /* Message sent for PART and QUIT by default */
 #define DEFAULT_QUIT_MESG "rirc v" VERSION
@@ -39,12 +41,12 @@
 /* Colours used for nicks */
 #define NICK_COLOURS {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14};
 
-/* Colours for channel names in response to activity, in order of precedence */
-#define ACTIVITY_COLOURS {            \
-	239, /* Default colour */         \
-	239, /* Join/Part/Quit colour */  \
-	247, /* Chat colour */            \
-	3    /* Ping colour */            \
+/* Colours for nav channel names in response to activity, in order of precedence */
+#define ACTIVITY_COLOURS {    \
+    239, /* Default */        \
+    242, /* Join/Part/Quit */ \
+    247, /* Chat */           \
+    3    /* Ping */           \
 };
 
 #define NAV_CURRENT_CHAN 255
