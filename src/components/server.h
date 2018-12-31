@@ -13,6 +13,7 @@ struct server
 	const char *username;
 	const char *realname;
 	const char *nick;
+	int (*cmp) (const char*, const char*);
 	struct {
 		size_t next;
 		size_t size;
