@@ -6,11 +6,9 @@
  *  NOTICE <targ> :\x01ACTION <text>\x01
  *  NOTICE <targ> :\x01CLIENTINFO 1*<arg>\x01
  *  NOTICE <targ> :\x01ERRMSG <text>\x01
- *  NOTICE <targ> :\x01FINGER <text>\x01
  *  NOTICE <targ> :\x01PING 1*<arg>\x01
  *  NOTICE <targ> :\x01SOURCE <text>\x01
  *  NOTICE <targ> :\x01TIME <text>\x01
- *  NOTICE <targ> :\x01USERINFO <text>\x01
  *  NOTICE <targ> :\x01VERSION <text>\x01
  */
 

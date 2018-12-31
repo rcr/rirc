@@ -7,8 +7,9 @@
 #include "src/components/server.h"
 #include "src/handlers/irc_send.gperf.out"
 #include "src/handlers/irc_send.h"
-#include "src/state.h"
 #include "src/io.h"
+#include "src/state.h"
+#include "src/utils/utils.h"
 
 // TODO: should privmsg/notice open a PRIVATE/CHANNEL buffer for the target?
 

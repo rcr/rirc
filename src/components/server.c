@@ -47,6 +47,9 @@ server(const char *host, const char *port, const char *pass, const char *user, c
 	s->channel->server = s;
 	channel_list_add(&(s->clist), s->channel);
 
+	/* TODO: CASEMAPPING */
+	s->cmp = strcmp;
+
 	return s;
 }
 

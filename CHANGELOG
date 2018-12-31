@@ -2,8 +2,19 @@
 Summary of notable changes and features
 
 ## Unreleased (dev)
+### Features
+ - add CTCP SOURCE
 ### Refactor
  - generate gperf files at compile time
+ - split mesg.c into:
+   - handlers/irc_send.c
+   - handlers/irc_recv.c
+   - handlers/irc_ctcp.c
+ - add unit test file for each source file
+### Fixes
+ - fix JOIN/PART/QUIT filtering bug when set 0
+ - fix nav colouring bug when message received on current chan
+ - fix handling of CTCP PING
 
 ## [0.1.1]
 ### Features

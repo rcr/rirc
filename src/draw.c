@@ -199,6 +199,8 @@ _draw_buffer_line(
 
 		switch (line->type) {
 			case BUFFER_LINE_OTHER:
+			case BUFFER_LINE_SERVER_MSG:
+			case BUFFER_LINE_SERVER_ERR:
 				if (!_draw_fmt(&header_ptr, &buff_n, &text_n, 0,
 						_colour(BUFFER_LINE_HEADER_FG_NEUTRAL, -1)))
 					goto print_header;
@@ -217,7 +219,7 @@ _draw_buffer_line(
 				break;
 
 			case BUFFER_LINE_T_SIZE:
-				break;
+				fatal("Invalid line type");
 		}
 
 		if (!_draw_fmt(&header_ptr, &buff_n, &text_n, 1,

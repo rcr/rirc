@@ -16,9 +16,11 @@
 /* Buffer line types, in order of precedence */
 enum buffer_line_t
 {
-	BUFFER_LINE_OTHER,  /* Default/all other lines */
-	BUFFER_LINE_CHAT,   /* Line of text from another IRC user */
-	BUFFER_LINE_PINGED, /* Line of text from another IRC user containing current nick */
+	BUFFER_LINE_OTHER,      /* Default/all other lines */
+	BUFFER_LINE_SERVER_MSG, /* Server info message */
+	BUFFER_LINE_SERVER_ERR, /* Server error message */
+	BUFFER_LINE_CHAT,       /* Line of text from another IRC user */
+	BUFFER_LINE_PINGED,     /* Line of text from another IRC user containing current nick */
 	BUFFER_LINE_T_SIZE
 };
 

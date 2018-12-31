@@ -114,7 +114,8 @@ static void _print_testcase_name_(const char*);
 #define assert_strncmp(X, Y, N) \
 	do { \
 		if (_assert_strncmp(X, Y, N)) \
-			fail_testf(#X " expected '%.*s', got '%.*s'", (N), (Y) == NULL ? "NULL" : (Y), (N), (X) == NULL ? "NULL" : (X)); \
+			fail_testf(#X " expected '%.*s', got '%.*s'", \
+				(int)(N), (Y) == NULL ? "NULL" : (Y), (int)(N), (X) == NULL ? "NULL" : (X)); \
 	} while (0)
 
 #define assert_lt(X, Y) \

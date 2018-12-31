@@ -19,7 +19,7 @@
 #include "src/handlers/irc_recv.h"
 #include "src/handlers/irc_send.h"
 
-// See: https://vt100.net/docs/vt100-ug/chapter3.html
+/* See: https://vt100.net/docs/vt100-ug/chapter3.html */
 #define CTRL(k) ((k) & 0x1f)
 
 static void _newline(struct channel*, enum buffer_line_t, const char*, const char*, va_list);

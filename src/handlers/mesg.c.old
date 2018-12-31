@@ -40,7 +40,6 @@ static const unsigned part_threshold = PART_THRESHOLD;
 static const unsigned quit_threshold = QUIT_THRESHOLD;
 
 /* Special cases handlers, CTCP messages are embedded in PRIVMSG */
-static int recv_ctcp_req(struct parsed_mesg*, struct server*);
 static int recv_ctcp_rpl(struct parsed_mesg*, struct server*);
 
 /* Special case handler for numeric replies */
@@ -96,139 +95,6 @@ recv_mesg(struct server *s, struct parsed_mesg *p)
 		handler->func(p, s);
 	else
 		newlinef(s->channel, 0, "-!!-", "Message type '%s' unknown", p->command);
-}
-
-static int
-recv_ctcp_req(struct parsed_mesg *p, struct server *s)
-{
-	/* CTCP Requests:
-	 * PRIVMSG <target> :0x01<command> <arguments>0x01
-	 *
-	 * All replies must be:
-	 * NOTICE <target> :0x01<reply>0x01 */
-
-	char *targ, *cmd, *mesg;
-	int ret;
-
-	if (!p->from)
-		fail(s->channel, "CTCP: sender's nick is null");
-
-	/* CTCP request from ignored user, do nothing */
-	if (user_list_get(&(s->ignore), p->from, 0))
-		return 0;
-
-	if (!(targ = getarg(&p->params, " ")))
-		fail(s->channel, "CTCP: target is null");
-
-	if (!(mesg = getarg(&p->trailing, "\x01")))
-		fail(s->channel, "CTCP: invalid markup");
-
-	/* Markup is valid, get command */
-	if (!(cmd = getarg(&mesg, " ")))
-		fail(s->channel, "CTCP: command is null");
-
-	/* Handle the CTCP request if supported */
-
-	if (!strcmp(cmd, "ACTION")) {
-		/* ACTION <message> */
-
-		struct channel *c;
-
-		if (IS_ME(targ)) {
-			/* Sending emote to private channel */
-
-			if ((c = channel_list_get(&s->clist, p->from)) == NULL) {
-				c = channel(p->from, CHANNEL_T_PRIVATE);
-				c->server = s;
-				channel_list_add(&s->clist, c);
-			}
-
-			if (c != current_channel()) {
-				c->activity = ACTIVITY_PINGED;
-				draw_nav();
-			}
-
-		} else if ((c = channel_list_get(&s->clist, targ)) == NULL)
-			failf(s->channel, "CTCP ACTION: channel '%s' not found", targ);
-
-		newlinef(c, 0, "*", "%s %s", p->from, mesg);
-
-		return 0;
-	}
-
-	if (!strcmp(cmd, "CLIENTINFO")) {
-		/* CLIENTINFO
-		 *
-		 * Returns a list of CTCP commands supported by rirc */
-
-		newlinef(s->channel, 0, "--", "CTCP CLIENTINFO request from %s", p->from);
-
-		if ((ret = io_sendf(s->connection, "NOTICE %s :\x01""CLIENTINFO ACTION PING VERSION TIME\x01", p->from)))
-			failf(s->channel, "sendf fail: %s", io_err(ret));
-
-		return 0;
-	}
-
-	if (!strcmp(cmd, "PING")) {
-		/* PING
-		 *
-		 * Returns a millisecond precision timestamp */
-
-		struct timeval t;
-
-		gettimeofday(&t, NULL);
-
-		long long milliseconds = t.tv_sec * 1000LL + t.tv_usec;
-
-		newlinef(s->channel, 0, "--", "CTCP PING request from %s", p->from);
-
-		if ((ret = io_sendf(s->connection, "NOTICE %s :\x01""PING %lld\x01", p->from, milliseconds)))
-			failf(s->channel, "sendf fail: %s", io_err(ret));
-
-		return 0;
-	}
-
-	if (!strcmp(cmd, "VERSION")) {
-		/* VERSION
-		 *
-		 * Returns version info about rirc */
-
-		newlinef(s->channel, 0, "--", "CTCP VERSION request from %s", p->from);
-
-		if ((ret = io_sendf(s->connection, "NOTICE %s :\x01""VERSION rirc v"VERSION", http://rcr.io/rirc\x01", p->from)))
-			failf(s->channel, "sendf fail: %s", io_err(ret));
-
-		return 0;
-	}
-
-	if (!strcmp(cmd, "TIME")) {
-		/* TIME
-		 *
-		 * Returns the localtime in human readable form */
-
-		char time_str[64];
-		struct tm *tm;
-		time_t t;
-
-		t = time(NULL);
-		tm = localtime(&t);
-
-		/* Mon Jan 01 20:30 GMT */
-		strftime(time_str, sizeof(time_str), "%a %b %d %H:%M %Z", tm);
-
-		newlinef(s->channel, 0, "--", "CTCP TIME request from %s", p->from);
-
-		if ((ret = io_sendf(s->connection, "NOTICE %s :\x01""TIME %s\x01", p->from, time_str)))
-			failf(s->channel, "sendf fail: %s", io_err(ret));
-
-		return 0;
-	}
-
-	/* Unsupported CTCP request */
-	if ((ret = io_sendf(s->connection, "NOTICE %s :\x01""ERRMSG %s not supported\x01", p->from, cmd)))
-		failf(s->channel, "sendf fail: %s", io_err(ret));
-
-	failf(s->channel, "CTCP: Unknown command '%s' from %s", cmd, p->from);
 }
 
 static int
@@ -1062,10 +928,6 @@ recv_privmsg(struct parsed_mesg *p, struct server *s)
 
 	if (!p->trailing)
 		fail(s->channel, "PRIVMSG: message is null");
-
-	/* CTCP request */
-	if (*p->trailing == 0x01)
-		return recv_ctcp_req(p, s);
 
 	if (!p->from)
 		fail(s->channel, "PRIVMSG: sender's nick is null");

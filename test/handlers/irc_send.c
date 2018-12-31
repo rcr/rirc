@@ -358,11 +358,12 @@ test_send_topic(void)
 int
 main(void)
 {
+	int ret;
 	c_chan = channel("chan", CHANNEL_T_CHANNEL);
 	c_priv = channel("priv", CHANNEL_T_PRIVATE);
 	c_serv = channel("serv", CHANNEL_T_SERVER);
 	s = server("h1", "p1", NULL, "u1", "r1");
-	s->nick = "nick";
+	server_nick_set(s, "mynick");
 
 	testcase tests[] = {
 		TESTCASE(test_irc_send_command),
@@ -375,5 +376,7 @@ main(void)
 #undef X
 	};
 
-	return run_tests(tests);
+	ret = run_tests(tests);
+	server_free(s);
+	return ret;
 }

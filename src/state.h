@@ -42,6 +42,12 @@ void channel_set_current(struct channel*);
 
 void free_channel(struct channel*);
 
+#define server_msg(S, ...) \
+	do { newlinef((S)->channel, BUFFER_LINE_SERVER_MSG, "--", __VA_ARGS__); } while (0)
+
+#define server_err(S, ...) \
+	do { newlinef((S)->channel, BUFFER_LINE_SERVER_ERR, "-!!-", __VA_ARGS__); } while (0)
+
 void newlinef(struct channel*, enum buffer_line_t, const char*, const char*, ...);
 void newline(struct channel*, enum buffer_line_t, const char*, const char*);
 
