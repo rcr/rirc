@@ -1,20 +1,33 @@
 %{
 #include <string.h>
 
-#define CTCP_HANDLERS \
-	X(action) \
+/* Not implemented:
+ *  - DCC      (extended query)
+ *  - FINGER   (metadata query)
+ *  - USERINFO (metadata query)
+ */
+
+#define CTCP_EXTENDED_FORMATTING \
+	X(action)
+
+#define CTCP_EXTENDED_QUERY \
 	X(clientinfo) \
 	X(ping) \
+	X(time)
+
+#define CTCP_METADATA_QUERY \
 	X(source) \
-	X(time) \
 	X(version)
 
 #define X(cmd) static int recv_ctcp_request_##cmd(struct server*, struct parsed_mesg*);
-CTCP_HANDLERS
+CTCP_EXTENDED_FORMATTING
+CTCP_EXTENDED_QUERY
+CTCP_METADATA_QUERY
 #undef X
 
 #define X(cmd) static int recv_ctcp_response_##cmd(struct server*, struct parsed_mesg*);
-CTCP_HANDLERS
+CTCP_EXTENDED_QUERY
+CTCP_METADATA_QUERY
 #undef X
 
 typedef int (*ctcp_f)(struct server*, struct parsed_mesg*);
@@ -38,7 +51,7 @@ struct ctcp_handler
 %define initializer-suffix ,(ctcp_f)0,(ctcp_f)0
 struct ctcp_handler;
 %%
-ACTION,     recv_ctcp_request_action,     recv_ctcp_response_action
+ACTION,     recv_ctcp_request_action,     (ctcp_f)0
 CLIENTINFO, recv_ctcp_request_clientinfo, recv_ctcp_response_clientinfo
 PING,       recv_ctcp_request_ping,       recv_ctcp_response_ping
 SOURCE,     recv_ctcp_request_source,     recv_ctcp_response_source

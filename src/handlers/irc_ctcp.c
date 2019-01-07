@@ -1,5 +1,4 @@
-// FIXME: use strerror_r here, elsewhere, move the io_strerror to utils
-
+#include <ctype.h>
 #include <errno.h>
 #include <string.h>
 #include <sys/time.h>
@@ -27,36 +26,63 @@
 int
 recv_ctcp_request(struct server *s, struct parsed_mesg *m)
 {
+	char *command;
 	char *term;
-	const char *command;
 	const char *from;
 	const struct ctcp_handler *ctcp;
 
 	if (!(from = m->from))
-		failf(s, "Received CTCP message from unknown sender");
+		failf(s, "Received CTCP request from unknown sender");
 
-	if (*m->trailing != '\001' || !(term = strchr(m->trailing + 1, '\001')))
-		failf(s, "Received malformed CTCP message from %s", from);
+	if (*m->trailing != '\001')
+		failf(s, "Received malformed CTCP request from %s", from);
 
-	*m->trailing++ = *term = 0;
+	if ((term = strchr(m->trailing + 1, '\001')))
+		*term = 0;
+
+	*m->trailing++ = 0;
 
 	if (!(command = getarg(&m->trailing, " ")))
-		failf(s, "Received empty CTCP message from %s", from);
+		failf(s, "Received empty CTCP request from %s", from);
+
+	for (char *p = command; *p; p++)
+		*p = toupper(*p);
 
 	if ((ctcp = ctcp_handler_lookup(command, strlen(command))))
 		return ctcp->f_request(s, m);
 
-	server_err(s, "Received unsupported CTCP command '%s' from %s", command, from);
-	sendf(s, "NOTICE %s :\001ERRMSG Unsupported CTCP command: '%s'\001", from, command);
+	failf(s, "Received unsupported CTCP request '%s' from %s", command, from);
 }
 
 int
 recv_ctcp_response(struct server *s, struct parsed_mesg *m)
 {
-	// TODO: should handle ERROR response too
-	(void)s;
-	(void)m;
-	return 0;
+	char *command;
+	char *term;
+	const char *from;
+	const struct ctcp_handler *ctcp;
+
+	if (!(from = m->from))
+		failf(s, "Received CTCP response from unknown sender");
+
+	if (*m->trailing != '\001')
+		failf(s, "Received malformed CTCP response from %s", from);
+
+	if ((term = strchr(m->trailing + 1, '\001')))
+		*term = 0;
+
+	*m->trailing++ = 0;
+
+	if (!(command = getarg(&m->trailing, " ")))
+		failf(s, "Received empty CTCP response from %s", from);
+
+	for (char *p = command; *p; p++)
+		*p = toupper(*p);
+
+	if ((ctcp = ctcp_handler_lookup(command, strlen(command))))
+		return ctcp->f_response(s, m);
+
+	failf(s, "Received unsupported CTCP response '%s' from %s", command, from);
 }
 
 static int
@@ -79,7 +105,10 @@ recv_ctcp_request_action(struct server *s, struct parsed_mesg *m)
 		failf(s, "CTCP ACTION: target '%s' not found", targ);
 	}
 
-	newlinef(c, 0, "*", "%s %s", m->from, m->trailing);
+	if (str_trim(&m->trailing))
+		newlinef(c, 0, "*", "%s %s", m->from, m->trailing);
+	else
+		newlinef(c, 0, "*", "%s", m->from);
 
 	return 0;
 }
@@ -118,7 +147,7 @@ static int
 recv_ctcp_request_time(struct server *s, struct parsed_mesg *m)
 {
 	/* ISO 8601 */
-	char buf[sizeof("1970-01-01T00:00:00Z+0000")];
+	char buf[sizeof("1970-01-01T00:00:00")];
 	struct tm tm;
 	time_t t = 0;
 
@@ -137,7 +166,7 @@ recv_ctcp_request_time(struct server *s, struct parsed_mesg *m)
 		failf(s, "CTCP TIME: localtime_r error: %s", strerror(errno));
 #endif
 
-	if ((strftime(buf, sizeof(buf), "%FT%TZ%z", &tm)) == 0)
+	if ((strftime(buf, sizeof(buf), "%FT%T", &tm)) == 0)
 		failf(s, "CTCP TIME: strftime error");
 
 	sendf(s, "NOTICE %s :\001TIME %s\001", m->from, buf);
@@ -155,49 +184,102 @@ recv_ctcp_request_version(struct server *s, struct parsed_mesg *m)
 }
 
 static int
-recv_ctcp_response_action(struct server *s, struct parsed_mesg *m)
-{
-	(void)s;
-	(void)m;
-	return 0;
-}
-
-static int
 recv_ctcp_response_clientinfo(struct server *s, struct parsed_mesg *m)
 {
-	(void)s;
-	(void)m;
+	if (!str_trim(&m->trailing))
+		failf(s, "CTCP CLIENTINFO response from %s: empty message", m->from);
+
+	server_msg(s, "CTCP CLIENTINFO response from %s: %s", m->from, m->trailing);
 	return 0;
 }
 
 static int
 recv_ctcp_response_ping(struct server *s, struct parsed_mesg *m)
 {
-	(void)s;
-	(void)m;
+	const char *sec;
+	const char *usec;
+	long long unsigned res;
+	long long unsigned res_sec;
+	long long unsigned res_usec;
+	long unsigned t1_sec;
+	long unsigned t1_usec;
+	long unsigned t2_sec;
+	long unsigned t2_usec;
+	struct timeval t;
+
+	if (!(sec = getarg(&m->trailing, " ")))
+		failf(s, "CTCP PING response from %s: sec is NULL", m->from);
+
+	if (!(usec = getarg(&m->trailing, " ")))
+		failf(s, "CTCP PING response from %s: usec is NULL", m->from);
+
+	for (const char *p = sec; *p; p++) {
+		if (!(isdigit(*p)))
+			failf(s, "CTCP PING response from %s: sec is invalid", m->from);
+	}
+
+	for (const char *p = usec; *p; p++) {
+		if (!(isdigit(*p)))
+			failf(s, "CTCP PING response from %s: usec is invalid", m->from);
+	}
+
+#ifdef TESTING
+	(void)t;
+
+	t2_sec = 123;
+	t2_usec = 456789;
+#else
+	(void)gettimeofday(&t, NULL);
+
+	t2_sec = (long unsigned) t.tv_sec;
+	t2_usec = (long unsigned) t.tv_usec;
+#endif
+
+	errno = 0;
+
+	t1_sec = strtoul(sec, NULL, 10);
+	t1_usec = strtoul(usec, NULL, 10);
+
+	if (errno)
+		failf(s, "CTCP PING response from %s: failed to parse timestamp", m->from);
+
+	if ((t1_usec > 999999) || (t1_sec > t2_sec) || (t1_sec == t2_sec && t1_usec > t2_usec))
+		failf(s, "CTCP PING response from %s: invalid timestamp", m->from);
+
+	res = (t2_usec + (1000000 * t2_sec)) - (t1_usec + (1000000 * t1_sec));
+	res_sec = res / 1000000;
+	res_usec = res % 1000000;
+
+	server_msg(s, "CTCP PING response from %s: %llu.%llus", m->from, res_sec, res_usec);
 	return 0;
 }
 
 static int
 recv_ctcp_response_source(struct server *s, struct parsed_mesg *m)
 {
-	(void)s;
-	(void)m;
+	if (!str_trim(&m->trailing))
+		failf(s, "CTCP SOURCE response from %s: empty message", m->from);
+
+	server_msg(s, "CTCP SOURCE response from %s: %s", m->from, m->trailing);
 	return 0;
 }
 
 static int
 recv_ctcp_response_time(struct server *s, struct parsed_mesg *m)
 {
-	(void)s;
-	(void)m;
+	if (!str_trim(&m->trailing))
+		failf(s, "CTCP TIME response from %s: empty message", m->from);
+
+	server_msg(s, "CTCP TIME response from %s: %s", m->from, m->trailing);
 	return 0;
 }
 
 static int
 recv_ctcp_response_version(struct server *s, struct parsed_mesg *m)
 {
-	(void)s;
-	(void)m;
+	if (!str_trim(&m->trailing))
+		failf(s, "CTCP VERSION response from %s: empty message", m->from);
+
+	server_msg(s, "CTCP VERSION response from %s: %s", m->from, m->trailing);
 	return 0;
 }

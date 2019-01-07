@@ -358,7 +358,6 @@ test_send_topic(void)
 int
 main(void)
 {
-	int ret;
 	c_chan = channel("chan", CHANNEL_T_CHANNEL);
 	c_priv = channel("priv", CHANNEL_T_PRIVATE);
 	c_serv = channel("serv", CHANNEL_T_SERVER);
@@ -376,7 +375,7 @@ main(void)
 #undef X
 	};
 
-	ret = run_tests(tests);
+	int ret = run_tests(tests);
 	server_free(s);
 	return ret;
 }
