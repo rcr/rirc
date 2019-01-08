@@ -2,10 +2,7 @@
 #include <string.h>
 
 /* Not implemented:
- *  - DCC      (extended query)
- *  - FINGER   (metadata query)
- *  - USERINFO (metadata query)
- */
+ *  - DCC (extended query) */
 
 #define CTCP_EXTENDED_FORMATTING \
 	X(action)
@@ -16,7 +13,9 @@
 	X(time)
 
 #define CTCP_METADATA_QUERY \
+	X(finger) \
 	X(source) \
+	X(userinfo) \
 	X(version)
 
 #define X(cmd) static int recv_ctcp_request_##cmd(struct server*, struct parsed_mesg*);
@@ -53,7 +52,9 @@ struct ctcp_handler;
 %%
 ACTION,     recv_ctcp_request_action,     (ctcp_f)0
 CLIENTINFO, recv_ctcp_request_clientinfo, recv_ctcp_response_clientinfo
+FINGER,     recv_ctcp_request_finger,     recv_ctcp_response_finger
 PING,       recv_ctcp_request_ping,       recv_ctcp_response_ping
 SOURCE,     recv_ctcp_request_source,     recv_ctcp_response_source
 TIME,       recv_ctcp_request_time,       recv_ctcp_response_time
+USERINFO,   recv_ctcp_request_userinfo,   recv_ctcp_response_userinfo
 VERSION,    recv_ctcp_request_version,    recv_ctcp_response_version

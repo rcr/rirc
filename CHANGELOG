@@ -3,7 +3,9 @@ Summary of notable changes and features
 
 ## Unreleased (dev)
 ### Features
+ - add CTCP FINGER
  - add CTCP SOURCE
+ - add CTCP USERINFO
 ### Refactor
  - generate gperf files at compile time
  - split mesg.c into:

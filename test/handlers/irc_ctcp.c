@@ -120,12 +120,12 @@ test_recv_ctcp_request(void)
 	struct parsed_mesg pm1 = { .from = "nick" };
 	struct parsed_mesg pm2 = { .from = NULL };
 
-	CHECK_REQUEST(pm1, m1, 1, "Received malformed CTCP request from nick", "");
-	CHECK_REQUEST(pm1, m2, 1, "Received malformed CTCP request from nick", "");
-	CHECK_REQUEST(pm1, m3, 1, "Received empty CTCP request from nick", "");
-	CHECK_REQUEST(pm1, m4, 1, "Received empty CTCP request from nick", "");
-	CHECK_REQUEST(pm1, m5, 1, "Received empty CTCP request from nick", "");
-	CHECK_REQUEST(pm2, m6, 1, "Received CTCP request from unknown sender", "");
+	CHECK_REQUEST(pm1, m1, 1, "Received malformed CTCP from nick", "");
+	CHECK_REQUEST(pm1, m2, 1, "Received malformed CTCP from nick", "");
+	CHECK_REQUEST(pm1, m3, 1, "Received empty CTCP from nick", "");
+	CHECK_REQUEST(pm1, m4, 1, "Received empty CTCP from nick", "");
+	CHECK_REQUEST(pm1, m5, 1, "Received empty CTCP from nick", "");
+	CHECK_REQUEST(pm2, m6, 1, "Received CTCP from unknown sender", "");
 	CHECK_REQUEST(pm1, m7, 1, "Received unsupported CTCP request 'TEST1' from nick", "");
 	CHECK_REQUEST(pm1, m8, 1, "Received unsupported CTCP request 'TEST1' from nick", "");
 	CHECK_REQUEST(pm1, m9, 1, "Received unsupported CTCP request 'TEST2' from nick", "");
@@ -147,12 +147,12 @@ test_recv_ctcp_response(void)
 	struct parsed_mesg pm1 = { .from = "nick" };
 	struct parsed_mesg pm2 = { .from = NULL };
 
-	CHECK_RESPONSE(pm1, m1, 1, "Received malformed CTCP response from nick");
-	CHECK_RESPONSE(pm1, m2, 1, "Received malformed CTCP response from nick");
-	CHECK_RESPONSE(pm1, m3, 1, "Received empty CTCP response from nick");
-	CHECK_RESPONSE(pm1, m4, 1, "Received empty CTCP response from nick");
-	CHECK_RESPONSE(pm1, m5, 1, "Received empty CTCP response from nick");
-	CHECK_RESPONSE(pm2, m6, 1, "Received CTCP response from unknown sender");
+	CHECK_RESPONSE(pm1, m1, 1, "Received malformed CTCP from nick");
+	CHECK_RESPONSE(pm1, m2, 1, "Received malformed CTCP from nick");
+	CHECK_RESPONSE(pm1, m3, 1, "Received empty CTCP from nick");
+	CHECK_RESPONSE(pm1, m4, 1, "Received empty CTCP from nick");
+	CHECK_RESPONSE(pm1, m5, 1, "Received empty CTCP from nick");
+	CHECK_RESPONSE(pm2, m6, 1, "Received CTCP from unknown sender");
 	CHECK_RESPONSE(pm1, m7, 1, "Received unsupported CTCP response 'TEST1' from nick");
 	CHECK_RESPONSE(pm1, m8, 1, "Received unsupported CTCP response 'TEST1' from nick");
 	CHECK_RESPONSE(pm1, m9, 1, "Received unsupported CTCP response 'TEST2' from nick");
@@ -242,6 +242,28 @@ test_recv_ctcp_request_clientinfo(void)
 }
 
 static void
+test_recv_ctcp_request_finger(void)
+{
+	char m1[] = "\001FINGER";
+	char m2[] = "\001FINGER\001";
+	char m3[] = "\001FINGER unused args\001";
+
+	struct parsed_mesg pm = { .from = "nick" };
+
+	CHECK_REQUEST(pm, m1, 0,
+		"CTCP FINGER from nick",
+		"NOTICE nick :\001FINGER rirc v"VERSION" ("__DATE__")\001");
+
+	CHECK_REQUEST(pm, m2, 0,
+		"CTCP FINGER from nick",
+		"NOTICE nick :\001FINGER rirc v"VERSION" ("__DATE__")\001");
+
+	CHECK_REQUEST(pm, m3, 0,
+		"CTCP FINGER from nick (unused args)",
+		"NOTICE nick :\001FINGER rirc v"VERSION" ("__DATE__")\001");
+}
+
+static void
 test_recv_ctcp_request_ping(void)
 {
 	char m1[] = "\001PING";
@@ -308,6 +330,28 @@ test_recv_ctcp_request_time(void)
 }
 
 static void
+test_recv_ctcp_request_userinfo(void)
+{
+	char m1[] = "\001USERINFO";
+	char m2[] = "\001USERINFO\001";
+	char m3[] = "\001USERINFO unused args\001";
+
+	struct parsed_mesg pm = { .from = "nick" };
+
+	CHECK_REQUEST(pm, m1, 0,
+		"CTCP USERINFO from nick",
+		"NOTICE nick :\001USERINFO mynick (r1)\001");
+
+	CHECK_REQUEST(pm, m2, 0,
+		"CTCP USERINFO from nick",
+		"NOTICE nick :\001USERINFO mynick (r1)\001");
+
+	CHECK_REQUEST(pm, m3, 0,
+		"CTCP USERINFO from nick (unused args)",
+		"NOTICE nick :\001USERINFO mynick (r1)\001");
+}
+
+static void
 test_recv_ctcp_request_version(void)
 {
 	char m1[] = "\001VERSION";
@@ -343,6 +387,22 @@ test_recv_ctcp_response_clientinfo(void)
 	CHECK_RESPONSE(pm, m2, 1, "CTCP CLIENTINFO response from nick: empty message");
 	CHECK_RESPONSE(pm, m3, 0, "CTCP CLIENTINFO response from nick: FOO BAR BAZ");
 	CHECK_RESPONSE(pm, m4, 0, "CTCP CLIENTINFO response from nick: 123 456 789");
+}
+
+static void
+test_recv_ctcp_response_finger(void)
+{
+	char m1[] = "\001FINGER";
+	char m2[] = "\001FINGER\001";
+	char m3[] = "\001FINGER FOO BAR BAZ";
+	char m4[] = "\001FINGER 123 456 789\001";
+
+	struct parsed_mesg pm = { .from = "nick" };
+
+	CHECK_RESPONSE(pm, m1, 1, "CTCP FINGER response from nick: empty message");
+	CHECK_RESPONSE(pm, m2, 1, "CTCP FINGER response from nick: empty message");
+	CHECK_RESPONSE(pm, m3, 0, "CTCP FINGER response from nick: FOO BAR BAZ");
+	CHECK_RESPONSE(pm, m4, 0, "CTCP FINGER response from nick: 123 456 789");
 }
 
 static void
@@ -401,6 +461,22 @@ test_recv_ctcp_response_time(void)
 	CHECK_RESPONSE(pm, m2, 1, "CTCP TIME response from nick: empty message");
 	CHECK_RESPONSE(pm, m3, 0, "CTCP TIME response from nick: FOO BAR BAZ");
 	CHECK_RESPONSE(pm, m4, 0, "CTCP TIME response from nick: 123 456 789");
+}
+
+static void
+test_recv_ctcp_response_userinfo(void)
+{
+	char m1[] = "\001USERINFO";
+	char m2[] = "\001USERINFO\001";
+	char m3[] = "\001USERINFO FOO BAR BAZ";
+	char m4[] = "\001USERINFO 123 456 789\001";
+
+	struct parsed_mesg pm = { .from = "nick" };
+
+	CHECK_RESPONSE(pm, m1, 1, "CTCP USERINFO response from nick: empty message");
+	CHECK_RESPONSE(pm, m2, 1, "CTCP USERINFO response from nick: empty message");
+	CHECK_RESPONSE(pm, m3, 0, "CTCP USERINFO response from nick: FOO BAR BAZ");
+	CHECK_RESPONSE(pm, m4, 0, "CTCP USERINFO response from nick: 123 456 789");
 }
 
 static void
