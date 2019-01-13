@@ -24,77 +24,78 @@
 	} while (0)
 
 static int
-parse_ctcp(struct server *s, struct parsed_mesg *m, const char **cmd)
+parse_ctcp(struct server *s, const char *from, char **args, const char **cmd)
 {
+	char *message = *args;
 	char *command;
 	char *p;
 
-	if (!m->from)
+	if (!from)
 		failf(s, "Received CTCP from unknown sender");
 
-	if (*m->trailing != '\001')
-		failf(s, "Received malformed CTCP from %s", m->from);
+	if (*message != '\001')
+		failf(s, "Received malformed CTCP from %s", from);
 
-	if ((p = strchr(m->trailing + 1, '\001')))
+	if ((p = strchr(message + 1, '\001')))
 		*p = 0;
 
-	*m->trailing++ = 0;
+	*message++ = 0;
 
-	if (!(command = getarg(&m->trailing, " ")))
-		failf(s, "Received empty CTCP from %s", m->from);
+	if (!(command = getarg(&message, " ")))
+		failf(s, "Received empty CTCP from %s", from);
 
 	for (p = command; *p; p++)
 		*p = toupper(*p);
 
 	*cmd = command;
+	*args = message;
 
 	return 0;
 }
 
 int
-recv_ctcp_request(struct server *s, struct parsed_mesg *m)
+ctcp_request(struct server *s, const char *from, const char *targ, char *message)
 {
 	const char *command;
 	const struct ctcp_handler *ctcp;
 	int ret;
 
-	if ((ret = parse_ctcp(s, m, &command)) != 0)
+	if ((ret = parse_ctcp(s, from, &message, &command)) != 0)
 		return ret;
 
 	if ((ctcp = ctcp_handler_lookup(command, strlen(command))))
-		return ctcp->f_request(s, m);
+		return ctcp->f_request(s, from, targ, message);
 
-	failf(s, "Received unsupported CTCP request '%s' from %s", command, m->from);
+	failf(s, "Received unsupported CTCP request '%s' from %s", command, from);
 }
 
 int
-recv_ctcp_response(struct server *s, struct parsed_mesg *m)
+ctcp_response(struct server *s, const char *from, const char *targ, char *message)
 {
 	const char *command;
 	const struct ctcp_handler *ctcp;
 	int ret;
 
-	if ((ret = parse_ctcp(s, m, &command)) != 0)
+	if ((ret = parse_ctcp(s, from, &message, &command)) != 0)
 		return ret;
 
 	if ((ctcp = ctcp_handler_lookup(command, strlen(command))))
-		return ctcp->f_response(s, m);
+		return ctcp->f_response(s, from, targ, message);
 
-	failf(s, "Received unsupported CTCP response '%s' from %s", command, m->from);
+	failf(s, "Received unsupported CTCP response '%s' from %s", command, from);
 }
 
 static int
-recv_ctcp_request_action(struct server *s, struct parsed_mesg *m)
+ctcp_request_action(struct server *s, const char *from, const char *targ, char *m)
 {
-	const char *targ;
 	struct channel *c;
 
-	if (!(targ = getarg(&m->params, " ")))
+	if (!targ)
 		failf(s, "CTCP ACTION: target is NULL");
 
 	if (!s->cmp(targ, s->nick)) {
-		if ((c = channel_list_get(&s->clist, m->from)) == NULL) {
-			c = channel(m->from, CHANNEL_T_PRIVATE);
+		if ((c = channel_list_get(&s->clist, from)) == NULL) {
+			c = channel(from, CHANNEL_T_PRIVATE);
 			c->activity = ACTIVITY_PINGED;
 			c->server = s;
 			channel_list_add(&s->clist, c);
@@ -103,67 +104,77 @@ recv_ctcp_request_action(struct server *s, struct parsed_mesg *m)
 		failf(s, "CTCP ACTION: target '%s' not found", targ);
 	}
 
-	if (str_trim(&m->trailing))
-		newlinef(c, 0, "*", "%s %s", m->from, m->trailing);
+	if (str_trim(&m))
+		newlinef(c, 0, "*", "%s %s", from, m);
 	else
-		newlinef(c, 0, "*", "%s", m->from);
+		newlinef(c, 0, "*", "%s", from);
 
 	return 0;
 }
 
 static int
-recv_ctcp_request_clientinfo(struct server *s, struct parsed_mesg *m)
+ctcp_request_clientinfo(struct server *s, const char *from, const char *targ, char *m)
 {
-	if (str_trim(&m->trailing))
-		server_msg(s, "CTCP CLIENTINFO from %s (%s)", m->from, m->trailing);
+	UNUSED(targ);
+
+	if (str_trim(&m))
+		server_msg(s, "CTCP CLIENTINFO from %s (%s)", from, m);
 	else
-		server_msg(s, "CTCP CLIENTINFO from %s", m->from);
+		server_msg(s, "CTCP CLIENTINFO from %s", from);
 
-	sendf(s, "NOTICE %s :\001CLIENTINFO ACTION CLIENTINFO PING SOURCE TIME VERSION\001", m->from);
+	sendf(s, "NOTICE %s :\001CLIENTINFO ACTION CLIENTINFO PING SOURCE TIME VERSION\001", from);
 }
 
 static int
-recv_ctcp_request_finger(struct server *s, struct parsed_mesg *m)
+ctcp_request_finger(struct server *s, const char *from, const char *targ, char *m)
 {
-	if (str_trim(&m->trailing))
-		server_msg(s, "CTCP FINGER from %s (%s)", m->from, m->trailing);
+	UNUSED(targ);
+
+	if (str_trim(&m))
+		server_msg(s, "CTCP FINGER from %s (%s)", from, m);
 	else
-		server_msg(s, "CTCP FINGER from %s", m->from);
+		server_msg(s, "CTCP FINGER from %s", from);
 
-	sendf(s, "NOTICE %s :\001FINGER rirc v"VERSION" ("__DATE__")\001", m->from);
+	sendf(s, "NOTICE %s :\001FINGER rirc v"VERSION" ("__DATE__")\001", from);
 }
 
 static int
-recv_ctcp_request_ping(struct server *s, struct parsed_mesg *m)
+ctcp_request_ping(struct server *s, const char *from, const char *targ, char *m)
 {
-	server_msg(s, "CTCP PING from %s", m->from);
+	UNUSED(targ);
 
-	sendf(s, "NOTICE %s :\001PING %s\001", m->from, m->trailing);
+	server_msg(s, "CTCP PING from %s", from);
+
+	sendf(s, "NOTICE %s :\001PING %s\001", from, m);
 }
 
 static int
-recv_ctcp_request_source(struct server *s, struct parsed_mesg *m)
+ctcp_request_source(struct server *s, const char *from, const char *targ, char *m)
 {
-	if (str_trim(&m->trailing))
-		server_msg(s, "CTCP SOURCE from %s (%s)", m->from, m->trailing);
+	UNUSED(targ);
+
+	if (str_trim(&m))
+		server_msg(s, "CTCP SOURCE from %s (%s)", from, m);
 	else
-		server_msg(s, "CTCP SOURCE from %s", m->from);
+		server_msg(s, "CTCP SOURCE from %s", from);
 
-	sendf(s, "NOTICE %s :\001SOURCE rcr.io/rirc\001", m->from);
+	sendf(s, "NOTICE %s :\001SOURCE rcr.io/rirc\001", from);
 }
 
 static int
-recv_ctcp_request_time(struct server *s, struct parsed_mesg *m)
+ctcp_request_time(struct server *s, const char *from, const char *targ, char *m)
 {
 	/* ISO 8601 */
 	char buf[sizeof("1970-01-01T00:00:00")];
 	struct tm tm;
 	time_t t = 0;
 
-	if (str_trim(&m->trailing))
-		server_msg(s, "CTCP TIME from %s (%s)", m->from, m->trailing);
+	(void) targ;
+
+	if (str_trim(&m))
+		server_msg(s, "CTCP TIME from %s (%s)", from, m);
 	else
-		server_msg(s, "CTCP TIME from %s", m->from);
+		server_msg(s, "CTCP TIME from %s", from);
 
 #ifdef TESTING
 	if (gmtime_r(&t, &tm) == NULL)
@@ -178,55 +189,63 @@ recv_ctcp_request_time(struct server *s, struct parsed_mesg *m)
 	if ((strftime(buf, sizeof(buf), "%FT%T", &tm)) == 0)
 		failf(s, "CTCP TIME: strftime error");
 
-	sendf(s, "NOTICE %s :\001TIME %s\001", m->from, buf);
+	sendf(s, "NOTICE %s :\001TIME %s\001", from, buf);
 }
 
 static int
-recv_ctcp_request_userinfo(struct server *s, struct parsed_mesg *m)
+ctcp_request_userinfo(struct server *s, const char *from, const char *targ, char *m)
 {
-	if (str_trim(&m->trailing))
-		server_msg(s, "CTCP USERINFO from %s (%s)", m->from, m->trailing);
+	UNUSED(targ);
+
+	if (str_trim(&m))
+		server_msg(s, "CTCP USERINFO from %s (%s)", from, m);
 	else
-		server_msg(s, "CTCP USERINFO from %s", m->from);
+		server_msg(s, "CTCP USERINFO from %s", from);
 
-	sendf(s, "NOTICE %s :\001USERINFO %s (%s)\001", m->from, s->nick, s->realname);
+	sendf(s, "NOTICE %s :\001USERINFO %s (%s)\001", from, s->nick, s->realname);
 }
 
 static int
-recv_ctcp_request_version(struct server *s, struct parsed_mesg *m)
+ctcp_request_version(struct server *s, const char *from, const char *targ, char *m)
 {
-	if (str_trim(&m->trailing))
-		server_msg(s, "CTCP VERSION from %s (%s)", m->from, m->trailing);
+	UNUSED(targ);
+
+	if (str_trim(&m))
+		server_msg(s, "CTCP VERSION from %s (%s)", from, m);
 	else
-		server_msg(s, "CTCP VERSION from %s", m->from);
+		server_msg(s, "CTCP VERSION from %s", from);
 
-	sendf(s, "NOTICE %s :\001VERSION rirc v"VERSION" ("__DATE__")\001", m->from);
+	sendf(s, "NOTICE %s :\001VERSION rirc v"VERSION" ("__DATE__")\001", from);
 }
 
 static int
-recv_ctcp_response_clientinfo(struct server *s, struct parsed_mesg *m)
+ctcp_response_clientinfo(struct server *s, const char *from, const char *targ, char *m)
 {
-	if (!str_trim(&m->trailing))
-		failf(s, "CTCP CLIENTINFO response from %s: empty message", m->from);
+	UNUSED(targ);
 
-	server_msg(s, "CTCP CLIENTINFO response from %s: %s", m->from, m->trailing);
+	if (!str_trim(&m))
+		failf(s, "CTCP CLIENTINFO response from %s: empty message", from);
+
+	server_msg(s, "CTCP CLIENTINFO response from %s: %s", from, m);
 
 	return 0;
 }
 
 static int
-recv_ctcp_response_finger(struct server *s, struct parsed_mesg *m)
+ctcp_response_finger(struct server *s, const char *from, const char *targ, char *m)
 {
-	if (!str_trim(&m->trailing))
-		failf(s, "CTCP FINGER response from %s: empty message", m->from);
+	UNUSED(targ);
 
-	server_msg(s, "CTCP FINGER response from %s: %s", m->from, m->trailing);
+	if (!str_trim(&m))
+		failf(s, "CTCP FINGER response from %s: empty message", from);
+
+	server_msg(s, "CTCP FINGER response from %s: %s", from, m);
 
 	return 0;
 }
 
 static int
-recv_ctcp_response_ping(struct server *s, struct parsed_mesg *m)
+ctcp_response_ping(struct server *s, const char *from, const char *targ, char *m)
 {
 	const char *sec;
 	const char *usec;
@@ -238,20 +257,22 @@ recv_ctcp_response_ping(struct server *s, struct parsed_mesg *m)
 	long unsigned t2_sec;
 	long unsigned t2_usec;
 
-	if (!(sec = getarg(&m->trailing, " ")))
-		failf(s, "CTCP PING response from %s: sec is NULL", m->from);
+	UNUSED(targ);
 
-	if (!(usec = getarg(&m->trailing, " ")))
-		failf(s, "CTCP PING response from %s: usec is NULL", m->from);
+	if (!(sec = getarg(&m, " ")))
+		failf(s, "CTCP PING response from %s: sec is NULL", from);
+
+	if (!(usec = getarg(&m, " ")))
+		failf(s, "CTCP PING response from %s: usec is NULL", from);
 
 	for (const char *p = sec; *p; p++) {
 		if (!(isdigit(*p)))
-			failf(s, "CTCP PING response from %s: sec is invalid", m->from);
+			failf(s, "CTCP PING response from %s: sec is invalid", from);
 	}
 
 	for (const char *p = usec; *p; p++) {
 		if (!(isdigit(*p)))
-			failf(s, "CTCP PING response from %s: usec is invalid", m->from);
+			failf(s, "CTCP PING response from %s: usec is invalid", from);
 	}
 
 #ifdef TESTING
@@ -272,60 +293,68 @@ recv_ctcp_response_ping(struct server *s, struct parsed_mesg *m)
 	t1_usec = strtoul(usec, NULL, 10);
 
 	if (errno)
-		failf(s, "CTCP PING response from %s: failed to parse timestamp", m->from);
+		failf(s, "CTCP PING response from %s: failed to parse timestamp", from);
 
 	if ((t1_usec > 999999) || (t1_sec > t2_sec) || (t1_sec == t2_sec && t1_usec > t2_usec))
-		failf(s, "CTCP PING response from %s: invalid timestamp", m->from);
+		failf(s, "CTCP PING response from %s: invalid timestamp", from);
 
 	res = (t2_usec + (1000000 * t2_sec)) - (t1_usec + (1000000 * t1_sec));
 	res_sec = res / 1000000;
 	res_usec = res % 1000000;
 
-	server_msg(s, "CTCP PING response from %s: %llu.%llus", m->from, res_sec, res_usec);
+	server_msg(s, "CTCP PING response from %s: %llu.%llus", from, res_sec, res_usec);
 
 	return 0;
 }
 
 static int
-recv_ctcp_response_source(struct server *s, struct parsed_mesg *m)
+ctcp_response_source(struct server *s, const char *from, const char *targ, char *m)
 {
-	if (!str_trim(&m->trailing))
-		failf(s, "CTCP SOURCE response from %s: empty message", m->from);
+	UNUSED(targ);
 
-	server_msg(s, "CTCP SOURCE response from %s: %s", m->from, m->trailing);
+	if (!str_trim(&m))
+		failf(s, "CTCP SOURCE response from %s: empty message", from);
+
+	server_msg(s, "CTCP SOURCE response from %s: %s", from, m);
 
 	return 0;
 }
 
 static int
-recv_ctcp_response_time(struct server *s, struct parsed_mesg *m)
+ctcp_response_time(struct server *s, const char *from, const char *targ, char *m)
 {
-	if (!str_trim(&m->trailing))
-		failf(s, "CTCP TIME response from %s: empty message", m->from);
+	UNUSED(targ);
 
-	server_msg(s, "CTCP TIME response from %s: %s", m->from, m->trailing);
+	if (!str_trim(&m))
+		failf(s, "CTCP TIME response from %s: empty message", from);
+
+	server_msg(s, "CTCP TIME response from %s: %s", from, m);
 
 	return 0;
 }
 
 static int
-recv_ctcp_response_userinfo(struct server *s, struct parsed_mesg *m)
+ctcp_response_userinfo(struct server *s, const char *from, const char *targ, char *m)
 {
-	if (!str_trim(&m->trailing))
-		failf(s, "CTCP USERINFO response from %s: empty message", m->from);
+	UNUSED(targ);
 
-	server_msg(s, "CTCP USERINFO response from %s: %s", m->from, m->trailing);
+	if (!str_trim(&m))
+		failf(s, "CTCP USERINFO response from %s: empty message", from);
+
+	server_msg(s, "CTCP USERINFO response from %s: %s", from, m);
 
 	return 0;
 }
 
 static int
-recv_ctcp_response_version(struct server *s, struct parsed_mesg *m)
+ctcp_response_version(struct server *s, const char *from, const char *targ, char *m)
 {
-	if (!str_trim(&m->trailing))
-		failf(s, "CTCP VERSION response from %s: empty message", m->from);
+	UNUSED(targ);
 
-	server_msg(s, "CTCP VERSION response from %s: %s", m->from, m->trailing);
+	if (!str_trim(&m))
+		failf(s, "CTCP VERSION response from %s: empty message", from);
+
+	server_msg(s, "CTCP VERSION response from %s: %s", from, m);
 
 	return 0;
 }

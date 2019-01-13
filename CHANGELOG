@@ -3,15 +3,32 @@ Summary of notable changes and features
 
 ## Unreleased (dev)
 ### Features
+ - add 115 previously unhandled numerics:
+    - 200, 201, 202, 203, 204, 205, 206, 207,
+    - 208, 209, 210, 211, 212, 213, 214, 215,
+    - 216, 217, 218, 219, 221, 234, 235, 240,
+    - 241, 242, 243, 244, 245, 246, 247, 256,
+    - 257, 258, 259, 262, 263, 301, 302, 303,
+    - 305, 306, 311, 312, 313, 314, 315, 317,
+    - 318, 319, 322, 323, 324, 325, 341, 346,
+    - 347, 348, 349, 351, 352, 364, 365, 367,
+    - 368, 369, 371, 374, 381, 391, 405, 406,
+    - 407, 408, 409, 411, 412, 413, 414, 415,
+    - 416, 421, 422, 423, 431, 436, 437, 441,
+    - 442, 443, 451, 461, 462, 463, 464, 465,
+    - 466, 467, 471, 472, 474, 475, 476, 478,
+    - 481, 482, 483, 484, 485, 491, 501, 502,
+    - 704, 705, 706,
  - add CTCP FINGER
  - add CTCP SOURCE
  - add CTCP USERINFO
+ - add INVITE
 ### Refactor
  - generate gperf files at compile time
  - split mesg.c into:
-   - handlers/irc_send.c
-   - handlers/irc_recv.c
-   - handlers/irc_ctcp.c
+    - handlers/irc_send.c
+    - handlers/irc_recv.c
+    - handlers/irc_ctcp.c
  - add unit test file for each source file
 ### Fixes
  - fix JOIN/PART/QUIT filtering bug when set 0

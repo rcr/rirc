@@ -39,9 +39,6 @@ static const unsigned join_threshold = JOIN_THRESHOLD;
 static const unsigned part_threshold = PART_THRESHOLD;
 static const unsigned quit_threshold = QUIT_THRESHOLD;
 
-/* Special cases handlers, CTCP messages are embedded in PRIVMSG */
-static int recv_ctcp_rpl(struct parsed_mesg*, struct server*);
-
 /* Special case handler for numeric replies */
 static int recv_numeric(struct parsed_mesg*, struct server*);
 
@@ -87,45 +84,12 @@ recv_mesg(struct server *s, struct parsed_mesg *p)
 {
 	const struct recv_handler* handler;
 
-	/* TODO: parsed_mesg can cache the length of command/args/etc */
-
 	if (isdigit(*p->command))
 		recv_numeric(p, s);
 	else if ((handler = recv_handler_lookup(p->command, strlen(p->command))))
 		handler->func(p, s);
 	else
 		newlinef(s->channel, 0, "-!!-", "Message type '%s' unknown", p->command);
-}
-
-static int
-recv_ctcp_rpl(struct parsed_mesg *p, struct server *s)
-{
-	/* CTCP replies:
-	 * NOTICE <target> :0x01<command> <arguments>0x01 */
-
-	char *cmd, *mesg;
-
-	if (!p->from)
-		fail(s->channel, "CTCP: sender's nick is null");
-
-	/* CTCP reply from ignored user, do nothing */
-	if (user_list_get(&(s->ignore), p->from, 0))
-		return 0;
-
-	if (!(mesg = getarg(&p->trailing, "\x01")))
-		fail(s->channel, "CTCP: invalid markup");
-
-	/* Markup is valid, get command */
-	if (!(cmd = getarg(&mesg, " ")))
-		fail(s->channel, "CTCP: command is null");
-
-	// FIXME: CTCP PING replies should come back with the same
-	// <second> <millisecond> value that was sent out, and is
-	// used to calculate the ping here
-
-	newlinef(s->channel, 0, p->from, "CTCP %s reply: %s", cmd, mesg);
-
-	return 0;
 }
 
 static int
@@ -511,10 +475,6 @@ recv_notice(struct parsed_mesg *p, struct server *s)
 
 	if (!p->trailing)
 		fail(s->channel, "NOTICE: message is null");
-
-	/* CTCP reply */
-	if (*p->trailing == 0x01)
-		return recv_ctcp_rpl(p, s);
 
 	if (!p->from)
 		fail(s->channel, "NOTICE: sender's nick is null");

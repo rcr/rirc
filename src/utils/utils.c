@@ -335,7 +335,6 @@ parse_mesg(struct parsed_mesg *pm, char *mesg)
 int
 check_pinged(const char *mesg, const char *nick)
 {
-
 	int len = strlen(nick);
 
 	while (*mesg) {
