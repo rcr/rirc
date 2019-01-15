@@ -214,28 +214,46 @@ irc_strncmp(const char *s1, const char *s2, size_t n)
 	return 0;
 }
 
-/* TODO:
- * - char *[] for args, remove getarg from message handling
- * - analogous function for parsing ctcp messages */
-
-/* FIXME:
- *
- * in order to fully implement the protocol, trailing needs to be considered
- * just another parameter, e.g. receiving
- *   - `<from> PRIVMSG hi`
- *   - `<from> PRIVMSG :hi`
- * are identical, and currently this would break rirc's parsing
- *
- * getarg(parsed message) -> return the next arg pointer, or if current
- * arg pointer is the trailing arg, parse out a token
- */
 int
-parse_mesg(struct parsed_mesg *pm, char *mesg)
+irc_message_param(struct irc_message *m, const char **param)
 {
-	/* Parse a string into components. Null terminators are only inserted
-	 * once the message is determined to be valid
-	 *
-	 * RFC 2812, section 2.3.1
+	*param = NULL;
+
+	if (m->params == NULL)
+		return 1;
+
+	if (!str_trim(&m->params))
+		return 1;
+
+	if (m->n_params >= 13) {
+		*param = m->params;
+		m->params = NULL;
+		return 0;
+	}
+
+	m->n_params++;
+
+	if (*m->params == ':') {
+		*param = m->params + 1;
+		m->params = NULL;
+		return 0;
+	}
+
+	*param = m->params;
+
+	while (*m->params && *m->params != ' ')
+		m->params++;
+
+	if (*m->params)
+		*m->params++ = 0;
+
+	return 0;
+}
+
+int
+irc_message_parse(struct irc_message *m, char *buf, size_t len)
+{
+	/* RFC 2812, section 2.3.1
 	 *
 	 * message    =   [ ":" prefix SPACE ] command [ params ] crlf
 	 * prefix     =   servername / ( nickname [ [ "!" user ] "@" host ] )
@@ -252,84 +270,57 @@ parse_mesg(struct parsed_mesg *pm, char *mesg)
 	 * crlf       =   %x0D %x0A   ; "carriage return" "linefeed"
 	 */
 
-	char *end_from = NULL,
-	     *end_host = NULL;
+	UNUSED(len);
 
-	memset(pm, 0, sizeof(*pm));
+	memset(m, 0, sizeof(*m));
 
-	if (*mesg == ':' && *(++mesg) != ' ') {
+	if (*buf == ':') {
 
 		/* Prefix:
-		 *  =  servername
-		 *  =/ nickname
-		 *  =/ nickname@host
-		 *  =/ nickname!user@host
-		 *
-		 * So:
-		 *  pm->from = servername / nickname
-		 *  pm->host = host / user@host
+		 *  =  :name
+		 *  =/ :name@host
+		 *  =/ :name!user@host
 		 */
 
-		pm->from = mesg;
+		buf++;
 
-		while (*mesg && *mesg != ' '  && *mesg != '!' && *mesg != '@')
-			mesg++;
+		m->from = buf;
 
-		if (*mesg == '!' || *mesg == '@') {
-			end_from = mesg++;
-			pm->host = mesg;
+		while (*buf && *buf != ' '  && *buf != '!' && *buf != '@')
+			buf++;
 
-			while (*mesg && *mesg != ' ')
-				mesg++;
+		m->len_from = buf - m->from;
+
+		if (m->len_from == 0)
+			return 1;
+
+		if (*buf == '!' || *buf == '@') {
+			*buf++ = 0;
+			m->host = buf;
+
+			while (*buf && *buf != ' ')
+				buf++;
+
+			m->len_host = buf - m->host;
 		}
 
-		end_host = mesg;
+		*buf++ = 0;
 	}
 
-	/* The command is minimally required for a valid message */
-	if (!(pm->command = getarg(&mesg, " ")))
-		return 0;
+	m->command = buf;
 
-	if (end_from)
-		*end_from = '\0';
+	while (*buf && *buf != ' ')
+		buf++;
 
-	if (end_host)
-		*end_host = '\0';
+	if (*buf != ' ')
+		return 1;
 
-	/* Keep track of the last arg so it can be terminated */
-	char *param_end = NULL;
+	m->len_command = buf - m->command;
+	*buf++ = 0;
 
-	int param_count = 0;
+	m->params = buf;
 
-	while (str_trim(&mesg)) {
-
-		/* Maximum number of parameters found */
-		if (param_count == 14) {
-			pm->trailing = mesg;
-			break;
-		}
-
-		/* Trailing section found */
-		if (*mesg == ':') {
-			pm->trailing = (mesg + 1);
-			break;
-		}
-
-		if (!pm->params)
-			pm->params = mesg;
-
-		while (*mesg && *mesg != ' ')
-			mesg++;
-
-		param_count++;
-		param_end = mesg;
-	}
-
-	/* Terminate the last parameter if any */
-	if (param_end)
-		*param_end = '\0';
-
-	return 1;
+	return 0;
 }
 
 int

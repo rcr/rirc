@@ -34,19 +34,20 @@
 	do { message("FATAL", __VA_ARGS__); } while (0)
 #endif
 
-/* FIXME: don't seperate trailing from params
- * simplify retrieving/tokenizing arguments
- * from a parsed_mesg struct
- */
-/* Parsed IRC message */
-struct parsed_mesg
+struct irc_message
 {
-	char *from;
-	char *host;
-	char *command;
 	char *params;
-	char *trailing;
+	const char *command;
+	const char *from;
+	const char *host;
+	size_t len_command;
+	size_t len_from;
+	size_t len_host;
+	unsigned n_params;
 };
+
+int irc_message_param(struct irc_message*, const char**);
+int irc_message_parse(struct irc_message*, char*, size_t);
 
 //TODO: replace comps to channel / nicks
 int irc_ischanchar(char, int);
@@ -63,7 +64,6 @@ char* strdup(const char*);
 void* memdup(const void*, size_t);
 
 int check_pinged(const char*, const char*);
-int parse_mesg(struct parsed_mesg*, char*);
 int str_trim(char**);
 
 #endif

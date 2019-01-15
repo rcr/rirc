@@ -1041,17 +1041,14 @@ io_cb_read_inp(char *buf, size_t len)
 void
 io_cb_read_soc(char *buf, size_t len, const void *cb_obj)
 {
-	/* TODO: */
-	(void)(len);
-
 	struct channel *c = ((struct server *)cb_obj)->channel;
 
-	struct parsed_mesg p;
+	struct irc_message m;
 
-	if (!(parse_mesg(&p, buf)))
+	if (!(irc_message_parse(&m, buf, len)))
 		newlinef(c, 0, "-!!-", "failed to parse message");
 	else
-		irc_recv((struct server *)cb_obj, &p);
+		irc_recv((struct server *)cb_obj, &m);
 
 	redraw();
 }
