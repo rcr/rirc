@@ -361,6 +361,6 @@
  *         --- NOT IMPLEMENTED ---
  */
 
-int irc_recv(struct server*, struct parsed_mesg*);
+int irc_recv(struct server*, struct irc_message*);
 
 #endif

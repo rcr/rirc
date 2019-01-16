@@ -215,7 +215,7 @@ irc_strncmp(const char *s1, const char *s2, size_t n)
 }
 
 int
-irc_message_param(struct irc_message *m, const char **param)
+irc_message_param(struct irc_message *m, char **param)
 {
 	*param = NULL;
 
@@ -320,6 +320,17 @@ irc_message_parse(struct irc_message *m, char *buf, size_t len)
 
 	m->params = buf;
 
+	return 0;
+}
+
+int
+irc_message_split(struct irc_message *m, char **trailing)
+{
+	/* Split the message params and trailing arg for use in generic handling */
+
+	/* TODO */
+	(void)m;
+	(void)trailing;
 	return 0;
 }
 

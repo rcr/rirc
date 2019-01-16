@@ -62,7 +62,7 @@ static void
 test_irc_message_param(void)
 {
 	struct irc_message m;
-	const char *param;
+	char *param;
 
 #define CHECK_IRC_MESSAGE_PARAM(R, S) \
 	assert_eq(irc_message_param(&m, &param), (R)); \

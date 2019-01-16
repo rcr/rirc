@@ -6,7 +6,6 @@
 #include "src/components/mode.c"
 #include "src/components/server.c"
 #include "src/components/user.c"
-#include "src/handlers/irc_recv.c"
 #include "src/handlers/irc_send.c"
 #include "src/state.c"
 #include "src/utils/utils.c"
@@ -51,6 +50,9 @@ unsigned io_tty_cols(void) { return 0; }
 unsigned io_tty_rows(void) { return 0; }
 void io_free(struct connection *c) { UNUSED(c); }
 void io_term(void) { ; }
+
+/* Mock handlers/irc_recv.c */
+int irc_recv(struct server *s, struct irc_message *m) { UNUSED(s); UNUSED(m); return 0; }
 
 #define INP_S(S) io_cb_read_inp((S), strlen(S))
 #define INP_C(C) io_cb_read_inp((char[]){(C)}, 1)

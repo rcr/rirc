@@ -1050,5 +1050,9 @@ io_cb_read_soc(char *buf, size_t len, const void *cb_obj)
 	else
 		irc_recv((struct server *)cb_obj, &m);
 
+	// FIXME: from ignored user?
+	// if (user_list_get(&(s->ignore), p->from, 0))
+	// 	return 0;
+
 	redraw();
 }

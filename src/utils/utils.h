@@ -46,8 +46,9 @@ struct irc_message
 	unsigned n_params;
 };
 
-int irc_message_param(struct irc_message*, const char**);
+int irc_message_param(struct irc_message*, char**);
 int irc_message_parse(struct irc_message*, char*, size_t);
+int irc_message_split(struct irc_message*, char**);
 
 //TODO: replace comps to channel / nicks
 int irc_ischanchar(char, int);

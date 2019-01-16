@@ -34,9 +34,9 @@ SRC_G   := $(shell find $(DIR_S) -name '*.gperf')
 SUBDIRS += $(shell find $(DIR_S) -name '*.gperf' -exec dirname {} \; | sort -u)
 
 # Release, debug, testcase build objects
-OBJS_D := $(patsubst $(DIR_S)/%.c,  $(DIR_B)/%.db.o, $(SRC))
-OBJS_R := $(patsubst $(DIR_S)/%.c,  $(DIR_B)/%.o,    $(SRC))
-OBJS_T := $(patsubst $(DIR_S)/%.c,  $(DIR_B)/%.t,    $(SRC))
+OBJS_D := $(patsubst $(DIR_S)/%.c, $(DIR_B)/%.db.o, $(SRC))
+OBJS_R := $(patsubst $(DIR_S)/%.c, $(DIR_B)/%.o,    $(SRC))
+OBJS_T := $(patsubst $(DIR_S)/%.c, $(DIR_B)/%.t,    $(SRC))
 
 # Gperf generated source files
 OBJS_G := $(patsubst %.gperf, %.gperf.out, $(SRC_G))

@@ -16,11 +16,11 @@
 	X(quit) \
 	X(topic)
 
-#define X(cmd) static int recv_##cmd(struct server*, struct parsed_mesg*);
+#define X(cmd) static int recv_##cmd(struct server*, struct irc_message*);
 RECV_HANDLERS
 #undef X
 
-typedef int (*irc_recv_f)(struct server*, struct parsed_mesg*);
+typedef int (*irc_recv_f)(struct server*, struct irc_message*);
 
 struct recv_handler
 {
