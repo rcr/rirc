@@ -11,7 +11,7 @@
 	assert_strcmp(buf, (S));
 
 #define CHECK_INPUT_WRITE(I, S) \
-	assert_eq(input_write((I), buf, sizeof(buf), 0), (int)strlen((S))); \
+	assert_ueq(input_write((I), buf, sizeof(buf), 0), strlen((S))); \
 	assert_strcmp(buf, (S));
 
 static uint16_t completion_l(char*, uint16_t, uint16_t, int);
@@ -144,12 +144,12 @@ test_input_ins(void)
 	assert_eq(input_insert(&inp, "j", 1), 1);
 	assert_eq(input_insert(&inp, "klmnop", 6), 1);
 	CHECK_INPUT_WRITE(&inp, "abcdefghijklmnop");
-	assert_eq((int)input_text_size(&inp), INPUT_LEN_MAX);
+	assert_ueq(input_text_size(&inp), INPUT_LEN_MAX);
 
 	/* Full */
 	assert_eq(input_insert(&inp, "z", 1), 0);
 	CHECK_INPUT_WRITE(&inp, "abcdefghijklmnop");
-	assert_eq((int)input_text_size(&inp), INPUT_LEN_MAX);
+	assert_ueq(input_text_size(&inp), INPUT_LEN_MAX);
 
 	input_free(&inp);
 }
@@ -526,7 +526,7 @@ test_input_complete(void)
 	assert_eq(input_insert(&inp, "a", 1), 1);
 	assert_eq(input_complete(&inp, completion_m), 1);
 	CHECK_INPUT_WRITE(&inp, "xxxxxxxxxxxxxxxx");
-	assert_eq((int)input_text_size(&inp), INPUT_LEN_MAX);
+	assert_ueq(input_text_size(&inp), INPUT_LEN_MAX);
 
 	input_free(&inp);
 }
@@ -540,16 +540,16 @@ test_input_text_size(void)
 
 	/* Test size is correct from 0 -> max */
 	for (int i = 0; i < INPUT_LEN_MAX; i++) {
-		assert_eq((int)input_text_size(&inp), i);
+		assert_ueq(input_text_size(&inp), i);
 		assert_eq(input_insert(&inp, "a", 1), 1);
 	}
 
-	assert_eq((int)input_text_size(&inp), INPUT_LEN_MAX);
+	assert_ueq(input_text_size(&inp), INPUT_LEN_MAX);
 
 	/* Test size is correct regardless of cursor position */
 	for (int i = 0; i < INPUT_LEN_MAX; i++) {
 		assert_eq(input_cursor_back(&inp), 1);
-		assert_eq((int)input_text_size(&inp), INPUT_LEN_MAX);
+		assert_ueq(input_text_size(&inp), INPUT_LEN_MAX);
 	}
 
 	input_free(&inp);

@@ -238,13 +238,13 @@ test_buffer_scrollback_status(void)
 	assert_true(buffer_full(&b));
 
 	b.scrollback = b.tail;
-	assert_eq((int)(100 * buffer_scrollback_status(&b)), 100);
+	assert_ueq((100 * buffer_scrollback_status(&b)), 100);
 
 	b.scrollback = b.tail + (BUFFER_LINES_MAX / 2);
-	assert_eq((int)(100 * buffer_scrollback_status(&b)), 50);
+	assert_ueq((100 * buffer_scrollback_status(&b)), 50);
 
 	b.scrollback = b.head - 1;
-	assert_eq((int)(100 * buffer_scrollback_status(&b)), 0);
+	assert_ueq((100 * buffer_scrollback_status(&b)), 0);
 }
 
 static void
@@ -307,8 +307,8 @@ test_buffer_line_overlength(void)
 
 	_buffer_newline(&b, text);
 
-	assert_eq((int)b.buffer_lines[0].text_len, TEXT_LENGTH_MAX);
-	assert_eq((int)b.buffer_lines[2].text_len, TEXT_LENGTH_MAX / 2);
+	assert_ueq(b.buffer_lines[0].text_len, TEXT_LENGTH_MAX);
+	assert_ueq(b.buffer_lines[2].text_len, TEXT_LENGTH_MAX / 2);
 
 	assert_eq(buffer_size(&b), 3);
 
@@ -390,7 +390,7 @@ test_buffer_newline_prefix(void)
 
 	assert_strcmp(line->text, "abc");
 	assert_strcmp(line->from, "testing");
-	assert_eq((int)line->from_len, (int)strlen("testing"));
+	assert_ueq(line->from_len, strlen("testing"));
 
 	buffer_newline(&b, BUFFER_LINE_OTHER, from_str, text_str, from_len, text_len, '@');
 
@@ -398,7 +398,7 @@ test_buffer_newline_prefix(void)
 
 	assert_strcmp(line->text, "abc");
 	assert_strcmp(line->from, "@testing");
-	assert_eq((int)line->from_len, (int)strlen("@testing"));
+	assert_ueq(line->from_len, strlen("@testing"));
 
 	/* Test truncating `from` */
 
@@ -422,14 +422,14 @@ test_buffer_newline_prefix(void)
 	buffer_newline(&b, BUFFER_LINE_OTHER, from_str, text_str, from_len, text_len, 0);
 
 	line = buffer_head(&b);
-	assert_eq((int)line->from_len, FROM_LENGTH_MAX);
+	assert_ueq(line->from_len, FROM_LENGTH_MAX);
 	assert_eq(line->from[FROM_LENGTH_MAX - 1], 'c');
 
 
 	buffer_newline(&b, BUFFER_LINE_OTHER, from_str, text_str, from_len, text_len, '@');
 
 	line = buffer_head(&b);
-	assert_eq((int)line->from_len, FROM_LENGTH_MAX);
+	assert_ueq(line->from_len, FROM_LENGTH_MAX);
 	assert_eq(line->from[FROM_LENGTH_MAX - 1], 'b');
 }
 

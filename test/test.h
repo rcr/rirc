@@ -111,8 +111,8 @@ static void _print_testcase_name_(const char*);
 		const char *__ret_y = (Y); \
 		if (_assert_strcmp(__ret_x, __ret_y)) \
 			fail_testf(#X " expected '%s', got '%s'", \
-					__ret_y == NULL ? "NULL" : __ret_y, \
-					__ret_x == NULL ? "NULL" : __ret_x); \
+				__ret_y == NULL ? "NULL" : __ret_y, \
+				__ret_x == NULL ? "NULL" : __ret_x); \
 	} while (0)
 
 #define assert_strncmp(X, Y, N) \
@@ -147,6 +147,14 @@ static void _print_testcase_name_(const char*);
 		int __ret_y = (int)(Y); \
 		if (__ret_x != __ret_y) \
 			fail_testf(#X " expected '%d', got '%d'", __ret_y, __ret_x); \
+	} while (0)
+
+#define assert_ueq(X, Y) \
+	do { \
+		unsigned __ret_x = (unsigned)(X); \
+		unsigned __ret_y = (unsigned)(Y); \
+		if (__ret_x != __ret_y) \
+			fail_testf(#X " expected '%u', got '%u'", __ret_y, __ret_x); \
 	} while (0)
 
 #define assert_true(X) \

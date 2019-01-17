@@ -140,9 +140,9 @@ test_irc_message_parse(void)
 	assert_strcmp(m.from,    "nick");
 	assert_strcmp(m.host,    "user@host.domain.tld");
 	assert_strcmp(m.params,  "args :trailing");
-	assert_eq((int)m.len_command, 3);
-	assert_eq((int)m.len_from,    4);
-	assert_eq((int)m.len_host,    20);
+	assert_ueq(m.len_command, 3);
+	assert_ueq(m.len_from,    4);
+	assert_ueq(m.len_host,    20);
 
 	/* Test no nick/host */
 	char mesg2[] = "CMD arg1 arg2 :  trailing message  ";
@@ -152,9 +152,9 @@ test_irc_message_parse(void)
 	assert_strcmp(m.from,    NULL);
 	assert_strcmp(m.host,    NULL);
 	assert_strcmp(m.params,  "arg1 arg2 :  trailing message  ");
-	assert_eq((int)m.len_command, 3);
-	assert_eq((int)m.len_from,    0);
-	assert_eq((int)m.len_host,    0);
+	assert_ueq(m.len_command, 3);
+	assert_ueq(m.len_from,    0);
+	assert_ueq(m.len_host,    0);
 
 	/* Test no user */
 	char mesg3[] = ":nick@host.domain.tld CMD arg1 arg2 arg3";
@@ -164,9 +164,9 @@ test_irc_message_parse(void)
 	assert_strcmp(m.from,    "nick");
 	assert_strcmp(m.host,    "host.domain.tld");
 	assert_strcmp(m.params,  "arg1 arg2 arg3");
-	assert_eq((int)m.len_command, 3);
-	assert_eq((int)m.len_from,    4);
-	assert_eq((int)m.len_host,    15);
+	assert_ueq(m.len_command, 3);
+	assert_ueq(m.len_from,    4);
+	assert_ueq(m.len_host,    15);
 
 	/* Test no host */
 	char mesg4[] = ":nick CMD arg1 arg2 arg3";
@@ -176,9 +176,9 @@ test_irc_message_parse(void)
 	assert_strcmp(m.from,    "nick");
 	assert_strcmp(m.host,    NULL);
 	assert_strcmp(m.params,  "arg1 arg2 arg3");
-	assert_eq((int)m.len_command, 3);
-	assert_eq((int)m.len_from,    4);
-	assert_eq((int)m.len_host,    0);
+	assert_ueq(m.len_command, 3);
+	assert_ueq(m.len_from,    4);
+	assert_ueq(m.len_host,    0);
 
 	/* Error: empty message */
 	char mesg5[] = "";
