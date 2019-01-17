@@ -225,7 +225,7 @@ irc_message_param(struct irc_message *m, char **param)
 	if (!str_trim(&m->params))
 		return 1;
 
-	if (m->n_params >= 13) {
+	if (m->n_params >= 14) {
 		*param = m->params;
 		m->params = NULL;
 		return 0;

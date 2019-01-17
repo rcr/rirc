@@ -107,38 +107,51 @@ static void _print_testcase_name_(const char*);
 
 #define assert_strcmp(X, Y) \
 	do { \
-		if (_assert_strcmp(X, Y)) \
-			fail_testf(#X " expected '%s', got '%s'", (Y) == NULL ? "NULL" : (Y), (X) == NULL ? "NULL" : (X)); \
+		const char *__ret_x = (X); \
+		const char *__ret_y = (Y); \
+		if (_assert_strcmp(__ret_x, __ret_y)) \
+			fail_testf(#X " expected '%s', got '%s'", \
+					__ret_y == NULL ? "NULL" : __ret_y, \
+					__ret_x == NULL ? "NULL" : __ret_x); \
 	} while (0)
 
 #define assert_strncmp(X, Y, N) \
 	do { \
-		if (_assert_strncmp(X, Y, N)) \
+		const char *__ret_x = (X); \
+		const char *__ret_y = (Y); \
+		if (_assert_strncmp(__ret_x, __ret_y, (N))) \
 			fail_testf(#X " expected '%.*s', got '%.*s'", \
-				(int)(N), (Y) == NULL ? "NULL" : (Y), (int)(N), (X) == NULL ? "NULL" : (X)); \
+				(int)(N), __ret_y == NULL ? "NULL" : __ret_y, \
+				(int)(N), __ret_x == NULL ? "NULL" : __ret_x); \
 	} while (0)
 
 #define assert_lt(X, Y) \
 	do { \
-		if (!((X) < (Y))) \
-			fail_testf(#X " expected '%d' to be less than '%d'", (X), (Y)); \
+		int __ret_x = (int)(X); \
+		int __ret_y = (int)(Y); \
+		if (!(__ret_x < __ret_y)) \
+			fail_testf(#X " expected '%d' to be less than '%d'", __ret_y, __ret_x); \
 	} while (0)
 
 #define assert_gt(X, Y) \
 	do { \
-		if (!((X) > (Y))) \
-			fail_testf(#X " expected '%d' to be greater than '%d'", (X), (Y)); \
+		int __ret_x = (int)(X); \
+		int __ret_y = (int)(Y); \
+		if (!(__ret_x > __ret_y)) \
+			fail_testf(#X " expected '%d' to be greater than '%d'", __ret_y, __ret_x); \
 	} while (0)
 
 #define assert_eq(X, Y) \
 	do { \
-		if ((X) != (Y)) \
-			fail_testf(#X " expected '%d', got '%d'", (Y), (X)); \
+		int __ret_x = (int)(X); \
+		int __ret_y = (int)(Y); \
+		if (__ret_x != __ret_y) \
+			fail_testf(#X " expected '%d', got '%d'", __ret_y, __ret_x); \
 	} while (0)
 
 #define assert_true(X) \
 	do { \
-		if ((X) != 1) \
+		if ((X) == 0) \
 			fail_test(#X " expected true"); \
 	} while (0)
 
@@ -150,14 +163,17 @@ static void _print_testcase_name_(const char*);
 
 #define assert_ptrequals(X, Y) \
 	do { \
-		if ((X) != (Y)) \
-			fail_testf(#X " expected '%016" PRIxPTR "', got '%016" PRIxPTR "'", (uintptr_t)(Y), (uintptr_t)(X)); \
+		uintptr_t __ret_x = (uintptr_t)(X); \
+		uintptr_t __ret_y = (uintptr_t)(Y); \
+		if (__ret_x != __ret_y) \
+			fail_testf(#X " expected '%016" PRIxPTR "', got '%016" PRIxPTR "'", __ret_y, __ret_x); \
 	} while (0)
 
 #define assert_null(X) \
 	do { \
-		if ((X) != NULL) \
-			fail_testf(#X " expected NULL, got '%016" PRIxPTR "'", (uintptr_t)(X)); \
+		uintptr_t __ret_x = (uintptr_t)(X); \
+		if (__ret_x ) \
+			fail_testf(#X " expected NULL, got '%016" PRIxPTR "'", __ret_x); \
 	} while (0)
 
 static int
