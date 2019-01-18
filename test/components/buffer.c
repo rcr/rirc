@@ -33,17 +33,17 @@ test_buffer(void)
 	buffer(&b);
 
 	assert_eq(buffer_size(&b), 0);
-	assert_null(buffer_head(&b));
-	assert_null(buffer_tail(&b));
-	assert_null(buffer_line(&b, b.scrollback));
+	assert_ptr_null(buffer_head(&b));
+	assert_ptr_null(buffer_tail(&b));
+	assert_ptr_null(buffer_line(&b, b.scrollback));
 
 	/* Reset the buffer, check values again */
 	buffer(&b);
 
 	assert_eq(buffer_size(&b), 0);
-	assert_null(buffer_head(&b));
-	assert_null(buffer_tail(&b));
-	assert_null(buffer_line(&b, b.scrollback));
+	assert_ptr_null(buffer_head(&b));
+	assert_ptr_null(buffer_tail(&b));
+	assert_ptr_null(buffer_line(&b, b.scrollback));
 }
 
 static void
@@ -56,7 +56,7 @@ test_buffer_head(void)
 
 	buffer(&b);
 
-	assert_null(buffer_head(&b));
+	assert_ptr_null(buffer_head(&b));
 
 	for (i = 0; i < BUFFER_LINES_MAX + 1; i++)
 		_buffer_newline(&b, _fmt_int(i + 1));
@@ -75,7 +75,7 @@ test_buffer_tail(void)
 
 	buffer(&b);
 
-	assert_null(buffer_tail(&b));
+	assert_ptr_null(buffer_tail(&b));
 
 	for (i = 0; i < BUFFER_LINES_MAX; i++)
 		_buffer_newline(&b, _fmt_int(i + 1));
@@ -100,9 +100,9 @@ test_buffer_line(void)
 
 	/* Should retrieve null for an empty buffer */
 	assert_eq(buffer_size(&b), 0);
-	assert_null(buffer_line(&b, b.head));
-	assert_null(buffer_line(&b, b.tail));
-	assert_null(buffer_line(&b, b.scrollback));
+	assert_ptr_null(buffer_line(&b, b.head));
+	assert_ptr_null(buffer_line(&b, b.tail));
+	assert_ptr_null(buffer_line(&b, b.scrollback));
 
 	/* For any buffer line retrieval, these conditions should always hold */
 	#define CHECK_BUFFER(B) \
@@ -192,7 +192,7 @@ test_buffer_scrollback(void)
 	buffer(&b);
 
 	/* Empty buffer returns NULL */
-	assert_null(buffer_line(&b, b.scrollback));
+	assert_ptr_null(buffer_line(&b, b.scrollback));
 
 	/* Buffer scrollback stays locked to the buffer head when incrementing */
 	_buffer_newline(&b, "a");
@@ -436,7 +436,7 @@ test_buffer_newline_prefix(void)
 int
 main(void)
 {
-	testcase tests[] = {
+	struct testcase tests[] = {
 		TESTCASE(test_buffer),
 		TESTCASE(test_buffer_head),
 		TESTCASE(test_buffer_tail),

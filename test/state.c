@@ -98,16 +98,16 @@ test_state(void)
 	assert_strcmp(CURRENT_LINE, "Type :quit to exit rirc");
 
 	INP_C(CTRL('l'));
-	assert_null(buffer_head(&current_channel()->buffer));
+	assert_ptr_null(buffer_head(&current_channel()->buffer));
 
 	/* Test adding servers */
 	struct server *s1 = server("h1", "p1", NULL, "u1", "r1");
 	struct server *s2 = server("h2", "p2", NULL, "u2", "r2");
 	struct server *s3 = server("h3", "p3", NULL, "u3", "r3");
 
-	assert_ptrequals(server_list_add(state_server_list(), s1), NULL);
-	assert_ptrequals(server_list_add(state_server_list(), s2), NULL);
-	assert_ptrequals(server_list_add(state_server_list(), s3), NULL);
+	assert_ptr_eq(server_list_add(state_server_list(), s1), NULL);
+	assert_ptr_eq(server_list_add(state_server_list(), s2), NULL);
+	assert_ptr_eq(server_list_add(state_server_list(), s3), NULL);
 
 	state_term();
 }
@@ -115,7 +115,7 @@ test_state(void)
 int
 main(void)
 {
-	testcase tests[] = {
+	struct testcase tests[] = {
 		TESTCASE(test_state),
 	};
 

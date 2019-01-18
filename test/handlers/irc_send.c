@@ -364,7 +364,7 @@ main(void)
 	s = server("h1", "p1", NULL, "u1", "r1");
 	server_nick_set(s, "mynick");
 
-	testcase tests[] = {
+	struct testcase tests[] = {
 		TESTCASE(test_irc_send_command),
 		TESTCASE(test_irc_send_privmsg),
 #define X(cmd) TESTCASE(test_send_##cmd),

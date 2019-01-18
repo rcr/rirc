@@ -1,13 +1,37 @@
 #ifndef TEST_H
 #define TEST_H
 
-#define TESTING
+/* test.h -- unit test framework for rirc
+ *
+ * Defines the following macros:
+ *
+ *   Signed, unsigned comparison:
+ *    - assert_true(expr)
+ *    - assert_false(expr)
+ *    - assert_eq(expr, expected)   - signed equality
+ *    - assert_lt(expr, expected)   - signed less than
+ *    - assert_gt(expr, expected)   - signed greater than
+ *    - assert_ueq(expr, expected)  - unsigned equality
+ *
+ *    String comparison:
+ *    - assert_strcmp(expr, expected)
+ *    - assert_strncmp(expr, expected, len)
+ *
+ *   Pointer comparison:
+ *    - assert_ptr_eq(expr, expected)
+ *    - assert_ptr_null(expr)
+ *
+ *   Assert that the expression exits rirc fatally:
+ *    - assert_fatal(expr)
+ *
+ *   Explicitly fail or abort a test [with formated] message
+ *    - fail_test(M)
+ *    - fail_testf(M, ...)
+ *    - abort_test(M)
+ *    - abort_testf(M, ...)
+ */
 
-/* TODO: list the test types at the top of file with usage */
-/* TODO: randomize testcase ordering */
-/* TODO: colours */
-/* TODO: verbose output */
-/* TODO: number of tests ran, time */
+#define TESTING
 
 #include <inttypes.h>
 #include <setjmp.h>
@@ -17,18 +41,18 @@
 
 #define TESTCASE(X) { &(X), #X }
 
-typedef struct testcase
+struct testcase
 {
 	void (*tc_ptr)(void);
 	const char *tc_str;
-} testcase;
+};
 
 /* Fatal errors normally abort program execution by calling exit().
  * In the testcases however, fatal errors jump to one of two places:
  *   - the next line of the testcase if the fatal error was expected
  *   - the end of the testcase if the fatal error was not expected */
-static jmp_buf _tc_fatal_expected_,
-               _tc_fatal_unexpected_;
+static jmp_buf _tc_fatal_expected_;
+static jmp_buf _tc_fatal_unexpected_;
 
 static int _assert_fatal_, _failures_, _failures_t_, _failure_printed_;
 static char _tc_errbuf_1[512];
@@ -36,8 +60,10 @@ static char _tc_errbuf_2[512];
 
 static int _assert_strcmp(const char*, const char*);
 static int _assert_strncmp(const char*, const char*, size_t);
-
 static void _print_testcase_name_(const char*);
+
+#define run_tests(X) \
+	_run_tests_(__FILE__, X, sizeof(X) / sizeof(X[0]))
 
 #define fail_test(M) \
 	do { \
@@ -46,11 +72,11 @@ static void _print_testcase_name_(const char*);
 		_failures_++; \
 	} while (0)
 
-#define fail_testf(...) \
+#define fail_testf(M, ...) \
 	do { \
 		_print_testcase_name_(__func__); \
 		printf("    %d: ", __LINE__); \
-		printf(__VA_ARGS__); \
+		printf((M), __VA_ARGS__); \
 		printf("\n"); \
 		_failures_++; \
 	} while (0)
@@ -64,11 +90,11 @@ static void _print_testcase_name_(const char*);
 		return; \
 	} while (0)
 
-#define abort_testf(...) \
+#define abort_testf(M, ...) \
 	do { \
 		_print_testcase_name_(__func__); \
 		printf("    %d: ", __LINE__); \
-		printf(__VA_ARGS__ "\n"); \
+		printf((M), __VA_ARGS__ "\n"); \
 		printf("    ---Testcase aborted---\n"); \
 		_failures_++; \
 		return; \
@@ -94,15 +120,48 @@ static void _print_testcase_name_(const char*);
 #define fatal_noexit _fatal
 #endif
 
-#define assert_fatal(X) \
+#define assert_true(X) \
 	do { \
-		if (setjmp(_tc_fatal_expected_)) { \
-			_assert_fatal_ = 1; \
-			(X); \
-			if (_assert_fatal_) \
-				fail_test("'"#X "' should have exited fatally"); \
-			_assert_fatal_ = 0; \
-		} \
+		if ((X) == 0) \
+			fail_test(#X " expected true"); \
+	} while (0)
+
+#define assert_false(X) \
+	do { \
+		if ((X) != 0) \
+			fail_test(#X " expected false"); \
+	} while (0)
+
+#define assert_eq(X, Y) \
+	do { \
+		int __ret_x = (int)(X); \
+		int __ret_y = (int)(Y); \
+		if (__ret_x != __ret_y) \
+			fail_testf(#X " expected '%d', got '%d'", __ret_y, __ret_x); \
+	} while (0)
+
+#define assert_gt(X, Y) \
+	do { \
+		int __ret_x = (int)(X); \
+		int __ret_y = (int)(Y); \
+		if (!(__ret_x > __ret_y)) \
+			fail_testf(#X " expected '%d' to be greater than '%d'", __ret_y, __ret_x); \
+	} while (0)
+
+#define assert_lt(X, Y) \
+	do { \
+		int __ret_x = (int)(X); \
+		int __ret_y = (int)(Y); \
+		if (!(__ret_x < __ret_y)) \
+			fail_testf(#X " expected '%d' to be less than '%d'", __ret_y, __ret_x); \
+	} while (0)
+
+#define assert_ueq(X, Y) \
+	do { \
+		unsigned __ret_x = (unsigned)(X); \
+		unsigned __ret_y = (unsigned)(Y); \
+		if (__ret_x != __ret_y) \
+			fail_testf(#X " expected '%u', got '%u'", __ret_y, __ret_x); \
 	} while (0)
 
 #define assert_strcmp(X, Y) \
@@ -125,51 +184,7 @@ static void _print_testcase_name_(const char*);
 				(int)(N), __ret_x == NULL ? "NULL" : __ret_x); \
 	} while (0)
 
-#define assert_lt(X, Y) \
-	do { \
-		int __ret_x = (int)(X); \
-		int __ret_y = (int)(Y); \
-		if (!(__ret_x < __ret_y)) \
-			fail_testf(#X " expected '%d' to be less than '%d'", __ret_y, __ret_x); \
-	} while (0)
-
-#define assert_gt(X, Y) \
-	do { \
-		int __ret_x = (int)(X); \
-		int __ret_y = (int)(Y); \
-		if (!(__ret_x > __ret_y)) \
-			fail_testf(#X " expected '%d' to be greater than '%d'", __ret_y, __ret_x); \
-	} while (0)
-
-#define assert_eq(X, Y) \
-	do { \
-		int __ret_x = (int)(X); \
-		int __ret_y = (int)(Y); \
-		if (__ret_x != __ret_y) \
-			fail_testf(#X " expected '%d', got '%d'", __ret_y, __ret_x); \
-	} while (0)
-
-#define assert_ueq(X, Y) \
-	do { \
-		unsigned __ret_x = (unsigned)(X); \
-		unsigned __ret_y = (unsigned)(Y); \
-		if (__ret_x != __ret_y) \
-			fail_testf(#X " expected '%u', got '%u'", __ret_y, __ret_x); \
-	} while (0)
-
-#define assert_true(X) \
-	do { \
-		if ((X) == 0) \
-			fail_test(#X " expected true"); \
-	} while (0)
-
-#define assert_false(X) \
-	do { \
-		if ((X) != 0) \
-			fail_test(#X " expected false"); \
-	} while (0)
-
-#define assert_ptrequals(X, Y) \
+#define assert_ptr_eq(X, Y) \
 	do { \
 		uintptr_t __ret_x = (uintptr_t)(X); \
 		uintptr_t __ret_y = (uintptr_t)(Y); \
@@ -177,11 +192,22 @@ static void _print_testcase_name_(const char*);
 			fail_testf(#X " expected '%016" PRIxPTR "', got '%016" PRIxPTR "'", __ret_y, __ret_x); \
 	} while (0)
 
-#define assert_null(X) \
+#define assert_ptr_null(X) \
 	do { \
 		uintptr_t __ret_x = (uintptr_t)(X); \
 		if (__ret_x ) \
 			fail_testf(#X " expected NULL, got '%016" PRIxPTR "'", __ret_x); \
+	} while (0)
+
+#define assert_fatal(X) \
+	do { \
+		if (setjmp(_tc_fatal_expected_)) { \
+			_assert_fatal_ = 1; \
+			(X); \
+			if (_assert_fatal_) \
+				fail_test("'"#X "' should have exited fatally"); \
+			_assert_fatal_ = 0; \
+		} \
 	} while (0)
 
 static int
@@ -217,7 +243,7 @@ _print_testcase_name_(const char *name)
 }
 
 static int
-_run_tests_(const char *filename, testcase testcases[], size_t len)
+_run_tests_(const char *filename, struct testcase testcases[], size_t len)
 {
 	/* Silence compiler warnings for unused test functions/vars */
 	((void)(_assert_strcmp));
@@ -230,20 +256,22 @@ _run_tests_(const char *filename, testcase testcases[], size_t len)
 	printf("%s... ", filename);
 	fflush(stdout);
 
-	testcase *tc;
+	struct testcase *tc;
 
 	for (tc = testcases; len--; tc++) {
+
 		_failures_ = 0;
 		_failure_printed_ = 0;
 
 		if (setjmp(_tc_fatal_unexpected_)) {
 			_print_testcase_name_(tc->tc_str);
 			printf("    Unexpected fatal error:\n");
-			printf("    %s %s\n", _tc_errbuf_1,_tc_errbuf_2);
+			printf("    %s %s\n", _tc_errbuf_1, _tc_errbuf_2);
 			printf("    -- aborting testcase --\n");
 			_failures_++;
-		} else
+		} else {
 			(*tc->tc_ptr)();
+		}
 
 		if (_failures_) {
 			printf("      %d failure%c\n", _failures_, (_failures_ > 1) ? 's' : 0);
@@ -259,9 +287,5 @@ _run_tests_(const char *filename, testcase testcases[], size_t len)
 		return EXIT_SUCCESS;
 	}
 }
-
-/* Macro so the proper filename is printed */
-#define run_tests(X) \
-	_run_tests_(__FILE__, X, sizeof(X) / sizeof(X[0]))
 
 #endif

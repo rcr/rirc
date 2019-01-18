@@ -502,7 +502,7 @@ buffer_scrollback_back(struct channel *c)
 
 	unsigned int buffer_i = b->scrollback,
 	             count = 0,
-	             text_w,
+	             text_w = 0,
 	             cols = io_tty_cols(),
 	             rows = io_tty_rows() - 4;
 
@@ -544,7 +544,7 @@ buffer_scrollback_forw(struct channel *c)
 	/* Scroll a buffer forward one page */
 
 	unsigned int count = 0,
-	             text_w,
+	             text_w = 0,
 	             cols = io_tty_cols(),
 	             rows = io_tty_rows() - 4;
 

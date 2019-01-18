@@ -69,7 +69,7 @@ main(void)
 	/* FIXME: */
 	(void)parse_args;
 
-	testcase tests[] = {
+	struct testcase tests[] = {
 		TESTCASE(test_STUB)
 	};
 

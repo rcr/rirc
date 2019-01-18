@@ -528,7 +528,7 @@ test_chanmode_type(void)
 int
 main(void)
 {
-	testcase tests[] = {
+	struct testcase tests[] = {
 		TESTCASE(test_flag_bit),
 		TESTCASE(test_mode_str),
 		TESTCASE(test_chanmode_set),

@@ -90,7 +90,7 @@ test_STUB(void)
 int
 main(void)
 {
-	testcase tests[] = {
+	struct testcase tests[] = {
 		TESTCASE(test_STUB)
 	};
 

@@ -274,6 +274,9 @@ irc_message_parse(struct irc_message *m, char *buf, size_t len)
 
 	memset(m, 0, sizeof(*m));
 
+	if (!str_trim(&buf))
+		return 1;
+
 	if (*buf == ':') {
 
 		/* Prefix:
@@ -304,21 +307,25 @@ irc_message_parse(struct irc_message *m, char *buf, size_t len)
 			m->len_host = buf - m->host;
 		}
 
-		*buf++ = 0;
+		if (*buf == ' ')
+			*buf++ = 0;
 	}
+
+	if (!str_trim(&buf))
+		return 1;
 
 	m->command = buf;
 
 	while (*buf && *buf != ' ')
 		buf++;
 
-	if (*buf != ' ')
-		return 1;
-
 	m->len_command = buf - m->command;
-	*buf++ = 0;
 
-	m->params = buf;
+	if (*buf == ' ')
+		*buf++ = 0;
+
+	if (str_trim(&buf))
+		m->params = buf;
 
 	return 0;
 }
@@ -328,9 +335,9 @@ irc_message_split(struct irc_message *m, char **trailing)
 {
 	/* Split the message params and trailing arg for use in generic handling */
 
-	/* TODO */
-	(void)m;
-	(void)trailing;
+	UNUSED(m);
+	UNUSED(trailing);
+
 	return 0;
 }
 

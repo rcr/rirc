@@ -58,6 +58,7 @@ int irc_isnick(const char*);
 //TODO: CASEMAPPING
 int irc_strcmp(const char*, const char*);
 int irc_strncmp(const char*, const char*, size_t);
+int str_trim(char**);
 
 char* getarg(char**, const char*);
 char* word_wrap(int, char**, char*);
@@ -65,6 +66,5 @@ char* strdup(const char*);
 void* memdup(const void*, size_t);
 
 int check_pinged(const char*, const char*);
-int str_trim(char**);
 
 #endif

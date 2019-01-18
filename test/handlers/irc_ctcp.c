@@ -475,7 +475,7 @@ main(void)
 	channel_list_add(&s->clist, c_priv);
 	server_nick_set(s, "mynick");
 
-	testcase tests[] = {
+	struct testcase tests[] = {
 		TESTCASE(test_recv_ctcp_request),
 		TESTCASE(test_recv_ctcp_response),
 #define X(cmd) TESTCASE(test_recv_ctcp_request_##cmd),

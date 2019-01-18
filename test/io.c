@@ -80,7 +80,7 @@ test_io_recv(void)
 int
 main(void)
 {
-	testcase tests[] = {
+	struct testcase tests[] = {
 		TESTCASE(test_io_recv),
 	};
 

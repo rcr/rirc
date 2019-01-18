@@ -558,7 +558,7 @@ test_input_text_size(void)
 int
 main(void)
 {
-	testcase tests[] = {
+	struct testcase tests[] = {
 		TESTCASE(test_input_init),
 		TESTCASE(test_input_reset),
 		TESTCASE(test_input_ins),
