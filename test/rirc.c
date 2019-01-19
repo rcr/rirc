@@ -62,7 +62,6 @@ test_STUB(void)
 	; /* TODO */
 }
 
-
 int
 main(void)
 {
