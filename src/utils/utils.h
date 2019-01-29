@@ -15,23 +15,24 @@
 
 #define UNUSED(X) ((void)(X))
 
-#define message(TYPE, ...) \
+#define MESSAGE(TYPE, ...) \
 	fprintf(stderr, "%s %s:%d:%s ", (TYPE), __FILE__, __LINE__, __func__); \
 	fprintf(stderr, __VA_ARGS__); \
 	fprintf(stderr, "\n");
 
 #if (defined DEBUG) && !(defined TESTING)
 #define debug(...) \
-	do { message("DEBUG", __VA_ARGS__); } while (0)
+	do { MESSAGE("DEBUG", __VA_ARGS__); } while (0)
 #else
-#define debug(...)
+#define debug(...) \
+	do { ; } while (0)
 #endif
 
 #ifndef fatal
 #define fatal(...) \
-	do { message("FATAL", __VA_ARGS__); exit(EXIT_FAILURE); } while (0)
+	do { MESSAGE("FATAL", __VA_ARGS__); exit(EXIT_FAILURE); } while (0)
 #define fatal_noexit(...) \
-	do { message("FATAL", __VA_ARGS__); } while (0)
+	do { MESSAGE("FATAL", __VA_ARGS__); } while (0)
 #endif
 
 struct irc_message
@@ -44,6 +45,7 @@ struct irc_message
 	size_t len_from;
 	size_t len_host;
 	unsigned n_params;
+	unsigned split : 1;
 };
 
 int irc_message_param(struct irc_message*, char**);
@@ -55,16 +57,20 @@ int irc_ischanchar(char, int);
 int irc_isnickchar(char, int);
 int irc_ischan(const char*);
 int irc_isnick(const char*);
-//TODO: CASEMAPPING
+//TODO: CASEMAPPING, ascii, rfc, strict
 int irc_strcmp(const char*, const char*);
 int irc_strncmp(const char*, const char*, size_t);
-int str_trim(char**);
 
+int str_trim(char**);
+int check_pinged(const char*, const char*);
 char* getarg(char**, const char*);
 char* word_wrap(int, char**, char*);
+
 char* strdup(const char*);
 void* memdup(const void*, size_t);
 
-int check_pinged(const char*, const char*);
+// TODO: replace check_pinged -> irc_pinged, account for casemapping
+// TODO: replace word_wrap -> str_wrap... int(char**, char**, size_t)
+// TODO: getarg -> simplify, str_token? tokens on ' ' only
 
 #endif

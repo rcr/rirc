@@ -61,76 +61,80 @@ test_getarg(void)
 static void
 test_irc_message_param(void)
 {
-	struct irc_message m;
 	char *param;
+	struct irc_message m;
 
 #define CHECK_IRC_MESSAGE_PARAM(R, S) \
 	assert_eq(irc_message_param(&m, &param), (R)); \
 	assert_strcmp(param, (S));
 
+#define CHECK_IRC_MESSAGE_PARSE(M, R) \
+	assert_eq(irc_message_parse(&m, (M), sizeof((M)) - 1), (R));
+
 	/* Test ordinary args */
 	char mesg1[] = ":nick!user@host.domain.tld CMD arg1 arg2 arg3 :trailing arg";
 
-	assert_eq(irc_message_parse(&m, mesg1, sizeof(mesg1) - 1), 0);
-	CHECK_IRC_MESSAGE_PARAM(0, "arg1");
-	CHECK_IRC_MESSAGE_PARAM(0, "arg2");
-	CHECK_IRC_MESSAGE_PARAM(0, "arg3");
-	CHECK_IRC_MESSAGE_PARAM(0, "trailing arg");
-	CHECK_IRC_MESSAGE_PARAM(1, NULL);
+	CHECK_IRC_MESSAGE_PARSE(mesg1, 1);
+	CHECK_IRC_MESSAGE_PARAM(1, "arg1");
+	CHECK_IRC_MESSAGE_PARAM(1, "arg2");
+	CHECK_IRC_MESSAGE_PARAM(1, "arg3");
+	CHECK_IRC_MESSAGE_PARAM(1, "trailing arg");
+	CHECK_IRC_MESSAGE_PARAM(0, NULL);
 
 	/* Test no trailing arg */
 	char mesg2[] = ":nick!user@host.domain.tld CMD arg1 arg2 arg3";
 
-	assert_eq(irc_message_parse(&m, mesg2, sizeof(mesg2) - 1), 0);
-	CHECK_IRC_MESSAGE_PARAM(0, "arg1");
-	CHECK_IRC_MESSAGE_PARAM(0, "arg2");
-	CHECK_IRC_MESSAGE_PARAM(0, "arg3");
-	CHECK_IRC_MESSAGE_PARAM(1, NULL);
+	CHECK_IRC_MESSAGE_PARSE(mesg2, 1);
+	CHECK_IRC_MESSAGE_PARAM(1, "arg1");
+	CHECK_IRC_MESSAGE_PARAM(1, "arg2");
+	CHECK_IRC_MESSAGE_PARAM(1, "arg3");
+	CHECK_IRC_MESSAGE_PARAM(0, NULL);
 
 	/* Test only trailing arg */
 	char mesg3[] = ":nick!user@host.domain.tld CMD :trailing arg";
 
-	assert_eq(irc_message_parse(&m, mesg3, sizeof(mesg3) - 1), 0);
-	CHECK_IRC_MESSAGE_PARAM(0, "trailing arg");
-	CHECK_IRC_MESSAGE_PARAM(1, NULL);
+	CHECK_IRC_MESSAGE_PARSE(mesg3, 1);
+	CHECK_IRC_MESSAGE_PARAM(1, "trailing arg");
+	CHECK_IRC_MESSAGE_PARAM(0, NULL);
 
 	/* Test ':' can exist in args */
 	char mesg4[] = ":nick!user@host.domain.tld CMD arg:1:2:3 arg:4:5:6 :trailing arg";
 
-	assert_eq(irc_message_parse(&m, mesg4, sizeof(mesg4) - 1), 0);
-	CHECK_IRC_MESSAGE_PARAM(0, "arg:1:2:3");
-	CHECK_IRC_MESSAGE_PARAM(0, "arg:4:5:6");
-	CHECK_IRC_MESSAGE_PARAM(0, "trailing arg");
-	CHECK_IRC_MESSAGE_PARAM(1, NULL);
+	CHECK_IRC_MESSAGE_PARSE(mesg4, 1);
+	CHECK_IRC_MESSAGE_PARAM(1, "arg:1:2:3");
+	CHECK_IRC_MESSAGE_PARAM(1, "arg:4:5:6");
+	CHECK_IRC_MESSAGE_PARAM(1, "trailing arg");
+	CHECK_IRC_MESSAGE_PARAM(0, NULL);
 
 	/* Test 15 arg limit */
 	char mesg5[] = "CMD a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 a11 a12 a13 a14 a15 :trailing arg";
 
-	assert_eq(irc_message_parse(&m, mesg5, sizeof(mesg5) - 1), 0);
-	CHECK_IRC_MESSAGE_PARAM(0, "a1");
-	CHECK_IRC_MESSAGE_PARAM(0, "a2");
-	CHECK_IRC_MESSAGE_PARAM(0, "a3");
-	CHECK_IRC_MESSAGE_PARAM(0, "a4");
-	CHECK_IRC_MESSAGE_PARAM(0, "a5");
-	CHECK_IRC_MESSAGE_PARAM(0, "a6");
-	CHECK_IRC_MESSAGE_PARAM(0, "a7");
-	CHECK_IRC_MESSAGE_PARAM(0, "a8");
-	CHECK_IRC_MESSAGE_PARAM(0, "a9");
-	CHECK_IRC_MESSAGE_PARAM(0, "a10");
-	CHECK_IRC_MESSAGE_PARAM(0, "a11");
-	CHECK_IRC_MESSAGE_PARAM(0, "a12");
-	CHECK_IRC_MESSAGE_PARAM(0, "a13");
-	CHECK_IRC_MESSAGE_PARAM(0, "a14");
-	CHECK_IRC_MESSAGE_PARAM(0, "a15 :trailing arg");
-	CHECK_IRC_MESSAGE_PARAM(1, NULL);
+	CHECK_IRC_MESSAGE_PARSE(mesg5, 1);
+	CHECK_IRC_MESSAGE_PARAM(1, "a1");
+	CHECK_IRC_MESSAGE_PARAM(1, "a2");
+	CHECK_IRC_MESSAGE_PARAM(1, "a3");
+	CHECK_IRC_MESSAGE_PARAM(1, "a4");
+	CHECK_IRC_MESSAGE_PARAM(1, "a5");
+	CHECK_IRC_MESSAGE_PARAM(1, "a6");
+	CHECK_IRC_MESSAGE_PARAM(1, "a7");
+	CHECK_IRC_MESSAGE_PARAM(1, "a8");
+	CHECK_IRC_MESSAGE_PARAM(1, "a9");
+	CHECK_IRC_MESSAGE_PARAM(1, "a10");
+	CHECK_IRC_MESSAGE_PARAM(1, "a11");
+	CHECK_IRC_MESSAGE_PARAM(1, "a12");
+	CHECK_IRC_MESSAGE_PARAM(1, "a13");
+	CHECK_IRC_MESSAGE_PARAM(1, "a14");
+	CHECK_IRC_MESSAGE_PARAM(1, "a15 :trailing arg");
+	CHECK_IRC_MESSAGE_PARAM(0, NULL);
 
 	/* Test no args */
 	char mesg6[] = ":nick!user@host.domain.tld CMD";
 
-	assert_eq(irc_message_parse(&m, mesg6, sizeof(mesg6) - 1), 0);
-	CHECK_IRC_MESSAGE_PARAM(1, NULL);
+	CHECK_IRC_MESSAGE_PARSE(mesg6, 1);
+	CHECK_IRC_MESSAGE_PARAM(0, NULL);
 
 #undef CHECK_IRC_MESSAGE_PARAM
+#undef CHECK_IRC_MESSAGE_PARSE
 }
 
 static void
@@ -138,10 +142,13 @@ test_irc_message_parse(void)
 {
 	struct irc_message m;
 
+#define CHECK_IRC_MESSAGE_PARSE(M, R) \
+	assert_eq(irc_message_parse(&m, (M), sizeof((M)) - 1), (R));
+
 	/* Test ordinary message */
 	char mesg1[] = ":nick!user@host.domain.tld CMD args :trailing";
 
-	assert_eq(irc_message_parse(&m, mesg1, sizeof(mesg1) - 1), 0);
+	CHECK_IRC_MESSAGE_PARSE(mesg1, 1);
 	assert_strcmp(m.command, "CMD");
 	assert_strcmp(m.from,    "nick");
 	assert_strcmp(m.host,    "user@host.domain.tld");
@@ -153,7 +160,7 @@ test_irc_message_parse(void)
 	/* Test no nick/host */
 	char mesg2[] = "CMD arg1 arg2 :  trailing message  ";
 
-	assert_eq(irc_message_parse(&m, mesg2, sizeof(mesg2) - 1), 0);
+	CHECK_IRC_MESSAGE_PARSE(mesg2, 1);
 	assert_strcmp(m.command, "CMD");
 	assert_strcmp(m.from,    NULL);
 	assert_strcmp(m.host,    NULL);
@@ -165,7 +172,7 @@ test_irc_message_parse(void)
 	/* Test no user */
 	char mesg3[] = ":nick@host.domain.tld CMD arg1 arg2 arg3";
 
-	assert_eq(irc_message_parse(&m, mesg3, sizeof(mesg3) - 1), 0);
+	CHECK_IRC_MESSAGE_PARSE(mesg3, 1);
 	assert_strcmp(m.command, "CMD");
 	assert_strcmp(m.from,    "nick");
 	assert_strcmp(m.host,    "host.domain.tld");
@@ -177,7 +184,7 @@ test_irc_message_parse(void)
 	/* Test no host */
 	char mesg4[] = ":nick CMD arg1 arg2 arg3";
 
-	assert_eq(irc_message_parse(&m, mesg4, sizeof(mesg4) - 1), 0);
+	CHECK_IRC_MESSAGE_PARSE(mesg4, 1);
 	assert_strcmp(m.command, "CMD");
 	assert_strcmp(m.from,    "nick");
 	assert_strcmp(m.host,    NULL);
@@ -189,7 +196,7 @@ test_irc_message_parse(void)
 	/* Test no args */
 	char mesg5[] = ":nick!user@host.domain.tld CMD";
 
-	assert_eq(irc_message_parse(&m, mesg5, sizeof(mesg5) - 1), 0);
+	CHECK_IRC_MESSAGE_PARSE(mesg5, 1);
 	assert_strcmp(m.command, "CMD");
 	assert_strcmp(m.from,    "nick");
 	assert_strcmp(m.host,    "user@host.domain.tld");
@@ -201,7 +208,7 @@ test_irc_message_parse(void)
 	/* Test extraneous space */
 	char mesg6[] = "  :nick!user@host.domain.tld   CMD   arg1  arg2  arg3   : trailing";
 
-	assert_eq(irc_message_parse(&m, mesg6, sizeof(mesg6) - 1), 0);
+	CHECK_IRC_MESSAGE_PARSE(mesg6, 1);
 	assert_strcmp(m.command, "CMD");
 	assert_strcmp(m.from,    "nick");
 	assert_strcmp(m.host,    "user@host.domain.tld");
@@ -212,60 +219,170 @@ test_irc_message_parse(void)
 
 	/* Error: empty message */
 	char mesg7[] = "";
-	assert_eq(irc_message_parse(&m, mesg7, sizeof(mesg7) - 1), 1);
+	CHECK_IRC_MESSAGE_PARSE(mesg7, 0);
 
 	/* Error: no command */
 	char mesg8[] = ":nick!user@host.domain.tld";
-	assert_eq(irc_message_parse(&m, mesg8, sizeof(mesg8) - 1), 1);
+	CHECK_IRC_MESSAGE_PARSE(mesg8, 0);
 
 	/* Error: malformed name/host */
 	char mesg9[] = ": CMD arg1 arg2 arg3";
-	assert_eq(irc_message_parse(&m, mesg9, sizeof(mesg9) - 1), 1);
+	CHECK_IRC_MESSAGE_PARSE(mesg9, 0);
+
+#undef CHECK_IRC_MESSAGE_PARSE
 }
 
 static void
 test_irc_message_split(void)
 {
-	// char *trailing;
-	// struct irc_message m;
+	char *param;
+	char *trailing;
+	struct irc_message m;
 
-#define CHECK_IRC_MESSAGE_SPLIT(M, R, P, T) \
-	m.params = (M); \
+#define CHECK_IRC_MESSAGE_PARAM(R, S) \
+	assert_eq(irc_message_param(&m, &param), (R)); \
+	assert_strcmp(param, (S));
+
+#define CHECK_IRC_MESSAGE_PARSE(M, R) \
+	assert_eq(irc_message_parse(&m, (M), sizeof((M)) - 1), (R));
+
+#define CHECK_IRC_MESSAGE_SPLIT(R, P, T) \
 	assert_eq(irc_message_split(&m, &trailing), (R)); \
 	assert_strcmp(m.params, (P)); \
 	assert_strcmp(trailing, (T));
 
-	/* TODO */
-#if 0
+	/* Test empty params */
+	char mesg1[] = "CMD";
+
+	CHECK_IRC_MESSAGE_PARSE(mesg1, 1);
+	CHECK_IRC_MESSAGE_SPLIT(0, NULL, NULL);
+
 	/* Test ordinary args */
-	char mesg1[] = "arg1 arg2 arg3 :trailing arg";
-	CHECK_IRC_MESSAGE_SPLIT(mesg1, 0, "arg1 arg2 arg3", "tailing arg");
+	char mesg2[] = "CMD a1 a2 a3 :trailing arg";
+
+	CHECK_IRC_MESSAGE_PARSE(mesg2, 1);
+	CHECK_IRC_MESSAGE_SPLIT(1, "a1 a2 a3 ", "trailing arg");
+	CHECK_IRC_MESSAGE_PARAM(1, "a1");
+	CHECK_IRC_MESSAGE_PARAM(1, "a2");
+	CHECK_IRC_MESSAGE_PARAM(1, "a3");
+	CHECK_IRC_MESSAGE_PARAM(0, NULL);
 
 	/* Test no trailing arg */
-	char mesg2[] = "arg1 arg2 arg3";
-	CHECK_IRC_MESSAGE_SPLIT(mesg2, 0, "arg1 arg2 arg3", NULL);
+	char mesg3[] = "CMD a1 a2 a3";
+
+	CHECK_IRC_MESSAGE_PARSE(mesg3, 1);
+	CHECK_IRC_MESSAGE_SPLIT(0, "a1 a2 a3", NULL);
+	CHECK_IRC_MESSAGE_PARAM(1, "a1");
+	CHECK_IRC_MESSAGE_PARAM(1, "a2");
+	CHECK_IRC_MESSAGE_PARAM(1, "a3");
+	CHECK_IRC_MESSAGE_PARAM(0, NULL);
 
 	/* Test only trailing arg */
-	char mesg3[] = ":trailing arg";
-	CHECK_IRC_MESSAGE_SPLIT(mesg3, 0, NULL, "tailing arg");
+	char mesg4[] = "CMD :trailing arg";
+
+	CHECK_IRC_MESSAGE_PARSE(mesg4, 1);
+	CHECK_IRC_MESSAGE_SPLIT(1, "", "trailing arg");
+	CHECK_IRC_MESSAGE_PARAM(0, NULL);
 
 	/* Test ':' can exist in args */
-	char mesg4[] = "arg:1:2:3 arg:4:5:6 :trailing arg";
-	CHECK_IRC_MESSAGE_SPLIT(mesg4, 0, "arg:1:2:3 arg:4:5:6", "tailing arg");
+	char mesg5[] = "CMD arg:1:2:3 arg:4:5:6 :trailing arg";
+
+	CHECK_IRC_MESSAGE_PARSE(mesg5, 1);
+	CHECK_IRC_MESSAGE_SPLIT(1, "arg:1:2:3 arg:4:5:6 ", "trailing arg");
+	CHECK_IRC_MESSAGE_PARAM(1, "arg:1:2:3");
+	CHECK_IRC_MESSAGE_PARAM(1, "arg:4:5:6");
+	CHECK_IRC_MESSAGE_PARAM(0, NULL);
 
 	/* Test 15 arg limit */
-	char mesg5[] = "a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 a11 a12 a13 a14 a15 :trailing arg";
-	CHECK_IRC_MESSAGE_SPLIT(mesg5, 0,
-		"a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 a11 a12 a13 a14", "a15 :trailing arg");
+	char mesg6[] = "CMD a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 a11 a12 a13 a14 a15 :trailing arg";
 
-	/* Test 15 arg limit with some parameters previously parsed */
-	char mesg6[] = "a4 a5 a6 a7 a8 a9 a10 a11 a12 a13 a14 a15 :trailing arg";
-	m.n_params = 3;
-	CHECK_IRC_MESSAGE_SPLIT(mesg6, 0,
-		"a4 a5 a6 a7 a8 a9 a10 a11 a12 a13 a14", "a15 :trailing arg");
-#endif
+	CHECK_IRC_MESSAGE_PARSE(mesg6, 1);
+	CHECK_IRC_MESSAGE_SPLIT(
+		1, "a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 a11 a12 a13 a14", "a15 :trailing arg");
+	CHECK_IRC_MESSAGE_PARAM(1, "a1");
+	CHECK_IRC_MESSAGE_PARAM(1, "a2");
+	CHECK_IRC_MESSAGE_PARAM(1, "a3");
+	CHECK_IRC_MESSAGE_PARAM(1, "a4");
+	CHECK_IRC_MESSAGE_PARAM(1, "a5");
+	CHECK_IRC_MESSAGE_PARAM(1, "a6");
+	CHECK_IRC_MESSAGE_PARAM(1, "a7");
+	CHECK_IRC_MESSAGE_PARAM(1, "a8");
+	CHECK_IRC_MESSAGE_PARAM(1, "a9");
+	CHECK_IRC_MESSAGE_PARAM(1, "a10");
+	CHECK_IRC_MESSAGE_PARAM(1, "a11");
+	CHECK_IRC_MESSAGE_PARAM(1, "a12");
+	CHECK_IRC_MESSAGE_PARAM(1, "a13");
+	CHECK_IRC_MESSAGE_PARAM(1, "a14");
+	CHECK_IRC_MESSAGE_PARAM(0, NULL);
 
-#undef CHECK_SPLIT
+	/* Test 15 arg limit - 1 previously parsed */
+	char mesg7[] = "CMD a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 a11 a12 a13 a14 a15 :trailing arg";
+
+	CHECK_IRC_MESSAGE_PARSE(mesg7, 1);
+	CHECK_IRC_MESSAGE_PARAM(1, "a1");
+	CHECK_IRC_MESSAGE_SPLIT(
+		1, "a2 a3 a4 a5 a6 a7 a8 a9 a10 a11 a12 a13 a14", "a15 :trailing arg");
+	CHECK_IRC_MESSAGE_PARAM(1, "a2");
+	CHECK_IRC_MESSAGE_PARAM(1, "a3");
+	CHECK_IRC_MESSAGE_PARAM(1, "a4");
+	CHECK_IRC_MESSAGE_PARAM(1, "a5");
+	CHECK_IRC_MESSAGE_PARAM(1, "a6");
+	CHECK_IRC_MESSAGE_PARAM(1, "a7");
+	CHECK_IRC_MESSAGE_PARAM(1, "a8");
+	CHECK_IRC_MESSAGE_PARAM(1, "a9");
+	CHECK_IRC_MESSAGE_PARAM(1, "a10");
+	CHECK_IRC_MESSAGE_PARAM(1, "a11");
+	CHECK_IRC_MESSAGE_PARAM(1, "a12");
+	CHECK_IRC_MESSAGE_PARAM(1, "a13");
+	CHECK_IRC_MESSAGE_PARAM(1, "a14");
+	CHECK_IRC_MESSAGE_PARAM(0, NULL);
+
+	/* Test 15 arg limit - 14 previously parsed */
+	char mesg8[] = "CMD a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 a11 a12 a13 a14 a15 :trailing arg";
+
+	CHECK_IRC_MESSAGE_PARSE(mesg8, 1);
+	CHECK_IRC_MESSAGE_PARAM(1, "a1");
+	CHECK_IRC_MESSAGE_PARAM(1, "a2");
+	CHECK_IRC_MESSAGE_PARAM(1, "a3");
+	CHECK_IRC_MESSAGE_PARAM(1, "a4");
+	CHECK_IRC_MESSAGE_PARAM(1, "a5");
+	CHECK_IRC_MESSAGE_PARAM(1, "a6");
+	CHECK_IRC_MESSAGE_PARAM(1, "a7");
+	CHECK_IRC_MESSAGE_PARAM(1, "a8");
+	CHECK_IRC_MESSAGE_PARAM(1, "a9");
+	CHECK_IRC_MESSAGE_PARAM(1, "a10");
+	CHECK_IRC_MESSAGE_PARAM(1, "a11");
+	CHECK_IRC_MESSAGE_PARAM(1, "a12");
+	CHECK_IRC_MESSAGE_PARAM(1, "a13");
+	CHECK_IRC_MESSAGE_PARAM(1, "a14");
+	CHECK_IRC_MESSAGE_SPLIT(1, NULL, "a15 :trailing arg");
+	CHECK_IRC_MESSAGE_PARAM(0, NULL);
+
+	/* Test 15 arg limit - all previously parsed */
+	char mesg9[] = "CMD a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 a11 a12 a13 a14 a15 :trailing arg";
+
+	CHECK_IRC_MESSAGE_PARSE(mesg9, 1);
+	CHECK_IRC_MESSAGE_PARAM(1, "a1");
+	CHECK_IRC_MESSAGE_PARAM(1, "a2");
+	CHECK_IRC_MESSAGE_PARAM(1, "a3");
+	CHECK_IRC_MESSAGE_PARAM(1, "a4");
+	CHECK_IRC_MESSAGE_PARAM(1, "a5");
+	CHECK_IRC_MESSAGE_PARAM(1, "a6");
+	CHECK_IRC_MESSAGE_PARAM(1, "a7");
+	CHECK_IRC_MESSAGE_PARAM(1, "a8");
+	CHECK_IRC_MESSAGE_PARAM(1, "a9");
+	CHECK_IRC_MESSAGE_PARAM(1, "a10");
+	CHECK_IRC_MESSAGE_PARAM(1, "a11");
+	CHECK_IRC_MESSAGE_PARAM(1, "a12");
+	CHECK_IRC_MESSAGE_PARAM(1, "a13");
+	CHECK_IRC_MESSAGE_PARAM(1, "a14");
+	CHECK_IRC_MESSAGE_PARAM(1, "a15 :trailing arg");
+	CHECK_IRC_MESSAGE_PARAM(0, NULL);
+	CHECK_IRC_MESSAGE_SPLIT(0, NULL, NULL);
+
+#undef CHECK_IRC_MESSAGE_PARAM
+#undef CHECK_IRC_MESSAGE_PARSE
+#undef CHECK_IRC_MESSAGE_SPLIT
 }
 
 static void
@@ -334,6 +451,9 @@ static void
 test_check_pinged(void)
 {
 	/* Test detecting user's nick in message */
+
+	// FIXME: check_pinged should take server argument
+	//        and use s->cmp to test nick case
 
 	char *nick = "testnick";
 
@@ -474,6 +594,8 @@ test_word_wrap(void)
 		"",
 		"");
 
+#undef CHECK_WORD_WRAP
+
 	if (seg1 != seg2 || seg2 != end)
 		fail_test("seg1 should be advanced to end of string");
 
@@ -498,8 +620,6 @@ test_word_wrap(void)
 	*ret = '!';
 	assert_strcmp(seg1, " te!ting");
 	assert_strcmp(seg2, "!ting");
-
-#undef CHECK_WORD_WRAP
 }
 
 int

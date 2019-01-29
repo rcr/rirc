@@ -14,6 +14,7 @@ struct server
 	const char *realname;
 	const char *nick;
 	int (*cmp) (const char*, const char*);
+	// TODO: enum for cmp type
 	struct {
 		size_t next;
 		size_t size;

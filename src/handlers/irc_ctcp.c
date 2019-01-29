@@ -358,3 +358,6 @@ ctcp_response_version(struct server *s, const char *from, const char *targ, char
 
 	return 0;
 }
+
+#undef failf
+#undef sendf

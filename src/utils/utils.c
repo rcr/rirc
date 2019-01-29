@@ -220,24 +220,24 @@ irc_message_param(struct irc_message *m, char **param)
 	*param = NULL;
 
 	if (m->params == NULL)
-		return 1;
+		return 0;
 
 	if (!str_trim(&m->params))
-		return 1;
+		return 0;
 
-	if (m->n_params >= 14) {
+	if (!m->split && m->n_params >= 14) {
 		*param = m->params;
 		m->params = NULL;
-		return 0;
+		return 1;
 	}
-
-	m->n_params++;
 
 	if (*m->params == ':') {
 		*param = m->params + 1;
 		m->params = NULL;
-		return 0;
+		return 1;
 	}
+
+	m->n_params++;
 
 	*param = m->params;
 
@@ -247,7 +247,7 @@ irc_message_param(struct irc_message *m, char **param)
 	if (*m->params)
 		*m->params++ = 0;
 
-	return 0;
+	return 1;
 }
 
 int
@@ -275,7 +275,7 @@ irc_message_parse(struct irc_message *m, char *buf, size_t len)
 	memset(m, 0, sizeof(*m));
 
 	if (!str_trim(&buf))
-		return 1;
+		return 0;
 
 	if (*buf == ':') {
 
@@ -295,7 +295,7 @@ irc_message_parse(struct irc_message *m, char *buf, size_t len)
 		m->len_from = buf - m->from;
 
 		if (m->len_from == 0)
-			return 1;
+			return 0;
 
 		if (*buf == '!' || *buf == '@') {
 			*buf++ = 0;
@@ -312,7 +312,7 @@ irc_message_parse(struct irc_message *m, char *buf, size_t len)
 	}
 
 	if (!str_trim(&buf))
-		return 1;
+		return 0;
 
 	m->command = buf;
 
@@ -327,7 +327,7 @@ irc_message_parse(struct irc_message *m, char *buf, size_t len)
 	if (str_trim(&buf))
 		m->params = buf;
 
-	return 0;
+	return 1;
 }
 
 int
@@ -335,8 +335,43 @@ irc_message_split(struct irc_message *m, char **trailing)
 {
 	/* Split the message params and trailing arg for use in generic handling */
 
-	UNUSED(m);
-	UNUSED(trailing);
+	*trailing = NULL;
+
+	if (!m->params)
+		return 0;
+
+	m->split = 1;
+
+	for (char *p = m->params; *p;) {
+
+		while (*p == ' ')
+			p++;
+
+		if (*p == 0)
+			return 0;
+
+		m->n_params++;
+
+		if (m->n_params >= 15) {
+			if (m->params == p) {
+				m->params = NULL;
+				*trailing = p;
+			} else {
+				*(p - 1) = 0;
+				*trailing = (*p) ? p : NULL;
+			}
+			return 1;
+		}
+
+		if (*p == ':') {
+			*p++ = 0;
+			*trailing = (*p) ? p : NULL;
+			return 1;
+		}
+
+		while (*p && *p != ' ')
+			p++;
+	}
 
 	return 0;
 }
