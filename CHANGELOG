@@ -34,6 +34,7 @@ Summary of notable changes and features
  - fix JOIN/PART/QUIT filtering bug when set 0
  - fix nav colouring bug when message received on current chan
  - fix handling of CTCP PING
+ - fix segfault on unrecognized cli args
 
 ## [0.1.1]
 ### Features

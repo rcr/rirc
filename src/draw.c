@@ -136,6 +136,13 @@ draw_bell(void)
 }
 
 void
+draw_init(void)
+{
+	draw_all();
+	redraw();
+}
+
+void
 draw_term(void)
 {
 	printf(RESET_ATTRIBUTES);

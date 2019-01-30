@@ -117,10 +117,6 @@ state_init(void)
 #ifdef DEBUG
 	newline(state.default_channel, 0, "--", " - compiled with DEBUG flags");
 #endif
-
-	/* Initiate a full redraw */
-	draw_all();
-	redraw();
 }
 
 void
@@ -129,8 +125,6 @@ state_term(void)
 	/* Exit handler; must return normally */
 
 	struct server *s1, *s2;
-
-	draw_term();
 
 	channel_free(state.default_channel);
 

@@ -272,10 +272,12 @@ main(int argc, char **argv)
 {
 	int ret;
 
-	if ((ret = parse_args(argc, argv)) == 0)
+	if ((ret = parse_args(argc, argv)) == 0) {
+		draw_init();
 		io_init();
-
-	state_term();
+		draw_term();
+		state_term();
+	}
 
 	return ret;
 }
