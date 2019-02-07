@@ -261,7 +261,7 @@ test_irc_message_split(void)
 	char mesg2[] = "CMD a1 a2 a3 :trailing arg";
 
 	CHECK_IRC_MESSAGE_PARSE(mesg2, 1);
-	CHECK_IRC_MESSAGE_SPLIT(1, "a1 a2 a3 ", "trailing arg");
+	CHECK_IRC_MESSAGE_SPLIT(1, "a1 a2 a3", "trailing arg");
 	CHECK_IRC_MESSAGE_PARAM(1, "a1");
 	CHECK_IRC_MESSAGE_PARAM(1, "a2");
 	CHECK_IRC_MESSAGE_PARAM(1, "a3");
@@ -281,14 +281,14 @@ test_irc_message_split(void)
 	char mesg4[] = "CMD :trailing arg";
 
 	CHECK_IRC_MESSAGE_PARSE(mesg4, 1);
-	CHECK_IRC_MESSAGE_SPLIT(1, "", "trailing arg");
+	CHECK_IRC_MESSAGE_SPLIT(1, NULL, "trailing arg");
 	CHECK_IRC_MESSAGE_PARAM(0, NULL);
 
 	/* Test ':' can exist in args */
 	char mesg5[] = "CMD arg:1:2:3 arg:4:5:6 :trailing arg";
 
 	CHECK_IRC_MESSAGE_PARSE(mesg5, 1);
-	CHECK_IRC_MESSAGE_SPLIT(1, "arg:1:2:3 arg:4:5:6 ", "trailing arg");
+	CHECK_IRC_MESSAGE_SPLIT(1, "arg:1:2:3 arg:4:5:6", "trailing arg");
 	CHECK_IRC_MESSAGE_PARAM(1, "arg:1:2:3");
 	CHECK_IRC_MESSAGE_PARAM(1, "arg:4:5:6");
 	CHECK_IRC_MESSAGE_PARAM(0, NULL);
@@ -377,8 +377,29 @@ test_irc_message_split(void)
 	CHECK_IRC_MESSAGE_PARAM(1, "a13");
 	CHECK_IRC_MESSAGE_PARAM(1, "a14");
 	CHECK_IRC_MESSAGE_PARAM(1, "a15 :trailing arg");
-	CHECK_IRC_MESSAGE_PARAM(0, NULL);
 	CHECK_IRC_MESSAGE_SPLIT(0, NULL, NULL);
+	CHECK_IRC_MESSAGE_PARAM(0, NULL);
+
+	/* Test trimming args - 14 previously parsed */
+	char mesg10[] = "CMD a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 a11 a12 a13 a14    a15 :trailing arg";
+
+	CHECK_IRC_MESSAGE_PARSE(mesg10, 1);
+	CHECK_IRC_MESSAGE_PARAM(1, "a1");
+	CHECK_IRC_MESSAGE_PARAM(1, "a2");
+	CHECK_IRC_MESSAGE_PARAM(1, "a3");
+	CHECK_IRC_MESSAGE_PARAM(1, "a4");
+	CHECK_IRC_MESSAGE_PARAM(1, "a5");
+	CHECK_IRC_MESSAGE_PARAM(1, "a6");
+	CHECK_IRC_MESSAGE_PARAM(1, "a7");
+	CHECK_IRC_MESSAGE_PARAM(1, "a8");
+	CHECK_IRC_MESSAGE_PARAM(1, "a9");
+	CHECK_IRC_MESSAGE_PARAM(1, "a10");
+	CHECK_IRC_MESSAGE_PARAM(1, "a11");
+	CHECK_IRC_MESSAGE_PARAM(1, "a12");
+	CHECK_IRC_MESSAGE_PARAM(1, "a13");
+	CHECK_IRC_MESSAGE_PARAM(1, "a14");
+	CHECK_IRC_MESSAGE_SPLIT(1, NULL, "a15 :trailing arg");
+	CHECK_IRC_MESSAGE_PARAM(0, NULL);
 
 #undef CHECK_IRC_MESSAGE_PARAM
 #undef CHECK_IRC_MESSAGE_PARSE

@@ -184,7 +184,7 @@ _draw_buffer_line(
 		char header[head_w + COLOUR_SIZE * 4 + 1];
 		char *header_ptr = header;
 
-		size_t buff_n = sizeof(header) - 1, /*  */
+		size_t buff_n = sizeof(header) - 1,
 		       text_n = head_w - 1;
 
 		struct tm *line_tm = localtime(&line->time);

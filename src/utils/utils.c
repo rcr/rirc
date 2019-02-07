@@ -357,15 +357,30 @@ irc_message_split(struct irc_message *m, char **trailing)
 				m->params = NULL;
 				*trailing = p;
 			} else {
-				*(p - 1) = 0;
 				*trailing = (*p) ? p : NULL;
+				do {
+					if (p == m->params) {
+						m->params = NULL;
+						return 1;
+					}
+					p--;
+				} while (*p == ' ');
+				*(p + 1) = 0;
 			}
 			return 1;
 		}
 
 		if (*p == ':') {
-			*p++ = 0;
-			*trailing = (*p) ? p : NULL;
+			*p = 0;
+			*trailing = (*(p + 1)) ? (p + 1) : NULL;
+			do {
+				if (p == m->params) {
+					m->params = NULL;
+					return 1;
+				}
+				p--;
+			} while (*p == ' ');
+			*(p + 1) = 0;
 			return 1;
 		}
 

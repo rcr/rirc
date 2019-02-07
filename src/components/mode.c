@@ -221,9 +221,8 @@ mode_chanmode_set(struct mode *m, const struct mode_cfg *cfg, int flag, enum mod
 			MODE_SET(m->lower, bit, set_t);
 		else
 			MODE_SET(m->upper, bit, set_t);
-	}
 
-	else if (flag == 'p') {
+	} else if (flag == 'p') {
 
 		/* Silently ignore */
 		if (mode_isset(m, 's'))
@@ -240,9 +239,8 @@ mode_chanmode_set(struct mode *m, const struct mode_cfg *cfg, int flag, enum mod
 
 			m->prefix = MODE_CHANMODE_PREFIX_PRIVATE;
 		}
-	}
 
-	else if (flag == 's') {
+	} else if (flag == 's') {
 
 		if (set_t == MODE_SET_OFF) {
 			MODE_SET(m->lower, flag_bit('s'), MODE_SET_OFF);
@@ -547,20 +545,19 @@ mode_cfg_subtypes(struct mode_cfg *cfg, const char *str)
 
 	while ((c = *str++)) {
 
+		uint32_t bit;
+
 		if (c == ',') {
 			switch (commas) {
 				case 0:
 				case 1:
 				case 2:
 					setting = subtypes[++commas];
-					break;
+					continue;
 				default:
 					return MODE_ERR_INVALID_CONFIG;
 			}
-			continue;
 		}
-
-		uint32_t bit;
 
 		if ((bit = flag_bit(c)) == 0)
 			continue; /* TODO: aggregate warnings, invalid flag */
@@ -571,8 +568,7 @@ mode_cfg_subtypes(struct mode_cfg *cfg, const char *str)
 		if (MODE_ISLOWER(c)) {
 			MODE_SET(duplicates.lower, bit, MODE_SET_ON);
 			MODE_SET(setting->lower, bit, MODE_SET_ON);
-		}
-		else {
+		} else {
 			MODE_SET(duplicates.upper, bit, MODE_SET_ON);
 			MODE_SET(setting->upper, bit, MODE_SET_ON);
 		}
