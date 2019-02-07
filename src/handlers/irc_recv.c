@@ -36,51 +36,51 @@ static const irc_recv_f irc_numerics[] = {
 	  [3] = irc_info,   /* RPL_CREATED */
 	  [4] = irc_004,    /* RPL_MYINFO */
 	  [5] = irc_005,    /* RPL_ISUPPORT */
-	[200] = NULL,       /* RPL_TRACELINK */
-	[201] = NULL,       /* RPL_TRACECONNECTING */
-	[202] = NULL,       /* RPL_TRACEHANDSHAKE */
-	[203] = NULL,       /* RPL_TRACEUNKNOWN */
-	[204] = NULL,       /* RPL_TRACEOPERATOR */
-	[205] = NULL,       /* RPL_TRACEUSER */
-	[206] = NULL,       /* RPL_TRACESERVER */
-	[207] = NULL,       /* RPL_TRACESERVICE */
-	[208] = NULL,       /* RPL_TRACENEWTYPE */
-	[209] = NULL,       /* RPL_TRACECLASS */
-	[210] = NULL,       /* RPL_TRACELOG */
-	[211] = NULL,       /* RPL_STATSLINKINFO */
-	[212] = NULL,       /* RPL_STATSCOMMANDS */
-	[213] = NULL,       /* RPL_STATSCLINE */
-	[214] = NULL,       /* RPL_STATSNLINE */
-	[215] = NULL,       /* RPL_STATSILINE */
-	[216] = NULL,       /* RPL_STATSKLINE */
-	[217] = NULL,       /* RPL_STATSQLINE */
-	[218] = NULL,       /* RPL_STATSYLINE */
-	[219] = NULL,       /* RPL_ENDOFSTATS */
+	[200] = irc_info,   /* RPL_TRACELINK */
+	[201] = irc_info,   /* RPL_TRACECONNECTING */
+	[202] = irc_info,   /* RPL_TRACEHANDSHAKE */
+	[203] = irc_info,   /* RPL_TRACEUNKNOWN */
+	[204] = irc_info,   /* RPL_TRACEOPERATOR */
+	[205] = irc_info,   /* RPL_TRACEUSER */
+	[206] = irc_info,   /* RPL_TRACESERVER */
+	[207] = irc_info,   /* RPL_TRACESERVICE */
+	[208] = irc_info,   /* RPL_TRACENEWTYPE */
+	[209] = irc_info,   /* RPL_TRACECLASS */
+	[210] = irc_info,   /* RPL_TRACELOG */
+	[211] = irc_info,   /* RPL_STATSLINKINFO */
+	[212] = irc_info,   /* RPL_STATSCOMMANDS */
+	[213] = irc_info,   /* RPL_STATSCLINE */
+	[214] = irc_info,   /* RPL_STATSNLINE */
+	[215] = irc_info,   /* RPL_STATSILINE */
+	[216] = irc_info,   /* RPL_STATSKLINE */
+	[217] = irc_info,   /* RPL_STATSQLINE */
+	[218] = irc_info,   /* RPL_STATSYLINE */
+	[219] = irc_ignore, /* RPL_ENDOFSTATS */
 	[221] = NULL,       /* RPL_UMODEIS */
-	[234] = NULL,       /* RPL_SERVLIST */
-	[235] = NULL,       /* RPL_SERVLISTEND */
-	[240] = NULL,       /* RPL_STATSVLINE */
-	[241] = NULL,       /* RPL_STATSLLINE */
-	[242] = NULL,       /* RPL_STATSUPTIME */
-	[243] = NULL,       /* RPL_STATSOLINE */
-	[244] = NULL,       /* RPL_STATSHLINE */
-	[245] = NULL,       /* RPL_STATSSLINE */
-	[246] = NULL,       /* RPL_STATSPING */
-	[247] = NULL,       /* RPL_STATSBLINE */
-	[250] = NULL,       /* RPL_STATSCONN */
-	[251] = NULL,       /* RPL_LUSERCLIENT */
-	[252] = NULL,       /* RPL_LUSEROP */
-	[253] = NULL,       /* RPL_LUSERUNKNOWN */
-	[254] = NULL,       /* RPL_LUSERCHANNELS */
-	[255] = NULL,       /* RPL_LUSERME */
-	[256] = NULL,       /* RPL_ADMINME */
-	[257] = NULL,       /* RPL_ADMINLOC1 */
-	[258] = NULL,       /* RPL_ADMINLOC2 */
-	[259] = NULL,       /* RPL_ADMINEMAIL */
-	[262] = NULL,       /* RPL_TRACEEND */
-	[263] = NULL,       /* RPL_TRYAGAIN */
-	[265] = NULL,       /* RPL_LOCALUSERS */
-	[266] = NULL,       /* RPL_GLOBALUSERS */
+	[234] = irc_ignore, /* RPL_SERVLIST */
+	[235] = irc_ignore, /* RPL_SERVLISTEND */
+	[240] = irc_info,   /* RPL_STATSVLINE */
+	[241] = irc_info,   /* RPL_STATSLLINE */
+	[242] = irc_info,   /* RPL_STATSUPTIME */
+	[243] = irc_info,   /* RPL_STATSOLINE */
+	[244] = irc_info,   /* RPL_STATSHLINE */
+	[245] = irc_info,   /* RPL_STATSSLINE */
+	[246] = irc_info,   /* RPL_STATSPING */
+	[247] = irc_info,   /* RPL_STATSBLINE */
+	[250] = irc_info,   /* RPL_STATSCONN */
+	[251] = irc_info,   /* RPL_LUSERCLIENT */
+	[252] = irc_info,   /* RPL_LUSEROP */
+	[253] = irc_info,   /* RPL_LUSERUNKNOWN */
+	[254] = irc_info,   /* RPL_LUSERCHANNELS */
+	[255] = irc_info,   /* RPL_LUSERME */
+	[256] = irc_info,   /* RPL_ADMINME */
+	[257] = irc_info,   /* RPL_ADMINLOC1 */
+	[258] = irc_info,   /* RPL_ADMINLOC2 */
+	[259] = irc_info,   /* RPL_ADMINEMAIL */
+	[262] = irc_info,   /* RPL_TRACEEND */
+	[263] = irc_info,   /* RPL_TRYAGAIN */
+	[265] = irc_info,   /* RPL_LOCALUSERS */
+	[266] = irc_info,   /* RPL_GLOBALUSERS */
 	[301] = NULL,       /* RPL_AWAY */
 	[302] = NULL,       /* ERR_USERHOST */
 	[303] = NULL,       /* RPL_ISON */
@@ -104,22 +104,22 @@ static const irc_recv_f irc_numerics[] = {
 	[333] = NULL,       /* RPL_TOPICWHOTIME */
 	[341] = NULL,       /* RPL_INVITING */
 	[346] = NULL,       /* RPL_INVITELIST */
-	[347] = NULL,       /* RPL_ENDOFINVITELIST */
+	[347] = irc_ignore, /* RPL_ENDOFINVITELIST */
 	[348] = NULL,       /* RPL_EXCEPTLIST */
-	[349] = NULL,       /* RPL_ENDOFEXCEPTLIST */
+	[349] = irc_ignore, /* RPL_ENDOFEXCEPTLIST */
 	[351] = NULL,       /* RPL_VERSION */
 	[352] = NULL,       /* RPL_WHOREPLY */
 	[353] = NULL,       /* RPL_NAMREPLY */
 	[364] = NULL,       /* RPL_LINKS */
-	[365] = NULL,       /* RPL_ENDOFLINKS */
+	[365] = irc_ignore, /* RPL_ENDOFLINKS */
 	[366] = irc_ignore, /* RPL_ENDOFNAMES */
 	[367] = NULL,       /* RPL_BANLIST */
 	[368] = NULL,       /* RPL_ENDOFBANLIST */
 	[369] = NULL,       /* RPL_ENDOFWHOWAS */
-	[371] = NULL,       /* RPL_INFO */
-	[372] = NULL,       /* RPL_MOTD */
-	[374] = NULL,       /* RPL_ENDOFINFO */
-	[375] = NULL,       /* RPL_MOTDSTART */
+	[371] = irc_info,   /* RPL_INFO */
+	[372] = irc_info,   /* RPL_MOTD */
+	[374] = irc_ignore, /* RPL_ENDOFINFO */
+	[375] = irc_ignore, /* RPL_MOTDSTART */
 	[376] = irc_ignore, /* RPL_ENDOFMOTD */
 	[381] = NULL,       /* RPL_YOUREOPER */
 	[391] = NULL,       /* RPL_TIME */
@@ -159,11 +159,11 @@ static const irc_recv_f irc_numerics[] = {
 	[467] = NULL,       /* ERR_KEYSET */
 	[471] = NULL,       /* ERR_CHANNELISFULL */
 	[472] = NULL,       /* ERR_UNKNOWNMODE */
-	[473] = NULL,       /* ERR_INVITEONLYCHAN */
+	[473] = irc_error,  /* ERR_INVITEONLYCHAN */
 	[474] = NULL,       /* ERR_BANNEDFROMCHAN */
 	[475] = NULL,       /* ERR_BADCHANNELKEY */
 	[476] = NULL,       /* ERR_BADCHANMASK */
-	[477] = NULL,       /* ERR_NOCHANMODES */
+	[477] = irc_error,  /* ERR_NOCHANMODES */
 	[478] = NULL,       /* ERR_BANLISTFULL */
 	[481] = NULL,       /* ERR_NOPRIVILEGES */
 	[482] = NULL,       /* ERR_CHANOPRIVSNEEDED */
@@ -173,9 +173,9 @@ static const irc_recv_f irc_numerics[] = {
 	[491] = NULL,       /* ERR_NOOPERHOST */
 	[501] = NULL,       /* ERR_UMODEUNKNOWNFLAG */
 	[502] = NULL,       /* ERR_USERSDONTMATCH */
-	[704] = NULL,       /* RPL_HELPSTART */
-	[705] = NULL,       /* RPL_HELP */
-	[706] = NULL,       /* RPL_ENDOFHELP */
+	[704] = irc_ignore, /* RPL_HELPSTART */
+	[705] = irc_info,   /* RPL_HELP */
+	[706] = irc_ignore, /* RPL_ENDOFHELP */
 };
 
 static int
@@ -183,12 +183,17 @@ irc_error(struct server *s, struct irc_message *m)
 {
 	/* Generic error message handling */
 
-	/* TODO */
-	(void)s;
-	(void)m;
-	(void)irc_error;
-	(void)irc_ignore;
-	(void)irc_info;
+	char *trailing;
+
+	if (!str_trim(&m->params))
+		return 0;
+
+	if (!irc_message_split(m, &trailing))
+		server_err(s, "[%s]", m->params);
+	else if (m->params)
+		server_err(s, "[%s] ~ %s", m->params, trailing);
+	else
+		server_err(s, "%s", m->params, trailing);
 
 	return 0;
 }
@@ -198,12 +203,8 @@ irc_ignore(struct server *s, struct irc_message *m)
 {
 	/* Generic handling for ignored message types */
 
-	/* TODO */
-	(void)s;
-	(void)m;
-	(void)irc_error;
-	(void)irc_ignore;
-	(void)irc_info;
+	UNUSED(s);
+	UNUSED(m);
 
 	return 0;
 }
@@ -213,12 +214,17 @@ irc_info(struct server *s, struct irc_message *m)
 {
 	/* Generic info message handling */
 
-	/* TODO */
-	(void)s;
-	(void)m;
-	(void)irc_error;
-	(void)irc_ignore;
-	(void)irc_info;
+	char *trailing;
+
+	if (!str_trim(&m->params))
+		return 0;
+
+	if (!irc_message_split(m, &trailing))
+		server_msg(s, "[%s]", m->params);
+	else if (m->params)
+		server_msg(s, "[%s] ~ %s", m->params, trailing);
+	else
+		server_msg(s, "%s", m->params, trailing);
 
 	return 0;
 }
@@ -239,14 +245,12 @@ irc_004(struct server *s, struct irc_message *m)
 {
 	/* 004 1*<params> [:message] */
 
-	// TODO: parse to trailing arg if it exists
+	// TODO: split
 
 	// newlinef(s->channel, 0, "--", "%s ~ supported by this server", p->params);
 	// server_set_004(s, p->params);
 
-	(void)s;
-	(void)m;
-	return 0;
+	return irc_info(s, m);
 }
 
 static int
@@ -254,12 +258,12 @@ irc_005(struct server *s, struct irc_message *m)
 {
 	/* 005 1*<params> :Are supported by this server */
 
+	// TODO: split
+
 	// newlinef(s->channel, 0, "--", "%s ~ supported by this server", p->params);
 	//server_set_004(s, p->params);
 
-	(void)s;
-	(void)m;
-	return 0;
+	return irc_info(s, m);
 }
 
 static int
@@ -284,7 +288,7 @@ irc_recv_numeric(struct server *s, struct irc_message *m)
 	}
 
 	/* Message target is only used to establish s->nick when registering with a server */
-	if ((irc_message_param(m, &targ))) {
+	if (!(irc_message_param(m, &targ))) {
 		io_dx(s->connection);
 		failf(s, "NUMERIC: target is null");
 	}
