@@ -63,7 +63,7 @@ static int nick_colours[] = NICK_COLOURS
  *
  * The origin for terminal coordinates is in the top left, indexed from 1
  *
- * */
+ */
 struct coords
 {
 	unsigned int c1;
@@ -800,7 +800,6 @@ split_buffer_cols(
 	if (_head_w >= cols)
 		_head_w = cols / 2;
 
-	//TODO: why?
 	_head_w -= 1;
 
 	if (head_w)

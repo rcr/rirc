@@ -354,7 +354,63 @@ static int recv_notice(struct server *s, struct irc_message *m) { (void)s; (void
 static int recv_part(struct server *s, struct irc_message *m) { (void)s; (void)m; return 0; }
 static int recv_ping(struct server *s, struct irc_message *m) { (void)s; (void)m; return 0; }
 static int recv_pong(struct server *s, struct irc_message *m) { (void)s; (void)m; return 0; }
-static int recv_privmsg(struct server *s, struct irc_message *m) { (void)s; (void)m; return 0; }
+
+static int
+recv_privmsg(struct server *s, struct irc_message *m)
+{
+	/* :nick!user@host PRIVMSG <channel> :<message> */
+
+	char *message;
+	char *target;
+	int urgent = 0;
+	struct channel *c;
+
+	if (!m->from)
+		failf(s, "PRIVMSG: sender's nick is null");
+
+	if (!irc_message_param(m, &target))
+		failf(s, "PRIVMSG: target is null");
+
+	if (!irc_message_param(m, &message))
+		failf(s, "PRIVMSG: message is null");
+
+	/* Privmsg from ignored user, do nothing */
+	if (user_list_get(&(s->ignore), m->from, 0))
+		return 0;
+
+	if (!strcmp(target, s->nick)) {
+
+		if ((c = channel_list_get(&s->clist, m->from)) == NULL) {
+			c = channel(m->from, CHANNEL_T_PRIVATE);
+			c->server = s;
+			channel_list_add(&s->clist, c);
+		}
+
+		if (c != current_channel())
+			urgent = 1;
+
+	} else if ((c = channel_list_get(&s->clist, target)) == NULL) {
+		failf(s, "PRIVMSG: channel '%s' not found", target);
+	}
+
+	if (check_pinged(message, s->nick)) {
+
+		if (c != current_channel())
+			urgent = 1;
+
+		newline(c, BUFFER_LINE_PINGED, m->from, message);
+	} else {
+		newline(c, BUFFER_LINE_CHAT, m->from, message);
+	}
+
+	if (urgent) {
+		c->activity = ACTIVITY_PINGED;
+		draw_bell();
+		draw_nav();
+	}
+
+	return 0;
+}
 
 static int
 recv_topic(struct server *s, struct irc_message *m)
