@@ -732,39 +732,3 @@ recv_numeric(struct parsed_mesg *p, struct server *s)
 
 	return 0;
 }
-
-static int
-recv_ping(struct parsed_mesg *p, struct server *s)
-{
-	/* PING :<server> */
-
-	int ret;
-
-	if (!p->trailing)
-		fail(s->channel, "PING: server is null");
-
-	if ((ret = io_sendf(s->connection, "PONG %s", p->trailing)))
-		failf(s->channel, "sendf fail: %s", io_err(ret));
-
-	return 0;
-}
-
-static int
-recv_pong(struct parsed_mesg *p, struct server *s)
-{
-	/*  PONG <server> [<server2>] */
-
-	// FIXME:
-	UNUSED(p);
-	UNUSED(s);
-
-#if 0
-	/*  PING sent explicitly by the user */
-	if (!s->pinging)
-		newlinef(s->channel, 0, "!!", "PONG %s", p->params);
-
-	s->pinging = 0;
-#endif
-
-	return 0;
-}

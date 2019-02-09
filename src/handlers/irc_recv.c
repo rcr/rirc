@@ -118,6 +118,7 @@ static const irc_recv_f irc_numerics[] = {
 	[324] = NULL,       /* RPL_CHANNELMODEIS */
 	[325] = NULL,       /* RPL_UNIQOPIS */
 	[328] = NULL,       /* RPL_CHANNEL_URL */
+	[329] = NULL,       /* RPL_CREATIONTIME */
 	[331] = irc_ignore, /* RPL_NOTOPIC */
 	[332] = NULL,       /* RPL_TOPIC */
 	[333] = NULL,       /* RPL_TOPICWHOTIME */
@@ -372,10 +373,11 @@ recv_join(struct server *s, struct irc_message *m)
 	if (!irc_message_param(m, &chan))
 		failf(s, "JOIN: target channel is null");
 
-	if (!strcmp(chan, s->nick)) {
+	if (!strcmp(m->from, s->nick)) {
 		if ((c = channel_list_get(&s->clist, chan)) == NULL) {
 			c = channel(chan, CHANNEL_T_CHANNEL);
 			c->server = s;
+			c->joined = 1;
 			channel_list_add(&s->clist, c);
 			channel_set_current(c);
 			sendf(s, "MODE %s", chan);
@@ -455,8 +457,31 @@ recv_part(struct server *s, struct irc_message *m)
 	return 0;
 }
 
-static int recv_ping(struct server *s, struct irc_message *m) { (void)s; (void)m; return 0; }
-static int recv_pong(struct server *s, struct irc_message *m) { (void)s; (void)m; return 0; }
+static int
+recv_ping(struct server *s, struct irc_message *m)
+{
+	/* PING :<server> */
+
+	char *server;
+
+	if (!irc_message_param(m, &server))
+		failf(s, "PING: server is null");
+
+	sendf(s, "PONG %s", server);
+
+	return 0;
+}
+
+static int
+recv_pong(struct server *s, struct irc_message *m)
+{
+	/*  PONG <server> [<server2>] */
+
+	UNUSED(s);
+	UNUSED(m);
+
+	return 0;
+}
 
 static int
 recv_privmsg(struct server *s, struct irc_message *m)
