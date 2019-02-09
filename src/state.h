@@ -45,6 +45,7 @@ void free_channel(struct channel*);
 #define FROM_ERROR "-!!-"
 #define FROM_INFO "--"
 #define FROM_UNKNOWN "-\?\?-"
+#define FROM_QUIT "<<"
 
 // info / err
 #define server_msg(S, ...) \

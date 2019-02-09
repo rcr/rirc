@@ -31,13 +31,8 @@
 #define PART_THRESHOLD 0
 #endif
 
-#ifndef QUIT_THRESHOLD
-#define QUIT_THRESHOLD 0
-#endif
-
 static const unsigned join_threshold = JOIN_THRESHOLD;
 static const unsigned part_threshold = PART_THRESHOLD;
-static const unsigned quit_threshold = QUIT_THRESHOLD;
 
 /* Special case handler for numeric replies */
 static int recv_numeric(struct parsed_mesg*, struct server*);
@@ -928,63 +923,6 @@ recv_privmsg(struct parsed_mesg *p, struct server *s)
 		newline(c, BUFFER_LINE_PINGED, p->from, p->trailing);
 	} else
 		newline(c, BUFFER_LINE_CHAT, p->from, p->trailing);
-
-	return 0;
-}
-
-static int
-recv_quit(struct parsed_mesg *p, struct server *s)
-{
-	/* :nick!user@hostname.domain QUIT [:message] */
-
-	if (!p->from)
-		fail(s->channel, "QUIT: sender's nick is null");
-
-	struct channel *c = s->channel;
-	//TODO: channel_list_foreach
-	do {
-		if (user_list_del(&(c->users), p->from) == USER_ERR_NONE) {
-			if (!quit_threshold || c->users.count <= quit_threshold)
-				if (p->trailing)
-					newlinef(c, 0, "<", "%s!%s has quit (%s)", p->from, p->host, p->trailing);
-				else
-					newlinef(c, 0, "<", "%s!%s has quit", p->from, p->host);
-			}
-		}
-		c = c->next;
-	} while (c != s->channel);
-
-	draw_status();
-
-	return 0;
-}
-
-static int
-recv_topic(struct parsed_mesg *p, struct server *s)
-{
-	/* :nick!user@hostname.domain TOPIC <channel> :[topic] */
-
-	char *targ;
-	struct channel *c;
-
-	if (!p->from)
-		fail(s->channel, "TOPIC: sender's nick is null");
-
-	if (!(targ = getarg(&p->params, " ")))
-		fail(s->channel, "TOPIC: target is null");
-
-	if (!p->trailing)
-		fail(s->channel, "TOPIC: topic is null");
-
-	if ((c = channel_list_get(&s->clist, targ)) == NULL)
-		failf(s->channel, "TOPIC: channel '%s' not found", targ);
-
-	if (*p->trailing) {
-		newlinef(c, 0, "--", "%s has changed the topic:", p->from);
-		newlinef(c, 0, "--", "\"%s\"", p->trailing);
-	} else {
-		newlinef(c, 0, "--", "%s has unset the topic", p->from);
-	}
 
 	return 0;
 }

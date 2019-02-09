@@ -20,6 +20,10 @@
 	     return 0; \
 	} while (0)
 
+#ifndef QUIT_THRESHOLD
+#define QUIT_THRESHOLD 0
+#endif
+
 /* Default message handler */
 static int irc_message(struct server*, struct irc_message*, const char*);
 
@@ -27,12 +31,13 @@ static int irc_message(struct server*, struct irc_message*, const char*);
 static int irc_error(struct server*, struct irc_message*);
 static int irc_ignore(struct server*, struct irc_message*);
 static int irc_info(struct server*, struct irc_message*);
-static int irc_unknown(struct server*, struct irc_message*);
 
 /* Numeric handlers */
 static int irc_001(struct server*, struct irc_message*);
 static int irc_004(struct server*, struct irc_message*);
 static int irc_005(struct server*, struct irc_message*);
+
+static const unsigned quit_threshold = QUIT_THRESHOLD;
 
 static const irc_recv_f irc_numerics[] = {
 	  [1] = irc_001,    /* RPL_WELCOME */
@@ -230,14 +235,6 @@ irc_info(struct server *s, struct irc_message *m)
 }
 
 static int
-irc_unknown(struct server *s, struct irc_message *m)
-{
-	/* Unknown message handling */
-
-	return irc_message(s, m, FROM_UNKNOWN);
-}
-
-static int
 irc_001(struct server *s, struct irc_message *m)
 {
 	/* 001 :<Welcome message> */
@@ -344,7 +341,7 @@ irc_recv(struct server *s, struct irc_message *m)
 	if ((handler = recv_handler_lookup(m->command, m->len_command)))
 		return handler->f(s, m);
 
-	return irc_unknown(s, m);
+	return irc_message(s, m, FROM_UNKNOWN);
 }
 
 static int recv_error(struct server *s, struct irc_message *m) { (void)s; (void)m; return 0; }
@@ -358,8 +355,65 @@ static int recv_part(struct server *s, struct irc_message *m) { (void)s; (void)m
 static int recv_ping(struct server *s, struct irc_message *m) { (void)s; (void)m; return 0; }
 static int recv_pong(struct server *s, struct irc_message *m) { (void)s; (void)m; return 0; }
 static int recv_privmsg(struct server *s, struct irc_message *m) { (void)s; (void)m; return 0; }
-static int recv_quit(struct server *s, struct irc_message *m) { (void)s; (void)m; return 0; }
-static int recv_topic(struct server *s, struct irc_message *m) { (void)s; (void)m; return 0; }
+
+static int
+recv_topic(struct server *s, struct irc_message *m)
+{
+	/* :nick!user@host TOPIC <channel> :[topic] */
+
+	char *chan;
+	char *topic;
+	struct channel *c;
+
+	if (!m->from)
+		failf(s, "TOPIC: sender's nick is null");
+
+	if (!irc_message_param(m, &chan))
+		failf(s, "TOPIC: target channel is null");
+
+	if (!irc_message_param(m, &topic))
+		failf(s, "TOPIC: topic is null");
+
+	if ((c = channel_list_get(&s->clist, chan)) == NULL)
+		failf(s, "TOPIC: target channel '%s' not found", chan);
+
+	if (*topic) {
+		newlinef(c, 0, FROM_INFO, "%s has changed the topic:", m->from);
+		newlinef(c, 0, FROM_INFO, "\"%s\"", topic);
+	} else {
+		newlinef(c, 0, FROM_INFO, "%s has unset the topic", m->from);
+	}
+
+	return 0;
+}
+
+static int
+recv_quit(struct server *s, struct irc_message *m)
+{
+	/* :nick!user@host QUIT [:message] */
+
+	char *message;
+	struct channel *c = s->channel;
+
+	if (!m->from)
+		failf(s, "QUIT: sender's nick is null");
+
+	do {
+		if (user_list_del(&(c->users), m->from) == USER_ERR_NONE) {
+			if (!quit_threshold || c->users.count <= quit_threshold) {
+				if (irc_message_param(m, &message))
+					newlinef(c, 0, FROM_QUIT, "%s!%s has quit (%s)", m->from, m->host, message);
+				else
+					newlinef(c, 0, FROM_QUIT, "%s!%s has quit", m->from, m->host);
+			}
+		}
+		c = c->next;
+	} while (c != s->channel);
+
+	draw_status();
+
+	return 0;
+}
 
 #undef failf
 #undef sendf
