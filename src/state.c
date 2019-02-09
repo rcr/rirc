@@ -105,7 +105,6 @@ state_init(void)
 {
 	state.default_channel = state.current_channel = channel("rirc", CHANNEL_T_OTHER);
 
-	/* Splashscreen */
 	newline(state.default_channel, 0, "--", "      _");
 	newline(state.default_channel, 0, "--", " _ __(_)_ __ ___");
 	newline(state.default_channel, 0, "--", "| '__| | '__/ __|");

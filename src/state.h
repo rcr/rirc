@@ -42,11 +42,23 @@ void channel_set_current(struct channel*);
 
 void free_channel(struct channel*);
 
+#define FROM_ERROR "-!!-"
+#define FROM_INFO "--"
+#define FROM_UNKNOWN "-\?\?-"
+
+// info / err
 #define server_msg(S, ...) \
-	do { newlinef((S)->channel, BUFFER_LINE_SERVER_MSG, "--", __VA_ARGS__); } while (0)
+	do { newlinef((S)->channel, BUFFER_LINE_SERVER_MSG, FROM_INFO, __VA_ARGS__); } while (0)
 
 #define server_err(S, ...) \
-	do { newlinef((S)->channel, BUFFER_LINE_SERVER_ERR, "-!!-", __VA_ARGS__); } while (0)
+	do { newlinef((S)->channel, BUFFER_LINE_SERVER_ERR, FROM_ERROR, __VA_ARGS__); } while (0)
+
+#define server_unknown(S, M, ...) \
+	do { newlinef((S)->channel, BUFFER_LINE_SERVER_ERR, FROM_UNKNOWN, (M), __VA_ARGS__); } while (0)
+
+// TODO: replace above macros
+#define server_message(S, F, M, ...) \
+	do { newlinef((S)->channel, BUFFER_LINE_SERVER_ERR, (F), (M), __VA_ARGS__); } while (0)
 
 void newlinef(struct channel*, enum buffer_line_t, const char*, const char*, ...);
 void newline(struct channel*, enum buffer_line_t, const char*, const char*);

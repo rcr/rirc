@@ -20,10 +20,14 @@
 	     return 0; \
 	} while (0)
 
+/* Default message handler */
+static int irc_message(struct server*, struct irc_message*, const char*);
+
 /* Generic handlers */
 static int irc_error(struct server*, struct irc_message*);
 static int irc_ignore(struct server*, struct irc_message*);
 static int irc_info(struct server*, struct irc_message*);
+static int irc_unknown(struct server*, struct irc_message*);
 
 /* Numeric handlers */
 static int irc_001(struct server*, struct irc_message*);
@@ -179,23 +183,31 @@ static const irc_recv_f irc_numerics[] = {
 };
 
 static int
-irc_error(struct server *s, struct irc_message *m)
+irc_message(struct server *s, struct irc_message *m, const char *from)
 {
-	/* Generic error message handling */
-
 	char *trailing;
 
 	if (!str_trim(&m->params))
 		return 0;
 
-	if (!irc_message_split(m, &trailing))
-		server_err(s, "[%s]", m->params);
-	else if (m->params)
-		server_err(s, "[%s] ~ %s", m->params, trailing);
-	else
-		server_err(s, "%s", m->params, trailing);
+	if (irc_message_split(m, &trailing)) {
+		if (m->params)
+			server_message(s, from, "[%s] ~ %s", m->params, trailing);
+		else
+			server_message(s, from, "%s", trailing);
+	} else if (m->params) {
+		server_message(s, from, "[%s]", m->params);
+	}
 
 	return 0;
+}
+
+static int
+irc_error(struct server *s, struct irc_message *m)
+{
+	/* Generic error message handling */
+
+	return irc_message(s, m, FROM_ERROR);
 }
 
 static int
@@ -214,19 +226,15 @@ irc_info(struct server *s, struct irc_message *m)
 {
 	/* Generic info message handling */
 
-	char *trailing;
+	return irc_message(s, m, FROM_INFO);
+}
 
-	if (!str_trim(&m->params))
-		return 0;
+static int
+irc_unknown(struct server *s, struct irc_message *m)
+{
+	/* Unknown message handling */
 
-	if (!irc_message_split(m, &trailing))
-		server_msg(s, "[%s]", m->params);
-	else if (m->params)
-		server_msg(s, "[%s] ~ %s", m->params, trailing);
-	else
-		server_msg(s, "%s", m->params, trailing);
-
-	return 0;
+	return irc_message(s, m, FROM_UNKNOWN);
 }
 
 static int
@@ -234,9 +242,20 @@ irc_001(struct server *s, struct irc_message *m)
 {
 	/* 001 :<Welcome message> */
 
-	(void)s;
-	(void)m;
+	char *trailing;
+	struct channel *c = s->channel;
 
+	/* join non-parted channels */
+	do {
+		if (c->type == CHANNEL_T_CHANNEL && !c->parted)
+			sendf(s, "JOIN %s", c->name);
+		c = c->next;
+	} while (c != s->channel);
+
+	if (irc_message_split(m, &trailing))
+		newline(s->channel, 0, "--", trailing);
+
+	newlinef(s->channel, 0, "--", "You are known as %s", s->nick);
 	return 0;
 }
 
@@ -245,25 +264,31 @@ irc_004(struct server *s, struct irc_message *m)
 {
 	/* 004 1*<params> [:message] */
 
-	// TODO: split
+	char *trailing;
 
-	// newlinef(s->channel, 0, "--", "%s ~ supported by this server", p->params);
-	// server_set_004(s, p->params);
+	if (irc_message_split(m, &trailing))
+		newlinef(s->channel, 0, "--", "%s ~ %s", m->params, trailing);
+	else
+		newlinef(s->channel, 0, "--", "%s", m->params);
 
-	return irc_info(s, m);
+	server_set_004(s, m->params);
+	return 0;
 }
 
 static int
 irc_005(struct server *s, struct irc_message *m)
 {
-	/* 005 1*<params> :Are supported by this server */
+	/* 005 1*<params> [:message] */
 
-	// TODO: split
+	char *trailing;
 
-	// newlinef(s->channel, 0, "--", "%s ~ supported by this server", p->params);
-	//server_set_004(s, p->params);
+	if (irc_message_split(m, &trailing))
+		newlinef(s->channel, 0, "--", "%s ~ %s", m->params, trailing);
+	else
+		newlinef(s->channel, 0, "--", "%s ~ are supported by this server", m->params);
 
-	return irc_info(s, m);
+	server_set_005(s, m->params);
+	return 0;
 }
 
 static int
@@ -319,7 +344,7 @@ irc_recv(struct server *s, struct irc_message *m)
 	if ((handler = recv_handler_lookup(m->command, m->len_command)))
 		return handler->f(s, m);
 
-	failf(s, "Message type '%s' unknown", m->command);
+	return irc_unknown(s, m);
 }
 
 static int recv_error(struct server *s, struct irc_message *m) { (void)s; (void)m; return 0; }
