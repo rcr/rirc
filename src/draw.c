@@ -208,6 +208,9 @@ _draw_buffer_line(
 			case BUFFER_LINE_OTHER:
 			case BUFFER_LINE_SERVER_MSG:
 			case BUFFER_LINE_SERVER_ERR:
+			case BUFFER_LINE_JOIN:
+			case BUFFER_LINE_PART:
+			case BUFFER_LINE_QUIT:
 				if (!_draw_fmt(&header_ptr, &buff_n, &text_n, 0,
 						_colour(BUFFER_LINE_HEADER_FG_NEUTRAL, -1)))
 					goto print_header;

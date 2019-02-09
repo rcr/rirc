@@ -45,6 +45,8 @@ void free_channel(struct channel*);
 #define FROM_ERROR "-!!-"
 #define FROM_INFO "--"
 #define FROM_UNKNOWN "-\?\?-"
+#define FROM_JOIN ">>"
+#define FROM_PART "<<"
 #define FROM_QUIT "<<"
 
 // info / err

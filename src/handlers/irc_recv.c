@@ -8,6 +8,18 @@
 #include "src/state.h"
 #include "src/utils/utils.h"
 
+#ifndef JOIN_THRESHOLD
+#define JOIN_THRESHOLD 0
+#endif
+
+#ifndef PART_THRESHOLD
+#define PART_THRESHOLD 0
+#endif
+
+#ifndef QUIT_THRESHOLD
+#define QUIT_THRESHOLD 0
+#endif
+
 #define failf(S, ...) \
 	do { server_err((S), __VA_ARGS__); \
 	     return 1; \
@@ -19,10 +31,6 @@
 	         failf((S), "Send fail: %s", io_err(ret)); \
 	     return 0; \
 	} while (0)
-
-#ifndef QUIT_THRESHOLD
-#define QUIT_THRESHOLD 0
-#endif
 
 /* Default message handler */
 static int irc_message(struct server*, struct irc_message*, const char*);
@@ -38,6 +46,8 @@ static int irc_004(struct server*, struct irc_message*);
 static int irc_005(struct server*, struct irc_message*);
 
 static const unsigned quit_threshold = QUIT_THRESHOLD;
+static const unsigned join_threshold = JOIN_THRESHOLD;
+static const unsigned part_threshold = PART_THRESHOLD;
 
 static const irc_recv_f irc_numerics[] = {
 	  [1] = irc_001,    /* RPL_WELCOME */
@@ -346,19 +356,112 @@ irc_recv(struct server *s, struct irc_message *m)
 
 static int recv_error(struct server *s, struct irc_message *m) { (void)s; (void)m; return 0; }
 static int recv_invite(struct server *s, struct irc_message *m) { (void)s; (void)m; return 0; }
-static int recv_join(struct server *s, struct irc_message *m) { (void)s; (void)m; return 0; }
+
+
+static int
+recv_join(struct server *s, struct irc_message *m)
+{
+	/* :nick!user@host JOIN <channel> */
+
+	char *chan;
+	struct channel *c;
+
+	if (!m->from)
+		failf(s, "JOIN: sender's nick is null");
+
+	if (!irc_message_param(m, &chan))
+		failf(s, "JOIN: target channel is null");
+
+	if (!strcmp(chan, s->nick)) {
+		if ((c = channel_list_get(&s->clist, chan)) == NULL) {
+			c = channel(chan, CHANNEL_T_CHANNEL);
+			c->server = s;
+			channel_list_add(&s->clist, c);
+			channel_set_current(c);
+			sendf(s, "MODE %s", chan);
+		} else {
+			c->parted = 0;
+		}
+		newlinef(c, BUFFER_LINE_JOIN, FROM_JOIN, "Joined %s", chan);
+		draw_all();
+		return 0;
+	}
+
+	if ((c = channel_list_get(&s->clist, chan)) == NULL)
+		failf(s, "JOIN: channel '%s' not found", chan);
+
+	if (user_list_add(&(c->users), m->from, MODE_EMPTY) == USER_ERR_DUPLICATE)
+		failf(s, "JOIN: user '%s' alread on channel '%s'", m->from, chan);
+
+	if (!join_threshold || c->users.count <= join_threshold)
+		newlinef(c, BUFFER_LINE_JOIN, ">", "%s!%s has joined", m->from, m->host);
+
+	draw_status();
+
+	return 0;
+}
+
+
 static int recv_kick(struct server *s, struct irc_message *m) { (void)s; (void)m; return 0; }
 static int recv_mode(struct server *s, struct irc_message *m) { (void)s; (void)m; return 0; }
 static int recv_nick(struct server *s, struct irc_message *m) { (void)s; (void)m; return 0; }
 static int recv_notice(struct server *s, struct irc_message *m) { (void)s; (void)m; return 0; }
-static int recv_part(struct server *s, struct irc_message *m) { (void)s; (void)m; return 0; }
+
+static int
+recv_part(struct server *s, struct irc_message *m)
+{
+	/* :nick!user@host PART <channel> [:message] */
+
+	char *chan;
+	char *message;
+	struct channel *c;
+
+	if (!m->from)
+		failf(s, "PART: sender's nick is null");
+
+	if (!irc_message_param(m, &chan))
+		failf(s, "PART: target channel is null");
+
+	if (!strcmp(chan, s->nick)) {
+
+		/* If not found, assume channel was closed */
+		if ((c = channel_list_get(&s->clist, chan)) != NULL) {
+
+			if (irc_message_param(m, &message))
+				newlinef(c, BUFFER_LINE_PART, FROM_PART, "you have parted (%s)", message);
+			else
+				newlinef(c, BUFFER_LINE_PART, FROM_PART, "you have parted");
+
+			channel_part(c);
+		}
+	} else {
+
+		if ((c = channel_list_get(&s->clist, chan)) == NULL)
+			failf(s, "PART: channel '%s' not found", chan);
+
+		if (user_list_del(&(c->users), m->from) == USER_ERR_NOT_FOUND)
+			failf(s, "PART: nick '%s' not found in '%s'", m->from, chan);
+
+		if (!part_threshold || c->users.count <= part_threshold) {
+			if (irc_message_param(m, &message))
+				newlinef(c, 0, FROM_PART, "%s!%s has parted (%s)", m->from, m->host, message);
+			else
+				newlinef(c, 0, FROM_PART, "%s!%s has parted", m->from, m->host);
+		}
+	}
+
+	draw_status();
+
+	return 0;
+}
+
 static int recv_ping(struct server *s, struct irc_message *m) { (void)s; (void)m; return 0; }
 static int recv_pong(struct server *s, struct irc_message *m) { (void)s; (void)m; return 0; }
 
 static int
 recv_privmsg(struct server *s, struct irc_message *m)
 {
-	/* :nick!user@host PRIVMSG <channel> :<message> */
+	/* :nick!user@host PRIVMSG <target> :<message> */
 
 	char *message;
 	char *target;
@@ -448,19 +551,21 @@ recv_quit(struct server *s, struct irc_message *m)
 {
 	/* :nick!user@host QUIT [:message] */
 
-	char *message;
+	char *message = NULL;
 	struct channel *c = s->channel;
 
 	if (!m->from)
 		failf(s, "QUIT: sender's nick is null");
 
+	irc_message_param(m, &message);
+
 	do {
 		if (user_list_del(&(c->users), m->from) == USER_ERR_NONE) {
 			if (!quit_threshold || c->users.count <= quit_threshold) {
-				if (irc_message_param(m, &message))
-					newlinef(c, 0, FROM_QUIT, "%s!%s has quit (%s)", m->from, m->host, message);
+				if (message)
+					newlinef(c, BUFFER_LINE_QUIT, FROM_QUIT, "%s!%s has quit (%s)", m->from, m->host, message);
 				else
-					newlinef(c, 0, FROM_QUIT, "%s!%s has quit", m->from, m->host);
+					newlinef(c, BUFFER_LINE_QUIT, FROM_QUIT, "%s!%s has quit", m->from, m->host);
 			}
 		}
 		c = c->next;
