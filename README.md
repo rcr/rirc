@@ -36,19 +36,23 @@ rirc requires the latest version of GNU gperf to compile.
 See: https://www.gnu.org/software/gperf/
 
     make
+
 Or
+
     make debug
 
 ## Installing:
 Default install path:
+
     EXE_DIR = /usr/local/bin
     MAN_DIR = /usr/local/share/man/man1
 
 Edit `Makefile` to alter install path if needed, then:
+
     make install
 
 ## Usage:
-### Args:
+
     rirc [-hv] [-s server [-p port] [-w pass] [-u user] [-r real] [-n nicks] [-c chans]], ...]
     
     Help:
@@ -64,13 +68,15 @@ Edit `Makefile` to alter install path if needed, then:
       -n, --nicks=NICKS         Comma separated list of nicks to use for SERVER
       -c, --chans=CHANNELS      Comma separated list of channels to join for SERVER
 
-### Commands:
+Commands:
+
       :quit
       :clear
       :close
       :connect [host [port] [pass] [user] [real]]
 
-### Keys:
+Keys:
+
       ^N : go to next channel
       ^P : go to previous channel
       ^L : clear channel
