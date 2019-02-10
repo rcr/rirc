@@ -45,6 +45,9 @@ static int irc_001(struct server*, struct irc_message*);
 static int irc_004(struct server*, struct irc_message*);
 static int irc_005(struct server*, struct irc_message*);
 
+static int recv_mode_chanmodes(struct irc_message*, const struct mode_cfg*, struct channel*);
+static int recv_mode_usermodes(struct irc_message*, const struct mode_cfg*, struct server*);
+
 static const unsigned quit_threshold = QUIT_THRESHOLD;
 static const unsigned join_threshold = JOIN_THRESHOLD;
 static const unsigned part_threshold = PART_THRESHOLD;
@@ -355,8 +358,45 @@ irc_recv(struct server *s, struct irc_message *m)
 	return irc_message(s, m, FROM_UNKNOWN);
 }
 
-static int recv_error(struct server *s, struct irc_message *m) { (void)s; (void)m; return 0; }
-static int recv_invite(struct server *s, struct irc_message *m) { (void)s; (void)m; return 0; }
+static int
+recv_error(struct server *s, struct irc_message *m)
+{
+	/* ERROR <message> */
+
+	char *message;
+
+	if (!irc_message_param(m, &message))
+		failf(s, "ERROR: message is null");
+
+	newlinef(s->channel, 0, (s->quitting ? FROM_INFO : "ERROR"), "%s", message);
+
+	return 0;
+}
+
+static int
+recv_invite(struct server *s, struct irc_message *m)
+{
+	/* :nick!user@host INVITE <nick> <channel> */
+
+	char *chan;
+	char *nick;
+
+	if (!m->from)
+		failf(s, "INVITE: sender's nick is null");
+
+	if (!irc_message_param(m, &chan))
+		failf(s, "INVITE: target channel is null");
+
+	if (!irc_message_param(m, &nick))
+		failf(s, "INVITE: target nick is null");
+
+	if (!strcmp(nick, s->nick))
+		newlinef(s->channel, 0, FROM_INFO, "You invited %s to %s", nick, chan);
+	else
+		newlinef(s->channel, 0, FROM_INFO, "You've been invited to %s by %s", chan, m->from);
+
+	return 0;
+}
 
 static int
 recv_join(struct server *s, struct irc_message *m)
@@ -401,7 +441,6 @@ recv_join(struct server *s, struct irc_message *m)
 
 	return 0;
 }
-
 
 static int
 recv_kick(struct server *s, struct irc_message *m)
@@ -459,12 +498,232 @@ recv_kick(struct server *s, struct irc_message *m)
 	return 0;
 }
 
-static int recv_mode(struct server *s, struct irc_message *m) { (void)s; (void)m; return 0; }
+static int
+recv_mode(struct server *s, struct irc_message *m)
+{
+	/* MODE <targ> 1*[<modestring> [<mode arguments>]]
+	 *
+	 * modestring  =  1*(modeset)
+	 * modeset     =  plusminus *(modechar)
+	 * plusminus   =  %x53 / %x55            ; '+' / '-'
+	 * modechar    =  ALPHA
+	 *
+	 * Any number of mode flags can be set or unset in a MODE message, but
+	 * the maximum number of modes with parameters is given by the server's
+	 * MODES configuration.
+	 *
+	 * Mode flags that require a parameter are configured as the server's
+	 * CHANMODE subtypes; A,B,C,D
+	 *
+	 * The following formats are equivalent, if e.g.:
+	 *  - 'a' and 'c' require parameters
+	 *  - 'b' has no parameter
+	 *
+	 *   MODE <chan> +ab  <param a> +c <param c>
+	 *   MODE <chan> +abc <param a>    <param c>
+	 */
+
+	char *targ;
+	struct channel *c;
+
+	if (!irc_message_param(m, &targ))
+		failf(s, "NICK: new nick is null");
+
+	if (!strcmp(targ, s->nick))
+		return recv_mode_usermodes(m, &(s->mode_cfg), s);
+
+	if ((c = channel_list_get(&s->clist, targ)))
+		return recv_mode_chanmodes(m, &(s->mode_cfg), c);
+
+	failf(s, "MODE: target '%s' not found", targ);
+}
+
+static int
+recv_mode_chanmodes(struct irc_message *m, const struct mode_cfg *cfg, struct channel *c)
+{
+	char flag;
+	char *modestring;
+	char *modearg;
+	enum mode_err_t mode_err;
+	enum mode_set_t mode_set;
+	struct mode *chanmodes = &(c->chanmodes);
+	struct user *user;
+
+	if (!irc_message_param(m, &modestring)) {
+		newlinef(c, 0, FROM_ERROR, "MODE: modestring is null");
+		return 1;
+	}
+
+	do {
+		mode_set = MODE_SET_INVALID;
+		mode_err = MODE_ERR_NONE;
+
+		while ((flag = *modestring++)) {
+
+			if (flag == '+') {
+				mode_set = MODE_SET_ON;
+				continue;
+			}
+
+			if (flag == '-') {
+				mode_set = MODE_SET_OFF;
+				continue;
+			}
+
+			modearg = NULL;
+
+			switch (chanmode_type(cfg, mode_set, flag)) {
+
+				/* Doesn't consume an argument */
+				case MODE_FLAG_CHANMODE:
+
+					mode_err = mode_chanmode_set(chanmodes, cfg, flag, mode_set);
+
+					if (mode_err == MODE_ERR_NONE) {
+						newlinef(c, 0, FROM_INFO, "%s%s%s mode: %c%c",
+								(m->from ? m->from : ""),
+								(m->from ? " set " : ""),
+								c->name,
+								(mode_set == MODE_SET_ON ? '+' : '-'),
+								flag);
+					}
+					break;
+
+				/* Consumes an argument */
+				case MODE_FLAG_CHANMODE_PARAM:
+
+					if (!irc_message_param(m, &modearg)) {
+						newlinef(c, 0, FROM_ERROR, "MODE: flag '%c' expected argument", flag);
+						continue;
+					}
+
+					mode_err = mode_chanmode_set(chanmodes, cfg, flag, mode_set);
+
+					if (mode_err == MODE_ERR_NONE) {
+						newlinef(c, 0, FROM_INFO, "%s%s%s mode: %c%c %s",
+								(m->from ? m->from : ""),
+								(m->from ? " set " : ""),
+								c->name,
+								(mode_set == MODE_SET_ON ? '+' : '-'),
+								flag,
+								modearg);
+					}
+					break;
+
+				/* Consumes an argument and sets a usermode */
+				case MODE_FLAG_PREFIX:
+
+					if (!irc_message_param(m, &modearg)) {
+						newlinef(c, 0, FROM_ERROR, "MODE: flag '%c' argument is null", flag);
+						continue;
+					}
+
+					if (!(user = user_list_get(&(c->users), modearg, 0))) {
+						newlinef(c, 0, FROM_ERROR, "MODE: flag '%c' user '%s' not found", flag, modearg);
+						continue;
+					}
+
+					mode_prfxmode_set(&(user->prfxmodes), cfg, flag, mode_set);
+
+					if (mode_err == MODE_ERR_NONE) {
+						newlinef(c, 0, FROM_INFO, "%s%suser %s mode: %c%c",
+								(m->from ? m->from : ""),
+								(m->from ? " set " : ""),
+								modearg,
+								(mode_set == MODE_SET_ON ? '+' : '-'),
+								flag);
+					}
+					break;
+
+				case MODE_FLAG_INVALID_SET:
+					mode_err = MODE_ERR_INVALID_SET;
+					break;
+
+				case MODE_FLAG_INVALID_FLAG:
+					mode_err = MODE_ERR_INVALID_FLAG;
+					break;
+
+				default:
+					newlinef(c, 0, FROM_ERROR, "MODE: unhandled error, flag '%c'");
+					continue;
+			}
+
+			switch (mode_err) {
+
+				case MODE_ERR_INVALID_FLAG:
+					newlinef(c, 0, FROM_ERROR, "MODE: invalid flag '%c'", flag);
+					break;
+
+				case MODE_ERR_INVALID_SET:
+					newlinef(c, 0, FROM_ERROR, "MODE: missing '+'/'-'");
+					break;
+
+				default:
+					break;
+			}
+		}
+	} while (irc_message_param(m, &modestring));
+
+	mode_str(&(c->chanmodes), &(c->chanmodes_str));
+	draw_status();
+
+	return 0;
+}
+
+static int
+recv_mode_usermodes(struct irc_message *m, const struct mode_cfg *cfg, struct server *s)
+{
+	char flag;
+	char *modestring;
+	enum mode_err_t mode_err;
+	enum mode_set_t mode_set;
+	struct mode *usermodes = &(s->usermodes);
+
+	if (!irc_message_param(m, &modestring))
+		failf(s, "MODE: modestring is null");
+
+	do {
+		mode_set = MODE_SET_INVALID;
+
+		while ((flag = *modestring++)) {
+
+			if (flag == '+') {
+				mode_set = MODE_SET_ON;
+				continue;
+			}
+
+			if (flag == '-') {
+				mode_set = MODE_SET_OFF;
+				continue;
+			}
+
+			mode_err = mode_usermode_set(usermodes, cfg, flag, mode_set);
+
+			if (mode_err == MODE_ERR_NONE)
+				newlinef(s->channel, 0, "--", "%s%smode: %c%c",
+						(m->from ? m->from : ""),
+						(m->from ? " set " : ""),
+						(mode_set == MODE_SET_ON ? '+' : '-'),
+						flag);
+
+			else if (mode_err == MODE_ERR_INVALID_SET)
+				newlinef(s->channel, 0, "-!!-", "MODE: missing '+'/'-'");
+
+			else if (mode_err == MODE_ERR_INVALID_FLAG)
+				newlinef(s->channel, 0, "-!!-", "MODE: invalid flag '%c'", flag);
+		}
+	} while (irc_message_param(m, &modestring));
+
+	mode_str(usermodes, &(s->mode_str));
+	draw_status();
+
+	return 0;
+}
 
 static int
 recv_nick(struct server *s, struct irc_message *m)
 {
-	/* :nick!user@host NICK <new nick> */
+	/* :nick!user@host NICK <nick> */
 
 	char *nick;
 	struct channel *c = s->channel;

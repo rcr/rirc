@@ -13,7 +13,7 @@ static char chan_buf[1024];
 static char line_buf[1024];
 static char send_buf[1024];
 
-/* Mock stat.c */
+/* Mock state.c */
 void
 newlinef(struct channel *c, enum buffer_line_t t, const char *f, const char *fmt, ...)
 {
@@ -49,6 +49,9 @@ newline(struct channel *c, enum buffer_line_t t, const char *f, const char *fmt)
 	assert_gt(r2, 0);
 }
 
+struct channel* current_channel(void) { return NULL; }
+void channel_set_current(struct channel *c) { UNUSED(c); }
+
 /* Mock io.c */
 const char*
 io_err(int err)
@@ -77,6 +80,33 @@ io_dx(struct connection *c)
 {
 	UNUSED(c);
 
+	return 0;
+}
+
+/* Mock draw.c */
+void draw_all(void) { ; }
+void draw_bell(void) { ; }
+void draw_nav(void) { ; }
+void draw_status(void) { ; }
+
+/* Mock irc_ctcp.c */
+int
+ctcp_request(struct server *s, const char *f, const char *t, char *m)
+{
+	UNUSED(s);
+	UNUSED(f);
+	UNUSED(t);
+	UNUSED(m);
+	return 0;
+}
+
+int
+ctcp_response(struct server *s, const char *f, const char *t, char *m)
+{
+	UNUSED(s);
+	UNUSED(f);
+	UNUSED(t);
+	UNUSED(m);
 	return 0;
 }
 
