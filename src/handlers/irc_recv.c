@@ -31,7 +31,6 @@
 	do { int ret; \
 	     if ((ret = io_sendf((S)->connection, __VA_ARGS__))) \
 	         failf((S), "Send fail: %s", io_err(ret)); \
-	     return 0; \
 	} while (0)
 
 /* Default message handler */
@@ -46,7 +45,10 @@ static int irc_info(struct server*, struct irc_message*);
 static int irc_001(struct server*, struct irc_message*);
 static int irc_004(struct server*, struct irc_message*);
 static int irc_005(struct server*, struct irc_message*);
+static int irc_221(struct server*, struct irc_message*);
+static int irc_324(struct server*, struct irc_message*);
 static int irc_328(struct server*, struct irc_message*);
+static int irc_329(struct server*, struct irc_message*);
 static int irc_332(struct server*, struct irc_message*);
 static int irc_333(struct server*, struct irc_message*);
 static int irc_353(struct server*, struct irc_message*);
@@ -86,8 +88,8 @@ static const irc_recv_f irc_numerics[] = {
 	[217] = irc_info,   /* RPL_STATSQLINE */
 	[218] = irc_info,   /* RPL_STATSYLINE */
 	[219] = irc_ignore, /* RPL_ENDOFSTATS */
-	[221] = NULL,       /* RPL_UMODEIS */
-	[234] = irc_ignore, /* RPL_SERVLIST */
+	[221] = irc_221,    /* RPL_UMODEIS */
+	[234] = irc_info,   /* RPL_SERVLIST */
 	[235] = irc_ignore, /* RPL_SERVLISTEND */
 	[240] = irc_info,   /* RPL_STATSVLINE */
 	[241] = irc_info,   /* RPL_STATSLLINE */
@@ -111,99 +113,98 @@ static const irc_recv_f irc_numerics[] = {
 	[263] = irc_info,   /* RPL_TRYAGAIN */
 	[265] = irc_info,   /* RPL_LOCALUSERS */
 	[266] = irc_info,   /* RPL_GLOBALUSERS */
-	[301] = NULL,       /* RPL_AWAY */
-	[302] = NULL,       /* ERR_USERHOST */
-	[303] = NULL,       /* RPL_ISON */
-	[305] = NULL,       /* RPL_UNAWAY */
-	[306] = NULL,       /* RPL_NOWAWAY */
-	[311] = NULL,       /* RPL_WHOISUSER */
-	[312] = NULL,       /* RPL_WHOISSERVER */
-	[313] = NULL,       /* RPL_WHOISOPERATOR */
-	[314] = NULL,       /* RPL_WHOWASUSER */
-	[315] = NULL,       /* RPL_ENDOFWHO */
-	[317] = NULL,       /* RPL_WHOISIDLE */
-	[318] = NULL,       /* RPL_ENDOFWHOIS */
-	[319] = NULL,       /* RPL_WHOISCHANNELS */
-	[322] = NULL,       /* RPL_LIST */
-	[323] = NULL,       /* RPL_LISTEND */
-	[324] = NULL,       /* RPL_CHANNELMODEIS */
-	[325] = NULL,       /* RPL_UNIQOPIS */
+	[301] = irc_info,   /* RPL_AWAY */
+	[302] = irc_info,   /* ERR_USERHOST */
+	[303] = irc_info,   /* RPL_ISON */
+	[305] = irc_info,   /* RPL_UNAWAY */
+	[306] = irc_info,   /* RPL_NOWAWAY */
+	[311] = irc_info,   /* RPL_WHOISUSER */
+	[312] = irc_info,   /* RPL_WHOISSERVER */
+	[313] = irc_info,   /* RPL_WHOISOPERATOR */
+	[314] = irc_info,   /* RPL_WHOWASUSER */
+	[315] = irc_ignore, /* RPL_ENDOFWHO */
+	[317] = irc_info,   /* RPL_WHOISIDLE */
+	[318] = irc_ignore, /* RPL_ENDOFWHOIS */
+	[319] = irc_info,   /* RPL_WHOISCHANNELS */
+	[322] = irc_info,   /* RPL_LIST */
+	[323] = irc_ignore, /* RPL_LISTEND */
+	[324] = irc_324,    /* RPL_CHANNELMODEIS */
+	[325] = irc_info,   /* RPL_UNIQOPIS */
 	[328] = irc_328,    /* RPL_CHANNEL_URL */
-	[329] = NULL,       /* RPL_CREATIONTIME */
+	[329] = irc_329,    /* RPL_CREATIONTIME */
 	[331] = irc_ignore, /* RPL_NOTOPIC */
 	[332] = irc_332,    /* RPL_TOPIC */
 	[333] = irc_333,    /* RPL_TOPICWHOTIME */
-	[341] = NULL,       /* RPL_INVITING */
-	[346] = NULL,       /* RPL_INVITELIST */
+	[341] = irc_info,   /* RPL_INVITING */
+	[346] = irc_info,   /* RPL_INVITELIST */
 	[347] = irc_ignore, /* RPL_ENDOFINVITELIST */
-	[348] = NULL,       /* RPL_EXCEPTLIST */
+	[348] = irc_info,   /* RPL_EXCEPTLIST */
 	[349] = irc_ignore, /* RPL_ENDOFEXCEPTLIST */
-	[351] = NULL,       /* RPL_VERSION */
-	[352] = NULL,       /* RPL_WHOREPLY */
+	[351] = irc_info,   /* RPL_VERSION */
+	[352] = irc_info,   /* RPL_WHOREPLY */
 	[353] = irc_353,    /* RPL_NAMREPLY */
-	[364] = NULL,       /* RPL_LINKS */
+	[364] = irc_info,   /* RPL_LINKS */
 	[365] = irc_ignore, /* RPL_ENDOFLINKS */
 	[366] = irc_ignore, /* RPL_ENDOFNAMES */
-	[367] = NULL,       /* RPL_BANLIST */
-	[368] = NULL,       /* RPL_ENDOFBANLIST */
-	[369] = NULL,       /* RPL_ENDOFWHOWAS */
+	[367] = irc_info,   /* RPL_BANLIST */
+	[368] = irc_ignore, /* RPL_ENDOFBANLIST */
+	[369] = irc_ignore, /* RPL_ENDOFWHOWAS */
 	[371] = irc_info,   /* RPL_INFO */
 	[372] = irc_info,   /* RPL_MOTD */
 	[374] = irc_ignore, /* RPL_ENDOFINFO */
 	[375] = irc_ignore, /* RPL_MOTDSTART */
 	[376] = irc_ignore, /* RPL_ENDOFMOTD */
-	[381] = NULL,       /* RPL_YOUREOPER */
-	[391] = NULL,       /* RPL_TIME */
+	[381] = irc_info,   /* RPL_YOUREOPER */
+	[391] = irc_info,   /* RPL_TIME */
 	[401] = irc_error,  /* ERR_NOSUCHNICK */
 	[402] = irc_error,  /* ERR_NOSUCHSERVER */
 	[403] = irc_error,  /* ERR_NOSUCHCHANNEL */
 	[404] = irc_error,  /* ERR_CANNOTSENDTOCHAN */
-	[405] = NULL,       /* ERR_TOOMANYCHANNELS */
-	[406] = NULL,       /* ERR_WASNOSUCHNICK */
-	[407] = NULL,       /* ERR_TOOMANYTARGETS */
-	[408] = NULL,       /* ERR_NOSUCHSERVICE */
-	[409] = NULL,       /* ERR_NOORIGIN */
-	[411] = NULL,       /* ERR_NORECIPIENT */
-	[412] = NULL,       /* ERR_NOTEXTTOSEND */
-	[413] = NULL,       /* ERR_NOTOPLEVEL */
-	[414] = NULL,       /* ERR_WILDTOPLEVEL */
-	[415] = NULL,       /* ERR_BADMASK */
-	[416] = NULL,       /* ERR_TOOMANYMATCHES */
-	[421] = NULL,       /* ERR_UNKNOWNCOMMAND */
-	[422] = NULL,       /* ERR_NOMOTD */
-	[423] = NULL,       /* ERR_NOADMININFO */
-	[431] = NULL,       /* ERR_NONICKNAMEGIVEN */
+	[405] = irc_error,  /* ERR_TOOMANYCHANNELS */
+	[406] = irc_error,  /* ERR_WASNOSUCHNICK */
+	[407] = irc_error,  /* ERR_TOOMANYTARGETS */
+	[408] = irc_error,  /* ERR_NOSUCHSERVICE */
+	[409] = irc_error,  /* ERR_NOORIGIN */
+	[411] = irc_error,  /* ERR_NORECIPIENT */
+	[412] = irc_error,  /* ERR_NOTEXTTOSEND */
+	[413] = irc_error,  /* ERR_NOTOPLEVEL */
+	[414] = irc_error,  /* ERR_WILDTOPLEVEL */
+	[415] = irc_error,  /* ERR_BADMASK */
+	[416] = irc_error,  /* ERR_TOOMANYMATCHES */
+	[421] = irc_error,  /* ERR_UNKNOWNCOMMAND */
+	[422] = irc_error,  /* ERR_NOMOTD */
+	[423] = irc_error,  /* ERR_NOADMININFO */
+	[431] = irc_error,  /* ERR_NONICKNAMEGIVEN */
 	[432] = irc_error,  /* ERR_ERRONEUSNICKNAME */
 	[433] = irc_433,    /* ERR_NICKNAMEINUSE */
-	[436] = NULL,       /* ERR_NICKCOLLISION */
-	[437] = NULL,       /* ERR_UNAVAILRESOURCE */
-	[441] = NULL,       /* ERR_USERNOTINCHANNEL */
-	[442] = NULL,       /* ERR_NOTONCHANNEL */
-	[443] = NULL,       /* ERR_USERONCHANNEL */
-	[451] = NULL,       /* ERR_NOTREGISTERED */
-	[461] = NULL,       /* ERR_NEEDMOREPARAMS */
-	[462] = NULL,       /* ERR_ALREADYREGISTRED */
-	[463] = NULL,       /* ERR_NOPERMFORHOST */
-	[464] = NULL,       /* ERR_PASSWDMISMATCH */
-	[465] = NULL,       /* ERR_YOUREBANNEDCREEP */
-	[466] = NULL,       /* ERR_YOUWILLBEBANNED */
-	[467] = NULL,       /* ERR_KEYSET */
-	[471] = NULL,       /* ERR_CHANNELISFULL */
-	[472] = NULL,       /* ERR_UNKNOWNMODE */
+	[436] = irc_error,  /* ERR_NICKCOLLISION */
+	[437] = irc_error,  /* ERR_UNAVAILRESOURCE */
+	[441] = irc_error,  /* ERR_USERNOTINCHANNEL */
+	[442] = irc_error,  /* ERR_NOTONCHANNEL */
+	[443] = irc_error,  /* ERR_USERONCHANNEL */
+	[451] = irc_error,  /* ERR_NOTREGISTERED */
+	[461] = irc_error,  /* ERR_NEEDMOREPARAMS */
+	[462] = irc_error,  /* ERR_ALREADYREGISTRED */
+	[463] = irc_error,  /* ERR_NOPERMFORHOST */
+	[464] = irc_error,  /* ERR_PASSWDMISMATCH */
+	[465] = irc_error,  /* ERR_YOUREBANNEDCREEP */
+	[466] = irc_error,  /* ERR_YOUWILLBEBANNED */
+	[467] = irc_error,  /* ERR_KEYSET */ [471] = irc_error,  /* ERR_CHANNELISFULL */
+	[472] = irc_error,  /* ERR_UNKNOWNMODE */
 	[473] = irc_error,  /* ERR_INVITEONLYCHAN */
-	[474] = NULL,       /* ERR_BANNEDFROMCHAN */
-	[475] = NULL,       /* ERR_BADCHANNELKEY */
-	[476] = NULL,       /* ERR_BADCHANMASK */
+	[474] = irc_error,  /* ERR_BANNEDFROMCHAN */
+	[475] = irc_error,  /* ERR_BADCHANNELKEY */
+	[476] = irc_error,  /* ERR_BADCHANMASK */
 	[477] = irc_error,  /* ERR_NOCHANMODES */
-	[478] = NULL,       /* ERR_BANLISTFULL */
-	[481] = NULL,       /* ERR_NOPRIVILEGES */
-	[482] = NULL,       /* ERR_CHANOPRIVSNEEDED */
-	[483] = NULL,       /* ERR_CANTKILLSERVER */
-	[484] = NULL,       /* ERR_RESTRICTED */
-	[485] = NULL,       /* ERR_UNIQOPPRIVSNEEDED */
-	[491] = NULL,       /* ERR_NOOPERHOST */
-	[501] = NULL,       /* ERR_UMODEUNKNOWNFLAG */
-	[502] = NULL,       /* ERR_USERSDONTMATCH */
+	[478] = irc_error,  /* ERR_BANLISTFULL */
+	[481] = irc_error,  /* ERR_NOPRIVILEGES */
+	[482] = irc_error,  /* ERR_CHANOPRIVSNEEDED */
+	[483] = irc_error,  /* ERR_CANTKILLSERVER */
+	[484] = irc_error,  /* ERR_RESTRICTED */
+	[485] = irc_error,  /* ERR_UNIQOPPRIVSNEEDED */
+	[491] = irc_error,  /* ERR_NOOPERHOST */
+	[501] = irc_error,  /* ERR_UMODEUNKNOWNFLAG */
+	[502] = irc_error,  /* ERR_USERSDONTMATCH */
 	[704] = irc_ignore, /* RPL_HELPSTART */
 	[705] = irc_info,   /* RPL_HELP */
 	[706] = irc_ignore, /* RPL_ENDOFHELP */
@@ -278,17 +279,15 @@ irc_001(struct server *s, struct irc_message *m)
 	char *trailing;
 	struct channel *c = s->channel;
 
-	/* join non-parted channels */
 	do {
 		if (c->type == CHANNEL_T_CHANNEL && !c->parted)
 			sendf(s, "JOIN %s", c->name);
-		c = c->next;
-	} while (c != s->channel);
+	} while ((c = c->next) != s->channel);
 
 	if (irc_message_split(m, &trailing))
-		newline(s->channel, 0, "--", trailing);
+		newline(s->channel, 0, FROM_INFO, trailing);
 
-	newlinef(s->channel, 0, "--", "You are known as %s", s->nick);
+	newlinef(s->channel, 0, FROM_INFO, "You are known as %s", s->nick);
 	return 0;
 }
 
@@ -300,9 +299,9 @@ irc_004(struct server *s, struct irc_message *m)
 	char *trailing;
 
 	if (irc_message_split(m, &trailing))
-		newlinef(s->channel, 0, "--", "%s ~ %s", m->params, trailing);
+		newlinef(s->channel, 0, FROM_INFO, "%s ~ %s", m->params, trailing);
 	else
-		newlinef(s->channel, 0, "--", "%s", m->params);
+		newlinef(s->channel, 0, FROM_INFO, "%s", m->params);
 
 	server_set_004(s, m->params);
 	return 0;
@@ -316,12 +315,37 @@ irc_005(struct server *s, struct irc_message *m)
 	char *trailing;
 
 	if (irc_message_split(m, &trailing))
-		newlinef(s->channel, 0, "--", "%s ~ %s", m->params, trailing);
+		newlinef(s->channel, 0, FROM_INFO, "%s ~ %s", m->params, trailing);
 	else
-		newlinef(s->channel, 0, "--", "%s ~ are supported by this server", m->params);
+		newlinef(s->channel, 0, FROM_INFO, "%s ~ are supported by this server", m->params);
 
 	server_set_005(s, m->params);
 	return 0;
+}
+
+static int
+irc_221(struct server *s, struct irc_message *m)
+{
+	/* 221 <modestring> */
+
+	return recv_mode_usermodes(m, &(s->mode_cfg), s);
+}
+
+static int
+irc_324(struct server *s, struct irc_message *m)
+{
+	/* 324 <channel> 1*[<modestring> [<mode arguments>]] */
+
+	char *chan;
+	struct channel *c;
+
+	if (!irc_message_param(m, &chan))
+		failf(s, "RPL_CHANNELMODEIS: channel is null");
+
+	if ((c = channel_list_get(&s->clist, chan)) == NULL)
+		failf(s, "RPL_CHANNELMODEIS: channel '%s' not found", chan);
+
+	return recv_mode_chanmodes(m, &(s->mode_cfg), c);
 }
 
 static int
@@ -343,6 +367,41 @@ irc_328(struct server *s, struct irc_message *m)
 		failf(s, "RPL_CHANNEL_URL: channel '%s' not found", chan);
 
 	newlinef(c, 0, FROM_INFO, "URL for %s is: \"%s\"", chan, url);
+	return 0;
+}
+
+static int
+irc_329(struct server *s, struct irc_message *m)
+{
+	char buf[sizeof("1970-01-01T00:00:00")];
+	char *chan;
+	char *time_str;
+	struct channel *c;
+	struct tm tm;
+	time_t t = 0;
+
+	if (!irc_message_param(m, &chan))
+		failf(s, "RPL_CREATIONTIME: channel is null");
+
+	if (!irc_message_param(m, &time_str))
+		failf(s, "RPL_CREATIONTIME: time is null");
+
+	if ((c = channel_list_get(&s->clist, chan)) == NULL)
+		failf(s, "RPL_CREATIONTIME: channel '%s' not found", chan);
+
+	errno = 0;
+	t = strtoul(time_str, NULL, 0);
+
+	if (errno)
+		failf(s, "RPL_CREATIONTIME: strtoul error: %s", strerror(errno));
+
+	if (gmtime_r(&t, &tm) == NULL)
+		failf(s, "RPL_CREATIONTIME: gmtime_r error: %s", strerror(errno));
+
+	if ((strftime(buf, sizeof(buf), "%FT%T", &tm)) == 0)
+		failf(s, "RPL_CREATIONTIME: strftime error");
+
+	newlinef(c, 0, FROM_INFO, "Channel created %s", buf);
 	return 0;
 }
 
@@ -405,7 +464,7 @@ irc_333(struct server *s, struct irc_message *m)
 	if ((strftime(buf, sizeof(buf), "%FT%T", &tm)) == 0)
 		failf(s, "RPL_TOPICWHOTIME: strftime error");
 
-	newlinef(c, 0, "--", "Topic set by %s, %s", nick, buf);
+	newlinef(c, 0, FROM_INFO, "Topic set by %s, %s", nick, buf);
 	return 0;
 }
 
@@ -510,7 +569,10 @@ irc_recv_numeric(struct server *s, struct irc_message *m)
 	if (handler)
 		return (*handler)(s, m);
 
-	failf(s, "Numeric type '%u' unknown", code);
+	if (m->params)
+		failf(s, "Numeric type '%u' unknown: %s", code, m->params);
+	else
+		failf(s, "Numeric type '%u' unknown", code);
 }
 
 static int
@@ -632,9 +694,9 @@ recv_kick(struct server *s, struct irc_message *m)
 		channel_part(c);
 
 		if (message)
-			newlinef(c, 0, "--", "Kicked by %s (%s)", m->from, message);
+			newlinef(c, 0, FROM_INFO, "Kicked by %s (%s)", m->from, message);
 		else
-			newlinef(c, 0, "--", "Kicked by %s", m->from);
+			newlinef(c, 0, FROM_INFO, "Kicked by %s", m->from);
 
 	} else {
 
@@ -642,9 +704,9 @@ recv_kick(struct server *s, struct irc_message *m)
 			failf(s, "KICK: nick '%s' not found in '%s'", user, chan);
 
 		if (message)
-			newlinef(c, 0, "--", "%s has kicked %s (%s)", m->from, user, message);
+			newlinef(c, 0, FROM_INFO, "%s has kicked %s (%s)", m->from, user, message);
 		else
-			newlinef(c, 0, "--", "%s has kicked %s", m->from, user);
+			newlinef(c, 0, FROM_INFO, "%s has kicked %s", m->from, user);
 	}
 
 	draw_status();
@@ -854,17 +916,17 @@ recv_mode_usermodes(struct irc_message *m, const struct mode_cfg *cfg, struct se
 			mode_err = mode_usermode_set(usermodes, cfg, flag, mode_set);
 
 			if (mode_err == MODE_ERR_NONE)
-				newlinef(s->channel, 0, "--", "%s%smode: %c%c",
+				newlinef(s->channel, 0, FROM_INFO, "%s%smode: %c%c",
 						(m->from ? m->from : ""),
 						(m->from ? " set " : ""),
 						(mode_set == MODE_SET_ON ? '+' : '-'),
 						flag);
 
 			else if (mode_err == MODE_ERR_INVALID_SET)
-				newlinef(s->channel, 0, "-!!-", "MODE: missing '+'/'-'");
+				newlinef(s->channel, 0, FROM_ERROR, "MODE: missing '+'/'-'");
 
 			else if (mode_err == MODE_ERR_INVALID_FLAG)
-				newlinef(s->channel, 0, "-!!-", "MODE: invalid flag '%c'", flag);
+				newlinef(s->channel, 0, FROM_ERROR, "MODE: invalid flag '%c'", flag);
 		}
 	} while (irc_message_param(m, &modestring));
 
@@ -910,7 +972,7 @@ recv_nick(struct server *s, struct irc_message *m)
 static int
 recv_notice(struct server *s, struct irc_message *m)
 {
-	/* :nick!user@host NOTICE <target> :<message> */
+	/* :nick!user@host NOTICE <target> <message> */
 
 	char *message;
 	char *target;
@@ -971,7 +1033,7 @@ recv_notice(struct server *s, struct irc_message *m)
 static int
 recv_part(struct server *s, struct irc_message *m)
 {
-	/* :nick!user@host PART <channel> [:message] */
+	/* :nick!user@host PART <channel> [message] */
 
 	char *chan;
 	char *message;
@@ -983,7 +1045,7 @@ recv_part(struct server *s, struct irc_message *m)
 	if (!irc_message_param(m, &chan))
 		failf(s, "PART: target channel is null");
 
-	if (!strcmp(chan, s->nick)) {
+	if (!strcmp(m->from, s->nick)) {
 
 		/* If not found, assume channel was closed */
 		if ((c = channel_list_get(&s->clist, chan)) != NULL) {
@@ -1019,7 +1081,7 @@ recv_part(struct server *s, struct irc_message *m)
 static int
 recv_ping(struct server *s, struct irc_message *m)
 {
-	/* PING :<server> */
+	/* PING <server> */
 
 	char *server;
 
@@ -1045,7 +1107,7 @@ recv_pong(struct server *s, struct irc_message *m)
 static int
 recv_privmsg(struct server *s, struct irc_message *m)
 {
-	/* :nick!user@host PRIVMSG <target> :<message> */
+	/* :nick!user@host PRIVMSG <target> <message> */
 
 	char *message;
 	char *target;
@@ -1104,7 +1166,7 @@ recv_privmsg(struct server *s, struct irc_message *m)
 static int
 recv_topic(struct server *s, struct irc_message *m)
 {
-	/* :nick!user@host TOPIC <channel> :[topic] */
+	/* :nick!user@host TOPIC <channel> [topic] */
 
 	char *chan;
 	char *topic;
@@ -1135,7 +1197,7 @@ recv_topic(struct server *s, struct irc_message *m)
 static int
 recv_quit(struct server *s, struct irc_message *m)
 {
-	/* :nick!user@host QUIT [:message] */
+	/* :nick!user@host QUIT [message] */
 
 	char *message = NULL;
 	struct channel *c = s->channel;
@@ -1154,8 +1216,7 @@ recv_quit(struct server *s, struct irc_message *m)
 					newlinef(c, BUFFER_LINE_QUIT, FROM_QUIT, "%s!%s has quit", m->from, m->host);
 			}
 		}
-		c = c->next;
-	} while (c != s->channel);
+	} while ((c = c->next) != s->channel);
 
 	draw_status();
 

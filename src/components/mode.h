@@ -51,6 +51,7 @@
 
 enum mode_err_t
 {
+	MODE_ERR_DUPLICATE      = -5,
 	MODE_ERR_INVALID_CONFIG = -4,
 	MODE_ERR_INVALID_PREFIX = -3,
 	MODE_ERR_INVALID_FLAG   = -2,
@@ -118,7 +119,7 @@ struct mode_str
 	char str[MODE_STR_LEN + 1];
 	enum mode_str_t
 	{
-		MODE_STR_UNSET = 0, /* Ensure a mode_str type is explicitly set */
+		MODE_STR_UNSET = 0,
 		MODE_STR_CHANMODE,
 		MODE_STR_USERMODE,
 		MODE_STR_PRFXMODE,
@@ -126,19 +127,14 @@ struct mode_str
 	} type;
 };
 
+const char* mode_str(const struct mode*, struct mode_str*);
 enum chanmode_flag_t chanmode_type(const struct mode_cfg*, enum mode_set_t, int);
-
 enum mode_err_t mode_cfg(struct mode_cfg*, const char*, enum mode_cfg_t);
-
+enum mode_err_t mode_chanmode_prefix(struct mode*, const struct mode_cfg*, int);
 enum mode_err_t mode_chanmode_set(struct mode*, const struct mode_cfg*, int, enum mode_set_t);
+enum mode_err_t mode_prfxmode_prefix(struct mode*, const struct mode_cfg*, int);
 enum mode_err_t mode_prfxmode_set(struct mode*, const struct mode_cfg*, int, enum mode_set_t);
 enum mode_err_t mode_usermode_set(struct mode*, const struct mode_cfg*, int, enum mode_set_t);
-
-enum mode_err_t mode_chanmode_prefix(struct mode*, const struct mode_cfg*, int);
-enum mode_err_t mode_prfxmode_prefix(struct mode*, const struct mode_cfg*, int);
-
-char* mode_str(const struct mode*, struct mode_str*);
-
 void mode_reset(struct mode*, struct mode_str*);
 
 #endif

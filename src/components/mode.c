@@ -209,6 +209,9 @@ mode_chanmode_set(struct mode *m, const struct mode_cfg *cfg, int flag, enum mod
 	if (!mode_isset(&(cfg->chanmodes), flag))
 		return MODE_ERR_INVALID_FLAG;
 
+	if (mode_isset(m, flag))
+		return MODE_ERR_DUPLICATE;
+
 	/* Mode subtypes A don't set a flag */
 	if (mode_isset(&(cfg->CHANMODES.A), flag))
 		return MODE_ERR_NONE;
@@ -398,37 +401,34 @@ mode_prfxmode_prefix(struct mode *m, const struct mode_cfg *cfg, int flag)
 	return MODE_ERR_NONE;
 }
 
-char*
+const char*
 mode_str(const struct mode *m, struct mode_str *m_str)
 {
 	/* Write the mode bits to a mode string */
 
-	char c, *skip = "", *str = m_str->str;
+	char c;
+	char *str = m_str->str;
 
 	uint32_t lower = m->lower,
 	         upper = m->upper;
 
-	/* 's' and 'p' flags should not appear in chanmode mode strings */
 	switch (m_str->type) {
 		case MODE_STR_CHANMODE:
-			skip = "sp";
-			break;
 		case MODE_STR_USERMODE:
 		case MODE_STR_PRFXMODE:
 			break;
 		case MODE_STR_UNSET:
 			fatal("mode_str type not set");
-			break;
 		default:
 			fatal("mode_str type unknown");
 	}
 
 	for (c = 'a'; c <= 'z' && lower; c++, lower >>= 1)
-		if ((lower & 1) && !strchr(skip, c))
+		if (lower & 1)
 			*str++ = c;
 
 	for (c = 'A'; c <= 'Z' && upper; c++, upper >>= 1)
-		if ((upper & 1) && !strchr(skip, c))
+		if (upper & 1)
 			*str++ = c;
 
 	*str = 0;
