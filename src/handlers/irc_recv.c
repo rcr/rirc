@@ -475,6 +475,7 @@ irc_353(struct server *s, struct irc_message *m)
 
 	char *chan;
 	char *nick;
+	char *nicks;
 	char *type;
 	struct channel *c;
 
@@ -484,13 +485,16 @@ irc_353(struct server *s, struct irc_message *m)
 	if (!irc_message_param(m, &chan))
 		failf(s, "RPL_NAMEREPLY: channel is null");
 
+	if (!irc_message_param(m, &nicks))
+		failf(s, "RPL_NAMEREPLY: nicks is null");
+
 	if ((c = channel_list_get(&s->clist, chan)) == NULL)
 		failf(s, "RPL_NAMEREPLY: channel '%s' not found", chan);
 
 	if (mode_chanmode_prefix(&(c->chanmodes), &(s->mode_cfg), *type) != MODE_ERR_NONE)
 		newlinef(c, 0, FROM_ERROR, "RPL_NAMEREPLY: invalid channel flag: '%c'", *type);
 
-	if (irc_message_param(m, &nick)) {
+	while ((nick = getarg(&nicks, " "))) {
 
 		char prefix = 0;
 		struct mode m = MODE_EMPTY;
