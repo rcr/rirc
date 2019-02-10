@@ -23,7 +23,7 @@
 #endif
 
 #define failf(S, ...) \
-	do { server_err((S), __VA_ARGS__); \
+	do { server_error((S), __VA_ARGS__); \
 	     return 1; \
 	} while (0)
 
@@ -189,7 +189,8 @@ static const irc_recv_f irc_numerics[] = {
 	[464] = irc_error,  /* ERR_PASSWDMISMATCH */
 	[465] = irc_error,  /* ERR_YOUREBANNEDCREEP */
 	[466] = irc_error,  /* ERR_YOUWILLBEBANNED */
-	[467] = irc_error,  /* ERR_KEYSET */ [471] = irc_error,  /* ERR_CHANNELISFULL */
+	[467] = irc_error,  /* ERR_KEYSET */
+	[471] = irc_error,  /* ERR_CHANNELISFULL */
 	[472] = irc_error,  /* ERR_UNKNOWNMODE */
 	[473] = irc_error,  /* ERR_INVITEONLYCHAN */
 	[474] = irc_error,  /* ERR_BANNEDFROMCHAN */
@@ -234,11 +235,11 @@ irc_message(struct server *s, struct irc_message *m, const char *from)
 
 	if (irc_message_split(m, &trailing)) {
 		if (m->params)
-			server_message(s, from, "[%s] ~ %s", m->params, trailing);
+			newlinef(s->channel, 0, from, "[%s] ~ %s", m->params, trailing);
 		else
-			server_message(s, from, "%s", trailing);
+			newlinef(s->channel, 0, from, "%s", trailing);
 	} else if (m->params) {
-		server_message(s, from, "[%s]", m->params);
+		newlinef(s->channel, 0, from, "[%s]", m->params);
 	}
 
 	return 0;
@@ -287,7 +288,7 @@ irc_001(struct server *s, struct irc_message *m)
 	if (irc_message_split(m, &trailing))
 		newline(s->channel, 0, FROM_INFO, trailing);
 
-	newlinef(s->channel, 0, FROM_INFO, "You are known as %s", s->nick);
+	server_info(s, "You are known as %s", s->nick);
 	return 0;
 }
 
@@ -655,7 +656,7 @@ recv_join(struct server *s, struct irc_message *m)
 		failf(s, "JOIN: user '%s' alread on channel '%s'", m->from, chan);
 
 	if (!join_threshold || c->users.count <= join_threshold)
-		newlinef(c, BUFFER_LINE_JOIN, ">", "%s!%s has joined", m->from, m->host);
+		newlinef(c, BUFFER_LINE_JOIN, FROM_JOIN, "%s!%s has joined", m->from, m->host);
 
 	draw_status();
 
@@ -966,7 +967,7 @@ recv_nick(struct server *s, struct irc_message *m)
 			newlinef(c, BUFFER_LINE_NICK, FROM_NICK, "%s  >>  %s", m->from, nick);
 
 		else if (ret == USER_ERR_DUPLICATE)
-			server_err(s, "NICK: user '%s' alread on channel '%s'", m->from, c->name);
+			server_error(s, "NICK: user '%s' alread on channel '%s'", m->from, c->name);
 
 	} while ((c = c->next) != s->channel);
 

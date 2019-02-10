@@ -12,7 +12,7 @@
 #include "src/utils/utils.h"
 
 #define failf(S, ...) \
-	do { server_err((S), __VA_ARGS__); \
+	do { server_error((S), __VA_ARGS__); \
 	     return 1; \
 	} while (0)
 
@@ -118,9 +118,9 @@ ctcp_request_clientinfo(struct server *s, const char *from, const char *targ, ch
 	UNUSED(targ);
 
 	if (str_trim(&m))
-		server_msg(s, "CTCP CLIENTINFO from %s (%s)", from, m);
+		server_info(s, "CTCP CLIENTINFO from %s (%s)", from, m);
 	else
-		server_msg(s, "CTCP CLIENTINFO from %s", from);
+		server_info(s, "CTCP CLIENTINFO from %s", from);
 
 	sendf(s, "NOTICE %s :\001CLIENTINFO ACTION CLIENTINFO PING SOURCE TIME VERSION\001", from);
 }
@@ -131,9 +131,9 @@ ctcp_request_finger(struct server *s, const char *from, const char *targ, char *
 	UNUSED(targ);
 
 	if (str_trim(&m))
-		server_msg(s, "CTCP FINGER from %s (%s)", from, m);
+		server_info(s, "CTCP FINGER from %s (%s)", from, m);
 	else
-		server_msg(s, "CTCP FINGER from %s", from);
+		server_info(s, "CTCP FINGER from %s", from);
 
 	sendf(s, "NOTICE %s :\001FINGER rirc v"VERSION" ("__DATE__")\001", from);
 }
@@ -143,7 +143,7 @@ ctcp_request_ping(struct server *s, const char *from, const char *targ, char *m)
 {
 	UNUSED(targ);
 
-	server_msg(s, "CTCP PING from %s", from);
+	server_info(s, "CTCP PING from %s", from);
 
 	sendf(s, "NOTICE %s :\001PING %s\001", from, m);
 }
@@ -154,9 +154,9 @@ ctcp_request_source(struct server *s, const char *from, const char *targ, char *
 	UNUSED(targ);
 
 	if (str_trim(&m))
-		server_msg(s, "CTCP SOURCE from %s (%s)", from, m);
+		server_info(s, "CTCP SOURCE from %s (%s)", from, m);
 	else
-		server_msg(s, "CTCP SOURCE from %s", from);
+		server_info(s, "CTCP SOURCE from %s", from);
 
 	sendf(s, "NOTICE %s :\001SOURCE rcr.io/rirc\001", from);
 }
@@ -172,9 +172,9 @@ ctcp_request_time(struct server *s, const char *from, const char *targ, char *m)
 	(void) targ;
 
 	if (str_trim(&m))
-		server_msg(s, "CTCP TIME from %s (%s)", from, m);
+		server_info(s, "CTCP TIME from %s (%s)", from, m);
 	else
-		server_msg(s, "CTCP TIME from %s", from);
+		server_info(s, "CTCP TIME from %s", from);
 
 #ifdef TESTING
 	if (gmtime_r(&t, &tm) == NULL)
@@ -198,9 +198,9 @@ ctcp_request_userinfo(struct server *s, const char *from, const char *targ, char
 	UNUSED(targ);
 
 	if (str_trim(&m))
-		server_msg(s, "CTCP USERINFO from %s (%s)", from, m);
+		server_info(s, "CTCP USERINFO from %s (%s)", from, m);
 	else
-		server_msg(s, "CTCP USERINFO from %s", from);
+		server_info(s, "CTCP USERINFO from %s", from);
 
 	sendf(s, "NOTICE %s :\001USERINFO %s (%s)\001", from, s->nick, s->realname);
 }
@@ -211,9 +211,9 @@ ctcp_request_version(struct server *s, const char *from, const char *targ, char 
 	UNUSED(targ);
 
 	if (str_trim(&m))
-		server_msg(s, "CTCP VERSION from %s (%s)", from, m);
+		server_info(s, "CTCP VERSION from %s (%s)", from, m);
 	else
-		server_msg(s, "CTCP VERSION from %s", from);
+		server_info(s, "CTCP VERSION from %s", from);
 
 	sendf(s, "NOTICE %s :\001VERSION rirc v"VERSION" ("__DATE__")\001", from);
 }
@@ -226,7 +226,7 @@ ctcp_response_clientinfo(struct server *s, const char *from, const char *targ, c
 	if (!str_trim(&m))
 		failf(s, "CTCP CLIENTINFO response from %s: empty message", from);
 
-	server_msg(s, "CTCP CLIENTINFO response from %s: %s", from, m);
+	server_info(s, "CTCP CLIENTINFO response from %s: %s", from, m);
 
 	return 0;
 }
@@ -239,7 +239,7 @@ ctcp_response_finger(struct server *s, const char *from, const char *targ, char 
 	if (!str_trim(&m))
 		failf(s, "CTCP FINGER response from %s: empty message", from);
 
-	server_msg(s, "CTCP FINGER response from %s: %s", from, m);
+	server_info(s, "CTCP FINGER response from %s: %s", from, m);
 
 	return 0;
 }
@@ -302,7 +302,7 @@ ctcp_response_ping(struct server *s, const char *from, const char *targ, char *m
 	res_sec = res / 1000000;
 	res_usec = res % 1000000;
 
-	server_msg(s, "CTCP PING response from %s: %llu.%llus", from, res_sec, res_usec);
+	server_info(s, "CTCP PING response from %s: %llu.%llus", from, res_sec, res_usec);
 
 	return 0;
 }
@@ -315,7 +315,7 @@ ctcp_response_source(struct server *s, const char *from, const char *targ, char 
 	if (!str_trim(&m))
 		failf(s, "CTCP SOURCE response from %s: empty message", from);
 
-	server_msg(s, "CTCP SOURCE response from %s: %s", from, m);
+	server_info(s, "CTCP SOURCE response from %s: %s", from, m);
 
 	return 0;
 }
@@ -328,7 +328,7 @@ ctcp_response_time(struct server *s, const char *from, const char *targ, char *m
 	if (!str_trim(&m))
 		failf(s, "CTCP TIME response from %s: empty message", from);
 
-	server_msg(s, "CTCP TIME response from %s: %s", from, m);
+	server_info(s, "CTCP TIME response from %s: %s", from, m);
 
 	return 0;
 }
@@ -341,7 +341,7 @@ ctcp_response_userinfo(struct server *s, const char *from, const char *targ, cha
 	if (!str_trim(&m))
 		failf(s, "CTCP USERINFO response from %s: empty message", from);
 
-	server_msg(s, "CTCP USERINFO response from %s: %s", from, m);
+	server_info(s, "CTCP USERINFO response from %s: %s", from, m);
 
 	return 0;
 }
@@ -354,7 +354,7 @@ ctcp_response_version(struct server *s, const char *from, const char *targ, char
 	if (!str_trim(&m))
 		failf(s, "CTCP VERSION response from %s: empty message", from);
 
-	server_msg(s, "CTCP VERSION response from %s: %s", from, m);
+	server_info(s, "CTCP VERSION response from %s: %s", from, m);
 
 	return 0;
 }
