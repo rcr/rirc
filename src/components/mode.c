@@ -209,7 +209,7 @@ mode_chanmode_set(struct mode *m, const struct mode_cfg *cfg, int flag, enum mod
 	if (!mode_isset(&(cfg->chanmodes), flag))
 		return MODE_ERR_INVALID_FLAG;
 
-	if (mode_isset(m, flag))
+	if (set_t == MODE_SET_ON && mode_isset(m, flag))
 		return MODE_ERR_DUPLICATE;
 
 	/* Mode subtypes A don't set a flag */
