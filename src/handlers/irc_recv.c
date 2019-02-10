@@ -49,6 +49,8 @@ static int irc_005(struct server*, struct irc_message*);
 static int irc_328(struct server*, struct irc_message*);
 static int irc_332(struct server*, struct irc_message*);
 static int irc_333(struct server*, struct irc_message*);
+static int irc_353(struct server*, struct irc_message*);
+static int irc_433(struct server*, struct irc_message*);
 
 static int irc_recv_numeric(struct server*, struct irc_message*);
 static int recv_mode_chanmodes(struct irc_message*, const struct mode_cfg*, struct channel*);
@@ -138,7 +140,7 @@ static const irc_recv_f irc_numerics[] = {
 	[349] = irc_ignore, /* RPL_ENDOFEXCEPTLIST */
 	[351] = NULL,       /* RPL_VERSION */
 	[352] = NULL,       /* RPL_WHOREPLY */
-	[353] = NULL,       /* RPL_NAMREPLY */
+	[353] = irc_353,    /* RPL_NAMREPLY */
 	[364] = NULL,       /* RPL_LINKS */
 	[365] = irc_ignore, /* RPL_ENDOFLINKS */
 	[366] = irc_ignore, /* RPL_ENDOFNAMES */
@@ -152,10 +154,10 @@ static const irc_recv_f irc_numerics[] = {
 	[376] = irc_ignore, /* RPL_ENDOFMOTD */
 	[381] = NULL,       /* RPL_YOUREOPER */
 	[391] = NULL,       /* RPL_TIME */
-	[401] = NULL,       /* ERR_NOSUCHNICK */
-	[402] = NULL,       /* ERR_NOSUCHSERVER */
-	[403] = NULL,       /* ERR_NOSUCHCHANNEL */
-	[404] = NULL,       /* ERR_CANNOTSENDTOCHAN */
+	[401] = irc_error,  /* ERR_NOSUCHNICK */
+	[402] = irc_error,  /* ERR_NOSUCHSERVER */
+	[403] = irc_error,  /* ERR_NOSUCHCHANNEL */
+	[404] = irc_error,  /* ERR_CANNOTSENDTOCHAN */
 	[405] = NULL,       /* ERR_TOOMANYCHANNELS */
 	[406] = NULL,       /* ERR_WASNOSUCHNICK */
 	[407] = NULL,       /* ERR_TOOMANYTARGETS */
@@ -171,8 +173,8 @@ static const irc_recv_f irc_numerics[] = {
 	[422] = NULL,       /* ERR_NOMOTD */
 	[423] = NULL,       /* ERR_NOADMININFO */
 	[431] = NULL,       /* ERR_NONICKNAMEGIVEN */
-	[432] = NULL,       /* ERR_ERRONEUSNICKNAME */
-	[433] = NULL,       /* ERR_NICKNAMEINUSE */
+	[432] = irc_error,  /* ERR_ERRONEUSNICKNAME */
+	[433] = irc_433,    /* ERR_NICKNAMEINUSE */
 	[436] = NULL,       /* ERR_NICKCOLLISION */
 	[437] = NULL,       /* ERR_UNAVAILRESOURCE */
 	[441] = NULL,       /* ERR_USERNOTINCHANNEL */
@@ -408,6 +410,68 @@ irc_333(struct server *s, struct irc_message *m)
 }
 
 static int
+irc_353(struct server *s, struct irc_message *m)
+{
+	/* 353 ("="/"*"/"@") <channel> *([ "@" / "+" ]<nick>) */
+
+	char *chan;
+	char *nick;
+	char *type;
+	struct channel *c;
+
+	if (!irc_message_param(m, &type))
+		failf(s, "RPL_NAMEREPLY: type is null");
+
+	if (!irc_message_param(m, &chan))
+		failf(s, "RPL_NAMEREPLY: channel is null");
+
+	if ((c = channel_list_get(&s->clist, chan)) == NULL)
+		failf(s, "RPL_NAMEREPLY: channel '%s' not found", chan);
+
+	if (mode_chanmode_prefix(&(c->chanmodes), &(s->mode_cfg), *type) != MODE_ERR_NONE)
+		newlinef(c, 0, FROM_ERROR, "RPL_NAMEREPLY: invalid channel flag: '%c'", *type);
+
+	if (irc_message_param(m, &nick)) {
+
+		char prefix = 0;
+		struct mode m = MODE_EMPTY;
+
+		if (!irc_isnickchar(*nick, 1))
+			prefix = *nick++;
+
+		if (prefix && mode_prfxmode_prefix(&m, &(s->mode_cfg), prefix) != MODE_ERR_NONE)
+			newlinef(c, 0, FROM_ERROR, "Invalid user prefix: '%c'", prefix);
+
+		if (user_list_add(&(c->users), nick, m) == USER_ERR_DUPLICATE)
+			newlinef(c, 0, FROM_ERROR, "Duplicate nick: '%s'", nick);
+	}
+
+	draw_status();
+	return 0;
+}
+
+static int
+irc_433(struct server *s, struct irc_message *m)
+{
+	/* 433 <nick> :Nickname is already in use */
+
+	char *nick;
+
+	if (!irc_message_param(m, &nick))
+		failf(s, "ERR_NICKNAMEINUSE: nick is null");
+
+	newlinef(s->channel, 0, FROM_ERROR, "Nick '%s' in use", nick);
+
+	if (!strcmp(m->from, s->nick)) {
+		server_nicks_next(s);
+		newlinef(s->channel, 0, FROM_ERROR, "Trying again with '%s'", s->nick);
+		sendf(s, "NICK %s", s->nick);
+	}
+
+	return 0;
+}
+
+static int
 irc_recv_numeric(struct server *s, struct irc_message *m)
 {
 	/* :server <code> <target> [args] */
@@ -509,11 +573,11 @@ recv_join(struct server *s, struct irc_message *m)
 			c->server = s;
 			channel_list_add(&s->clist, c);
 			channel_set_current(c);
-			sendf(s, "MODE %s", chan);
 		}
 		c->joined = 1;
 		c->parted = 0;
 		newlinef(c, BUFFER_LINE_JOIN, FROM_JOIN, "Joined %s", chan);
+		sendf(s, "MODE %s", chan);
 		draw_all();
 		return 0;
 	}
