@@ -13,6 +13,8 @@
  *  NOTICE <targ> :\x01VERSION <text>\x01
  */
 
+#define IS_CTCP(M) ((M)[0] == 0x01)
+
 int ctcp_request(struct server*, const char*, const char*, char*);
 int ctcp_response(struct server*, const char*, const char*, char*);
 

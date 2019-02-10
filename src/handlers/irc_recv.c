@@ -358,7 +358,6 @@ irc_recv(struct server *s, struct irc_message *m)
 static int recv_error(struct server *s, struct irc_message *m) { (void)s; (void)m; return 0; }
 static int recv_invite(struct server *s, struct irc_message *m) { (void)s; (void)m; return 0; }
 
-
 static int
 recv_join(struct server *s, struct irc_message *m)
 {
@@ -404,10 +403,155 @@ recv_join(struct server *s, struct irc_message *m)
 }
 
 
-static int recv_kick(struct server *s, struct irc_message *m) { (void)s; (void)m; return 0; }
+static int
+recv_kick(struct server *s, struct irc_message *m)
+{
+	/* :nick!user@host KICK <channel> <user> [message] */
+
+	char *chan;
+	char *message;
+	char *user;
+	struct channel *c;
+
+	if (!m->from)
+		failf(s, "KICK: sender's nick is null");
+
+	if (!irc_message_param(m, &chan))
+		failf(s, "KICK: channel is null");
+
+	if (!irc_message_param(m, &user))
+		failf(s, "KICK: user is null");
+
+	if ((c = channel_list_get(&s->clist, chan)) == NULL)
+		failf(s, "KICK: channel '%s' not found", chan);
+
+	irc_message_param(m, &message);
+
+	/* RFC 2812, section 3.2.8:
+	 *
+	 * If a "comment" is given, this will be sent instead of the
+	 * default message, the nickname of the user issuing the KICK */
+	if (message && !strcmp(m->from, message))
+		message = NULL;
+
+	if (!strcmp(user, s->nick)) {
+
+		channel_part(c);
+
+		if (message)
+			newlinef(c, 0, "--", "Kicked by %s (%s)", m->from, message);
+		else
+			newlinef(c, 0, "--", "Kicked by %s", m->from);
+
+	} else {
+
+		if (user_list_del(&(c->users), user) == USER_ERR_NOT_FOUND)
+			failf(s, "KICK: nick '%s' not found in '%s'", user, chan);
+
+		if (message)
+			newlinef(c, 0, "--", "%s has kicked %s (%s)", m->from, user, message);
+		else
+			newlinef(c, 0, "--", "%s has kicked %s", m->from, user);
+	}
+
+	draw_status();
+
+	return 0;
+}
+
 static int recv_mode(struct server *s, struct irc_message *m) { (void)s; (void)m; return 0; }
-static int recv_nick(struct server *s, struct irc_message *m) { (void)s; (void)m; return 0; }
-static int recv_notice(struct server *s, struct irc_message *m) { (void)s; (void)m; return 0; }
+
+static int
+recv_nick(struct server *s, struct irc_message *m)
+{
+	/* :nick!user@host NICK <new nick> */
+
+	char *nick;
+	struct channel *c = s->channel;
+
+	if (!m->from)
+		failf(s, "NICK: old nick is null");
+
+	if (!irc_message_param(m, &nick))
+		failf(s, "NICK: new nick is null");
+
+	if (!strcmp(nick, s->nick)) {
+		server_nick_set(s, nick);
+		newlinef(s->channel, BUFFER_LINE_NICK, FROM_NICK, "Youn nick is '%s'", nick);
+	}
+
+	do {
+		enum user_err ret;
+
+		if ((ret = user_list_rpl(&(c->users), m->from, nick)) == USER_ERR_NONE)
+			newlinef(c, BUFFER_LINE_NICK, FROM_NICK, "%s  >>  %s", m->from, nick);
+
+		else if (ret == USER_ERR_DUPLICATE)
+			server_err(s, "NICK: user '%s' alread on channel '%s'", m->from, c->name);
+
+	} while ((c = c->next) != s->channel);
+
+	return 0;
+}
+
+static int
+recv_notice(struct server *s, struct irc_message *m)
+{
+	/* :nick!user@host NOTICE <target> :<message> */
+
+	char *message;
+	char *target;
+	int urgent = 0;
+	struct channel *c;
+
+	if (!m->from)
+		failf(s, "NOTICE: sender's nick is null");
+
+	if (!irc_message_param(m, &target))
+		failf(s, "NOTICE: target is null");
+
+	if (!irc_message_param(m, &message))
+		failf(s, "NOTICE: message is null");
+
+	if (user_list_get(&(s->ignore), m->from, 0))
+		return 0;
+
+	if (IS_CTCP(message))
+		return ctcp_response(s, m->from, target, message);
+
+	if (!strcmp(target, s->nick)) {
+
+		if ((c = channel_list_get(&s->clist, m->from)) == NULL) {
+			c = channel(m->from, CHANNEL_T_PRIVATE);
+			c->server = s;
+			channel_list_add(&s->clist, c);
+		}
+
+		if (c != current_channel())
+			urgent = 1;
+
+	} else if ((c = channel_list_get(&s->clist, target)) == NULL) {
+		failf(s, "NOTICE: channel '%s' not found", target);
+	}
+
+	if (check_pinged(message, s->nick)) {
+
+		if (c != current_channel())
+			urgent = 1;
+
+		newline(c, BUFFER_LINE_PINGED, m->from, message);
+	} else {
+		newline(c, BUFFER_LINE_CHAT, m->from, message);
+	}
+
+	if (urgent) {
+		c->activity = ACTIVITY_PINGED;
+		draw_bell();
+		draw_nav();
+	}
+
+	return 0;
+}
 
 static int
 recv_part(struct server *s, struct irc_message *m)
@@ -502,9 +646,11 @@ recv_privmsg(struct server *s, struct irc_message *m)
 	if (!irc_message_param(m, &message))
 		failf(s, "PRIVMSG: message is null");
 
-	/* Privmsg from ignored user, do nothing */
 	if (user_list_get(&(s->ignore), m->from, 0))
 		return 0;
+
+	if (IS_CTCP(message))
+		return ctcp_request(s, m->from, target, message);
 
 	if (!strcmp(target, s->nick)) {
 

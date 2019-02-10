@@ -90,58 +90,6 @@ recv_error(struct parsed_mesg *p, struct server *s)
 }
 
 static int
-recv_kick(struct parsed_mesg *p, struct server *s)
-{
-	/* :nick!user@hostname.domain KICK <channel> <user> :comment */
-
-	char *chan, *user;
-	struct channel *c;
-
-	if (!p->from)
-		fail(s->channel, "KICK: sender's nick is null");
-
-	if (!(chan = getarg(&p->params, " ")))
-		fail(s->channel, "KICK: channel is null");
-
-	if (!(user = getarg(&p->params, " ")))
-		fail(s->channel, "KICK: user is null");
-
-	if ((c = channel_list_get(&s->clist, chan)) == NULL)
-		failf(s->channel, "KICK: channel '%s' not found", chan);
-
-	/* RFC 2812, section 3.2.8:
-	 *
-	 * If a "comment" is given, this will be sent instead of the default message,
-	 * the nickname of the user issuing the KICK.
-	 */
-	if (!strcmp(p->from, p->trailing))
-		p->trailing = NULL;
-
-	if (IS_ME(user)) {
-
-		channel_part(c);
-
-		if (p->trailing)
-			newlinef(c, 0, "--", "You've been kicked by %s (%s)", p->from, p->trailing);
-		else
-			newlinef(c, 0, "--", "You've been kicked by %s", p->from, user);
-	} else {
-
-		if (user_list_del(&(c->users), user) == USER_ERR_NOT_FOUND)
-			failf(s->channel, "KICK: nick '%s' not found in '%s'", user, chan);
-
-		if (p->trailing)
-			newlinef(c, 0, "--", "%s has kicked %s (%s)", p->from, user, p->trailing);
-		else
-			newlinef(c, 0, "--", "%s has kicked %s", p->from, user);
-	}
-
-	draw_status();
-
-	return 0;
-}
-
-static int
 recv_mode(struct parsed_mesg *p, struct server *s)
 {
 	/* MODE <targ> 1*[<modestring> [<mode arguments>]]
@@ -367,70 +315,6 @@ recv_mode_usermodes(struct parsed_mesg *p, const struct mode_cfg *cfg, struct se
 
 	mode_str(usermodes, &(s->mode_str));
 	draw_status();
-
-	return 0;
-}
-
-static int
-recv_nick(struct parsed_mesg *p, struct server *s)
-{
-	/* :nick!user@hostname.domain NICK [:]<new nick> */
-
-	char *nick;
-
-	if (!p->from)
-		fail(s->channel, "NICK: old nick is null");
-
-	/* Some servers seem to send the new nick in the trailing */
-	if (!(nick = getarg(&p->params, " ")) && !(nick = getarg(&p->trailing, " ")))
-		fail(s->channel, "NICK: new nick is null");
-
-	if (IS_ME(p->from)) {
-		server_nick_set(s, nick);
-		newlinef(s->channel, 0, "--", "You are now known as %s", nick);
-	}
-
-	struct channel *c = s->channel;
-	//TODO: channel_list_foreach
-	do {
-		enum user_err ret;
-
-		if ((ret = user_list_rpl(&(c->users), p->from, nick)) == USER_ERR_NONE)
-			newlinef(c, 0, "--", "%s  >>  %s", p->from, nick);
-
-		else if (ret == USER_ERR_DUPLICATE)
-			newlinef(c, 0, "-!!-", "Error: user '%s' alread on channel '%s'", p->from, c->name);
-
-	} while ((c = c->next) != s->channel);
-
-	return 0;
-}
-
-static int
-recv_notice(struct parsed_mesg *p, struct server *s)
-{
-	/* :nick.hostname.domain NOTICE <target> :<message> */
-
-	char *targ;
-	struct channel *c;
-
-	if (!p->trailing)
-		fail(s->channel, "NOTICE: message is null");
-
-	if (!p->from)
-		fail(s->channel, "NOTICE: sender's nick is null");
-
-	/* Notice from ignored user, do nothing */
-	if (user_list_get(&(s->ignore), p->from, 0))
-		return 0;
-
-	if (!(targ = getarg(&p->params, " ")))
-		fail(s->channel, "NOTICE: target is null");
-
-	if ((c = channel_list_get(&s->clist, targ)))
-		newline(c, 0, p->from, p->trailing);
-	else
-		newline(s->channel, 0, p->from, p->trailing);
 
 	return 0;
 }

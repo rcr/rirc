@@ -209,6 +209,7 @@ _draw_buffer_line(
 			case BUFFER_LINE_SERVER_MSG:
 			case BUFFER_LINE_SERVER_ERR:
 			case BUFFER_LINE_JOIN:
+			case BUFFER_LINE_NICK:
 			case BUFFER_LINE_PART:
 			case BUFFER_LINE_QUIT:
 				if (!_draw_fmt(&header_ptr, &buff_n, &text_n, 0,
