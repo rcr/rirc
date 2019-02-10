@@ -16,8 +16,10 @@
 #include "src/rirc.h"
 #include "src/state.h"
 #include "src/utils/utils.h"
+#include "src/handlers/irc_recv.h"
+#include "src/handlers/irc_send.h"
 
-// See: https://vt100.net/docs/vt100-ug/chapter3.html
+/* See: https://vt100.net/docs/vt100-ug/chapter3.html */
 #define CTRL(k) ((k) & 0x1f)
 
 static void _newline(struct channel*, enum buffer_line_t, const char*, const char*, va_list);
@@ -33,6 +35,8 @@ static int state_input_action(const char*, size_t);
 static uint16_t state_complete(char*, uint16_t, uint16_t, int);
 static uint16_t state_complete_list(char*, uint16_t, uint16_t, const char**);
 static uint16_t state_complete_user(char*, uint16_t, uint16_t, int);
+
+static void command(struct channel*, char*);
 
 static struct
 {
@@ -56,6 +60,14 @@ current_channel(void)
 
 /* List of IRC commands for tab completion */
 static const char *irc_list[] = {
+	"ctcp-action",
+	"ctcp-clientinfo",
+	"ctcp-finger",
+	"ctcp-ping",
+	"ctcp-source",
+	"ctcp-time",
+	"ctcp-userinfo",
+	"ctcp-version",
 	"admin",   "connect", "info",     "invite", "join",
 	"kick",    "kill",    "links",    "list",   "lusers",
 	"mode",    "motd",    "names",    "nick",   "notice",
@@ -64,6 +76,7 @@ static const char *irc_list[] = {
 	"time",    "topic",   "trace",    "user",   "version",
 	"who",     "whois",   "whowas",   NULL };
 
+// TODO: from command handler list
 /* List of rirc commands for tab completeion */
 static const char *cmd_list[] = {
 	"clear", "close", "connect", "quit", "set", NULL};
@@ -92,7 +105,6 @@ state_init(void)
 {
 	state.default_channel = state.current_channel = channel("rirc", CHANNEL_T_OTHER);
 
-	/* Splashscreen */
 	newline(state.default_channel, 0, "--", "      _");
 	newline(state.default_channel, 0, "--", " _ __(_)_ __ ___");
 	newline(state.default_channel, 0, "--", "| '__| | '__/ __|");
@@ -104,10 +116,6 @@ state_init(void)
 #ifdef DEBUG
 	newline(state.default_channel, 0, "--", " - compiled with DEBUG flags");
 #endif
-
-	/* Initiate a full redraw */
-	draw_all();
-	redraw();
 }
 
 void
@@ -116,8 +124,6 @@ state_term(void)
 	/* Exit handler; must return normally */
 
 	struct server *s1, *s2;
-
-	draw_term();
 
 	channel_free(state.default_channel);
 
@@ -194,12 +200,12 @@ _newline(struct channel *c, enum buffer_line_t type, const char *from, const cha
 		_text_len,
 		((u == NULL) ? 0 : u->prfxmodes.prefix));
 
-	c->activity = MAX(c->activity, ACTIVITY_ACTIVE);
-
-	if (c == current_channel())
+	if (c == current_channel()) {
 		draw_buffer();
-	else
+	} else {
+		c->activity = MAX(c->activity, ACTIVITY_ACTIVE);
 		draw_nav();
+	}
 }
 
 int
@@ -326,13 +332,9 @@ action_close_server(char c)
 		if ((ret = io_sendf(s->connection, "QUIT :%s", DEFAULT_QUIT_MESG)))
 			newlinef(s->channel, 0, "-!!-", "sendf fail: %s", io_err(ret));
 
-		// FIXME:
-		// - state_server_free shouldn't have to call io/dx/free.
-		// - server objects can have void* connections and remove
-		//   the dependancy on io.h
 		io_dx(s->connection);
-		server_list_del(state_server_list(), s);
 		io_free(s->connection);
+		server_list_del(state_server_list(), s);
 		server_free(s);
 
 		draw_all();
@@ -493,7 +495,7 @@ buffer_scrollback_back(struct channel *c)
 
 	unsigned int buffer_i = b->scrollback,
 	             count = 0,
-	             text_w,
+	             text_w = 0,
 	             cols = io_tty_cols(),
 	             rows = io_tty_rows() - 4;
 
@@ -535,7 +537,7 @@ buffer_scrollback_forw(struct channel *c)
 	/* Scroll a buffer forward one page */
 
 	unsigned int count = 0,
-	             text_w,
+	             text_w = 0,
 	             cols = io_tty_cols(),
 	             rows = io_tty_rows() - 4;
 
@@ -798,7 +800,7 @@ io_cb(enum io_cb_t type, const void *cb_obj, ...)
 }
 
 static void
-send_cmnd(struct channel *c, char *buf)
+command(struct channel *c, char *buf)
 {
 	const char *cmnd;
 	int err;
@@ -838,13 +840,9 @@ send_cmnd(struct channel *c, char *buf)
 				channel_set_current(s->channel);
 				newlinef(s->channel, 0, "-!!-", "already connected to %s:%s", host, port);
 			} else {
-
 				s = server(host, port, pass, user, real);
 				s->connection = connection(s, host, port);
-
-				// TODO: here just get/set the connection object
 				server_list_add(state_server_list(), s);
-
 				channel_set_current(s->channel);
 				io_cx(s->connection);
 				draw_all();
@@ -983,13 +981,7 @@ state_input_ctrlch(const char *c, size_t len)
 static int
 state_input_linef(struct channel *c)
 {
-	/* TODO: cleanup, switch on input type/contents */
-	// input types:
-	//    message/paste
-	//    ::message
-	//    :command
-	//    //message
-	//    /command
+	/* Handle line feed */
 
 	char buf[INPUT_LEN_MAX + 1];
 	size_t len;
@@ -997,10 +989,22 @@ state_input_linef(struct channel *c)
 	if ((len = input_write(&(c->input), buf, sizeof(buf), 0)) == 0)
 		return 0;
 
-	if (buf[0] == ':')
-		send_cmnd(current_channel(), buf + 1);
-	else
-		send_mesg(current_channel()->server, current_channel(), buf);
+	switch (buf[0]) {
+		case ':':
+			if (len > 1 && buf[1] == ':')
+				irc_send_privmsg(current_channel()->server, current_channel(), buf + 1);
+			else
+				command(current_channel(), buf + 1);
+			break;
+		case '/':
+			if (len > 1 && buf[1] == '/')
+				irc_send_privmsg(current_channel()->server, current_channel(), buf + 1);
+			else
+				irc_send_command(current_channel()->server, current_channel(), buf + 1);
+			break;
+		default:
+			irc_send_privmsg(current_channel()->server, current_channel(), buf);
+	}
 
 	input_hist_push(&(c->input));
 
@@ -1030,17 +1034,18 @@ io_cb_read_inp(char *buf, size_t len)
 void
 io_cb_read_soc(char *buf, size_t len, const void *cb_obj)
 {
-	/* TODO: */
-	(void)(len);
-
 	struct channel *c = ((struct server *)cb_obj)->channel;
 
-	struct parsed_mesg p;
+	struct irc_message m;
 
-	if (!(parse_mesg(&p, buf)))
+	if (!(irc_message_parse(&m, buf, len)))
 		newlinef(c, 0, "-!!-", "failed to parse message");
 	else
-		recv_mesg((struct server *)cb_obj, &p);
+		irc_recv((struct server *)cb_obj, &m);
+
+	// FIXME: from ignored user?
+	// if (user_list_get(&(s->ignore), p->from, 0))
+	// 	return 0;
 
 	redraw();
 }

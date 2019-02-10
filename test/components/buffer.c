@@ -33,17 +33,17 @@ test_buffer(void)
 	buffer(&b);
 
 	assert_eq(buffer_size(&b), 0);
-	assert_null(buffer_head(&b));
-	assert_null(buffer_tail(&b));
-	assert_null(buffer_line(&b, b.scrollback));
+	assert_ptr_null(buffer_head(&b));
+	assert_ptr_null(buffer_tail(&b));
+	assert_ptr_null(buffer_line(&b, b.scrollback));
 
 	/* Reset the buffer, check values again */
 	buffer(&b);
 
 	assert_eq(buffer_size(&b), 0);
-	assert_null(buffer_head(&b));
-	assert_null(buffer_tail(&b));
-	assert_null(buffer_line(&b, b.scrollback));
+	assert_ptr_null(buffer_head(&b));
+	assert_ptr_null(buffer_tail(&b));
+	assert_ptr_null(buffer_line(&b, b.scrollback));
 }
 
 static void
@@ -56,7 +56,7 @@ test_buffer_head(void)
 
 	buffer(&b);
 
-	assert_null(buffer_head(&b));
+	assert_ptr_null(buffer_head(&b));
 
 	for (i = 0; i < BUFFER_LINES_MAX + 1; i++)
 		_buffer_newline(&b, _fmt_int(i + 1));
@@ -75,7 +75,7 @@ test_buffer_tail(void)
 
 	buffer(&b);
 
-	assert_null(buffer_tail(&b));
+	assert_ptr_null(buffer_tail(&b));
 
 	for (i = 0; i < BUFFER_LINES_MAX; i++)
 		_buffer_newline(&b, _fmt_int(i + 1));
@@ -100,9 +100,9 @@ test_buffer_line(void)
 
 	/* Should retrieve null for an empty buffer */
 	assert_eq(buffer_size(&b), 0);
-	assert_null(buffer_line(&b, b.head));
-	assert_null(buffer_line(&b, b.tail));
-	assert_null(buffer_line(&b, b.scrollback));
+	assert_ptr_null(buffer_line(&b, b.head));
+	assert_ptr_null(buffer_line(&b, b.tail));
+	assert_ptr_null(buffer_line(&b, b.scrollback));
 
 	/* For any buffer line retrieval, these conditions should always hold */
 	#define CHECK_BUFFER(B) \
@@ -192,7 +192,7 @@ test_buffer_scrollback(void)
 	buffer(&b);
 
 	/* Empty buffer returns NULL */
-	assert_null(buffer_line(&b, b.scrollback));
+	assert_ptr_null(buffer_line(&b, b.scrollback));
 
 	/* Buffer scrollback stays locked to the buffer head when incrementing */
 	_buffer_newline(&b, "a");
@@ -238,13 +238,13 @@ test_buffer_scrollback_status(void)
 	assert_true(buffer_full(&b));
 
 	b.scrollback = b.tail;
-	assert_eq((int)(100 * buffer_scrollback_status(&b)), 100);
+	assert_ueq((100 * buffer_scrollback_status(&b)), 100);
 
 	b.scrollback = b.tail + (BUFFER_LINES_MAX / 2);
-	assert_eq((int)(100 * buffer_scrollback_status(&b)), 50);
+	assert_ueq((100 * buffer_scrollback_status(&b)), 50);
 
 	b.scrollback = b.head - 1;
-	assert_eq((int)(100 * buffer_scrollback_status(&b)), 0);
+	assert_ueq((100 * buffer_scrollback_status(&b)), 0);
 }
 
 static void
@@ -307,8 +307,8 @@ test_buffer_line_overlength(void)
 
 	_buffer_newline(&b, text);
 
-	assert_eq((int)b.buffer_lines[0].text_len, TEXT_LENGTH_MAX);
-	assert_eq((int)b.buffer_lines[2].text_len, TEXT_LENGTH_MAX / 2);
+	assert_ueq(b.buffer_lines[0].text_len, TEXT_LENGTH_MAX);
+	assert_ueq(b.buffer_lines[2].text_len, TEXT_LENGTH_MAX / 2);
 
 	assert_eq(buffer_size(&b), 3);
 
@@ -390,7 +390,7 @@ test_buffer_newline_prefix(void)
 
 	assert_strcmp(line->text, "abc");
 	assert_strcmp(line->from, "testing");
-	assert_eq((int)line->from_len, (int)strlen("testing"));
+	assert_ueq(line->from_len, strlen("testing"));
 
 	buffer_newline(&b, BUFFER_LINE_OTHER, from_str, text_str, from_len, text_len, '@');
 
@@ -398,7 +398,7 @@ test_buffer_newline_prefix(void)
 
 	assert_strcmp(line->text, "abc");
 	assert_strcmp(line->from, "@testing");
-	assert_eq((int)line->from_len, (int)strlen("@testing"));
+	assert_ueq(line->from_len, strlen("@testing"));
 
 	/* Test truncating `from` */
 
@@ -422,21 +422,21 @@ test_buffer_newline_prefix(void)
 	buffer_newline(&b, BUFFER_LINE_OTHER, from_str, text_str, from_len, text_len, 0);
 
 	line = buffer_head(&b);
-	assert_eq((int)line->from_len, FROM_LENGTH_MAX);
+	assert_ueq(line->from_len, FROM_LENGTH_MAX);
 	assert_eq(line->from[FROM_LENGTH_MAX - 1], 'c');
 
 
 	buffer_newline(&b, BUFFER_LINE_OTHER, from_str, text_str, from_len, text_len, '@');
 
 	line = buffer_head(&b);
-	assert_eq((int)line->from_len, FROM_LENGTH_MAX);
+	assert_ueq(line->from_len, FROM_LENGTH_MAX);
 	assert_eq(line->from[FROM_LENGTH_MAX - 1], 'b');
 }
 
 int
 main(void)
 {
-	testcase tests[] = {
+	struct testcase tests[] = {
 		TESTCASE(test_buffer),
 		TESTCASE(test_buffer_head),
 		TESTCASE(test_buffer_tail),

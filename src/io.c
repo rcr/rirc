@@ -138,8 +138,10 @@ static void io_soc_shutdown(int);
 static void io_state_force(struct connection*, enum io_state_t);
 static void io_tty_init(void);
 static void io_tty_term(void);
-static void io_tty_winsize(unsigned*, unsigned*);
+static void io_tty_winsize(void);
 static void* io_thread(void*);
+static unsigned io_cols;
+static unsigned io_rows;
 
 static int io_running;
 static pthread_mutex_t cb_mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -566,7 +568,7 @@ io_recv(struct connection *c, const char *buf, size_t n)
 
 			c->read.buf[ci] = 0;
 
-			debug("recv: (%zu) %s", ci, c->read.buf);
+			debug(" recv: (%zu) %s", ci, c->read.buf);
 
 			PT_LK(&cb_mutex);
 			io_cb_read_soc(c->read.buf, ci, c->obj);
@@ -686,7 +688,7 @@ io_term(void)
 }
 
 static void
-io_tty_winsize(unsigned *rows, unsigned *cols)
+io_tty_winsize(void)
 {
 	static struct winsize tty_ws;
 
@@ -695,26 +697,24 @@ io_tty_winsize(unsigned *rows, unsigned *cols)
 
 		if (ioctl(0, TIOCGWINSZ, &tty_ws) < 0)
 			fatal("ioctl: %s", strerror(errno));
-	}
 
-	*rows = tty_ws.ws_row;
-	*cols = tty_ws.ws_col;
+		io_rows = tty_ws.ws_row;
+		io_cols = tty_ws.ws_col;
+	}
 }
 
 unsigned
 io_tty_cols(void)
 {
-	unsigned rows, cols;
-	io_tty_winsize(&rows, &cols);
-	return cols;
+	io_tty_winsize();
+	return io_cols;
 }
 
 unsigned
 io_tty_rows(void)
 {
-	unsigned rows, cols;
-	io_tty_winsize(&rows, &cols);
-	return rows;
+	io_tty_winsize();
+	return io_rows;
 }
 
 const char*

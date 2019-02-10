@@ -24,8 +24,8 @@ test_user_list(void)
 	assert_eq(user_list_add(&ulist, "aaa", MODE_EMPTY), USER_ERR_DUPLICATE);
 
 	/* Test retrieving by name, failure */
-	assert_null(user_list_get(&ulist, "a", 0));
-	assert_null(user_list_get(&ulist, "z", 0));
+	assert_ptr_null(user_list_get(&ulist, "a", 0));
+	assert_ptr_null(user_list_get(&ulist, "z", 0));
 
 	/* Test retrieving by name, success */
 	if ((u1 = user_list_get(&ulist, "aaa", 0)) == NULL)
@@ -42,8 +42,8 @@ test_user_list(void)
 	assert_strcmp(u3->nick, "ccc");
 
 	/* Test retrieving by name prefix, failure */
-	assert_null(user_list_get(&ulist, "z",  1));
-	assert_null(user_list_get(&ulist, "ab", 2));
+	assert_ptr_null(user_list_get(&ulist, "z",  1));
+	assert_ptr_null(user_list_get(&ulist, "ab", 2));
 
 	if ((u1 = user_list_get(&ulist, "a", 1)) == NULL)
 		abort_test("Failed to retrieve u1 by prefix");
@@ -78,7 +78,7 @@ test_user_list(void)
 
 	assert_strcmp(u4->nick, "ddd");
 
-	assert_null(user_list_get(&ulist, "ccc",  0));
+	assert_ptr_null(user_list_get(&ulist, "ccc",  0));
 
 	/* Test removing users from list, failure */
 	assert_eq(user_list_del(&ulist, "ccc"), USER_ERR_NOT_FOUND);
@@ -126,7 +126,7 @@ test_user_list_free(void)
 int
 main(void)
 {
-	testcase tests[] = {
+	struct testcase tests[] = {
 		TESTCASE(test_user_list),
 		TESTCASE(test_user_list_free)
 	};

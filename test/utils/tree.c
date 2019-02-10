@@ -142,53 +142,53 @@ test_avl_add(void)
 		t5 = { .val = 250 },
 		t6 = { .val = 350 };
 
-	assert_ptrequals(test_avl_list_AVL_ADD(&tl, &t0), &t0);
-	assert_ptrequals(test_avl_list_AVL_ADD(&tl, &t1), &t1);
-	assert_ptrequals(test_avl_list_AVL_ADD(&tl, &t2), &t2);
-	assert_ptrequals(test_avl_list_AVL_ADD(&tl, &t3), &t3);
-	assert_ptrequals(test_avl_list_AVL_ADD(&tl, &t4), &t4);
-	assert_ptrequals(test_avl_list_AVL_ADD(&tl, &t5), &t5);
-	assert_ptrequals(test_avl_list_AVL_ADD(&tl, &t6), &t6);
+	assert_ptr_eq(test_avl_list_AVL_ADD(&tl, &t0), &t0);
+	assert_ptr_eq(test_avl_list_AVL_ADD(&tl, &t1), &t1);
+	assert_ptr_eq(test_avl_list_AVL_ADD(&tl, &t2), &t2);
+	assert_ptr_eq(test_avl_list_AVL_ADD(&tl, &t3), &t3);
+	assert_ptr_eq(test_avl_list_AVL_ADD(&tl, &t4), &t4);
+	assert_ptr_eq(test_avl_list_AVL_ADD(&tl, &t5), &t5);
+	assert_ptr_eq(test_avl_list_AVL_ADD(&tl, &t6), &t6);
 
 	/* Duplicate */
-	assert_null(test_avl_list_AVL_ADD(&tl, &t6));
+	assert_ptr_null(test_avl_list_AVL_ADD(&tl, &t6));
 
 	/* Check tree structure */
-	assert_ptrequals(TREE_ROOT(&tl), &t0);
+	assert_ptr_eq(TREE_ROOT(&tl), &t0);
 
-	assert_ptrequals(t0.node.tree_left,  &t1);
-	assert_ptrequals(t0.node.tree_right, &t2);
+	assert_ptr_eq(t0.node.tree_left,  &t1);
+	assert_ptr_eq(t0.node.tree_right, &t2);
 
-	assert_ptrequals(t1.node.tree_left,  &t3);
-	assert_ptrequals(t1.node.tree_right, &t4);
+	assert_ptr_eq(t1.node.tree_left,  &t3);
+	assert_ptr_eq(t1.node.tree_right, &t4);
 
-	assert_ptrequals(t2.node.tree_left,  &t5);
-	assert_ptrequals(t2.node.tree_right, &t6);
+	assert_ptr_eq(t2.node.tree_left,  &t5);
+	assert_ptr_eq(t2.node.tree_right, &t6);
 
-	assert_null(t3.node.tree_left);
-	assert_null(t3.node.tree_right);
+	assert_ptr_null(t3.node.tree_left);
+	assert_ptr_null(t3.node.tree_right);
 
-	assert_null(t4.node.tree_left);
-	assert_null(t4.node.tree_right);
+	assert_ptr_null(t4.node.tree_left);
+	assert_ptr_null(t4.node.tree_right);
 
-	assert_null(t5.node.tree_left);
-	assert_null(t5.node.tree_right);
+	assert_ptr_null(t5.node.tree_left);
+	assert_ptr_null(t5.node.tree_right);
 
-	assert_null(t6.node.tree_left);
-	assert_null(t6.node.tree_right);
+	assert_ptr_null(t6.node.tree_left);
+	assert_ptr_null(t6.node.tree_right);
 
 	/* Retrieve the nodes */
-	assert_ptrequals(test_avl_list_AVL_GET(&tl, &t0), &t0);
-	assert_ptrequals(test_avl_list_AVL_GET(&tl, &t1), &t1);
-	assert_ptrequals(test_avl_list_AVL_GET(&tl, &t2), &t2);
-	assert_ptrequals(test_avl_list_AVL_GET(&tl, &t3), &t3);
-	assert_ptrequals(test_avl_list_AVL_GET(&tl, &t4), &t4);
-	assert_ptrequals(test_avl_list_AVL_GET(&tl, &t5), &t5);
-	assert_ptrequals(test_avl_list_AVL_GET(&tl, &t6), &t6);
+	assert_ptr_eq(test_avl_list_AVL_GET(&tl, &t0), &t0);
+	assert_ptr_eq(test_avl_list_AVL_GET(&tl, &t1), &t1);
+	assert_ptr_eq(test_avl_list_AVL_GET(&tl, &t2), &t2);
+	assert_ptr_eq(test_avl_list_AVL_GET(&tl, &t3), &t3);
+	assert_ptr_eq(test_avl_list_AVL_GET(&tl, &t4), &t4);
+	assert_ptr_eq(test_avl_list_AVL_GET(&tl, &t5), &t5);
+	assert_ptr_eq(test_avl_list_AVL_GET(&tl, &t6), &t6);
 
 	struct test_avl t7 = { .val = -1 };
 
-	assert_null(test_avl_list_AVL_GET(&tl, &t7));
+	assert_ptr_null(test_avl_list_AVL_GET(&tl, &t7));
 }
 
 static void
@@ -217,16 +217,16 @@ test_avl_del(void)
 		t350 = { .val = 350 },
 		t0 = { .val = 0 };
 
-	assert_ptrequals(test_avl_list_AVL_ADD(&tl, &t200), &t200);
-	assert_ptrequals(test_avl_list_AVL_ADD(&tl, &t100), &t100);
-	assert_ptrequals(test_avl_list_AVL_ADD(&tl, &t300), &t300);
-	assert_ptrequals(test_avl_list_AVL_ADD(&tl, &t050), &t050);
-	assert_ptrequals(test_avl_list_AVL_ADD(&tl, &t150), &t150);
-	assert_ptrequals(test_avl_list_AVL_ADD(&tl, &t250), &t250);
-	assert_ptrequals(test_avl_list_AVL_ADD(&tl, &t350), &t350);
+	assert_ptr_eq(test_avl_list_AVL_ADD(&tl, &t200), &t200);
+	assert_ptr_eq(test_avl_list_AVL_ADD(&tl, &t100), &t100);
+	assert_ptr_eq(test_avl_list_AVL_ADD(&tl, &t300), &t300);
+	assert_ptr_eq(test_avl_list_AVL_ADD(&tl, &t050), &t050);
+	assert_ptr_eq(test_avl_list_AVL_ADD(&tl, &t150), &t150);
+	assert_ptr_eq(test_avl_list_AVL_ADD(&tl, &t250), &t250);
+	assert_ptr_eq(test_avl_list_AVL_ADD(&tl, &t350), &t350);
 
 	/* Test deleting node not found in tree */
-	assert_ptrequals(test_avl_list_AVL_DEL(&tl, &t0), NULL);
+	assert_ptr_eq(test_avl_list_AVL_DEL(&tl, &t0), NULL);
 
 	/* Delete 200; In-order successor is substituted from leaf
 	 *
@@ -237,28 +237,28 @@ test_avl_del(void)
 	 * 50     150        350
 	 */
 
-	assert_ptrequals(test_avl_list_AVL_DEL(&tl, &t200), &t200);
+	assert_ptr_eq(test_avl_list_AVL_DEL(&tl, &t200), &t200);
 
 	/* Check tree structure */
-	assert_ptrequals(TREE_ROOT(&tl), &t250);
+	assert_ptr_eq(TREE_ROOT(&tl), &t250);
 
-	assert_ptrequals(t250.node.tree_left, &t100);
-	assert_ptrequals(t250.node.tree_right, &t300);
+	assert_ptr_eq(t250.node.tree_left, &t100);
+	assert_ptr_eq(t250.node.tree_right, &t300);
 
-	assert_ptrequals(t100.node.tree_left, &t050);
-	assert_ptrequals(t100.node.tree_right, &t150);
+	assert_ptr_eq(t100.node.tree_left, &t050);
+	assert_ptr_eq(t100.node.tree_right, &t150);
 
-	assert_null(t300.node.tree_left);
-	assert_ptrequals(t300.node.tree_right, &t350);
+	assert_ptr_null(t300.node.tree_left);
+	assert_ptr_eq(t300.node.tree_right, &t350);
 
-	assert_null(t050.node.tree_left);
-	assert_null(t050.node.tree_right);
+	assert_ptr_null(t050.node.tree_left);
+	assert_ptr_null(t050.node.tree_right);
 
-	assert_null(t150.node.tree_left);
-	assert_null(t150.node.tree_right);
+	assert_ptr_null(t150.node.tree_left);
+	assert_ptr_null(t150.node.tree_right);
 
-	assert_null(t350.node.tree_left);
-	assert_null(t350.node.tree_right);
+	assert_ptr_null(t350.node.tree_left);
+	assert_ptr_null(t350.node.tree_right);
 
 	/* Delete 250; In-order successor with no left-subtree is substituted
 	 *
@@ -270,25 +270,25 @@ test_avl_del(void)
 	 *
 	 */
 
-	assert_ptrequals(test_avl_list_AVL_DEL(&tl, &t250), &t250);
+	assert_ptr_eq(test_avl_list_AVL_DEL(&tl, &t250), &t250);
 
 	/* Check tree structure */
-	assert_ptrequals(TREE_ROOT(&tl), &t300);
+	assert_ptr_eq(TREE_ROOT(&tl), &t300);
 
-	assert_ptrequals(t300.node.tree_left, &t100);
-	assert_ptrequals(t300.node.tree_right, &t350);
+	assert_ptr_eq(t300.node.tree_left, &t100);
+	assert_ptr_eq(t300.node.tree_right, &t350);
 
-	assert_ptrequals(t100.node.tree_left, &t050);
-	assert_ptrequals(t100.node.tree_right, &t150);
+	assert_ptr_eq(t100.node.tree_left, &t050);
+	assert_ptr_eq(t100.node.tree_right, &t150);
 
-	assert_null(t050.node.tree_left);
-	assert_null(t050.node.tree_right);
+	assert_ptr_null(t050.node.tree_left);
+	assert_ptr_null(t050.node.tree_right);
 
-	assert_null(t150.node.tree_left);
-	assert_null(t150.node.tree_right);
+	assert_ptr_null(t150.node.tree_left);
+	assert_ptr_null(t150.node.tree_right);
 
-	assert_null(t350.node.tree_left);
-	assert_null(t350.node.tree_right);
+	assert_ptr_null(t350.node.tree_left);
+	assert_ptr_null(t350.node.tree_right);
 
 	/* Delete 300; No successor, tree is rotated
 	 *
@@ -306,22 +306,22 @@ test_avl_del(void)
 	 *        150
 	 */
 
-	assert_ptrequals(test_avl_list_AVL_DEL(&tl, &t300), &t300);
+	assert_ptr_eq(test_avl_list_AVL_DEL(&tl, &t300), &t300);
 
 	/* Check tree structure */
-	assert_ptrequals(TREE_ROOT(&tl), &t100);
+	assert_ptr_eq(TREE_ROOT(&tl), &t100);
 
-	assert_ptrequals(t100.node.tree_left, &t050);
-	assert_ptrequals(t100.node.tree_right, &t350);
+	assert_ptr_eq(t100.node.tree_left, &t050);
+	assert_ptr_eq(t100.node.tree_right, &t350);
 
-	assert_null(t050.node.tree_left);
-	assert_null(t050.node.tree_right);
+	assert_ptr_null(t050.node.tree_left);
+	assert_ptr_null(t050.node.tree_right);
 
-	assert_ptrequals(t350.node.tree_left, &t150);
-	assert_null(t350.node.tree_right);
+	assert_ptr_eq(t350.node.tree_left, &t150);
+	assert_ptr_null(t350.node.tree_right);
 
-	assert_null(t150.node.tree_left);
-	assert_null(t150.node.tree_right);
+	assert_ptr_null(t150.node.tree_left);
+	assert_ptr_null(t150.node.tree_right);
 
 	/* Delete 50; tree is rotated
 	 *
@@ -338,31 +338,31 @@ test_avl_del(void)
 	 * 100     350
 	 */
 
-	assert_ptrequals(test_avl_list_AVL_DEL(&tl, &t050), &t050);
+	assert_ptr_eq(test_avl_list_AVL_DEL(&tl, &t050), &t050);
 
 	/* Check tree structure */
-	assert_ptrequals(TREE_ROOT(&tl), &t150);
+	assert_ptr_eq(TREE_ROOT(&tl), &t150);
 
-	assert_ptrequals(t150.node.tree_left, &t100);
-	assert_ptrequals(t150.node.tree_right, &t350);
+	assert_ptr_eq(t150.node.tree_left, &t100);
+	assert_ptr_eq(t150.node.tree_right, &t350);
 
-	assert_null(t100.node.tree_left);
-	assert_null(t100.node.tree_right);
+	assert_ptr_null(t100.node.tree_left);
+	assert_ptr_null(t100.node.tree_right);
 
-	assert_null(t350.node.tree_left);
-	assert_null(t350.node.tree_right);
+	assert_ptr_null(t350.node.tree_left);
+	assert_ptr_null(t350.node.tree_right);
 
 	/* Test same-key based delete returns pointer to the deleted object */
 
 	struct test_avl key_test = { .val = t100.val };
 
-	assert_ptrequals(test_avl_list_AVL_DEL(&tl, &key_test), &t100);
+	assert_ptr_eq(test_avl_list_AVL_DEL(&tl, &key_test), &t100);
 
 	/* Delete remaining nodes */
-	assert_ptrequals(test_avl_list_AVL_DEL(&tl, &t150), &t150);
-	assert_ptrequals(test_avl_list_AVL_DEL(&tl, &t350), &t350);
+	assert_ptr_eq(test_avl_list_AVL_DEL(&tl, &t150), &t150);
+	assert_ptr_eq(test_avl_list_AVL_DEL(&tl, &t350), &t350);
 
-	assert_null(TREE_ROOT(&tl));
+	assert_ptr_null(TREE_ROOT(&tl));
 }
 
 static void
@@ -378,12 +378,12 @@ test_avl_get_n(void)
 		t2 = { .val = -15, },
 		t3 = { .val =   5, };
 
-	assert_ptrequals(test_avl_list_AVL_ADD(&tl, &t0), &t0);
-	assert_ptrequals(test_avl_list_AVL_ADD(&tl, &t1), &t1);
-	assert_ptrequals(test_avl_list_AVL_ADD(&tl, &t2), &t2);
+	assert_ptr_eq(test_avl_list_AVL_ADD(&tl, &t0), &t0);
+	assert_ptr_eq(test_avl_list_AVL_ADD(&tl, &t1), &t1);
+	assert_ptr_eq(test_avl_list_AVL_ADD(&tl, &t2), &t2);
 
-	assert_ptrequals(test_avl_list_AVL_NGET(&tl, &t3,  2), &t1);
-	assert_ptrequals(test_avl_list_AVL_NGET(&tl, &t3, -3), &t2);
+	assert_ptr_eq(test_avl_list_AVL_NGET(&tl, &t3,  2), &t1);
+	assert_ptr_eq(test_avl_list_AVL_NGET(&tl, &t3, -3), &t2);
 }
 
 static void
@@ -413,23 +413,23 @@ test_avl_rotations(void)
 		t1 = { .val = 200 },
 		t2 = { .val = 300 };
 
-	assert_ptrequals(test_avl_list_AVL_ADD(&tl, &t0), &t0);
-	assert_ptrequals(test_avl_list_AVL_ADD(&tl, &t1), &t1);
-	assert_ptrequals(test_avl_list_AVL_ADD(&tl, &t2), &t2);
+	assert_ptr_eq(test_avl_list_AVL_ADD(&tl, &t0), &t0);
+	assert_ptr_eq(test_avl_list_AVL_ADD(&tl, &t1), &t1);
+	assert_ptr_eq(test_avl_list_AVL_ADD(&tl, &t2), &t2);
 
-	assert_ptrequals(TREE_ROOT(&tl), &t1);
+	assert_ptr_eq(TREE_ROOT(&tl), &t1);
 
 	/* 100 */
-	assert_null(t0.node.tree_left);
-	assert_null(t0.node.tree_right);
+	assert_ptr_null(t0.node.tree_left);
+	assert_ptr_null(t0.node.tree_right);
 
 	/* 200 */
-	assert_ptrequals(t1.node.tree_left,  &t0);
-	assert_ptrequals(t1.node.tree_right, &t2);
+	assert_ptr_eq(t1.node.tree_left,  &t0);
+	assert_ptr_eq(t1.node.tree_right, &t2);
 
 	/* 300 */
-	assert_null(t2.node.tree_left);
-	assert_null(t2.node.tree_right);
+	assert_ptr_null(t2.node.tree_left);
+	assert_ptr_null(t2.node.tree_right);
 
 	/* Add 225, 275:
 	 *
@@ -456,30 +456,30 @@ test_avl_rotations(void)
 		t3 = { .val = 225 },
 		t4 = { .val = 275 };
 
-	assert_ptrequals(test_avl_list_AVL_ADD(&tl, &t3), &t3);
-	assert_ptrequals(test_avl_list_AVL_ADD(&tl, &t4), &t4);
+	assert_ptr_eq(test_avl_list_AVL_ADD(&tl, &t3), &t3);
+	assert_ptr_eq(test_avl_list_AVL_ADD(&tl, &t4), &t4);
 
-	assert_ptrequals(TREE_ROOT(&tl), &t1);
+	assert_ptr_eq(TREE_ROOT(&tl), &t1);
 
 	/* 100 */
-	assert_null(t0.node.tree_left);
-	assert_null(t0.node.tree_right);
+	assert_ptr_null(t0.node.tree_left);
+	assert_ptr_null(t0.node.tree_right);
 
 	/* 200 */
-	assert_ptrequals(t1.node.tree_left,  &t0);
-	assert_ptrequals(t1.node.tree_right, &t4);
+	assert_ptr_eq(t1.node.tree_left,  &t0);
+	assert_ptr_eq(t1.node.tree_right, &t4);
 
 	/* 300 */
-	assert_null(t2.node.tree_left);
-	assert_null(t2.node.tree_right);
+	assert_ptr_null(t2.node.tree_left);
+	assert_ptr_null(t2.node.tree_right);
 
 	/* 225 */
-	assert_null(t3.node.tree_left);
-	assert_null(t3.node.tree_right);
+	assert_ptr_null(t3.node.tree_left);
+	assert_ptr_null(t3.node.tree_right);
 
 	/* 275 */
-	assert_ptrequals(t4.node.tree_left,  &t3);
-	assert_ptrequals(t4.node.tree_right, &t2);
+	assert_ptr_eq(t4.node.tree_left,  &t3);
+	assert_ptr_eq(t4.node.tree_right, &t2);
 
 	/* Add 50, 40, 30:
 	 *
@@ -504,38 +504,38 @@ test_avl_rotations(void)
 		t5 = { .val = 50 },
 		t6 = { .val = 40 };
 
-	assert_ptrequals(test_avl_list_AVL_ADD(&tl, &t5), &t5);
-	assert_ptrequals(test_avl_list_AVL_ADD(&tl, &t6), &t6);
+	assert_ptr_eq(test_avl_list_AVL_ADD(&tl, &t5), &t5);
+	assert_ptr_eq(test_avl_list_AVL_ADD(&tl, &t6), &t6);
 
-	assert_ptrequals(TREE_ROOT(&tl), &t1);
+	assert_ptr_eq(TREE_ROOT(&tl), &t1);
 
 	/* 100 */
-	assert_null(t0.node.tree_left);
-	assert_null(t0.node.tree_right);
+	assert_ptr_null(t0.node.tree_left);
+	assert_ptr_null(t0.node.tree_right);
 
 	/* 200 */
-	assert_ptrequals(t1.node.tree_left,  &t5);
-	assert_ptrequals(t1.node.tree_right, &t4);
+	assert_ptr_eq(t1.node.tree_left,  &t5);
+	assert_ptr_eq(t1.node.tree_right, &t4);
 
 	/* 300 */
-	assert_null(t2.node.tree_left);
-	assert_null(t2.node.tree_right);
+	assert_ptr_null(t2.node.tree_left);
+	assert_ptr_null(t2.node.tree_right);
 
 	/* 225 */
-	assert_null(t3.node.tree_left);
-	assert_null(t3.node.tree_right);
+	assert_ptr_null(t3.node.tree_left);
+	assert_ptr_null(t3.node.tree_right);
 
 	/* 275 */
-	assert_ptrequals(t4.node.tree_left,  &t3);
-	assert_ptrequals(t4.node.tree_right, &t2);
+	assert_ptr_eq(t4.node.tree_left,  &t3);
+	assert_ptr_eq(t4.node.tree_right, &t2);
 
 	/* 50 */
-	assert_ptrequals(t5.node.tree_left,  &t6);
-	assert_ptrequals(t5.node.tree_right, &t0);
+	assert_ptr_eq(t5.node.tree_left,  &t6);
+	assert_ptr_eq(t5.node.tree_right, &t0);
 
 	/* 40 */
-	assert_null(t6.node.tree_left);
-	assert_null(t6.node.tree_right);
+	assert_ptr_null(t6.node.tree_left);
+	assert_ptr_null(t6.node.tree_right);
 
 	/* Add 45, 42:
 	 *
@@ -568,46 +568,46 @@ test_avl_rotations(void)
 		t7 = { .val = 45 },
 		t8 = { .val = 42 };
 
-	assert_ptrequals(test_avl_list_AVL_ADD(&tl, &t7), &t7);
-	assert_ptrequals(test_avl_list_AVL_ADD(&tl, &t8), &t8);
+	assert_ptr_eq(test_avl_list_AVL_ADD(&tl, &t7), &t7);
+	assert_ptr_eq(test_avl_list_AVL_ADD(&tl, &t8), &t8);
 
-	assert_ptrequals(TREE_ROOT(&tl), &t1);
+	assert_ptr_eq(TREE_ROOT(&tl), &t1);
 
 	/* 100 */
-	assert_null(t0.node.tree_left);
-	assert_null(t0.node.tree_right);
+	assert_ptr_null(t0.node.tree_left);
+	assert_ptr_null(t0.node.tree_right);
 
 	/* 200 */
-	assert_ptrequals(t1.node.tree_left,  &t5);
-	assert_ptrequals(t1.node.tree_right, &t4);
+	assert_ptr_eq(t1.node.tree_left,  &t5);
+	assert_ptr_eq(t1.node.tree_right, &t4);
 
 	/* 300 */
-	assert_null(t2.node.tree_left);
-	assert_null(t2.node.tree_right);
+	assert_ptr_null(t2.node.tree_left);
+	assert_ptr_null(t2.node.tree_right);
 
 	/* 225 */
-	assert_null(t3.node.tree_left);
-	assert_null(t3.node.tree_right);
+	assert_ptr_null(t3.node.tree_left);
+	assert_ptr_null(t3.node.tree_right);
 
 	/* 275 */
-	assert_ptrequals(t4.node.tree_left,  &t3);
-	assert_ptrequals(t4.node.tree_right, &t2);
+	assert_ptr_eq(t4.node.tree_left,  &t3);
+	assert_ptr_eq(t4.node.tree_right, &t2);
 
 	/* 50 */
-	assert_ptrequals(t5.node.tree_left,  &t8);
-	assert_ptrequals(t5.node.tree_right, &t0);
+	assert_ptr_eq(t5.node.tree_left,  &t8);
+	assert_ptr_eq(t5.node.tree_right, &t0);
 
 	/* 40 */
-	assert_null(t6.node.tree_left);
-	assert_null(t6.node.tree_right);
+	assert_ptr_null(t6.node.tree_left);
+	assert_ptr_null(t6.node.tree_right);
 
 	/* 45 */
-	assert_null(t7.node.tree_left);
-	assert_null(t7.node.tree_right);
+	assert_ptr_null(t7.node.tree_left);
+	assert_ptr_null(t7.node.tree_right);
 
 	/* 42 */
-	assert_ptrequals(t8.node.tree_left,  &t6);
-	assert_ptrequals(t8.node.tree_right, &t7);
+	assert_ptr_eq(t8.node.tree_left,  &t6);
+	assert_ptr_eq(t8.node.tree_right, &t7);
 }
 
 static void
@@ -626,49 +626,49 @@ test_avl_foreach(void)
 		t250 = { .val = 250 },
 		t350 = { .val = 350 };
 
-	assert_ptrequals(test_avl_list_AVL_ADD(&tl, &t200), &t200);
-	assert_ptrequals(test_avl_list_AVL_ADD(&tl, &t100), &t100);
-	assert_ptrequals(test_avl_list_AVL_ADD(&tl, &t300), &t300);
-	assert_ptrequals(test_avl_list_AVL_ADD(&tl, &t050), &t050);
-	assert_ptrequals(test_avl_list_AVL_ADD(&tl, &t150), &t150);
-	assert_ptrequals(test_avl_list_AVL_ADD(&tl, &t250), &t250);
-	assert_ptrequals(test_avl_list_AVL_ADD(&tl, &t350), &t350);
+	assert_ptr_eq(test_avl_list_AVL_ADD(&tl, &t200), &t200);
+	assert_ptr_eq(test_avl_list_AVL_ADD(&tl, &t100), &t100);
+	assert_ptr_eq(test_avl_list_AVL_ADD(&tl, &t300), &t300);
+	assert_ptr_eq(test_avl_list_AVL_ADD(&tl, &t050), &t050);
+	assert_ptr_eq(test_avl_list_AVL_ADD(&tl, &t150), &t150);
+	assert_ptr_eq(test_avl_list_AVL_ADD(&tl, &t250), &t250);
+	assert_ptr_eq(test_avl_list_AVL_ADD(&tl, &t350), &t350);
 
 	test_avl_list_AVL_FOREACH(&tl, foreach_f);
 
 	assert_eq(t200.val, 0);
-	assert_null(t200.node.tree_left);
-	assert_null(t200.node.tree_right);
+	assert_ptr_null(t200.node.tree_left);
+	assert_ptr_null(t200.node.tree_right);
 
 	assert_eq(t100.val, 0);
-	assert_null(t100.node.tree_left);
-	assert_null(t100.node.tree_right);
+	assert_ptr_null(t100.node.tree_left);
+	assert_ptr_null(t100.node.tree_right);
 
 	assert_eq(t300.val, 0);
-	assert_null(t300.node.tree_left);
-	assert_null(t300.node.tree_right);
+	assert_ptr_null(t300.node.tree_left);
+	assert_ptr_null(t300.node.tree_right);
 
 	assert_eq(t050.val, 0);
-	assert_null(t050.node.tree_left);
-	assert_null(t050.node.tree_right);
+	assert_ptr_null(t050.node.tree_left);
+	assert_ptr_null(t050.node.tree_right);
 
 	assert_eq(t150.val, 0);
-	assert_null(t150.node.tree_left);
-	assert_null(t150.node.tree_right);
+	assert_ptr_null(t150.node.tree_left);
+	assert_ptr_null(t150.node.tree_right);
 
 	assert_eq(t250.val, 0);
-	assert_null(t250.node.tree_left);
-	assert_null(t250.node.tree_right);
+	assert_ptr_null(t250.node.tree_left);
+	assert_ptr_null(t250.node.tree_right);
 
 	assert_eq(t350.val, 0);
-	assert_null(t350.node.tree_left);
-	assert_null(t350.node.tree_right);
+	assert_ptr_null(t350.node.tree_left);
+	assert_ptr_null(t350.node.tree_right);
 }
 
 int
 main(void)
 {
-	testcase tests[] = {
+	struct testcase tests[] = {
 		TESTCASE(test_avl_get_height),
 		TESTCASE(test_avl_set_height),
 		TESTCASE(test_avl_balance),

@@ -18,6 +18,11 @@ addons:
   sonarcloud:
     organization: "rcr-github"
 
+  apt:
+    packages: gperf
+  homebrew:
+    packages: gperf
+
 matrix:
   include:
     - os: linux
@@ -34,13 +39,15 @@ before_install:
 
 script:
   - set -e
-  - make clean test rirc
+  - make -e clean test rirc debug
   - test "${TRAVIS_JOB_NUMBER##*.}" = "1" || exit 0
-  - make clean
-  - build-wrapper-linux-x86-64 --out-dir bw-output make debug
-  - make test
-  - echo "sonar.projectKey=rcr_rirc" > sonar-project.properties
+  - build-wrapper-linux-x86-64 --out-dir bw-output make clean debug test
+  - ./scripts/coverage.sh
+  - echo "" > sonar-project.properties
+  - echo "sonar.cfamily.build-wrapper-output=bw-output" >> sonar-project.properties
+  - echo "sonar.cfamily.gcov.reportsPath=." >> sonar-project.properties
+  - echo "sonar.coverage.exclusions=test" >> sonar-project.properties
+  - echo "sonar.projectKey=rcr_rirc" >> sonar-project.properties
   - echo "sonar.sources=src" >> sonar-project.properties
   - echo "sonar.tests=test" >> sonar-project.properties
-  - echo "sonar.cfamily.build-wrapper-output=bw-output" >> sonar-project.properties
   - sonar-scanner

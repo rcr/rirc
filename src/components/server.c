@@ -47,6 +47,9 @@ server(const char *host, const char *port, const char *pass, const char *user, c
 	s->channel->server = s;
 	channel_list_add(&(s->clist), s->channel);
 
+	/* TODO: CASEMAPPING */
+	s->cmp = strcmp;
+
 	return s;
 }
 
@@ -314,7 +317,7 @@ parse_opt(struct opt *opt, char **str)
 	opt->arg = NULL;
 	opt->val = NULL;
 
-	if (!skip_sp(&p))
+	if (!str_trim(&p))
 		return 0;
 
 	if (!isalnum(*p))

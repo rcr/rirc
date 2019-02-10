@@ -209,6 +209,9 @@ mode_chanmode_set(struct mode *m, const struct mode_cfg *cfg, int flag, enum mod
 	if (!mode_isset(&(cfg->chanmodes), flag))
 		return MODE_ERR_INVALID_FLAG;
 
+	if (set_t == MODE_SET_ON && mode_isset(m, flag))
+		return MODE_ERR_DUPLICATE;
+
 	/* Mode subtypes A don't set a flag */
 	if (mode_isset(&(cfg->CHANMODES.A), flag))
 		return MODE_ERR_NONE;
@@ -221,9 +224,8 @@ mode_chanmode_set(struct mode *m, const struct mode_cfg *cfg, int flag, enum mod
 			MODE_SET(m->lower, bit, set_t);
 		else
 			MODE_SET(m->upper, bit, set_t);
-	}
 
-	else if (flag == 'p') {
+	} else if (flag == 'p') {
 
 		/* Silently ignore */
 		if (mode_isset(m, 's'))
@@ -240,9 +242,8 @@ mode_chanmode_set(struct mode *m, const struct mode_cfg *cfg, int flag, enum mod
 
 			m->prefix = MODE_CHANMODE_PREFIX_PRIVATE;
 		}
-	}
 
-	else if (flag == 's') {
+	} else if (flag == 's') {
 
 		if (set_t == MODE_SET_OFF) {
 			MODE_SET(m->lower, flag_bit('s'), MODE_SET_OFF);
@@ -400,37 +401,34 @@ mode_prfxmode_prefix(struct mode *m, const struct mode_cfg *cfg, int flag)
 	return MODE_ERR_NONE;
 }
 
-char*
+const char*
 mode_str(const struct mode *m, struct mode_str *m_str)
 {
 	/* Write the mode bits to a mode string */
 
-	char c, *skip = "", *str = m_str->str;
+	char c;
+	char *str = m_str->str;
 
 	uint32_t lower = m->lower,
 	         upper = m->upper;
 
-	/* 's' and 'p' flags should not appear in chanmode mode strings */
 	switch (m_str->type) {
 		case MODE_STR_CHANMODE:
-			skip = "sp";
-			break;
 		case MODE_STR_USERMODE:
 		case MODE_STR_PRFXMODE:
 			break;
 		case MODE_STR_UNSET:
 			fatal("mode_str type not set");
-			break;
 		default:
 			fatal("mode_str type unknown");
 	}
 
 	for (c = 'a'; c <= 'z' && lower; c++, lower >>= 1)
-		if ((lower & 1) && !strchr(skip, c))
+		if (lower & 1)
 			*str++ = c;
 
 	for (c = 'A'; c <= 'Z' && upper; c++, upper >>= 1)
-		if ((upper & 1) && !strchr(skip, c))
+		if (upper & 1)
 			*str++ = c;
 
 	*str = 0;
@@ -547,20 +545,19 @@ mode_cfg_subtypes(struct mode_cfg *cfg, const char *str)
 
 	while ((c = *str++)) {
 
+		uint32_t bit;
+
 		if (c == ',') {
 			switch (commas) {
 				case 0:
 				case 1:
 				case 2:
 					setting = subtypes[++commas];
-					break;
+					continue;
 				default:
 					return MODE_ERR_INVALID_CONFIG;
 			}
-			continue;
 		}
-
-		uint32_t bit;
 
 		if ((bit = flag_bit(c)) == 0)
 			continue; /* TODO: aggregate warnings, invalid flag */
@@ -571,8 +568,7 @@ mode_cfg_subtypes(struct mode_cfg *cfg, const char *str)
 		if (MODE_ISLOWER(c)) {
 			MODE_SET(duplicates.lower, bit, MODE_SET_ON);
 			MODE_SET(setting->lower, bit, MODE_SET_ON);
-		}
-		else {
+		} else {
 			MODE_SET(duplicates.upper, bit, MODE_SET_ON);
 			MODE_SET(setting->upper, bit, MODE_SET_ON);
 		}

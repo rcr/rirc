@@ -1,31 +1,3 @@
-/* TODO: reduce overall size of buffer, implement growable text area with
- * ring of buffer_lines pointing to strings, keeping nulls for easy casting
- * to c strings
- *
- * i.e.            line(n).text            line(n+1).text
- *                           v                         v
- * text buffer: [...\0user1\0some line of text\0user2\0some other line\0...]
- *                    ^                         ^
- *          line(n).user             line(n+1).user
- *
- *
- * growable area, e.g. realloced in factors of 1.5, indexed by buffer_segment, e.g.
- * struct segment {
- *     uint16_t index;
- *     uint16_t len;
- * }
- * indexed from base of data pointer
- *
- * TODO: cache a sensible number of line breaks (2?) against the line width
- * and dynamically calculate the rest, terminal size rarely changes
- *
- * TODO: buffer_newline should accept the formatting arguments rather than
- * vsnprintf to a temp buffer and pass, e.g.:
- * void buffer_newline(buffer*, buffer_line_t, struct user*, const char*, ...)
- *
- * TODO: print time string to buffer space
- * */
-
 #include <string.h>
 
 #include "src/components/buffer.h"

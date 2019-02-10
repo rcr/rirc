@@ -1,0 +1,62 @@
+%{
+#include <string.h>
+
+#define SEND_HANDLERS \
+	X(notice) \
+	X(part) \
+	X(privmsg) \
+	X(quit) \
+	X(topic)
+
+#define SEND_CTCP_HANDLERS \
+	X(action) \
+	X(clientinfo) \
+	X(finger) \
+	X(ping) \
+	X(source) \
+	X(time) \
+	X(userinfo) \
+	X(version)
+
+#define X(cmd) static int send_##cmd(struct server*, struct channel*, char*);
+SEND_HANDLERS
+#undef X
+
+#define X(cmd) static int send_ctcp_##cmd(struct server*, struct channel*, char*);
+SEND_CTCP_HANDLERS
+#undef X
+
+typedef int (*irc_send_f)(struct server*, struct channel*, char*);
+
+struct send_handler
+{
+	char *key;
+	irc_send_f f;
+};
+%}
+
+%enum
+%null-strings
+%readonly-tables
+%struct-type
+%define slot-name key
+%define word-array-name      send_handlers
+%define hash-function-name   send_handler_hash
+%define lookup-function-name send_handler_lookup
+%define initializer-suffix ,(irc_send_f)0
+struct send_handler;
+%%
+CTCP-ACTION,     send_ctcp_action
+CTCP-CLIENTINFO, send_ctcp_clientinfo
+CTCP-FINGER,     send_ctcp_finger
+CTCP-PING,       send_ctcp_ping
+CTCP-SOURCE,     send_ctcp_source
+CTCP-TIME,       send_ctcp_time
+CTCP-USERINFO,   send_ctcp_userinfo
+CTCP-VERSION,    send_ctcp_version
+NOTICE,          send_notice
+PART,            send_part
+PRIVMSG,         send_privmsg
+QUIT,            send_quit
+TOPIC,           send_topic
+%%

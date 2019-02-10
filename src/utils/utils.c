@@ -7,33 +7,6 @@
 
 #include "src/utils/utils.h"
 
-#if !((' ' == 32) && ('!' == 33) && ('"' == 34) && ('#' == 35) \
-      && ('%' == 37) && ('&' == 38) && ('\'' == 39) && ('(' == 40) \
-      && (')' == 41) && ('*' == 42) && ('+' == 43) && (',' == 44) \
-      && ('-' == 45) && ('.' == 46) && ('/' == 47) && ('0' == 48) \
-      && ('1' == 49) && ('2' == 50) && ('3' == 51) && ('4' == 52) \
-      && ('5' == 53) && ('6' == 54) && ('7' == 55) && ('8' == 56) \
-      && ('9' == 57) && (':' == 58) && (';' == 59) && ('<' == 60) \
-      && ('=' == 61) && ('>' == 62) && ('?' == 63) && ('A' == 65) \
-      && ('B' == 66) && ('C' == 67) && ('D' == 68) && ('E' == 69) \
-      && ('F' == 70) && ('G' == 71) && ('H' == 72) && ('I' == 73) \
-      && ('J' == 74) && ('K' == 75) && ('L' == 76) && ('M' == 77) \
-      && ('N' == 78) && ('O' == 79) && ('P' == 80) && ('Q' == 81) \
-      && ('R' == 82) && ('S' == 83) && ('T' == 84) && ('U' == 85) \
-      && ('V' == 86) && ('W' == 87) && ('X' == 88) && ('Y' == 89) \
-      && ('Z' == 90) && ('[' == 91) && ('\\' == 92) && (']' == 93) \
-      && ('^' == 94) && ('_' == 95) && ('a' == 97) && ('b' == 98) \
-      && ('c' == 99) && ('d' == 100) && ('e' == 101) && ('f' == 102) \
-      && ('g' == 103) && ('h' == 104) && ('i' == 105) && ('j' == 106) \
-      && ('k' == 107) && ('l' == 108) && ('m' == 109) && ('n' == 110) \
-      && ('o' == 111) && ('p' == 112) && ('q' == 113) && ('r' == 114) \
-      && ('s' == 115) && ('t' == 116) && ('u' == 117) && ('v' == 118) \
-      && ('w' == 119) && ('x' == 120) && ('y' == 121) && ('z' == 122) \
-      && ('{' == 123) && ('|' == 124) && ('}' == 125) && ('~' == 126))
-/* The character set is not based on ISO-646.  */
-#error "gperf generated tables don't work with this execution character set. Please report a bug to <bug-gperf@gnu.org>."
-#endif
-
 static inline int irc_toupper(int);
 
 char*
@@ -94,7 +67,7 @@ memdup(const void *mem, size_t len)
 }
 
 int
-skip_sp(char **str)
+str_trim(char **str)
 {
 	char *p;
 
@@ -241,28 +214,46 @@ irc_strncmp(const char *s1, const char *s2, size_t n)
 	return 0;
 }
 
-/* TODO:
- * - char *[] for args, remove getarg from message handling
- * - analogous function for parsing ctcp messages */
-
-/* FIXME:
- *
- * in order to fully implement the protocol, trailing needs to be considered
- * just another parameter, e.g. receiving
- *   - `<from> PRIVMSG hi`
- *   - `<from> PRIVMSG :hi`
- * are identical, and currently this would break rirc's parsing
- *
- * getarg(parsed message) -> return the next arg pointer, or if current
- * arg pointer is the trailing arg, parse out a token
- */
 int
-parse_mesg(struct parsed_mesg *pm, char *mesg)
+irc_message_param(struct irc_message *m, char **param)
 {
-	/* Parse a string into components. Null terminators are only inserted
-	 * once the message is determined to be valid
-	 *
-	 * RFC 2812, section 2.3.1
+	*param = NULL;
+
+	if (m->params == NULL)
+		return 0;
+
+	if (!str_trim(&m->params))
+		return 0;
+
+	if (!m->split && m->n_params >= 14) {
+		*param = m->params;
+		m->params = NULL;
+		return 1;
+	}
+
+	if (*m->params == ':') {
+		*param = m->params + 1;
+		m->params = NULL;
+		return 1;
+	}
+
+	m->n_params++;
+
+	*param = m->params;
+
+	while (*m->params && *m->params != ' ')
+		m->params++;
+
+	if (*m->params)
+		*m->params++ = 0;
+
+	return 1;
+}
+
+int
+irc_message_parse(struct irc_message *m, char *buf, size_t len)
+{
+	/* RFC 2812, section 2.3.1
 	 *
 	 * message    =   [ ":" prefix SPACE ] command [ params ] crlf
 	 * prefix     =   servername / ( nickname [ [ "!" user ] "@" host ] )
@@ -279,90 +270,130 @@ parse_mesg(struct parsed_mesg *pm, char *mesg)
 	 * crlf       =   %x0D %x0A   ; "carriage return" "linefeed"
 	 */
 
-	char *end_from = NULL,
-	     *end_host = NULL;
+	UNUSED(len);
 
-	memset(pm, 0, sizeof(*pm));
+	memset(m, 0, sizeof(*m));
 
-	if (*mesg == ':' && *(++mesg) != ' ') {
-
-		/* Prefix:
-		 *  =  servername
-		 *  =/ nickname
-		 *  =/ nickname@host
-		 *  =/ nickname!user@host
-		 *
-		 * So:
-		 *  pm->from = servername / nickname
-		 *  pm->host = host / user@host
-		 */
-
-		pm->from = mesg;
-
-		while (*mesg && *mesg != ' '  && *mesg != '!' && *mesg != '@')
-			mesg++;
-
-		if (*mesg == '!' || *mesg == '@') {
-			end_from = mesg++;
-			pm->host = mesg;
-
-			while (*mesg && *mesg != ' ')
-				mesg++;
-		}
-
-		end_host = mesg;
-	}
-
-	/* The command is minimally required for a valid message */
-	if (!(pm->command = getarg(&mesg, " ")))
+	if (!str_trim(&buf))
 		return 0;
 
-	if (end_from)
-		*end_from = '\0';
+	if (*buf == ':') {
 
-	if (end_host)
-		*end_host = '\0';
+		/* Prefix:
+		 *  =  :name
+		 *  =/ :name@host
+		 *  =/ :name!user@host
+		 */
 
-	/* Keep track of the last arg so it can be terminated */
-	char *param_end = NULL;
+		buf++;
 
-	int param_count = 0;
+		m->from = buf;
 
-	while (skip_sp(&mesg)) {
+		while (*buf && *buf != ' '  && *buf != '!' && *buf != '@')
+			buf++;
 
-		/* Maximum number of parameters found */
-		if (param_count == 14) {
-			pm->trailing = mesg;
-			break;
+		m->len_from = buf - m->from;
+
+		if (m->len_from == 0)
+			return 0;
+
+		if (*buf == '!' || *buf == '@') {
+			*buf++ = 0;
+			m->host = buf;
+
+			while (*buf && *buf != ' ')
+				buf++;
+
+			m->len_host = buf - m->host;
 		}
 
-		/* Trailing section found */
-		if (*mesg == ':') {
-			pm->trailing = (mesg + 1);
-			break;
-		}
-
-		if (!pm->params)
-			pm->params = mesg;
-
-		while (*mesg && *mesg != ' ')
-			mesg++;
-
-		param_count++;
-		param_end = mesg;
+		if (*buf == ' ')
+			*buf++ = 0;
 	}
 
-	/* Terminate the last parameter if any */
-	if (param_end)
-		*param_end = '\0';
+	if (!str_trim(&buf))
+		return 0;
+
+	m->command = buf;
+
+	while (*buf && *buf != ' ')
+		buf++;
+
+	m->len_command = buf - m->command;
+
+	if (*buf == ' ')
+		*buf++ = 0;
+
+	if (str_trim(&buf))
+		m->params = buf;
 
 	return 1;
 }
 
 int
+irc_message_split(struct irc_message *m, char **trailing)
+{
+	/* Split the message params and trailing arg for use in generic handling */
+
+	*trailing = NULL;
+
+	if (!m->params)
+		return 0;
+
+	m->split = 1;
+
+	for (char *p = m->params; *p;) {
+
+		while (*p == ' ')
+			p++;
+
+		if (*p == 0)
+			return 0;
+
+		m->n_params++;
+
+		if (m->n_params >= 15) {
+			if (m->params == p) {
+				m->params = NULL;
+				*trailing = p;
+			} else {
+				*trailing = (*p) ? p : NULL;
+				do {
+					if (p == m->params) {
+						m->params = NULL;
+						return 1;
+					}
+					p--;
+				} while (*p == ' ');
+				*(p + 1) = 0;
+			}
+			return 1;
+		}
+
+		if (*p == ':') {
+			*p = 0;
+			*trailing = (*(p + 1)) ? (p + 1) : NULL;
+			do {
+				if (p == m->params) {
+					m->params = NULL;
+					return 1;
+				}
+				p--;
+			} while (*p == ' ');
+			*(p + 1) = 0;
+			return 1;
+		}
+
+		while (*p && *p != ' ')
+			p++;
+	}
+
+	return 0;
+}
+
+int
 check_pinged(const char *mesg, const char *nick)
 {
-
 	int len = strlen(nick);
 
 	while (*mesg) {
