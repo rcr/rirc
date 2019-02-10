@@ -2,6 +2,8 @@
 Summary of notable changes and features
 
 ## Unreleased (dev)
+
+## [0.1.2]
 ### Features
  - add 116 previously unhandled numerics:
     - 200, 201, 202, 203, 204, 205, 206, 207,
