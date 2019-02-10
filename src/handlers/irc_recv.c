@@ -1,4 +1,6 @@
 #include <ctype.h>
+#include <errno.h>
+#include <stdlib.h>
 
 #include "src/components/server.h"
 #include "src/handlers/irc_ctcp.h"
@@ -44,7 +46,11 @@ static int irc_info(struct server*, struct irc_message*);
 static int irc_001(struct server*, struct irc_message*);
 static int irc_004(struct server*, struct irc_message*);
 static int irc_005(struct server*, struct irc_message*);
+static int irc_328(struct server*, struct irc_message*);
+static int irc_332(struct server*, struct irc_message*);
+static int irc_333(struct server*, struct irc_message*);
 
+static int irc_recv_numeric(struct server*, struct irc_message*);
 static int recv_mode_chanmodes(struct irc_message*, const struct mode_cfg*, struct channel*);
 static int recv_mode_usermodes(struct irc_message*, const struct mode_cfg*, struct server*);
 
@@ -120,11 +126,11 @@ static const irc_recv_f irc_numerics[] = {
 	[323] = NULL,       /* RPL_LISTEND */
 	[324] = NULL,       /* RPL_CHANNELMODEIS */
 	[325] = NULL,       /* RPL_UNIQOPIS */
-	[328] = NULL,       /* RPL_CHANNEL_URL */
+	[328] = irc_328,    /* RPL_CHANNEL_URL */
 	[329] = NULL,       /* RPL_CREATIONTIME */
 	[331] = irc_ignore, /* RPL_NOTOPIC */
-	[332] = NULL,       /* RPL_TOPIC */
-	[333] = NULL,       /* RPL_TOPICWHOTIME */
+	[332] = irc_332,    /* RPL_TOPIC */
+	[333] = irc_333,    /* RPL_TOPICWHOTIME */
 	[341] = NULL,       /* RPL_INVITING */
 	[346] = NULL,       /* RPL_INVITELIST */
 	[347] = irc_ignore, /* RPL_ENDOFINVITELIST */
@@ -200,6 +206,20 @@ static const irc_recv_f irc_numerics[] = {
 	[705] = irc_info,   /* RPL_HELP */
 	[706] = irc_ignore, /* RPL_ENDOFHELP */
 };
+
+int
+irc_recv(struct server *s, struct irc_message *m)
+{
+	const struct recv_handler* handler;
+
+	if (isdigit(*m->command))
+		return irc_recv_numeric(s, m);
+
+	if ((handler = recv_handler_lookup(m->command, m->len_command)))
+		return handler->f(s, m);
+
+	return irc_message(s, m, FROM_UNKNOWN);
+}
 
 static int
 irc_message(struct server *s, struct irc_message *m, const char *from)
@@ -303,6 +323,91 @@ irc_005(struct server *s, struct irc_message *m)
 }
 
 static int
+irc_328(struct server *s, struct irc_message *m)
+{
+	/* 328 <channel> <url> */
+
+	char *chan;
+	char *url;
+	struct channel *c;
+
+	if (!irc_message_param(m, &chan))
+		failf(s, "RPL_CHANNEL_URL: channel is null");
+
+	if (!irc_message_param(m, &url))
+		failf(s, "RPL_CHANNEL_URL: url is null");
+
+	if ((c = channel_list_get(&s->clist, chan)) == NULL)
+		failf(s, "RPL_CHANNEL_URL: channel '%s' not found", chan);
+
+	newlinef(c, 0, FROM_INFO, "URL for %s is: \"%s\"", chan, url);
+	return 0;
+}
+
+static int
+irc_332(struct server *s, struct irc_message *m)
+{
+	/* 332 <channel> <topic> */
+
+	char *chan;
+	char *topic;
+	struct channel *c;
+
+	if (!irc_message_param(m, &chan))
+		failf(s, "RPL_TOPIC: channel is null");
+
+	if (!irc_message_param(m, &topic))
+		failf(s, "RPL_TOPIC: topic is null");
+
+	if ((c = channel_list_get(&s->clist, chan)) == NULL)
+		failf(s, "RPL_TOPIC: channel '%s' not found", chan);
+
+	newlinef(c, 0, FROM_INFO, "Topic for %s is \"%s\"", chan, topic);
+	return 0;
+}
+
+static int
+irc_333(struct server *s, struct irc_message *m)
+{
+	/* 333 <channel> <nick> <time> */
+
+	char buf[sizeof("1970-01-01T00:00:00")];
+	char *chan;
+	char *nick;
+	char *time_str;
+	struct channel *c;
+	struct tm tm;
+	time_t t = 0;
+
+	if (!irc_message_param(m, &chan))
+		failf(s, "RPL_TOPICWHOTIME: channel is null");
+
+	if (!irc_message_param(m, &nick))
+		failf(s, "RPL_TOPICWHOTIME: nick is null");
+
+	if (!irc_message_param(m, &time_str))
+		failf(s, "RPL_TOPICWHOTIME: time is null");
+
+	if ((c = channel_list_get(&s->clist, chan)) == NULL)
+		failf(s, "RPL_TOPICWHOTIME: channel '%s' not found", chan);
+
+	errno = 0;
+	t = strtoul(time_str, NULL, 0);
+
+	if (errno)
+		failf(s, "RPL_TOPICWHOTIME: strtoul error: %s", strerror(errno));
+
+	if (gmtime_r(&t, &tm) == NULL)
+		failf(s, "RPL_TOPICWHOTIME: gmtime_r error: %s", strerror(errno));
+
+	if ((strftime(buf, sizeof(buf), "%FT%T", &tm)) == 0)
+		failf(s, "RPL_TOPICWHOTIME: strftime error");
+
+	newlinef(c, 0, "--", "Topic set by %s, %s", nick, buf);
+	return 0;
+}
+
+static int
 irc_recv_numeric(struct server *s, struct irc_message *m)
 {
 	/* :server <code> <target> [args] */
@@ -342,20 +447,6 @@ irc_recv_numeric(struct server *s, struct irc_message *m)
 		return (*handler)(s, m);
 
 	failf(s, "Numeric type '%u' unknown", code);
-}
-
-int
-irc_recv(struct server *s, struct irc_message *m)
-{
-	const struct recv_handler* handler;
-
-	if (isdigit(*m->command))
-		return irc_recv_numeric(s, m);
-
-	if ((handler = recv_handler_lookup(m->command, m->len_command)))
-		return handler->f(s, m);
-
-	return irc_message(s, m, FROM_UNKNOWN);
 }
 
 static int
@@ -416,13 +507,12 @@ recv_join(struct server *s, struct irc_message *m)
 		if ((c = channel_list_get(&s->clist, chan)) == NULL) {
 			c = channel(chan, CHANNEL_T_CHANNEL);
 			c->server = s;
-			c->joined = 1;
 			channel_list_add(&s->clist, c);
 			channel_set_current(c);
 			sendf(s, "MODE %s", chan);
-		} else {
-			c->parted = 0;
 		}
+		c->joined = 1;
+		c->parted = 0;
 		newlinef(c, BUFFER_LINE_JOIN, FROM_JOIN, "Joined %s", chan);
 		draw_all();
 		return 0;
@@ -519,8 +609,8 @@ recv_mode(struct server *s, struct irc_message *m)
 	 *  - 'a' and 'c' require parameters
 	 *  - 'b' has no parameter
 	 *
-	 *   MODE <chan> +ab  <param a> +c <param c>
-	 *   MODE <chan> +abc <param a>    <param c>
+	 *   MODE <channel> +ab  <param a> +c <param c>
+	 *   MODE <channel> +abc <param a>    <param c>
 	 */
 
 	char *targ;
@@ -778,7 +868,9 @@ recv_notice(struct server *s, struct irc_message *m)
 	if (IS_CTCP(message))
 		return ctcp_response(s, m->from, target, message);
 
-	if (!strcmp(target, s->nick)) {
+	if (!strcmp(target, "*")) {
+		c = s->channel;
+	} else if (!strcmp(target, s->nick)) {
 
 		if ((c = channel_list_get(&s->clist, m->from)) == NULL) {
 			c = channel(m->from, CHANNEL_T_PRIVATE);

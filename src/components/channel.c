@@ -141,6 +141,7 @@ void
 channel_part(struct channel *c)
 {
 	channel_reset(c);
+	c->joined = 0;
 	c->parted = 1;
 }
 
