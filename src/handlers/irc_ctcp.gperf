@@ -1,0 +1,60 @@
+%{
+#include <string.h>
+
+/* Not implemented:
+ *  - DCC (extended query) */
+
+#define CTCP_EXTENDED_FORMATTING \
+	X(action)
+
+#define CTCP_EXTENDED_QUERY \
+	X(clientinfo) \
+	X(ping) \
+	X(time)
+
+#define CTCP_METADATA_QUERY \
+	X(finger) \
+	X(source) \
+	X(userinfo) \
+	X(version)
+
+#define X(cmd) static int ctcp_request_##cmd(struct server*, const char*, const char*, char*);
+CTCP_EXTENDED_FORMATTING
+CTCP_EXTENDED_QUERY
+CTCP_METADATA_QUERY
+#undef X
+
+#define X(cmd) static int ctcp_response_##cmd(struct server*, const char*, const char*, char*);
+CTCP_EXTENDED_QUERY
+CTCP_METADATA_QUERY
+#undef X
+
+typedef int (*ctcp_f)(struct server*, const char*, const char*, char*);
+
+struct ctcp_handler
+{
+	const char *key;
+	ctcp_f f_request;
+	ctcp_f f_response;
+};
+%}
+
+%enum
+%null-strings
+%readonly-tables
+%struct-type
+%define slot-name key
+%define word-array-name      ctcp_handlers
+%define hash-function-name   ctcp_handler_hash
+%define lookup-function-name ctcp_handler_lookup
+%define initializer-suffix ,(ctcp_f)0,(ctcp_f)0
+struct ctcp_handler;
+%%
+ACTION,     ctcp_request_action,     (ctcp_f)0
+CLIENTINFO, ctcp_request_clientinfo, ctcp_response_clientinfo
+FINGER,     ctcp_request_finger,     ctcp_response_finger
+PING,       ctcp_request_ping,       ctcp_response_ping
+SOURCE,     ctcp_request_source,     ctcp_response_source
+TIME,       ctcp_request_time,       ctcp_response_time
+USERINFO,   ctcp_request_userinfo,   ctcp_response_userinfo
+VERSION,    ctcp_request_version,    ctcp_response_version

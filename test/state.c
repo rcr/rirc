@@ -6,8 +6,8 @@
 #include "src/components/mode.c"
 #include "src/components/server.c"
 #include "src/components/user.c"
+#include "src/handlers/irc_send.c"
 #include "src/state.c"
-#include "src/mesg.c"
 #include "src/utils/utils.c"
 
 /* Mock rirc.c */
@@ -51,15 +51,25 @@ unsigned io_tty_rows(void) { return 0; }
 void io_free(struct connection *c) { UNUSED(c); }
 void io_term(void) { ; }
 
+/* Mock handlers/irc_recv.c */
+int irc_recv(struct server *s, struct irc_message *m) { UNUSED(s); UNUSED(m); return 0; }
+
 #define INP_S(S) io_cb_read_inp((S), strlen(S))
 #define INP_C(C) io_cb_read_inp((char[]){(C)}, 1)
 #define CURRENT_LINE (buffer_head(&current_channel()->buffer)->text)
+
+// TODO: tests for
+// sending certain /commands to private buffer, server buffer
 
 static void
 test_state(void)
 {
 	state_init();
 
+	/* Test splash message */
+	assert_strcmp(CURRENT_LINE, " - compiled with DEBUG flags");
+
+	/* Test messages sent to the default rirc buffer */
 	INP_S("/");
 	INP_C(0x0A);
 	assert_strcmp(CURRENT_LINE, "This is not a server");
@@ -68,33 +78,36 @@ test_state(void)
 	INP_C(0x0A);
 	assert_strcmp(CURRENT_LINE, "This is not a server");
 
-	INP_S(":");
-	INP_C(0x0A);
-	assert_strcmp(CURRENT_LINE, "Messages beginning with ':' require a command");
-
 	INP_S("::");
 	INP_C(0x0A);
-	assert_strcmp(CURRENT_LINE, "Messages beginning with ':' require a command");
+	assert_strcmp(CURRENT_LINE, "This is not a server");
 
 	INP_S("test");
 	INP_C(0x0A);
 	assert_strcmp(CURRENT_LINE, "This is not a server");
 
+	/* Test empty command */
+	INP_S(":");
+	INP_C(0x0A);
+	assert_strcmp(CURRENT_LINE, "Messages beginning with ':' require a command");
+
+	/* Test control characters */
 	INP_C(CTRL('c'));
 	INP_C(CTRL('p'));
 	INP_C(CTRL('x'));
 	assert_strcmp(CURRENT_LINE, "Type :quit to exit rirc");
 
 	INP_C(CTRL('l'));
-	assert_null(buffer_head(&current_channel()->buffer));
+	assert_ptr_null(buffer_head(&current_channel()->buffer));
 
+	/* Test adding servers */
 	struct server *s1 = server("h1", "p1", NULL, "u1", "r1");
 	struct server *s2 = server("h2", "p2", NULL, "u2", "r2");
 	struct server *s3 = server("h3", "p3", NULL, "u3", "r3");
 
-	assert_ptrequals(server_list_add(state_server_list(), s1), NULL);
-	assert_ptrequals(server_list_add(state_server_list(), s2), NULL);
-	assert_ptrequals(server_list_add(state_server_list(), s3), NULL);
+	assert_ptr_eq(server_list_add(state_server_list(), s1), NULL);
+	assert_ptr_eq(server_list_add(state_server_list(), s2), NULL);
+	assert_ptr_eq(server_list_add(state_server_list(), s3), NULL);
 
 	state_term();
 }
@@ -102,7 +115,7 @@ test_state(void)
 int
 main(void)
 {
-	testcase tests[] = {
+	struct testcase tests[] = {
 		TESTCASE(test_state),
 	};
 

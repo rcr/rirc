@@ -97,11 +97,10 @@ test_chanmode_set(void)
 	/* Test 's'/'p' chanmodes set prefix but do not appear in mode string
 	 *
 	 * Ensure 's' always supercedes and unsets 'p',
-	 * Ensure 'p' is silently ignored when 's' is set
-	 * Ensure unsetting the current 's'/'p' flag always sets default prefix */
+	 * Ensure 'p' is silently ignored when 's' is set */
 
 	assert_eq(mode_chanmode_set(&m, &cfg, 'p', MODE_SET_ON), MODE_ERR_NONE);
-	CHECK("dej", MODE_CHANMODE_PREFIX_PRIVATE);
+	CHECK("dejp", MODE_CHANMODE_PREFIX_PRIVATE);
 	assert_true(mode_isset(&m, 'p'));
 	assert_false(mode_isset(&m, 's'));
 
@@ -114,13 +113,13 @@ test_chanmode_set(void)
 	/* 's' supercedes 'p' */
 	assert_eq(mode_chanmode_set(&m, &cfg, 'p', MODE_SET_ON), MODE_ERR_NONE);
 	assert_eq(mode_chanmode_set(&m, &cfg, 's', MODE_SET_ON), MODE_ERR_NONE);
-	CHECK("dej", MODE_CHANMODE_PREFIX_SECRET);
+	CHECK("dejs", MODE_CHANMODE_PREFIX_SECRET);
 	assert_true(mode_isset(&m, 's'));
 	assert_false(mode_isset(&m, 'p'));
 
 	/* 'p' is silently ignored when 's' is set */
 	assert_eq(mode_chanmode_set(&m, &cfg, 'p', MODE_SET_ON), MODE_ERR_NONE);
-	CHECK("dej", MODE_CHANMODE_PREFIX_SECRET);
+	CHECK("dejs", MODE_CHANMODE_PREFIX_SECRET);
 	assert_true(mode_isset(&m, 's'));
 	assert_false(mode_isset(&m, 'p'));
 
@@ -244,10 +243,10 @@ test_chanmode_prefix(void)
 	CHECK(m, MODE_CHANMODE_PREFIX_OTHER, 0, 0, "");
 
 	assert_eq(mode_chanmode_prefix(&m, &cfg, MODE_CHANMODE_PREFIX_PRIVATE), MODE_ERR_NONE);
-	CHECK(m, MODE_CHANMODE_PREFIX_PRIVATE, 1, 0, "");
+	CHECK(m, MODE_CHANMODE_PREFIX_PRIVATE, 1, 0, "p");
 
 	assert_eq(mode_chanmode_prefix(&m, &cfg, MODE_CHANMODE_PREFIX_SECRET), MODE_ERR_NONE);
-	CHECK(m, MODE_CHANMODE_PREFIX_SECRET, 0, 1, "");
+	CHECK(m, MODE_CHANMODE_PREFIX_SECRET, 0, 1, "s");
 
 	/* Test silently ignored setting by precedence */
 
@@ -256,7 +255,7 @@ test_chanmode_prefix(void)
 
 	assert_eq(mode_chanmode_prefix(&m2, &cfg, MODE_CHANMODE_PREFIX_PRIVATE), MODE_ERR_NONE);
 	assert_eq(mode_chanmode_prefix(&m2, &cfg, MODE_CHANMODE_PREFIX_OTHER), MODE_ERR_NONE);
-	CHECK(m2, MODE_CHANMODE_PREFIX_PRIVATE, 1, 0, "");
+	CHECK(m2, MODE_CHANMODE_PREFIX_PRIVATE, 1, 0, "p");
 
 	/* SECRET > PRIVATE, OTHER */
 	struct mode m3 = MODE_EMPTY;
@@ -264,7 +263,7 @@ test_chanmode_prefix(void)
 	assert_eq(mode_chanmode_prefix(&m3, &cfg, MODE_CHANMODE_PREFIX_SECRET), MODE_ERR_NONE);
 	assert_eq(mode_chanmode_prefix(&m3, &cfg, MODE_CHANMODE_PREFIX_PRIVATE), MODE_ERR_NONE);
 	assert_eq(mode_chanmode_prefix(&m3, &cfg, MODE_CHANMODE_PREFIX_OTHER), MODE_ERR_NONE);
-	CHECK(m3, MODE_CHANMODE_PREFIX_SECRET, 0, 1, "");
+	CHECK(m3, MODE_CHANMODE_PREFIX_SECRET, 0, 1, "s");
 
 #undef CHECK
 }
@@ -528,7 +527,7 @@ test_chanmode_type(void)
 int
 main(void)
 {
-	testcase tests[] = {
+	struct testcase tests[] = {
 		TESTCASE(test_flag_bit),
 		TESTCASE(test_mode_str),
 		TESTCASE(test_chanmode_set),

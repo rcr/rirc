@@ -4,13 +4,6 @@
  *
  * Assumes vt-100 compatible escape codes, as such YMMV */
 
-/* TODO:
- *
- * setvbuf can be used for testing draw routines, pointing to static buffer
- *
- * vector io, from draw(), pass pointers to terminal row buffers, draw in a single write
- * */
-
 #include <alloca.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -70,7 +63,7 @@ static int nick_colours[] = NICK_COLOURS
  *
  * The origin for terminal coordinates is in the top left, indexed from 1
  *
- * */
+ */
 struct coords
 {
 	unsigned int c1;
@@ -143,6 +136,13 @@ draw_bell(void)
 }
 
 void
+draw_init(void)
+{
+	draw_all();
+	redraw();
+}
+
+void
 draw_term(void)
 {
 	printf(RESET_ATTRIBUTES);
@@ -184,7 +184,7 @@ _draw_buffer_line(
 		char header[head_w + COLOUR_SIZE * 4 + 1];
 		char *header_ptr = header;
 
-		size_t buff_n = sizeof(header) - 1, /*  */
+		size_t buff_n = sizeof(header) - 1,
 		       text_n = head_w - 1;
 
 		struct tm *line_tm = localtime(&line->time);
@@ -206,6 +206,12 @@ _draw_buffer_line(
 
 		switch (line->type) {
 			case BUFFER_LINE_OTHER:
+			case BUFFER_LINE_SERVER_MSG:
+			case BUFFER_LINE_SERVER_ERR:
+			case BUFFER_LINE_JOIN:
+			case BUFFER_LINE_NICK:
+			case BUFFER_LINE_PART:
+			case BUFFER_LINE_QUIT:
 				if (!_draw_fmt(&header_ptr, &buff_n, &text_n, 0,
 						_colour(BUFFER_LINE_HEADER_FG_NEUTRAL, -1)))
 					goto print_header;
@@ -224,7 +230,7 @@ _draw_buffer_line(
 				break;
 
 			case BUFFER_LINE_T_SIZE:
-				break;
+				fatal("Invalid line type");
 		}
 
 		if (!_draw_fmt(&header_ptr, &buff_n, &text_n, 1,
@@ -798,7 +804,6 @@ split_buffer_cols(
 	if (_head_w >= cols)
 		_head_w = cols / 2;
 
-	//TODO: why?
 	_head_w -= 1;
 
 	if (head_w)

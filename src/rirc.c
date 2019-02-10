@@ -52,17 +52,17 @@ static const char *const rirc_usage =
 "\n  rirc [-hv] [-s server [-p port] [-w pass] [-n nicks] [-c chans] [-u user] [-r real]], ...]"
 "\n"
 "\nHelp:"
-"\n  -h, --help            Print this message and exit"
-"\n  -v, --version         Print rirc version and exit"
+"\n  -h, --help      Print this message and exit"
+"\n  -v, --version   Print rirc version and exit"
 "\n"
 "\nOptions:"
-"\n  -s, --server=SERVER      Connect to SERVER"
-"\n  -p, --port=PORT          Connect to SERVER using PORT"
-"\n  -w, --pass=PASS          Connect to SERVER using PASS"
-"\n  -u, --username=USERNAME  Connect to SERVER using USERNAME"
-"\n  -r, --realname=REALNAME  Connect to SERVER using REALNAME"
-"\n  -n, --nicks=NICKS        Comma separated list of nicks to use for SERVER"
-"\n  -c, --chans=CHANNELS     Comma separated list of channels to join for SERVER"
+"\n  -s, --server=SERVER       Connect to SERVER"
+"\n  -p, --port=PORT           Connect to SERVER using PORT"
+"\n  -w, --pass=PASS           Connect to SERVER using PASS"
+"\n  -u, --username=USERNAME   Connect to SERVER using USERNAME"
+"\n  -r, --realname=REALNAME   Connect to SERVER using REALNAME"
+"\n  -n, --nicks=NICKS         Comma separated list of nicks to use for SERVER"
+"\n  -c, --chans=CHANNELS      Comma separated list of channels to join for SERVER"
 "\n";
 
 static const char *const rirc_version =
@@ -266,15 +266,19 @@ parse_args(int argc, char **argv)
 	return 0;
 }
 
+#ifndef TESTING
 int
 main(int argc, char **argv)
 {
 	int ret;
 
-	if ((ret = parse_args(argc, argv)) == 0)
+	if ((ret = parse_args(argc, argv)) == 0) {
+		draw_init();
 		io_init();
-
-	state_term();
+		draw_term();
+		state_term();
+	}
 
 	return ret;
 }
+#endif

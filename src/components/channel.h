@@ -28,6 +28,7 @@ enum channel_t
 
 struct channel
 {
+	const char *name;
 	enum activity_t activity;
 	enum channel_t type;
 	size_t name_len;
@@ -40,7 +41,8 @@ struct channel
 	struct server *server;
 	struct user_list users;
 	unsigned int parted : 1;
-	char name[];
+	unsigned int joined : 1; // TODO
+	char _[];
 };
 
 struct channel_list

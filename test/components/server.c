@@ -52,54 +52,54 @@ test_server_list(void)
 	s7 = server("host2", "port1", NULL, "", "");   /* duplicate host, port (s5) */
 
 	/* Test add */
-	assert_ptrequals(server_list_add(&servers, s1), NULL);
-	assert_ptrequals(server_list_add(&servers, s1), s1); /* duplicate pointer */
-	assert_ptrequals(server_list_add(&servers, s2), s2); /* duplicate by host/port */
-	assert_ptrequals(server_list_add(&servers, s3), NULL);
-	assert_ptrequals(server_list_add(&servers, s4), NULL);
-	assert_ptrequals(server_list_add(&servers, s5), NULL);
-	assert_ptrequals(server_list_add(&servers, s6), s6); /* duplicate by host/port */
-	assert_ptrequals(server_list_add(&servers, s7), s7); /* duplicate by host/port */
+	assert_ptr_eq(server_list_add(&servers, s1), NULL);
+	assert_ptr_eq(server_list_add(&servers, s1), s1); /* duplicate pointer */
+	assert_ptr_eq(server_list_add(&servers, s2), s2); /* duplicate by host/port */
+	assert_ptr_eq(server_list_add(&servers, s3), NULL);
+	assert_ptr_eq(server_list_add(&servers, s4), NULL);
+	assert_ptr_eq(server_list_add(&servers, s5), NULL);
+	assert_ptr_eq(server_list_add(&servers, s6), s6); /* duplicate by host/port */
+	assert_ptr_eq(server_list_add(&servers, s7), s7); /* duplicate by host/port */
 
 	/* Test del */
-	assert_ptrequals(server_list_del(&servers, s2), NULL); /* not in list */
-	assert_ptrequals(server_list_del(&servers, s6), NULL); /* not in list */
-	assert_ptrequals(server_list_del(&servers, s7), NULL); /* not in list */
+	assert_ptr_eq(server_list_del(&servers, s2), NULL); /* not in list */
+	assert_ptr_eq(server_list_del(&servers, s6), NULL); /* not in list */
+	assert_ptr_eq(server_list_del(&servers, s7), NULL); /* not in list */
 
 	/* head              tail
 	 *  v                 v
 	 *  s1 -> s3 -> s4 -> s5
 	 */
-	assert_ptrequals(servers.head, s1);
-	assert_ptrequals(servers.tail, s5);
+	assert_ptr_eq(servers.head, s1);
+	assert_ptr_eq(servers.tail, s5);
 
 	/* delete from middle */
-	assert_ptrequals(server_list_del(&servers, s4), s4);
-	assert_ptrequals(servers.head, s1);
-	assert_ptrequals(servers.tail, s5);
+	assert_ptr_eq(server_list_del(&servers, s4), s4);
+	assert_ptr_eq(servers.head, s1);
+	assert_ptr_eq(servers.tail, s5);
 
 	/* delete head */
-	assert_ptrequals(server_list_del(&servers, s1), s1);
-	assert_ptrequals(servers.head, s3);
-	assert_ptrequals(servers.tail, s5);
+	assert_ptr_eq(server_list_del(&servers, s1), s1);
+	assert_ptr_eq(servers.head, s3);
+	assert_ptr_eq(servers.tail, s5);
 
 	/* delete tail */
-	assert_ptrequals(server_list_del(&servers, s5), s5);
-	assert_ptrequals(servers.head, s3);
-	assert_ptrequals(servers.tail, s3);
+	assert_ptr_eq(server_list_del(&servers, s5), s5);
+	assert_ptr_eq(servers.head, s3);
+	assert_ptr_eq(servers.tail, s3);
 
 	/* delete last */
-	assert_ptrequals(server_list_del(&servers, s3), s3);
-	assert_ptrequals(servers.head, NULL);
-	assert_ptrequals(servers.tail, NULL);
+	assert_ptr_eq(server_list_del(&servers, s3), s3);
+	assert_ptr_eq(servers.head, NULL);
+	assert_ptr_eq(servers.tail, NULL);
 
 	/* server was removed from list */
-	assert_ptrequals(s1->next, NULL);
-	assert_ptrequals(s1->prev, NULL);
+	assert_ptr_eq(s1->next, NULL);
+	assert_ptr_eq(s1->prev, NULL);
 
 	/* server was never added to list */
-	assert_ptrequals(s7->next, NULL);
-	assert_ptrequals(s7->prev, NULL);
+	assert_ptr_eq(s7->next, NULL);
+	assert_ptr_eq(s7->prev, NULL);
 
 	server_free(s1);
 	server_free(s2);
@@ -248,7 +248,7 @@ test_parse_opt(void)
 int
 main(void)
 {
-	testcase tests[] = {
+	struct testcase tests[] = {
 		TESTCASE(test_server_list),
 		TESTCASE(test_server_set_nicks),
 		TESTCASE(test_parse_opt)

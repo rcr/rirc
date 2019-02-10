@@ -22,6 +22,7 @@ union draw
 
 void draw(union draw);
 void draw_bell(void);
+void draw_init(void);
 void draw_term(void);
 void split_buffer_cols(struct buffer_line*, unsigned int*, unsigned int*, unsigned int, unsigned int);
 

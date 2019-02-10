@@ -1,0 +1,56 @@
+%{
+#include <string.h>
+
+#define RECV_HANDLERS \
+	X(error) \
+	X(invite) \
+	X(join) \
+	X(kick) \
+	X(mode) \
+	X(nick) \
+	X(notice) \
+	X(part) \
+	X(ping) \
+	X(pong) \
+	X(privmsg) \
+	X(quit) \
+	X(topic)
+
+#define X(cmd) static int recv_##cmd(struct server*, struct irc_message*);
+RECV_HANDLERS
+#undef X
+
+typedef int (*irc_recv_f)(struct server*, struct irc_message*);
+
+struct recv_handler
+{
+	char *key;
+	irc_recv_f f;
+};
+%}
+
+%enum
+%null-strings
+%readonly-tables
+%struct-type
+%define slot-name key
+%define word-array-name      recv_handlers
+%define hash-function-name   recv_handler_hash
+%define lookup-function-name recv_handler_lookup
+%define initializer-suffix ,(irc_recv_f)0
+struct recv_handler;
+%%
+ERROR,   recv_error
+INVITE,  recv_invite
+JOIN,    recv_join
+KICK,    recv_kick
+MODE,    recv_mode
+NICK,    recv_nick
+NOTICE,  recv_notice
+PART,    recv_part
+PING,    recv_ping
+PONG,    recv_pong
+PRIVMSG, recv_privmsg
+QUIT,    recv_quit
+TOPIC,   recv_topic
+%%
