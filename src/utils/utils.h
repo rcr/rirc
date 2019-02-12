@@ -69,13 +69,8 @@ int irc_strcmp(enum casemapping_t, const char*, const char*);
 int irc_strncmp(enum casemapping_t, const char*, const char*, size_t);
 
 int str_trim(char**);
-char* getarg(char**, const char*);
 char* word_wrap(int, char**, char*);
-
 char* strdup(const char*);
 void* memdup(const void*, size_t);
-
-// TODO: replace word_wrap -> str_wrap... int(char**, char**, size_t)
-// TODO: getarg -> simplify, str_token? tokens on ' ' only
 
 #endif

@@ -10,44 +10,6 @@
 static inline int irc_toupper(enum casemapping_t, int);
 
 char*
-getarg(char **str, const char *sep)
-{
-	/* Return a token parsed from *str delimited by any character in sep.
-	 *
-	 * Consumes all sep characters preceding the token and null terminates it.
-	 *
-	 * Returns NULL if *str is NULL or contains only sep characters */
-
-	char *ret, *ptr;
-
-	if (str == NULL || (ptr = *str) == NULL)
-		return NULL;
-
-	while (*ptr && strchr(sep, *ptr))
-		ptr++;
-
-	if (*ptr == '\0')
-		return NULL;
-
-	ret = ptr;
-
-	while (*ptr && !strchr(sep, *ptr))
-		ptr++;
-
-	/* If the string continues after the found arg, set the input to point
-	 * one past the arg's null terminator.
-	 *
-	 * This might result in *str pointing to the original string's null
-	 * terminator, in which case the next call to getarg will return NULL */
-
-	*str = ptr + (*ptr && strchr(sep, *ptr));
-
-	*ptr = '\0';
-
-	return ret;
-}
-
-char*
 strdup(const char *str)
 {
 	return memdup(str, strlen(str) + 1);
@@ -132,7 +94,7 @@ irc_ischanchar(char c, int first)
 	 * channelid  = 5( %x41-5A / digit )   ; 5( A-Z / 0-9 )
 	 */
 
-	/* TODO: */
+	/* TODO: CHANTYPES */
 	(void)c;
 	(void)first;
 

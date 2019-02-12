@@ -474,6 +474,7 @@ irc_353(struct server *s, struct irc_message *m)
 {
 	/* 353 ("="/"*"/"@") <channel> *([ "@" / "+" ]<nick>) */
 
+	char *saveptr;
 	char *chan;
 	char *nick;
 	char *nicks;
@@ -495,7 +496,7 @@ irc_353(struct server *s, struct irc_message *m)
 	if (mode_chanmode_prefix(&(c->chanmodes), &(s->mode_cfg), *type) != MODE_ERR_NONE)
 		newlinef(c, 0, FROM_ERROR, "RPL_NAMEREPLY: invalid channel flag: '%c'", *type);
 
-	while ((nick = getarg(&nicks, " "))) {
+	while ((nick = strtok_r(nicks, " ", &saveptr))) {
 
 		char prefix = 0;
 		struct mode m = MODE_EMPTY;

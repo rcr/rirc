@@ -30,13 +30,14 @@ static const char* targ_or_type(struct channel*, char*, enum channel_t type);
 int
 irc_send_command(struct server *s, struct channel *c, char *m)
 {
+	char *saveptr;
 	char *command, *p;
 	const struct send_handler *send;
 
 	if (!s)
 		failf(c, "This is not a server");
 
-	if (*m == ' ' || !(command = getarg(&m, " ")))
+	if (*m == ' ' || !(command = strtok_r(m, " ", &saveptr)))
 		failf(c, "Messages beginning with '/' require a command");
 
 	for (p = command; *p; p++)
@@ -75,9 +76,10 @@ irc_send_privmsg(struct server *s, struct channel *c, char *m)
 static const char*
 targ_or_type(struct channel *c, char *m, enum channel_t type)
 {
+	char *saveptr;
 	const char *targ;
 
-	if ((targ = getarg(&m, " ")))
+	if ((targ = strtok_r(m, " ", &saveptr)))
 		return targ;
 
 	if (c->type == type)
@@ -178,9 +180,10 @@ send_ctcp_version(struct server *s, struct channel *c, char *m)
 static int
 send_notice(struct server *s, struct channel *c, char *m)
 {
+	char *saveptr;
 	const char *targ;
 
-	if (!(targ = getarg(&m, " ")))
+	if (!(targ = strtok_r(m, " ", &saveptr)))
 		failf(c, "Usage: /notice <target> <message>");
 
 	if (*m == 0)
@@ -204,9 +207,10 @@ send_part(struct server *s, struct channel *c, char *m)
 static int
 send_privmsg(struct server *s, struct channel *c, char *m)
 {
+	char *saveptr;
 	const char *targ;
 
-	if (!(targ = getarg(&m, " ")))
+	if (!(targ = strtok_r(m, " ", &saveptr)))
 		failf(c, "Usage: /privmsg <target> <message>");
 
 	if (*m == 0)

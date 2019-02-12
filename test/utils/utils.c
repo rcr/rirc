@@ -2,63 +2,6 @@
 #include "src/utils/utils.c"
 
 static void
-test_getarg(void)
-{
-	/* Test string token parsing */
-
-	char *ptr;
-
-	/* Test null pointer */
-	assert_strcmp(getarg(NULL, " "), NULL);
-
-	/* Test empty string */
-	char str1[] = "";
-
-	ptr = str1;
-	assert_strcmp(getarg(&ptr, " "), NULL);
-
-	/* Test only whitestapce */
-	char str2[] = "   ";
-
-	ptr = str2;
-	assert_strcmp(getarg(&ptr, " "), NULL);
-
-	/* Test single token */
-	char str3[] = "arg1";
-
-	ptr = str3;
-	assert_strcmp(getarg(&ptr, " "), "arg1");
-	assert_strcmp(getarg(&ptr, " "), NULL);
-
-	/* Test multiple tokens */
-	char str4[] = "arg2 arg3 arg4";
-
-	ptr = str4;
-	assert_strcmp(getarg(&ptr, " "), "arg2");
-	assert_strcmp(getarg(&ptr, " "), "arg3");
-	assert_strcmp(getarg(&ptr, " "), "arg4");
-	assert_strcmp(getarg(&ptr, " "), NULL);
-
-	/* Test multiple tokens with extraneous whitespace */
-	char str5[] = "   arg5   arg6   arg7   ";
-
-	ptr = str5;
-	assert_strcmp(getarg(&ptr, " "), "arg5");
-	assert_strcmp(getarg(&ptr, " "), "arg6");
-	assert_strcmp(getarg(&ptr, " "), "arg7");
-	assert_strcmp(getarg(&ptr, " "), NULL);
-
-	/* Test multiple separator characters */
-	char str6[] = "!!!arg8:!@#$arg9   :   arg10!@#";
-
-	ptr = str6;
-	assert_strcmp(getarg(&ptr, "!:"), "arg8");
-	assert_strcmp(getarg(&ptr, ":$#@! "), "arg9");
-	assert_strcmp(getarg(&ptr, " :"), "arg10!@#");
-	assert_strcmp(getarg(&ptr, " "), NULL);
-}
-
-static void
 test_irc_message_param(void)
 {
 	char *param;
@@ -646,7 +589,6 @@ int
 main(void)
 {
 	struct testcase tests[] = {
-		TESTCASE(test_getarg),
 		TESTCASE(test_irc_message_param),
 		TESTCASE(test_irc_message_parse),
 		TESTCASE(test_irc_message_split),

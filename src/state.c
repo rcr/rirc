@@ -803,9 +803,10 @@ static void
 command(struct channel *c, char *buf)
 {
 	const char *cmnd;
+	char *saveptr;
 	int err;
 
-	if (!(cmnd = getarg(&buf, " "))) {
+	if (!(cmnd = strtok_r(buf, " ", &saveptr))) {
 		newline(c, 0, "-!!-", "Messages beginning with ':' require a command");
 		return;
 	}
@@ -816,13 +817,12 @@ command(struct channel *c, char *buf)
 
 	if (!strcasecmp(cmnd, "connect")) {
 
-		const char *host = getarg(&buf, " "),
-		           *port = getarg(&buf, " "),
-		           *pass = getarg(&buf, " "),
-		           *user = getarg(&buf, " "),
-		           *real = getarg(&buf, " "),
-		           *help = ":connect [host [port] [pass] [user] [real]]";
-
+		const char *host = strtok_r(NULL, " ", &saveptr);
+		const char *port = strtok_r(NULL, " ", &saveptr);
+		const char *pass = strtok_r(NULL, " ", &saveptr);
+		const char *user = strtok_r(NULL, " ", &saveptr);
+		const char *real = strtok_r(NULL, " ", &saveptr);
+		const char *help = ":connect [host [port] [pass] [user] [real]]";
 		struct server *s;
 
 		if (host == NULL) {

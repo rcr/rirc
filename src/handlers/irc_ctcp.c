@@ -26,6 +26,7 @@
 static int
 parse_ctcp(struct server *s, const char *from, char **args, const char **cmd)
 {
+	char *saveptr;
 	char *message = *args;
 	char *command;
 	char *p;
@@ -41,7 +42,7 @@ parse_ctcp(struct server *s, const char *from, char **args, const char **cmd)
 
 	*message++ = 0;
 
-	if (!(command = getarg(&message, " ")))
+	if (!(command = strtok_r(message, " ", &saveptr)))
 		failf(s, "Received empty CTCP from %s", from);
 
 	for (p = command; *p; p++)
@@ -247,6 +248,7 @@ ctcp_response_finger(struct server *s, const char *from, const char *targ, char 
 static int
 ctcp_response_ping(struct server *s, const char *from, const char *targ, char *m)
 {
+	char *saveptr;
 	const char *sec;
 	const char *usec;
 	long long unsigned res;
@@ -259,10 +261,10 @@ ctcp_response_ping(struct server *s, const char *from, const char *targ, char *m
 
 	UNUSED(targ);
 
-	if (!(sec = getarg(&m, " ")))
+	if (!(sec = strtok_r(m, " ", &saveptr)))
 		failf(s, "CTCP PING response from %s: sec is NULL", from);
 
-	if (!(usec = getarg(&m, " ")))
+	if (!(usec = strtok_r(NULL, " ", &saveptr)))
 		failf(s, "CTCP PING response from %s: usec is NULL", from);
 
 	for (const char *p = sec; *p; p++) {

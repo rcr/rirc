@@ -165,21 +165,22 @@ server_set_004(struct server *s, char *str)
 
 	struct channel *c = s->channel;
 
+	char *saveptr;
 	char *server_name, /* Not used */
 	     *version,     /* Not used */
 	     *user_modes,  /* Configure server usermodes */
 	     *chan_modes;  /* Configure server chanmodes */
 
-	if (!(server_name = getarg(&str, " ")))
+	if (!(server_name = strtok_r(str, " ", &saveptr)))
 		newline(c, 0, "-!!-", "invalid numeric 004: server_name is null");
 
-	if (!(version = getarg(&str, " ")))
+	if (!(version = strtok_r(NULL, " ", &saveptr)))
 		newline(c, 0, "-!!-", "invalid numeric 004: version is null");
 
-	if (!(user_modes = getarg(&str, " ")))
+	if (!(user_modes = strtok_r(NULL, " ", &saveptr)))
 		newline(c, 0, "-!!-", "invalid numeric 004: user_modes is null");
 
-	if (!(chan_modes = getarg(&str, " ")))
+	if (!(chan_modes = strtok_r(NULL, " ", &saveptr)))
 		newline(c, 0, "-!!-", "invalid numeric 004: chan_modes is null");
 
 	if (user_modes) {
