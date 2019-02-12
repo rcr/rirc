@@ -122,13 +122,13 @@ static void _print_testcase_name_(const char*);
 
 #define assert_true(X) \
 	do { \
-		if ((X) == 0) \
+		if (!(X)) \
 			fail_test(#X " expected true"); \
 	} while (0)
 
 #define assert_false(X) \
 	do { \
-		if ((X) != 0) \
+		if ((X)) \
 			fail_test(#X " expected false"); \
 	} while (0)
 

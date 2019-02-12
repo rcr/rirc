@@ -49,7 +49,7 @@ parse_ctcp(struct server *s, const char *from, char **args, const char **cmd)
 		*p = toupper(*p);
 
 	*cmd = command;
-	*args = message;
+	*args = saveptr;
 
 	return 0;
 }

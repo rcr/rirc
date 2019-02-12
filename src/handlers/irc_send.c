@@ -44,10 +44,10 @@ irc_send_command(struct server *s, struct channel *c, char *m)
 		*p = toupper(*p);
 
 	if ((send = send_handler_lookup(command, strlen(command))))
-		return send->f(s, c, m);
+		return send->f(s, c, saveptr);
 
-	if (str_trim(&m))
-		sendf(s, c, "%s %s", command, m);
+	if (str_trim(&saveptr))
+		sendf(s, c, "%s %s", command, saveptr);
 	else
 		sendf(s, c, "%s", command);
 }
@@ -186,10 +186,10 @@ send_notice(struct server *s, struct channel *c, char *m)
 	if (!(targ = strtok_r(m, " ", &saveptr)))
 		failf(c, "Usage: /notice <target> <message>");
 
-	if (*m == 0)
+	if (*saveptr == 0)
 		failf(c, "Usage: /notice <target> <message>");
 
-	sendf(s, c, "NOTICE %s :%s", targ, m);
+	sendf(s, c, "NOTICE %s :%s", targ, saveptr);
 }
 
 static int
@@ -213,10 +213,10 @@ send_privmsg(struct server *s, struct channel *c, char *m)
 	if (!(targ = strtok_r(m, " ", &saveptr)))
 		failf(c, "Usage: /privmsg <target> <message>");
 
-	if (*m == 0)
+	if (*saveptr == 0)
 		failf(c, "Usage: /privmsg <target> <message>");
 
-	sendf(s, c, "PRIVMSG %s :%s", targ, m);
+	sendf(s, c, "PRIVMSG %s :%s", targ, saveptr);
 }
 
 static int
