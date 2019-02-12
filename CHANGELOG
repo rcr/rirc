@@ -2,6 +2,8 @@
 Summary of notable changes and features
 
 ## Unreleased (dev)
+### Features
+ - add CASEMAPPING handling
 
 ## [0.1.2]
 ### Features

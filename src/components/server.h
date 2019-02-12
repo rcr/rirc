@@ -4,6 +4,7 @@
 #include "src/components/buffer.h"
 #include "src/components/channel.h"
 #include "src/components/mode.h"
+#include "src/utils/utils.h"
 
 struct server
 {
@@ -13,8 +14,7 @@ struct server
 	const char *username;
 	const char *realname;
 	const char *nick;
-	int (*cmp) (const char*, const char*);
-	// TODO: enum for cmp type
+	enum casemapping_t casemapping;
 	struct {
 		size_t next;
 		size_t size;

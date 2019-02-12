@@ -18,14 +18,14 @@ static inline int
 user_cmp(struct user *u1, struct user *u2)
 {
 	/* TODO: CASEMAPPING */
-	return irc_strcmp(u1->nick, u2->nick);
+	return irc_strcmp(CASEMAPPING_RFC1459, u1->nick, u2->nick);
 }
 
 static inline int
 user_ncmp(struct user *u1, struct user *u2, size_t n)
 {
 	/* TODO: CASEMAPPING */
-	return irc_strncmp(u1->nick, u2->nick, n);
+	return irc_strncmp(CASEMAPPING_RFC1459, u1->nick, u2->nick, n);
 }
 
 static inline void

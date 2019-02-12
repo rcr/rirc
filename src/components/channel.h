@@ -41,7 +41,7 @@ struct channel
 	struct server *server;
 	struct user_list users;
 	unsigned int parted : 1;
-	unsigned int joined : 1; // TODO
+	unsigned int joined : 1;
 	char _[];
 };
 
@@ -52,31 +52,12 @@ struct channel_list
 };
 
 struct channel* channel(const char*, enum channel_t);
-
-struct channel* channel_list_add(struct channel_list*, struct channel*);
-struct channel* channel_list_del(struct channel_list*, struct channel*);
-struct channel* channel_list_get(struct channel_list*, const char*);
-
-/* TODO: `channel_tree_*` for fast retrieval
- *   struct channel_tree_node slist  -> for server channel list
- *   struct channel_list_node glist  -> unordered global channel list
- */
-
-/* TODO: pointer from channel back to server can be eliminated which
- * simplifies architecture by having stateful functions aware of the
- * current context, and having input keybind functions, and send_mesg
- * returned from input() instead of calling them from input.c
- *
- * input shouldn't be a pointer, and thus shouldn't require being freed
- */
-
-/* TODO: abstract list.h, test, add list foreach, replace
- * channel list iteration everywhere */
-
+struct channel* channel_list_get(struct channel_list*, const char*, enum casemapping_t);
+void channel_free(struct channel*);
+void channel_list_add(struct channel_list*, struct channel*);
+void channel_list_del(struct channel_list*, struct channel*);
+void channel_list_free(struct channel_list*);
 void channel_part(struct channel*);
 void channel_reset(struct channel*);
-
-void channel_free(struct channel*);
-void channel_list_free(struct channel_list*);
 
 #endif

@@ -7,7 +7,7 @@
 
 #include "src/utils/utils.h"
 
-static inline int irc_toupper(int);
+static inline int irc_toupper(enum casemapping_t, int);
 
 char*
 getarg(char **str, const char *sep)
@@ -79,32 +79,37 @@ str_trim(char **str)
 	return !!*p;
 }
 
-//TODO: CASEMAPPING,
-//        - if `ascii` only az->AZ is used for nick/channel comp
 static inline int
-irc_toupper(const int c)
+irc_toupper(enum casemapping_t casemapping, int c)
 {
 	/* RFC 2812, section 2.2
 	 *
 	 * Because of IRC's Scandinavian origin, the characters {}|^ are
 	 * considered to be the lower case equivalents of the characters []\~,
 	 * respectively. This is a critical issue when determining the
-	 * equivalence of two nicknames or channel names.
-	 */
+	 * equivalence of two nicknames or channel names. */
 
-	switch (c) {
-		case '{': return '[';
-		case '}': return ']';
-		case '|': return '\\';
-		case '^': return '~';
-		default:
+	switch (casemapping) {
+		case CASEMAPPING_RFC1459:
+			if (c == '^') return '~';
+			/* FALLTHROUGH */
+		case CASEMAPPING_STRICT_RFC1459:
+			if (c == '{') return '[';
+			if (c == '}') return ']';
+			if (c == '|') return '\\';
+			/* FALLTHROUGH */
+		case CASEMAPPING_ASCII:
 			return (c >= 'a' && c <= 'z') ? (c + 'A' - 'a') : c;
+		default:
+			fatal("Unknown CASEMAPPING");
 	}
 }
 
 int
 irc_isnickchar(char c, int first)
 {
+	// TODO: casemapping
+
 	/* RFC 2812, section 2.3.1
 	 *
 	 * nickname   =  ( letter / special ) *8( letter / digit / special / "-" )
@@ -139,6 +144,8 @@ irc_ischanchar(char c, int first)
 int
 irc_isnick(const char *str)
 {
+	// TODO: casemapping
+
 	if (!irc_isnickchar(*str++, 1))
 		return 0;
 
@@ -165,18 +172,17 @@ irc_ischan(const char *str)
 }
 
 int
-irc_strcmp(const char *s1, const char *s2)
+irc_strcmp(enum casemapping_t casemapping, const char *s1, const char *s2)
 {
 	/* Case insensitive comparison of strings s1, s2 in accordance
-	 * with RFC 2812, section 2.2
-	 */
+	 * with RFC 2812, section 2.2 */
 
 	int c1, c2;
 
 	for (;;) {
 
-		c1 = irc_toupper(*s1++);
-		c2 = irc_toupper(*s2++);
+		c1 = irc_toupper(casemapping, *s1++);
+		c2 = irc_toupper(casemapping, *s2++);
 
 		if ((c1 -= c2))
 			return -c1;
@@ -189,18 +195,17 @@ irc_strcmp(const char *s1, const char *s2)
 }
 
 int
-irc_strncmp(const char *s1, const char *s2, size_t n)
+irc_strncmp(enum casemapping_t casemapping, const char *s1, const char *s2, size_t n)
 {
 	/* Case insensitive comparison of strings s1, s2 in accordance
-	 * with RFC 2812, section 2.2, up to n characters
-	 */
+	 * with RFC 2812, section 2.2, up to n characters */
 
 	int c1, c2;
 
 	while (n > 0) {
 
-		c1 = irc_toupper(*s1++);
-		c2 = irc_toupper(*s2++);
+		c1 = irc_toupper(casemapping, *s1++);
+		c2 = irc_toupper(casemapping, *s2++);
 
 		if ((c1 -= c2))
 			return -c1;
@@ -403,7 +408,7 @@ check_pinged(const char *mesg, const char *nick)
 			mesg++;
 
 		/* nick prefixes the word, following character is space or symbol */
-		if (!irc_strncmp(mesg, nick, len) && !irc_isnickchar(*(mesg + len), 0))
+		if (!irc_strncmp(CASEMAPPING_RFC1459, mesg, nick, len) && !irc_isnickchar(*(mesg + len), 0))
 			return 1;
 
 		/* skip to end of word */

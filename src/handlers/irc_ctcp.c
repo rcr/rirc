@@ -93,14 +93,14 @@ ctcp_request_action(struct server *s, const char *from, const char *targ, char *
 	if (!targ)
 		failf(s, "CTCP ACTION: target is NULL");
 
-	if (!s->cmp(targ, s->nick)) {
-		if ((c = channel_list_get(&s->clist, from)) == NULL) {
+	if (!irc_strcmp(s->casemapping, targ, s->nick)) {
+		if ((c = channel_list_get(&s->clist, from, s->casemapping)) == NULL) {
 			c = channel(from, CHANNEL_T_PRIVATE);
 			c->activity = ACTIVITY_PINGED;
 			c->server = s;
 			channel_list_add(&s->clist, c);
 		}
-	} else if ((c = channel_list_get(&s->clist, targ)) == NULL) {
+	} else if ((c = channel_list_get(&s->clist, targ, s->casemapping)) == NULL) {
 		failf(s, "CTCP ACTION: target '%s' not found", targ);
 	}
 

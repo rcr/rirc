@@ -35,6 +35,14 @@
 	do { MESSAGE("FATAL", __VA_ARGS__); } while (0)
 #endif
 
+enum casemapping_t
+{
+	CASEMAPPING_INVALID,
+	CASEMAPPING_ASCII,
+	CASEMAPPING_RFC1459,
+	CASEMAPPING_STRICT_RFC1459
+};
+
 struct irc_message
 {
 	char *params;
@@ -52,14 +60,12 @@ int irc_message_param(struct irc_message*, char**);
 int irc_message_parse(struct irc_message*, char*, size_t);
 int irc_message_split(struct irc_message*, char**);
 
-//TODO: replace comps to channel / nicks
-int irc_ischanchar(char, int);
-int irc_isnickchar(char, int);
 int irc_ischan(const char*);
+int irc_ischanchar(char, int);
 int irc_isnick(const char*);
-//TODO: CASEMAPPING, ascii, rfc, strict
-int irc_strcmp(const char*, const char*);
-int irc_strncmp(const char*, const char*, size_t);
+int irc_isnickchar(char, int);
+int irc_strcmp(enum casemapping_t, const char*, const char*);
+int irc_strncmp(enum casemapping_t, const char*, const char*, size_t);
 
 int str_trim(char**);
 int check_pinged(const char*, const char*);

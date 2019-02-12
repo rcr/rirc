@@ -409,50 +409,48 @@ test_irc_message_split(void)
 static void
 test_irc_strcmp(void)
 {
-	/* Test case insensitive */
-	assert_eq(irc_strcmp("abc123[]\\~`_", "ABC123{}|^`_"), 0);
-
 	/* Test lexicographic order
 	 *
 	 * The character '`' is permitted along with '{', but are disjoint
 	 * in ascii, with lowercase letters between them. Ensure that in
 	 * lexicographic order, irc_strmp ranks:
-	 *  numeric > alpha > special
-	 */
+	 *  numeric > alpha > special */
 
-	assert_gt(irc_strcmp("0", "a"), 0);
-	assert_gt(irc_strcmp("a", "`"), 0);
-	assert_gt(irc_strcmp("a", "{"), 0);
-	assert_gt(irc_strcmp("z", "{"), 0);
-	assert_gt(irc_strcmp("Z", "`"), 0);
-	assert_gt(irc_strcmp("a", "Z"), 0);
-	assert_gt(irc_strcmp("A", "z"), 0);
+	assert_gt(irc_strcmp(CASEMAPPING_RFC1459, "0", "a"), 0);
+	assert_gt(irc_strcmp(CASEMAPPING_RFC1459, "a", "`"), 0);
+	assert_gt(irc_strcmp(CASEMAPPING_RFC1459, "a", "{"), 0);
+	assert_gt(irc_strcmp(CASEMAPPING_RFC1459, "z", "{"), 0);
+	assert_gt(irc_strcmp(CASEMAPPING_RFC1459, "Z", "`"), 0);
+	assert_gt(irc_strcmp(CASEMAPPING_RFC1459, "a", "Z"), 0);
+	assert_gt(irc_strcmp(CASEMAPPING_RFC1459, "A", "z"), 0);
+
+	/* Test case insensitive */
+
+	/* Passes for CASEMAPPING_RFC1459 */
+	assert_eq(irc_strcmp(CASEMAPPING_RFC1459, "abc123[]\\~`_", "ABC123{}|^`_"), 0);
+	assert_lt(irc_strcmp(CASEMAPPING_STRICT_RFC1459, "abc123[]\\~`_", "ABC123{}|^`_"), 0);
+	assert_gt(irc_strcmp(CASEMAPPING_ASCII, "abc123[]\\~`_", "ABC123{}|^`_"), 0);
+
+	/* Passes for CASEMAPPING_RFC1459, CASEMAPPING_STRICT_RFC1459 */
+	assert_eq(irc_strcmp(CASEMAPPING_RFC1459, "abc123[]\\`_", "ABC123{}|`_"), 0);
+	assert_eq(irc_strcmp(CASEMAPPING_STRICT_RFC1459, "abc123[]\\`_", "ABC123{}|`_"), 0);
+	assert_gt(irc_strcmp(CASEMAPPING_ASCII, "abc123[]\\`_", "ABC123{}|`_"), 0);
+
+	/* Passes for CASEMAPPING_RFC1459, CASEMAPPING_STRICT_RFC1459, CASEMAPPING_ASCII */
+	assert_eq(irc_strcmp(CASEMAPPING_RFC1459, "abc123", "ABC123"), 0);
+	assert_eq(irc_strcmp(CASEMAPPING_STRICT_RFC1459, "abc123", "ABC123"), 0);
+	assert_eq(irc_strcmp(CASEMAPPING_ASCII, "abc123", "ABC123"), 0);
 }
 
 static void
 test_irc_strncmp(void)
 {
 	/* Test case insensitive */
-	assert_eq(irc_strncmp("abc123[]\\~`_", "ABC123{}|^`_", 100), 0);
-
-	/* Test lexicographic order
-	 *
-	 * The character '`' is permitted along with '{', but are disjoint
-	 * in ascii, with lowercase letters between them. Ensure that in
-	 * lexicographic order, irc_strmp ranks:
-	 *  numeric > alpha > special
-	 */
-	assert_gt(irc_strncmp("0", "a", 1), 0);
-	assert_gt(irc_strncmp("a", "`", 1), 0);
-	assert_gt(irc_strncmp("a", "{", 1), 0);
-	assert_gt(irc_strncmp("z", "{", 1), 0);
-	assert_gt(irc_strncmp("Z", "`", 1), 0);
-	assert_gt(irc_strncmp("a", "Z", 1), 0);
-	assert_gt(irc_strncmp("A", "z", 1), 0);
+	assert_eq(irc_strncmp(CASEMAPPING_RFC1459, "abc123[]\\~`_", "ABC123{}|^`_", 100), 0);
 
 	/* Test n */
-	assert_eq(irc_strncmp("abcA", "abcZ", 3), 0);
-	assert_gt(irc_strncmp("abcA", "abcZ", 4), 0);
+	assert_eq(irc_strncmp(CASEMAPPING_RFC1459, "abcA", "abcZ", 3), 0);
+	assert_gt(irc_strncmp(CASEMAPPING_RFC1459, "abcA", "abcZ", 4), 0);
 }
 
 static void
@@ -463,7 +461,7 @@ test_irc_toupper(void)
 	char *p, str[] = "*az{}|^[]\\~*";
 
 	for (p = str; *p; p++)
-		*p = irc_toupper(*p);
+		*p = irc_toupper(CASEMAPPING_RFC1459, *p);
 
 	assert_strcmp(str, "*AZ[]\\~[]\\~*");
 }
