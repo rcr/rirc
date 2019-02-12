@@ -1016,7 +1016,7 @@ recv_notice(struct server *s, struct irc_message *m)
 		failf(s, "NOTICE: channel '%s' not found", target);
 	}
 
-	if (check_pinged(message, s->nick)) {
+	if (irc_pinged(s->casemapping, message, s->nick)) {
 
 		if (c != current_channel())
 			urgent = 1;
@@ -1149,7 +1149,7 @@ recv_privmsg(struct server *s, struct irc_message *m)
 		failf(s, "PRIVMSG: channel '%s' not found", target);
 	}
 
-	if (check_pinged(message, s->nick)) {
+	if (irc_pinged(s->casemapping, message, s->nick)) {
 
 		if (c != current_channel())
 			urgent = 1;

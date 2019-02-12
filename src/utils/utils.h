@@ -64,18 +64,17 @@ int irc_ischan(const char*);
 int irc_ischanchar(char, int);
 int irc_isnick(const char*);
 int irc_isnickchar(char, int);
+int irc_pinged(enum casemapping_t, const char*, const char*);
 int irc_strcmp(enum casemapping_t, const char*, const char*);
 int irc_strncmp(enum casemapping_t, const char*, const char*, size_t);
 
 int str_trim(char**);
-int check_pinged(const char*, const char*);
 char* getarg(char**, const char*);
 char* word_wrap(int, char**, char*);
 
 char* strdup(const char*);
 void* memdup(const void*, size_t);
 
-// TODO: replace check_pinged -> irc_pinged, account for casemapping
 // TODO: replace word_wrap -> str_wrap... int(char**, char**, size_t)
 // TODO: getarg -> simplify, str_token? tokens on ' ' only
 

@@ -108,8 +108,6 @@ irc_toupper(enum casemapping_t casemapping, int c)
 int
 irc_isnickchar(char c, int first)
 {
-	// TODO: casemapping
-
 	/* RFC 2812, section 2.3.1
 	 *
 	 * nickname   =  ( letter / special ) *8( letter / digit / special / "-" )
@@ -144,8 +142,6 @@ irc_ischanchar(char c, int first)
 int
 irc_isnick(const char *str)
 {
-	// TODO: casemapping
-
 	if (!irc_isnickchar(*str++, 1))
 		return 0;
 
@@ -169,6 +165,29 @@ irc_ischan(const char *str)
 	}
 
 	return 1;
+}
+
+int
+irc_pinged(enum casemapping_t casemapping, const char *mesg, const char *nick)
+{
+	size_t len = strlen(nick);
+
+	while (*mesg) {
+
+		/* skip any prefixing characters that wouldn't match a valid nick */
+		while (!(*mesg >= 0x41 && *mesg <= 0x7D))
+			mesg++;
+
+		/* nick prefixes the word, following character is space or symbol */
+		if (!irc_strncmp(casemapping, mesg, nick, len) && !irc_isnickchar(*(mesg + len), 0))
+			return 1;
+
+		/* skip to end of word */
+		while (*mesg && *mesg != ' ')
+			mesg++;
+	}
+
+	return 0;
 }
 
 int
@@ -391,29 +410,6 @@ irc_message_split(struct irc_message *m, char **trailing)
 
 		while (*p && *p != ' ')
 			p++;
-	}
-
-	return 0;
-}
-
-int
-check_pinged(const char *mesg, const char *nick)
-{
-	int len = strlen(nick);
-
-	while (*mesg) {
-
-		/* skip any prefixing characters that wouldn't match a valid nick */
-		while (!(*mesg >= 0x41 && *mesg <= 0x7D))
-			mesg++;
-
-		/* nick prefixes the word, following character is space or symbol */
-		if (!irc_strncmp(CASEMAPPING_RFC1459, mesg, nick, len) && !irc_isnickchar(*(mesg + len), 0))
-			return 1;
-
-		/* skip to end of word */
-		while (*mesg && *mesg != ' ')
-			mesg++;
 	}
 
 	return 0;
