@@ -527,7 +527,7 @@ irc_433(struct server *s, struct irc_message *m)
 
 	newlinef(s->channel, 0, FROM_ERROR, "Nick '%s' in use", nick);
 
-	if (!strcmp(m->from, s->nick)) {
+	if (!strcmp(nick, s->nick)) {
 		server_nicks_next(s);
 		newlinef(s->channel, 0, FROM_ERROR, "Trying again with '%s'", s->nick);
 		sendf(s, "NICK %s", s->nick);

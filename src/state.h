@@ -51,8 +51,6 @@ void channel_move_prev(void);
 void channel_move_next(void);
 void channel_set_current(struct channel*);
 
-void free_channel(struct channel*);
-
 void newlinef(struct channel*, enum buffer_line_t, const char*, const char*, ...);
 void newline(struct channel*, enum buffer_line_t, const char*, const char*);
 
