@@ -496,19 +496,21 @@ irc_353(struct server *s, struct irc_message *m)
 	if (mode_chanmode_prefix(&(c->chanmodes), &(s->mode_cfg), *type) != MODE_ERR_NONE)
 		newlinef(c, 0, FROM_ERROR, "RPL_NAMEREPLY: invalid channel flag: '%c'", *type);
 
-	while ((nick = strtok_r(nicks, " ", &saveptr))) {
+	if ((nick = strtok_r(nicks, " ", &saveptr))) {
+		do {
+			char prefix = 0;
+			struct mode m = MODE_EMPTY;
 
-		char prefix = 0;
-		struct mode m = MODE_EMPTY;
+			if (!irc_isnickchar(*nick, 1))
+				prefix = *nick++;
 
-		if (!irc_isnickchar(*nick, 1))
-			prefix = *nick++;
+			if (prefix && mode_prfxmode_prefix(&m, &(s->mode_cfg), prefix) != MODE_ERR_NONE)
+				newlinef(c, 0, FROM_ERROR, "Invalid user prefix: '%c'", prefix);
 
-		if (prefix && mode_prfxmode_prefix(&m, &(s->mode_cfg), prefix) != MODE_ERR_NONE)
-			newlinef(c, 0, FROM_ERROR, "Invalid user prefix: '%c'", prefix);
+			if (user_list_add(&(c->users), nick, m) == USER_ERR_DUPLICATE)
+				newlinef(c, 0, FROM_ERROR, "Duplicate nick: '%s'", nick);
 
-		if (user_list_add(&(c->users), nick, m) == USER_ERR_DUPLICATE)
-			newlinef(c, 0, FROM_ERROR, "Duplicate nick: '%s'", nick);
+		} while ((nick = strtok_r(NULL, " ", &saveptr)));
 	}
 
 	draw_status();
