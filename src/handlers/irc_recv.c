@@ -289,6 +289,7 @@ irc_001(struct server *s, struct irc_message *m)
 		newline(s->channel, 0, FROM_INFO, trailing);
 
 	server_info(s, "You are known as %s", s->nick);
+
 	return 0;
 }
 
@@ -305,6 +306,7 @@ irc_004(struct server *s, struct irc_message *m)
 		newlinef(s->channel, 0, FROM_INFO, "%s", m->params);
 
 	server_set_004(s, m->params);
+
 	return 0;
 }
 
@@ -321,6 +323,7 @@ irc_005(struct server *s, struct irc_message *m)
 		newlinef(s->channel, 0, FROM_INFO, "%s ~ are supported by this server", m->params);
 
 	server_set_005(s, m->params);
+
 	return 0;
 }
 
@@ -368,6 +371,7 @@ irc_328(struct server *s, struct irc_message *m)
 		failf(s, "RPL_CHANNEL_URL: channel '%s' not found", chan);
 
 	newlinef(c, 0, FROM_INFO, "URL for %s is: \"%s\"", chan, url);
+
 	return 0;
 }
 
@@ -403,6 +407,7 @@ irc_329(struct server *s, struct irc_message *m)
 		failf(s, "RPL_CREATIONTIME: strftime error");
 
 	newlinef(c, 0, FROM_INFO, "Channel created %s", buf);
+
 	return 0;
 }
 
@@ -425,6 +430,7 @@ irc_332(struct server *s, struct irc_message *m)
 		failf(s, "RPL_TOPIC: channel '%s' not found", chan);
 
 	newlinef(c, 0, FROM_INFO, "Topic for %s is \"%s\"", chan, topic);
+
 	return 0;
 }
 
@@ -466,6 +472,7 @@ irc_333(struct server *s, struct irc_message *m)
 		failf(s, "RPL_TOPICWHOTIME: strftime error");
 
 	newlinef(c, 0, FROM_INFO, "Topic set by %s, %s", nick, buf);
+
 	return 0;
 }
 
@@ -507,13 +514,14 @@ irc_353(struct server *s, struct irc_message *m)
 			if (prefix && mode_prfxmode_prefix(&m, &(s->mode_cfg), prefix) != MODE_ERR_NONE)
 				newlinef(c, 0, FROM_ERROR, "Invalid user prefix: '%c'", prefix);
 
-			if (user_list_add(&(c->users), nick, m) == USER_ERR_DUPLICATE)
+			if (user_list_add(&(c->users), s->casemapping, nick, m) == USER_ERR_DUPLICATE)
 				newlinef(c, 0, FROM_ERROR, "Duplicate nick: '%s'", nick);
 
 		} while ((nick = strtok_r(NULL, " ", &saveptr)));
 	}
 
 	draw_status();
+
 	return 0;
 }
 
@@ -655,7 +663,7 @@ recv_join(struct server *s, struct irc_message *m)
 	if ((c = channel_list_get(&s->clist, chan, s->casemapping)) == NULL)
 		failf(s, "JOIN: channel '%s' not found", chan);
 
-	if (user_list_add(&(c->users), m->from, MODE_EMPTY) == USER_ERR_DUPLICATE)
+	if (user_list_add(&(c->users), s->casemapping, m->from, MODE_EMPTY) == USER_ERR_DUPLICATE)
 		failf(s, "JOIN: user '%s' alread on channel '%s'", m->from, chan);
 
 	if (!join_threshold || c->users.count <= join_threshold)
@@ -708,7 +716,7 @@ recv_kick(struct server *s, struct irc_message *m)
 
 	} else {
 
-		if (user_list_del(&(c->users), user) == USER_ERR_NOT_FOUND)
+		if (user_list_del(&(c->users), s->casemapping, user) == USER_ERR_NOT_FOUND)
 			failf(s, "KICK: nick '%s' not found in '%s'", user, chan);
 
 		if (message)
@@ -842,7 +850,7 @@ recv_mode_chanmodes(struct irc_message *m, const struct mode_cfg *cfg, struct ch
 						continue;
 					}
 
-					if (!(user = user_list_get(&(c->users), modearg, 0))) {
+					if (!(user = user_list_get(&(c->users), c->server->casemapping, modearg, 0))) {
 						newlinef(c, 0, FROM_ERROR, "MODE: flag '%c' user '%s' not found", flag, modearg);
 						continue;
 					}
@@ -966,7 +974,7 @@ recv_nick(struct server *s, struct irc_message *m)
 	do {
 		enum user_err ret;
 
-		if ((ret = user_list_rpl(&(c->users), m->from, nick)) == USER_ERR_NONE)
+		if ((ret = user_list_rpl(&(c->users), s->casemapping, m->from, nick)) == USER_ERR_NONE)
 			newlinef(c, BUFFER_LINE_NICK, FROM_NICK, "%s  >>  %s", m->from, nick);
 
 		else if (ret == USER_ERR_DUPLICATE)
@@ -996,7 +1004,7 @@ recv_notice(struct server *s, struct irc_message *m)
 	if (!irc_message_param(m, &message))
 		failf(s, "NOTICE: message is null");
 
-	if (user_list_get(&(s->ignore), m->from, 0))
+	if (user_list_get(&(s->ignore), s->casemapping, m->from, 0))
 		return 0;
 
 	if (IS_CTCP(message))
@@ -1070,7 +1078,7 @@ recv_part(struct server *s, struct irc_message *m)
 		if ((c = channel_list_get(&s->clist, chan, s->casemapping)) == NULL)
 			failf(s, "PART: channel '%s' not found", chan);
 
-		if (user_list_del(&(c->users), m->from) == USER_ERR_NOT_FOUND)
+		if (user_list_del(&(c->users), s->casemapping, m->from) == USER_ERR_NOT_FOUND)
 			failf(s, "PART: nick '%s' not found in '%s'", m->from, chan);
 
 		if (!part_threshold || c->users.count <= part_threshold) {
@@ -1131,7 +1139,7 @@ recv_privmsg(struct server *s, struct irc_message *m)
 	if (!irc_message_param(m, &message))
 		failf(s, "PRIVMSG: message is null");
 
-	if (user_list_get(&(s->ignore), m->from, 0))
+	if (user_list_get(&(s->ignore), s->casemapping, m->from, 0))
 		return 0;
 
 	if (IS_CTCP(message))
@@ -1216,7 +1224,7 @@ recv_quit(struct server *s, struct irc_message *m)
 	irc_message_param(m, &message);
 
 	do {
-		if (user_list_del(&(c->users), m->from) == USER_ERR_NONE) {
+		if (user_list_del(&(c->users), s->casemapping, m->from) == USER_ERR_NONE) {
 			if (!quit_threshold || c->users.count <= quit_threshold) {
 				if (message)
 					newlinef(c, BUFFER_LINE_QUIT, FROM_QUIT, "%s!%s has quit (%s)", m->from, m->host, message);

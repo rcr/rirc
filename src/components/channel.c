@@ -86,18 +86,18 @@ channel_list_del(struct channel_list *cl, struct channel *c)
 }
 
 struct channel*
-channel_list_get(struct channel_list *cl, const char *name, enum casemapping_t casemapping)
+channel_list_get(struct channel_list *cl, const char *name, enum casemapping_t cm)
 {
 	struct channel *tmp;
 
 	if ((tmp = cl->head) == NULL)
 		return NULL;
 
-	if (!irc_strcmp(casemapping, cl->head->name, name))
+	if (!irc_strcmp(cm, cl->head->name, name))
 		return cl->head;
 
 	while ((tmp = tmp->next) != cl->head) {
-		if (!irc_strcmp(casemapping, tmp->name, name))
+		if (!irc_strcmp(cm, tmp->name, name))
 			return tmp;
 	}
 

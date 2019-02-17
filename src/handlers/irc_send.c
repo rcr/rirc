@@ -14,7 +14,7 @@
 // TODO: should privmsg/notice open a PRIVATE/CHANNEL buffer for the target?
 
 #define failf(C, ...) \
-	do { newlinef((C), 0, "-!!-", __VA_ARGS__); \
+	do { newlinef((C), 0, FROM_ERROR, __VA_ARGS__); \
 	     return 1; \
 	} while (0)
 
@@ -22,7 +22,6 @@
 	do { int ret; \
 	     if ((ret = io_sendf((S)->connection, __VA_ARGS__))) \
 	         failf((C), "Send fail: %s", io_err(ret)); \
-	     return 0; \
 	} while (0)
 
 static const char* targ_or_type(struct channel*, char*, enum channel_t type);
@@ -50,6 +49,8 @@ irc_send_command(struct server *s, struct channel *c, char *m)
 		sendf(s, c, "%s %s", command, saveptr);
 	else
 		sendf(s, c, "%s", command);
+
+	return 0;
 }
 
 int
@@ -67,10 +68,11 @@ irc_send_privmsg(struct server *s, struct channel *c, char *m)
 	if (*m == 0)
 		failf(c, "Message is empty");
 
-	// FIXME: move this to state.c?
+	sendf(s, c, "PRIVMSG %s :%s", c->name, m);
+
 	newline(c, BUFFER_LINE_CHAT, s->nick, m);
 
-	sendf(s, c, "PRIVMSG %s :%s", c->name, m);
+	return 0;
 }
 
 static const char*
@@ -95,6 +97,8 @@ send_ctcp_action(struct server *s, struct channel *c, char *m)
 		failf(c, "This is not a channel");
 
 	sendf(s, c, "PRIVMSG %s :\001ACTION %s\001", c->name, m);
+
+	return 0;
 }
 
 static int
@@ -106,6 +110,8 @@ send_ctcp_clientinfo(struct server *s, struct channel *c, char *m)
 		failf(c, "Usage: /ctcp-clientinfo <target>");
 
 	sendf(s, c, "PRIVMSG %s :\001CLIENTINFO\001", targ);
+
+	return 0;
 }
 
 static int
@@ -117,6 +123,8 @@ send_ctcp_finger(struct server *s, struct channel *c, char *m)
 		failf(c, "Usage: /ctcp-finger <target>");
 
 	sendf(s, c, "PRIVMSG %s :\001FINGER\001", targ);
+
+	return 0;
 }
 
 static int
@@ -131,6 +139,8 @@ send_ctcp_ping(struct server *s, struct channel *c, char *m)
 	(void) gettimeofday(&t, NULL);
 
 	sendf(s, c, "PRIVMSG %s :\001PING %llu %llu\001", targ, t.tv_sec, t.tv_usec);
+
+	return 0;
 }
 
 static int
@@ -142,6 +152,8 @@ send_ctcp_source(struct server *s, struct channel *c, char *m)
 		failf(c, "Usage: /ctcp-source <target>");
 
 	sendf(s, c, "PRIVMSG %s :\001SOURCE\001", targ);
+
+	return 0;
 }
 
 static int
@@ -153,6 +165,8 @@ send_ctcp_time(struct server *s, struct channel *c, char *m)
 		failf(c, "Usage: /ctcp-time <target>");
 
 	sendf(s, c, "PRIVMSG %s :\001TIME\001", targ);
+
+	return 0;
 }
 
 static int
@@ -164,6 +178,8 @@ send_ctcp_userinfo(struct server *s, struct channel *c, char *m)
 		failf(c, "Usage: /ctcp-userinfo <target>");
 
 	sendf(s, c, "PRIVMSG %s :\001USERINFO\001", targ);
+
+	return 0;
 }
 
 static int
@@ -175,6 +191,8 @@ send_ctcp_version(struct server *s, struct channel *c, char *m)
 		failf(c, "Usage: /ctcp-version <target>");
 
 	sendf(s, c, "PRIVMSG %s :\001VERSION\001", targ);
+
+	return 0;
 }
 
 static int
@@ -190,6 +208,8 @@ send_notice(struct server *s, struct channel *c, char *m)
 		failf(c, "Usage: /notice <target> <message>");
 
 	sendf(s, c, "NOTICE %s :%s", targ, saveptr);
+
+	return 0;
 }
 
 static int
@@ -199,9 +219,11 @@ send_part(struct server *s, struct channel *c, char *m)
 		failf(c, "This is not a channel");
 
 	if (str_trim(&m))
-		sendf(s, c, "PART %s :%s",c->name, m);
+		sendf(s, c, "PART %s :%s", c->name, m);
 	else
 		sendf(s, c, "PART %s :%s", c->name, DEFAULT_PART_MESG);
+
+	return 0;
 }
 
 static int
@@ -217,6 +239,8 @@ send_privmsg(struct server *s, struct channel *c, char *m)
 		failf(c, "Usage: /privmsg <target> <message>");
 
 	sendf(s, c, "PRIVMSG %s :%s", targ, saveptr);
+
+	return 0;
 }
 
 static int
@@ -228,6 +252,8 @@ send_quit(struct server *s, struct channel *c, char *m)
 		sendf(s, c, "QUIT :%s", m);
 	else
 		sendf(s, c, "QUIT :%s", DEFAULT_PART_MESG);
+
+	return 0;
 }
 
 static int
@@ -240,4 +266,9 @@ send_topic(struct server *s, struct channel *c, char *m)
 		sendf(s, c, "TOPIC %s :%s", c->name, m);
 	else
 		sendf(s, c, "TOPIC %s", c->name);
+
+	return 0;
 }
+
+#undef failf
+#undef sendf

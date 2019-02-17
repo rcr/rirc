@@ -492,7 +492,7 @@ test_chanmode_type(void)
 	config_errs -= mode_cfg(&cfg, "(f)@",    MODE_CFG_PREFIX);
 
 	if (config_errs != MODE_ERR_NONE)
-		abort_test("Configuration error");
+		test_abort("Configuration error");
 
 	/* Test invalid '+'/'-' */
 	assert_eq(chanmode_type(&cfg, MODE_SET_T_SIZE, 'a'), MODE_FLAG_INVALID_SET);

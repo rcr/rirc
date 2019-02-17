@@ -161,44 +161,48 @@ newlinef(struct channel *c, enum buffer_line_t type, const char *from, const cha
 static void
 _newline(struct channel *c, enum buffer_line_t type, const char *from, const char *fmt, va_list ap)
 {
-	/* Static function for handling inserting new lines into buffers */
-
 	char buf[TEXT_LENGTH_MAX];
-
+	char prefix = 0;
+	const char *from_str;
+	const char *text_str;
 	int len;
-
-	const char *_from_str;
-	const char *_text_str;
-	size_t _from_len;
-	size_t _text_len;
-
-	struct user *u = NULL;
+	size_t from_len;
+	size_t text_len;
 
 	if ((len = vsnprintf(buf, sizeof(buf), fmt, ap)) < 0) {
-		_text_str = "newlinef error: vsprintf failure";
-		_text_len = strlen(_text_str);
-		_from_str = "-!!-";
-		_from_len = strlen(_from_str);
+		text_str = "newlinef error: vsprintf failure";
+		text_len = strlen(text_str);
+		from_str = "-!!-";
+		from_len = strlen(from_str);
 	} else {
-		_text_str = buf;
-		_text_len = len;
-		_from_str = from;
+		text_str = buf;
+		text_len = len;
+		from_str = from;
 
-		// FIXME: don't need to get user for many non-user message types
-		if ((u = user_list_get(&(c->users), from, 0)) != NULL)
-			_from_len = u->nick_len;
-		else
-			_from_len = strlen(from);
+		const struct user *u = NULL;
+
+		if (type == BUFFER_LINE_CHAT) {
+			u = user_list_get(&(c->users), c->server->casemapping, from, 0);
+		}
+
+		if (u) {
+			prefix = u->prfxmodes.prefix;
+			from_len = u->nick_len;
+		} else {
+			from_len = strlen(from);
+		}
 	}
+
+	// TODO: preformat the time string here
 
 	buffer_newline(
 		&(c->buffer),
 		type,
-		_from_str,
-		_text_str,
-		_from_len,
-		_text_len,
-		((u == NULL) ? 0 : u->prfxmodes.prefix));
+		from_str,
+		text_str,
+		from_len,
+		text_len,
+		prefix);
 
 	if (c == current_channel()) {
 		draw_buffer();
@@ -673,8 +677,12 @@ static uint16_t
 state_complete_user(char *str, uint16_t len, uint16_t max, int first)
 {
 	struct user *u;
+	struct channel *c = current_channel();
 
-	if ((u = user_list_get(&(current_channel()->users), str, len)) == NULL)
+	if (c->server == NULL)
+		return 0;
+
+	if ((u = user_list_get(&(c->users), c->server->casemapping, str, len)) == NULL)
 		return 0;
 
 	if ((u->nick_len + (first != 0)) > max)

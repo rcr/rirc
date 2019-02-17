@@ -27,8 +27,8 @@
  *   Explicitly fail or abort a test [with formated] message
  *    - fail_test(M)
  *    - fail_testf(M, ...)
- *    - abort_test(M)
- *    - abort_testf(M, ...)
+ *    - test_abort(M)
+ *    - test_abortf(M, ...)
  */
 
 #define TESTING
@@ -81,7 +81,7 @@ static void _print_testcase_name_(const char*);
 		_failures_++; \
 	} while (0)
 
-#define abort_test(M) \
+#define test_abort(M) \
 	do { \
 		_print_testcase_name_(__func__); \
 		printf("    %d: " M "\n", __LINE__); \
@@ -90,7 +90,7 @@ static void _print_testcase_name_(const char*);
 		return; \
 	} while (0)
 
-#define abort_testf(M, ...) \
+#define test_abortf(M, ...) \
 	do { \
 		_print_testcase_name_(__func__); \
 		printf("    %d: ", __LINE__); \

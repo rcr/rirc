@@ -16,12 +16,10 @@
 
 #define AVL_HEIGHT(elm, field) (elm)->field.height
 
-#define AVL_NEW(name, x, y) name##_AVL_NEW(x, y)
-#define AVL_ADD(name, x, y) name##_AVL_ADD(x, y)
-#define AVL_DEL(name, x, y) name##_AVL_DEL(x, y)
-
-#define AVL_GET(name, x, y)     name##_AVL_GET(x, y)
-#define AVL_NGET(name, x, y, z) name##_AVL_NGET(x, y, z)
+#define AVL_ADD(name, x, y, z)     name##_AVL_ADD(x, y, z)
+#define AVL_DEL(name, x, y, z)     name##_AVL_DEL(x, y, z)
+#define AVL_GET(name, x, y, z)     name##_AVL_GET(x, y, z)
+#define AVL_NGET(name, x, y, z, n) name##_AVL_NGET(x, y, z, n)
 
 #define AVL_FOREACH(name, x, y) name##_AVL_FOREACH(x, y)
 
@@ -38,11 +36,11 @@
 
 /* FIXME: scan-build showing NULL pointer dereferences on add */
 
-#define AVL_GENERATE(name, type, field, cmp, cmp_n)                               \
-    static struct type* name##_AVL_ADD(struct name*, struct type*);               \
-    static struct type* name##_AVL_DEL(struct name*, struct type*);               \
-    static struct type* name##_AVL_ADD_REC(struct type*, struct type*);           \
-    static struct type* name##_AVL_DEL_REC(struct type**, struct type*);          \
+#define AVL_GENERATE(name, type, field, cmp, ncmp) \
+    static struct type* name##_AVL_ADD(struct name*, struct type*, void*);        \
+    static struct type* name##_AVL_DEL(struct name*, struct type*, void*);        \
+    static struct type* name##_AVL_ADD_REC(struct type*, struct type*, void*);    \
+    static struct type* name##_AVL_DEL_REC(struct type**, struct type*, void*);   \
                                                                                   \
 static inline void                                                                \
 name##_AVL_INIT(struct type *elm)                                                 \
@@ -124,37 +122,35 @@ name##_AVL_FOREACH(struct name *head, void (*f)(struct type*))                  
 }                                                                                 \
                                                                                   \
 static struct type*                                                               \
-name##_AVL_GET(struct name *head, struct type *elm)                               \
+name##_AVL_GET(struct name *head, struct type *elm, void *arg)                    \
 {                                                                                 \
+    int comp;                                                                     \
     struct type *tmp = TREE_ROOT(head);                                           \
                                                                                   \
-    int comp;                                                                     \
-                                                                                  \
-    while (tmp && (comp = (cmp)(elm, tmp)))                                       \
+    while (tmp && (comp = cmp(elm, tmp, arg)))                                    \
         tmp = (comp > 0) ? TREE_RIGHT(tmp, field) : TREE_LEFT(tmp, field);        \
                                                                                   \
     return tmp;                                                                   \
 }                                                                                 \
                                                                                   \
 static struct type*                                                               \
-name##_AVL_NGET(struct name *head, struct type *elm, size_t n)                    \
+name##_AVL_NGET(struct name *head, struct type *elm, void *arg, size_t n)         \
 {                                                                                 \
+    int comp;                                                                     \
     struct type *tmp = TREE_ROOT(head);                                           \
                                                                                   \
-    int comp;                                                                     \
-                                                                                  \
-    while (tmp && (comp = (cmp_n)(elm, tmp, n)))                                  \
+    while (tmp && (comp = ncmp(elm, tmp, arg, n)))                                \
         tmp = (comp > 0) ? TREE_RIGHT(tmp, field) : TREE_LEFT(tmp, field);        \
                                                                                   \
     return tmp;                                                                   \
 }                                                                                 \
                                                                                   \
 static struct type*                                                               \
-name##_AVL_ADD(struct name *head, struct type *elm)                               \
+name##_AVL_ADD(struct name *head, struct type *elm, void *arg)                    \
 {                                                                                 \
     name##_AVL_INIT(elm);                                                         \
                                                                                   \
-    struct type *r = name##_AVL_ADD_REC(TREE_ROOT(head), elm);                    \
+    struct type *r = name##_AVL_ADD_REC(TREE_ROOT(head), elm, arg);               \
                                                                                   \
     if (r == NULL)                                                                \
         return NULL;                                                              \
@@ -165,29 +161,26 @@ name##_AVL_ADD(struct name *head, struct type *elm)                             
 }                                                                                 \
                                                                                   \
 static struct type*                                                               \
-name##_AVL_ADD_REC(struct type *n, struct type *elm)                              \
+name##_AVL_ADD_REC(struct type *n, struct type *elm, void *arg)                   \
 {                                                                                 \
-    struct type *tmp;                                                             \
-                                                                                  \
     int comp, balance;                                                            \
+    struct type *tmp;                                                             \
                                                                                   \
     if (n == NULL)                                                                \
         return elm;                                                               \
                                                                                   \
-    if ((comp = (cmp)(elm, n)) == 0)                                              \
+    if ((comp = cmp(elm, n, arg)) == 0) {                                         \
         return NULL;                                                              \
+    } else if (comp > 0) {                                                        \
                                                                                   \
-    else if (comp > 0) {                                                          \
-                                                                                  \
-        if ((tmp = name##_AVL_ADD_REC(TREE_RIGHT(n, field), elm)) == NULL)        \
+        if ((tmp = name##_AVL_ADD_REC(TREE_RIGHT(n, field), elm, arg)) == NULL)   \
             return NULL;                                                          \
                                                                                   \
         TREE_RIGHT(n, field) = tmp;                                               \
-    }                                                                             \
                                                                                   \
-    else if (comp < 0) {                                                          \
+    } else if (comp < 0) {                                                        \
                                                                                   \
-        if ((tmp = name##_AVL_ADD_REC(TREE_LEFT(n, field), elm)) == NULL)         \
+        if ((tmp = name##_AVL_ADD_REC(TREE_LEFT(n, field), elm, arg)) == NULL)    \
             return NULL;                                                          \
                                                                                   \
         TREE_LEFT(n, field) = tmp;                                                \
@@ -197,7 +190,7 @@ name##_AVL_ADD_REC(struct type *n, struct type *elm)                            
                                                                                   \
     if (balance > 1) {                                                            \
                                                                                   \
-        if (((cmp)(elm, TREE_RIGHT(n, field))) < 0)                               \
+        if ((cmp(elm, TREE_RIGHT(n, field), arg)) < 0)                            \
             TREE_RIGHT(n, field) = name##_AVL_ROTATE_RIGHT(TREE_RIGHT(n, field)); \
                                                                                   \
         return name##_AVL_ROTATE_LEFT(n);                                         \
@@ -205,7 +198,7 @@ name##_AVL_ADD_REC(struct type *n, struct type *elm)                            
                                                                                   \
     if (balance < -1) {                                                           \
                                                                                   \
-        if (((cmp)(elm, TREE_LEFT(n, field))) > 0)                                \
+        if ((cmp(elm, TREE_LEFT(n, field), arg)) > 0)                             \
             TREE_LEFT(n, field) = name##_AVL_ROTATE_LEFT(TREE_LEFT(n, field));    \
                                                                                   \
         return name##_AVL_ROTATE_RIGHT(n);                                        \
@@ -215,22 +208,22 @@ name##_AVL_ADD_REC(struct type *n, struct type *elm)                            
 }                                                                                 \
                                                                                   \
 static struct type*                                                               \
-name##_AVL_DEL(struct name *head, struct type *elm)                               \
+name##_AVL_DEL(struct name *head, struct type *elm, void *arg)                    \
 {                                                                                 \
-    return name##_AVL_DEL_REC(&TREE_ROOT(head), elm);                             \
+    return name##_AVL_DEL_REC(&TREE_ROOT(head), elm, arg);                        \
 }                                                                                 \
                                                                                   \
 static struct type*                                                               \
-name##_AVL_DEL_REC(struct type **p, struct type *elm)                             \
+name##_AVL_DEL_REC(struct type **p, struct type *elm, void *arg)                  \
 {                                                                                 \
-    struct type *ret = NULL, *n = *p;                                             \
-                                                                                  \
     int comp, balance;                                                            \
+    struct type *n = *p;                                                          \
+    struct type *ret;                                                             \
                                                                                   \
     if (n == NULL)                                                                \
         return NULL;                                                              \
                                                                                   \
-    if ((comp = (cmp)(elm, n)) == 0) {                                            \
+    if ((comp = cmp(elm, n, arg)) == 0) {                                         \
                                                                                   \
         ret = n;                                                                  \
                                                                                   \
@@ -244,9 +237,9 @@ name##_AVL_DEL_REC(struct type **p, struct type *elm)                           
                 swap = TREE_LEFT(swap, field);                                    \
             }                                                                     \
                                                                                   \
-            if (swap_p == swap)                                                   \
+            if (swap_p == swap) {                                                 \
                 TREE_LEFT(swap, field) = TREE_LEFT(n, field);                     \
-            else {                                                                \
+            } else {                                                              \
                 struct type *swap_l = TREE_LEFT(swap, field),                     \
                             *swap_r = TREE_RIGHT(swap, field);                    \
                                                                                   \
@@ -258,24 +251,22 @@ name##_AVL_DEL_REC(struct type **p, struct type *elm)                           
                                                                                   \
                 TREE_LEFT(swap_p, field) = n;                                     \
                                                                                   \
-                name##_AVL_DEL_REC(&TREE_RIGHT(swap, field), elm);                \
+                name##_AVL_DEL_REC(&TREE_RIGHT(swap, field), elm, arg);           \
             }                                                                     \
                                                                                   \
             *p = n = swap;                                                        \
-        }                                                                         \
-        else if (TREE_LEFT(n, field))                                             \
+        } else if (TREE_LEFT(n, field))  {                                        \
             *p = TREE_LEFT(n, field);                                             \
-        else if (TREE_RIGHT(n, field))                                            \
+        } else if (TREE_RIGHT(n, field)) {                                        \
             *p = TREE_RIGHT(n, field);                                            \
-        else                                                                      \
+        } else {                                                                  \
             *p = NULL;                                                            \
+        }                                                                         \
+    } else if (comp < 0) {                                                        \
+        ret = name##_AVL_DEL_REC(&TREE_LEFT(n, field), elm, arg);                 \
+    } else if (comp > 0) {                                                        \
+        ret = name##_AVL_DEL_REC(&TREE_RIGHT(n, field), elm, arg);                \
     }                                                                             \
-                                                                                  \
-    else if (comp < 0)                                                            \
-        ret = name##_AVL_DEL_REC(&TREE_LEFT(n, field), elm);                      \
-                                                                                  \
-    else if (comp > 0)                                                            \
-        ret = name##_AVL_DEL_REC(&TREE_RIGHT(n, field), elm);                     \
                                                                                   \
     if (ret == NULL)                                                              \
         return NULL;                                                              \
@@ -283,23 +274,23 @@ name##_AVL_DEL_REC(struct type **p, struct type *elm)                           
     balance = name##_AVL_BALANCE(n);                                              \
                                                                                   \
     if (balance > 1) {                                                            \
-                                                                                  \
         int hrl = name##_AVL_GET_HEIGHT(TREE_LEFT(TREE_RIGHT(n, field), field)),  \
             hrr = name##_AVL_GET_HEIGHT(TREE_RIGHT(TREE_RIGHT(n, field), field)); \
                                                                                   \
-        if ((hrl - hrr) > 0)                                                      \
+        if ((hrl - hrr) > 0) {                                                    \
             TREE_RIGHT(n, field) = name##_AVL_ROTATE_RIGHT(TREE_RIGHT(n, field)); \
+        }                                                                         \
                                                                                   \
         *p = name##_AVL_ROTATE_LEFT(n);                                           \
     }                                                                             \
                                                                                   \
     if (balance < -1) {                                                           \
-                                                                                  \
         int hll = name##_AVL_GET_HEIGHT(TREE_LEFT(TREE_LEFT(n, field), field)),   \
             hlr = name##_AVL_GET_HEIGHT(TREE_RIGHT(TREE_LEFT(n, field), field));  \
                                                                                   \
-        if ((hll - hlr) < 0)                                                      \
+        if ((hll - hlr) < 0) {                                                    \
             TREE_LEFT(n, field) = name##_AVL_ROTATE_LEFT(TREE_LEFT(n, field));    \
+        }                                                                         \
                                                                                   \
         *p = name##_AVL_ROTATE_RIGHT(n);                                          \
     }                                                                             \
@@ -403,7 +394,7 @@ name##_SPLAY_GET(struct name *head, struct type *elm)                    \
                                                                          \
     name##_SPLAY(head, elm);                                             \
                                                                          \
-    if ((cmp)(elm, TREE_ROOT(head)) == 0)                                \
+    if (cmp(elm, TREE_ROOT(head)) == 0)                                  \
         return TREE_ROOT(head);                                          \
                                                                          \
     return NULL;                                                         \
@@ -417,7 +408,7 @@ name##_SPLAY_ADD(struct name *head, struct type *elm)                    \
     } else {                                                             \
         int comp;                                                        \
         name##_SPLAY(head, elm);                                         \
-        comp = (cmp)(elm, TREE_ROOT(head));                              \
+        comp = cmp(elm, TREE_ROOT(head));                                \
         if (comp < 0) {                                                  \
             TREE_LEFT(elm, field) = TREE_LEFT(TREE_ROOT(head), field);   \
             TREE_RIGHT(elm, field) = TREE_ROOT(head);                    \
@@ -440,7 +431,7 @@ name##_SPLAY_DEL(struct name *head, struct type *elm)                    \
     if (TREE_EMPTY(head))                                                \
         return NULL;                                                     \
     name##_SPLAY(head, elm);                                             \
-    if ((cmp)(elm, TREE_ROOT(head)) == 0) {                              \
+    if (cmp(elm, TREE_ROOT(head)) == 0) {                                \
         if (TREE_LEFT(TREE_ROOT(head), field) == NULL) {                 \
             TREE_ROOT(head) = TREE_RIGHT(TREE_ROOT(head), field);        \
         } else {                                                         \
@@ -463,12 +454,12 @@ name##_SPLAY(struct name *head, struct type *elm)                        \
     TREE_LEFT(&node, field) = TREE_RIGHT(&node, field) = NULL;           \
     left = right = &node;                                                \
                                                                          \
-    while ((comp = (cmp)(elm, TREE_ROOT(head))) != 0) {                  \
+    while ((comp = cmp(elm, TREE_ROOT(head))) != 0) {                    \
         if (comp < 0) {                                                  \
             tmp = TREE_LEFT(TREE_ROOT(head), field);                     \
             if (tmp == NULL)                                             \
                 break;                                                   \
-            if ((cmp)(elm, tmp) < 0){                                    \
+            if (cmp(elm, tmp) < 0){                                      \
                 SPLAY_ROTATE_RIGHT(head, tmp, field);                    \
                 if (TREE_LEFT(TREE_ROOT(head), field) == NULL)           \
                     break;                                               \
@@ -478,7 +469,7 @@ name##_SPLAY(struct name *head, struct type *elm)                        \
             tmp = TREE_RIGHT(TREE_ROOT(head), field);                    \
             if (tmp == NULL)                                             \
                 break;                                                   \
-            if ((cmp)(elm, tmp) > 0){                                    \
+            if (cmp(elm, tmp) > 0){                                      \
                 SPLAY_ROTATE_LEFT(head, tmp, field);                     \
                 if (TREE_RIGHT(TREE_ROOT(head), field) == NULL)          \
                     break;                                               \

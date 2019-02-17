@@ -20,7 +20,6 @@
 	do { int ret; \
 	     if ((ret = io_sendf((S)->connection, __VA_ARGS__))) \
 	         failf((S), "Send fail: %s", io_err(ret)); \
-	     return 0; \
 	} while (0)
 
 static int
@@ -124,6 +123,8 @@ ctcp_request_clientinfo(struct server *s, const char *from, const char *targ, ch
 		server_info(s, "CTCP CLIENTINFO from %s", from);
 
 	sendf(s, "NOTICE %s :\001CLIENTINFO ACTION CLIENTINFO PING SOURCE TIME VERSION\001", from);
+
+	return 0;
 }
 
 static int
@@ -137,6 +138,8 @@ ctcp_request_finger(struct server *s, const char *from, const char *targ, char *
 		server_info(s, "CTCP FINGER from %s", from);
 
 	sendf(s, "NOTICE %s :\001FINGER rirc v"VERSION" ("__DATE__")\001", from);
+
+	return 0;
 }
 
 static int
@@ -147,6 +150,8 @@ ctcp_request_ping(struct server *s, const char *from, const char *targ, char *m)
 	server_info(s, "CTCP PING from %s", from);
 
 	sendf(s, "NOTICE %s :\001PING %s\001", from, m);
+
+	return 0;
 }
 
 static int
@@ -160,6 +165,8 @@ ctcp_request_source(struct server *s, const char *from, const char *targ, char *
 		server_info(s, "CTCP SOURCE from %s", from);
 
 	sendf(s, "NOTICE %s :\001SOURCE rcr.io/rirc\001", from);
+
+	return 0;
 }
 
 static int
@@ -170,7 +177,7 @@ ctcp_request_time(struct server *s, const char *from, const char *targ, char *m)
 	struct tm tm;
 	time_t t = 0;
 
-	(void) targ;
+	UNUSED(targ);
 
 	if (str_trim(&m))
 		server_info(s, "CTCP TIME from %s (%s)", from, m);
@@ -191,6 +198,8 @@ ctcp_request_time(struct server *s, const char *from, const char *targ, char *m)
 		failf(s, "CTCP TIME: strftime error");
 
 	sendf(s, "NOTICE %s :\001TIME %s\001", from, buf);
+
+	return 0;
 }
 
 static int
@@ -204,6 +213,8 @@ ctcp_request_userinfo(struct server *s, const char *from, const char *targ, char
 		server_info(s, "CTCP USERINFO from %s", from);
 
 	sendf(s, "NOTICE %s :\001USERINFO %s (%s)\001", from, s->nick, s->realname);
+
+	return 0;
 }
 
 static int
@@ -217,6 +228,8 @@ ctcp_request_version(struct server *s, const char *from, const char *targ, char 
 		server_info(s, "CTCP VERSION from %s", from);
 
 	sendf(s, "NOTICE %s :\001VERSION rirc v"VERSION" ("__DATE__")\001", from);
+
+	return 0;
 }
 
 static int
