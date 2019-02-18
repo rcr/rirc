@@ -966,7 +966,7 @@ recv_nick(struct server *s, struct irc_message *m)
 	if (!irc_message_param(m, &nick))
 		failf(s, "NICK: new nick is null");
 
-	if (!strcmp(nick, s->nick)) {
+	if (!strcmp(m->from, s->nick)) {
 		server_nick_set(s, nick);
 		newlinef(s->channel, BUFFER_LINE_NICK, FROM_NICK, "Youn nick is '%s'", nick);
 	}
