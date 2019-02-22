@@ -196,8 +196,10 @@ test_send_ctcp_ping(void)
 
 	assert_eq(irc_send_command(s, c_priv, m3), 0);
 
-	assert_true(((p1 = strchr(send_buf, '\001')) != NULL));
-	assert_true(((p2 = strchr(p1 + 1, '\001')) != NULL));
+	p1 = strchr(send_buf, '\001');
+	p2 = strchr(p1 + 1, '\001');
+	assert_true(p1 != NULL);
+	assert_true(p2 != NULL);
 
 	*p1++ = 0;
 	*p2++ = 0;
@@ -213,8 +215,10 @@ test_send_ctcp_ping(void)
 
 	assert_eq(irc_send_command(s, c_priv, m4), 0);
 
-	assert_true(((p1 = strchr(send_buf, '\001')) != NULL));
-	assert_true(((p2 = strchr(p1 + 1, '\001')) != NULL));
+	p1 = strchr(send_buf, '\001');
+	p2 = strchr(p1 + 1, '\001');
+	assert_true(p1 != NULL);
+	assert_true(p2 != NULL);
 
 	*p1++ = 0;
 	*p2++ = 0;

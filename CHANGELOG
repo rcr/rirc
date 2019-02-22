@@ -3,7 +3,7 @@ Summary of notable changes and features
 
 ## Unreleased (dev)
 ### Features
- - add CASEMAPPING handling
+### Fixes
 
 ## [0.1.2]
 ### Features
@@ -27,6 +27,7 @@ Summary of notable changes and features
  - add CTCP SOURCE
  - add CTCP USERINFO
  - add INVITE
+ - add CASEMAPPING handling
 ### Refactor
  - generate gperf files at compile time
  - split mesg.c into:
