@@ -21,30 +21,23 @@ test_channel_list(void)
 
 	c1 = channel("aaa", CHANNEL_T_OTHER);
 	c2 = channel("bbb", CHANNEL_T_OTHER);
-	c3 = channel("bbb", CHANNEL_T_OTHER);
+	c3 = channel("ccc", CHANNEL_T_OTHER);
 
-	/* Test adding channels to list */
-	assert_ptr_eq(channel_list_add(&clist, c1), NULL);
-	assert_ptr_eq(channel_list_add(&clist, c2), NULL);
+	channel_list_add(&clist, c1);
+	channel_list_add(&clist, c2);
+	channel_list_add(&clist, c3);
 
-	/* Test adding duplicate */
-	assert_ptr_eq(channel_list_add(&clist, c2), c2);
+	assert_ptr_eq(channel_list_get(&clist, "aaa", CASEMAPPING_ASCII), c1);
+	assert_ptr_eq(channel_list_get(&clist, "bbb", CASEMAPPING_ASCII), c2);
+	assert_ptr_eq(channel_list_get(&clist, "ccc", CASEMAPPING_ASCII), c3);
 
-	/* Test adding duplicate by name */
-	assert_ptr_eq(channel_list_add(&clist, c3), c2);
+	channel_list_del(&clist, c2);
+	channel_list_del(&clist, c1);
+	channel_list_del(&clist, c3);
 
-	/* Test retrieving by name */
-	assert_ptr_eq(channel_list_get(&clist, "aaa"), c1);
-	assert_ptr_eq(channel_list_get(&clist, "bbb"), c2);
-
-	/* Test removing channels from list */
-	assert_ptr_eq(channel_list_del(&clist, c1), c1);
-	assert_ptr_eq(channel_list_del(&clist, c2), c2);
-
-	/* Test removing channels not in list */
-	assert_ptr_eq(channel_list_del(&clist, c1), NULL);
-	assert_ptr_eq(channel_list_del(&clist, c2), NULL);
-	assert_ptr_eq(channel_list_del(&clist, c3), NULL);
+	assert_ptr_eq(channel_list_get(&clist, "aaa", CASEMAPPING_ASCII), NULL);
+	assert_ptr_eq(channel_list_get(&clist, "bbb", CASEMAPPING_ASCII), NULL);
+	assert_ptr_eq(channel_list_get(&clist, "ccc", CASEMAPPING_ASCII), NULL);
 
 	channel_free(c1);
 	channel_free(c2);

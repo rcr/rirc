@@ -3,6 +3,7 @@
 
 #include "src/components/mode.h"
 #include "src/utils/tree.h"
+#include "src/utils/utils.h"
 
 enum user_err
 {
@@ -14,9 +15,9 @@ enum user_err
 struct user
 {
 	AVL_NODE(user) ul;
+	const char *nick;
 	size_t nick_len;
 	struct mode prfxmodes;
-	const char *nick;
 	char _[];
 };
 
@@ -26,12 +27,10 @@ struct user_list
 	unsigned int count;
 };
 
-enum user_err user_list_add(struct user_list*, const char*, struct mode);
-enum user_err user_list_del(struct user_list*, const char*);
-enum user_err user_list_rpl(struct user_list*, const char*, const char*);
-
-struct user* user_list_get(struct user_list*, const char*, size_t);
-
+enum user_err user_list_add(struct user_list*, enum casemapping_t, const char*, struct mode);
+enum user_err user_list_del(struct user_list*, enum casemapping_t, const char*);
+enum user_err user_list_rpl(struct user_list*, enum casemapping_t, const char*, const char*);
+struct user* user_list_get(struct user_list*, enum casemapping_t, const char*, size_t);
 void user_list_free(struct user_list*);
 
 #endif

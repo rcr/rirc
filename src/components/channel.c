@@ -5,15 +5,6 @@
 #include "src/components/channel.h"
 #include "src/utils/utils.h"
 
-static inline int channel_cmp(struct channel*, const char*);
-
-static inline int
-channel_cmp(struct channel *c, const char *name)
-{
-	/* TODO: CASEMAPPING, as ftpr held by the server */
-	return irc_strcmp(c->name, name);
-}
-
 struct channel*
 channel(const char *name, enum channel_t type)
 {
@@ -26,9 +17,8 @@ channel(const char *name, enum channel_t type)
 
 	c->chanmodes_str.type = MODE_STR_CHANMODE;
 	c->name_len = len;
-	c->type = type;
-
 	c->name = memcpy(c->_, name, len + 1);
+	c->type = type;
 
 	buffer(&c->buffer);
 	input_init(&c->input);
@@ -59,14 +49,9 @@ channel_list_free(struct channel_list *cl)
 	} while (c1 != cl->head);
 }
 
-struct channel*
+void
 channel_list_add(struct channel_list *cl, struct channel *c)
 {
-	struct channel *tmp;
-
-	if ((tmp = channel_list_get(cl, c->name)) != NULL)
-		return tmp;
-
 	if (cl->head == NULL) {
 		cl->head = c->next = c;
 		cl->tail = c->prev = c;
@@ -77,60 +62,42 @@ channel_list_add(struct channel_list *cl, struct channel *c)
 		cl->tail->next = c;
 		cl->tail = c;
 	}
-
-	return NULL;
 }
 
-struct channel*
+void
 channel_list_del(struct channel_list *cl, struct channel *c)
 {
-	struct channel *tmp_h,
-	               *tmp_t;
-
-	if (cl->head == NULL) {
-		return NULL;
-	} else if (cl->head == c && cl->tail == c) {
-		/* Removing tail */
+	if (cl->head == c && cl->tail == c) {
 		cl->head = NULL;
 		cl->tail = NULL;
-	} else if ((tmp_h = cl->head) == c) {
-		/* Removing head */
+	} else if (cl->head == c) {
 		cl->head = cl->tail->next = cl->head->next;
 		cl->head->prev = cl->tail;
-	} else if ((tmp_t = cl->tail) == c) {
-		/* Removing tail */
+	} else if (cl->tail == c) {
 		cl->tail = cl->head->prev = cl->tail->prev;
 		cl->tail->next = cl->head;
 	} else {
-		/* Removing some channel (head, tail) */
-		while ((tmp_h = tmp_h->next) != c) {
-			if (tmp_h == tmp_t)
-				return NULL;
-		}
 		c->next->prev = c->prev;
 		c->prev->next = c->next;
 	}
 
 	c->next = NULL;
 	c->prev = NULL;
-
-	return c;
 }
 
 struct channel*
-channel_list_get(struct channel_list *cl, const char *name)
+channel_list_get(struct channel_list *cl, const char *name, enum casemapping_t cm)
 {
 	struct channel *tmp;
 
 	if ((tmp = cl->head) == NULL)
 		return NULL;
 
-	if (!channel_cmp(cl->head, name))
+	if (!irc_strcmp(cm, cl->head->name, name))
 		return cl->head;
 
 	while ((tmp = tmp->next) != cl->head) {
-
-		if (!channel_cmp(tmp, name))
+		if (!irc_strcmp(cm, tmp->name, name))
 			return tmp;
 	}
 

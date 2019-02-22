@@ -32,7 +32,7 @@ static struct channel *c_chan;
 static struct channel *c_priv;
 static struct server *s;
 
-/* Mock stat.c */
+/* Mock state.c */
 void
 newlinef(struct channel *c, enum buffer_line_t t, const char *f, const char *fmt, ...)
 {

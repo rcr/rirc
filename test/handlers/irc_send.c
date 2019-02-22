@@ -42,7 +42,7 @@ static struct channel *c_priv;
 static struct channel *c_serv;
 static struct server *s;
 
-/* Mock stat.c */
+/* Mock state.c */
 void
 newlinef(struct channel *c, enum buffer_line_t t, const char *f, const char *fmt, ...)
 {
@@ -184,6 +184,7 @@ test_send_ctcp_ping(void)
 	char m3[] = "ctcp-ping";
 	char m4[] = "ctcp-ping targ";
 
+	char *saveptr;
 	char *p1;
 	char *p2;
 
@@ -195,14 +196,16 @@ test_send_ctcp_ping(void)
 
 	assert_eq(irc_send_command(s, c_priv, m3), 0);
 
-	assert_true(((p1 = strchr(send_buf, '\001')) != NULL));
-	assert_true(((p2 = strchr(p1 + 1, '\001')) != NULL));
+	p1 = strchr(send_buf, '\001');
+	p2 = strchr(p1 + 1, '\001');
+	assert_true(p1 != NULL);
+	assert_true(p2 != NULL);
 
 	*p1++ = 0;
 	*p2++ = 0;
 
-	assert_true((getarg(&p1, " ") != NULL));
-	assert_true((getarg(&p1, " ") != NULL));
+	assert_true((strtok_r(p1, " ", &saveptr)));
+	assert_true((strtok_r(NULL, " ", &saveptr)));
 
 	assert_strcmp(fail_buf, "");
 	assert_strcmp(send_buf, "PRIVMSG priv :");
@@ -212,14 +215,16 @@ test_send_ctcp_ping(void)
 
 	assert_eq(irc_send_command(s, c_priv, m4), 0);
 
-	assert_true(((p1 = strchr(send_buf, '\001')) != NULL));
-	assert_true(((p2 = strchr(p1 + 1, '\001')) != NULL));
+	p1 = strchr(send_buf, '\001');
+	p2 = strchr(p1 + 1, '\001');
+	assert_true(p1 != NULL);
+	assert_true(p2 != NULL);
 
 	*p1++ = 0;
 	*p2++ = 0;
 
-	assert_true((getarg(&p1, " ") != NULL));
-	assert_true((getarg(&p1, " ") != NULL));
+	assert_true((strtok_r(p1, " ", &saveptr)));
+	assert_true((strtok_r(NULL, " ", &saveptr)));
 
 	assert_strcmp(fail_buf, "");
 	assert_strcmp(send_buf, "PRIVMSG targ :");

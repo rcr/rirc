@@ -23,7 +23,7 @@
 #endif
 
 #define failf(S, ...) \
-	do { server_err((S), __VA_ARGS__); \
+	do { server_error((S), __VA_ARGS__); \
 	     return 1; \
 	} while (0)
 
@@ -189,7 +189,8 @@ static const irc_recv_f irc_numerics[] = {
 	[464] = irc_error,  /* ERR_PASSWDMISMATCH */
 	[465] = irc_error,  /* ERR_YOUREBANNEDCREEP */
 	[466] = irc_error,  /* ERR_YOUWILLBEBANNED */
-	[467] = irc_error,  /* ERR_KEYSET */ [471] = irc_error,  /* ERR_CHANNELISFULL */
+	[467] = irc_error,  /* ERR_KEYSET */
+	[471] = irc_error,  /* ERR_CHANNELISFULL */
 	[472] = irc_error,  /* ERR_UNKNOWNMODE */
 	[473] = irc_error,  /* ERR_INVITEONLYCHAN */
 	[474] = irc_error,  /* ERR_BANNEDFROMCHAN */
@@ -234,11 +235,11 @@ irc_message(struct server *s, struct irc_message *m, const char *from)
 
 	if (irc_message_split(m, &trailing)) {
 		if (m->params)
-			server_message(s, from, "[%s] ~ %s", m->params, trailing);
+			newlinef(s->channel, 0, from, "[%s] ~ %s", m->params, trailing);
 		else
-			server_message(s, from, "%s", trailing);
+			newlinef(s->channel, 0, from, "%s", trailing);
 	} else if (m->params) {
-		server_message(s, from, "[%s]", m->params);
+		newlinef(s->channel, 0, from, "[%s]", m->params);
 	}
 
 	return 0;
@@ -287,7 +288,8 @@ irc_001(struct server *s, struct irc_message *m)
 	if (irc_message_split(m, &trailing))
 		newline(s->channel, 0, FROM_INFO, trailing);
 
-	newlinef(s->channel, 0, FROM_INFO, "You are known as %s", s->nick);
+	server_info(s, "You are known as %s", s->nick);
+
 	return 0;
 }
 
@@ -304,6 +306,7 @@ irc_004(struct server *s, struct irc_message *m)
 		newlinef(s->channel, 0, FROM_INFO, "%s", m->params);
 
 	server_set_004(s, m->params);
+
 	return 0;
 }
 
@@ -320,6 +323,7 @@ irc_005(struct server *s, struct irc_message *m)
 		newlinef(s->channel, 0, FROM_INFO, "%s ~ are supported by this server", m->params);
 
 	server_set_005(s, m->params);
+
 	return 0;
 }
 
@@ -342,7 +346,7 @@ irc_324(struct server *s, struct irc_message *m)
 	if (!irc_message_param(m, &chan))
 		failf(s, "RPL_CHANNELMODEIS: channel is null");
 
-	if ((c = channel_list_get(&s->clist, chan)) == NULL)
+	if ((c = channel_list_get(&s->clist, chan, s->casemapping)) == NULL)
 		failf(s, "RPL_CHANNELMODEIS: channel '%s' not found", chan);
 
 	return recv_mode_chanmodes(m, &(s->mode_cfg), c);
@@ -363,10 +367,11 @@ irc_328(struct server *s, struct irc_message *m)
 	if (!irc_message_param(m, &url))
 		failf(s, "RPL_CHANNEL_URL: url is null");
 
-	if ((c = channel_list_get(&s->clist, chan)) == NULL)
+	if ((c = channel_list_get(&s->clist, chan, s->casemapping)) == NULL)
 		failf(s, "RPL_CHANNEL_URL: channel '%s' not found", chan);
 
 	newlinef(c, 0, FROM_INFO, "URL for %s is: \"%s\"", chan, url);
+
 	return 0;
 }
 
@@ -386,7 +391,7 @@ irc_329(struct server *s, struct irc_message *m)
 	if (!irc_message_param(m, &time_str))
 		failf(s, "RPL_CREATIONTIME: time is null");
 
-	if ((c = channel_list_get(&s->clist, chan)) == NULL)
+	if ((c = channel_list_get(&s->clist, chan, s->casemapping)) == NULL)
 		failf(s, "RPL_CREATIONTIME: channel '%s' not found", chan);
 
 	errno = 0;
@@ -402,6 +407,7 @@ irc_329(struct server *s, struct irc_message *m)
 		failf(s, "RPL_CREATIONTIME: strftime error");
 
 	newlinef(c, 0, FROM_INFO, "Channel created %s", buf);
+
 	return 0;
 }
 
@@ -420,10 +426,11 @@ irc_332(struct server *s, struct irc_message *m)
 	if (!irc_message_param(m, &topic))
 		failf(s, "RPL_TOPIC: topic is null");
 
-	if ((c = channel_list_get(&s->clist, chan)) == NULL)
+	if ((c = channel_list_get(&s->clist, chan, s->casemapping)) == NULL)
 		failf(s, "RPL_TOPIC: channel '%s' not found", chan);
 
 	newlinef(c, 0, FROM_INFO, "Topic for %s is \"%s\"", chan, topic);
+
 	return 0;
 }
 
@@ -449,7 +456,7 @@ irc_333(struct server *s, struct irc_message *m)
 	if (!irc_message_param(m, &time_str))
 		failf(s, "RPL_TOPICWHOTIME: time is null");
 
-	if ((c = channel_list_get(&s->clist, chan)) == NULL)
+	if ((c = channel_list_get(&s->clist, chan, s->casemapping)) == NULL)
 		failf(s, "RPL_TOPICWHOTIME: channel '%s' not found", chan);
 
 	errno = 0;
@@ -465,6 +472,7 @@ irc_333(struct server *s, struct irc_message *m)
 		failf(s, "RPL_TOPICWHOTIME: strftime error");
 
 	newlinef(c, 0, FROM_INFO, "Topic set by %s, %s", nick, buf);
+
 	return 0;
 }
 
@@ -473,6 +481,7 @@ irc_353(struct server *s, struct irc_message *m)
 {
 	/* 353 ("="/"*"/"@") <channel> *([ "@" / "+" ]<nick>) */
 
+	char *saveptr;
 	char *chan;
 	char *nick;
 	char *nicks;
@@ -488,28 +497,31 @@ irc_353(struct server *s, struct irc_message *m)
 	if (!irc_message_param(m, &nicks))
 		failf(s, "RPL_NAMEREPLY: nicks is null");
 
-	if ((c = channel_list_get(&s->clist, chan)) == NULL)
+	if ((c = channel_list_get(&s->clist, chan, s->casemapping)) == NULL)
 		failf(s, "RPL_NAMEREPLY: channel '%s' not found", chan);
 
 	if (mode_chanmode_prefix(&(c->chanmodes), &(s->mode_cfg), *type) != MODE_ERR_NONE)
 		newlinef(c, 0, FROM_ERROR, "RPL_NAMEREPLY: invalid channel flag: '%c'", *type);
 
-	while ((nick = getarg(&nicks, " "))) {
+	if ((nick = strtok_r(nicks, " ", &saveptr))) {
+		do {
+			char prefix = 0;
+			struct mode m = MODE_EMPTY;
 
-		char prefix = 0;
-		struct mode m = MODE_EMPTY;
+			if (!irc_isnickchar(*nick, 1))
+				prefix = *nick++;
 
-		if (!irc_isnickchar(*nick, 1))
-			prefix = *nick++;
+			if (prefix && mode_prfxmode_prefix(&m, &(s->mode_cfg), prefix) != MODE_ERR_NONE)
+				newlinef(c, 0, FROM_ERROR, "Invalid user prefix: '%c'", prefix);
 
-		if (prefix && mode_prfxmode_prefix(&m, &(s->mode_cfg), prefix) != MODE_ERR_NONE)
-			newlinef(c, 0, FROM_ERROR, "Invalid user prefix: '%c'", prefix);
+			if (user_list_add(&(c->users), s->casemapping, nick, m) == USER_ERR_DUPLICATE)
+				newlinef(c, 0, FROM_ERROR, "Duplicate nick: '%s'", nick);
 
-		if (user_list_add(&(c->users), nick, m) == USER_ERR_DUPLICATE)
-			newlinef(c, 0, FROM_ERROR, "Duplicate nick: '%s'", nick);
+		} while ((nick = strtok_r(NULL, " ", &saveptr)));
 	}
 
 	draw_status();
+
 	return 0;
 }
 
@@ -525,7 +537,7 @@ irc_433(struct server *s, struct irc_message *m)
 
 	newlinef(s->channel, 0, FROM_ERROR, "Nick '%s' in use", nick);
 
-	if (!strcmp(m->from, s->nick)) {
+	if (!strcmp(nick, s->nick)) {
 		server_nicks_next(s);
 		newlinef(s->channel, 0, FROM_ERROR, "Trying again with '%s'", s->nick);
 		sendf(s, "NICK %s", s->nick);
@@ -634,7 +646,7 @@ recv_join(struct server *s, struct irc_message *m)
 		failf(s, "JOIN: target channel is null");
 
 	if (!strcmp(m->from, s->nick)) {
-		if ((c = channel_list_get(&s->clist, chan)) == NULL) {
+		if ((c = channel_list_get(&s->clist, chan, s->casemapping)) == NULL) {
 			c = channel(chan, CHANNEL_T_CHANNEL);
 			c->server = s;
 			channel_list_add(&s->clist, c);
@@ -648,14 +660,14 @@ recv_join(struct server *s, struct irc_message *m)
 		return 0;
 	}
 
-	if ((c = channel_list_get(&s->clist, chan)) == NULL)
+	if ((c = channel_list_get(&s->clist, chan, s->casemapping)) == NULL)
 		failf(s, "JOIN: channel '%s' not found", chan);
 
-	if (user_list_add(&(c->users), m->from, MODE_EMPTY) == USER_ERR_DUPLICATE)
+	if (user_list_add(&(c->users), s->casemapping, m->from, MODE_EMPTY) == USER_ERR_DUPLICATE)
 		failf(s, "JOIN: user '%s' alread on channel '%s'", m->from, chan);
 
 	if (!join_threshold || c->users.count <= join_threshold)
-		newlinef(c, BUFFER_LINE_JOIN, ">", "%s!%s has joined", m->from, m->host);
+		newlinef(c, BUFFER_LINE_JOIN, FROM_JOIN, "%s!%s has joined", m->from, m->host);
 
 	draw_status();
 
@@ -681,7 +693,7 @@ recv_kick(struct server *s, struct irc_message *m)
 	if (!irc_message_param(m, &user))
 		failf(s, "KICK: user is null");
 
-	if ((c = channel_list_get(&s->clist, chan)) == NULL)
+	if ((c = channel_list_get(&s->clist, chan, s->casemapping)) == NULL)
 		failf(s, "KICK: channel '%s' not found", chan);
 
 	irc_message_param(m, &message);
@@ -704,7 +716,7 @@ recv_kick(struct server *s, struct irc_message *m)
 
 	} else {
 
-		if (user_list_del(&(c->users), user) == USER_ERR_NOT_FOUND)
+		if (user_list_del(&(c->users), s->casemapping, user) == USER_ERR_NOT_FOUND)
 			failf(s, "KICK: nick '%s' not found in '%s'", user, chan);
 
 		if (message)
@@ -752,7 +764,7 @@ recv_mode(struct server *s, struct irc_message *m)
 	if (!strcmp(targ, s->nick))
 		return recv_mode_usermodes(m, &(s->mode_cfg), s);
 
-	if ((c = channel_list_get(&s->clist, targ)))
+	if ((c = channel_list_get(&s->clist, targ, s->casemapping)))
 		return recv_mode_chanmodes(m, &(s->mode_cfg), c);
 
 	failf(s, "MODE: target '%s' not found", targ);
@@ -838,7 +850,7 @@ recv_mode_chanmodes(struct irc_message *m, const struct mode_cfg *cfg, struct ch
 						continue;
 					}
 
-					if (!(user = user_list_get(&(c->users), modearg, 0))) {
+					if (!(user = user_list_get(&(c->users), c->server->casemapping, modearg, 0))) {
 						newlinef(c, 0, FROM_ERROR, "MODE: flag '%c' user '%s' not found", flag, modearg);
 						continue;
 					}
@@ -954,7 +966,7 @@ recv_nick(struct server *s, struct irc_message *m)
 	if (!irc_message_param(m, &nick))
 		failf(s, "NICK: new nick is null");
 
-	if (!strcmp(nick, s->nick)) {
+	if (!strcmp(m->from, s->nick)) {
 		server_nick_set(s, nick);
 		newlinef(s->channel, BUFFER_LINE_NICK, FROM_NICK, "Youn nick is '%s'", nick);
 	}
@@ -962,11 +974,11 @@ recv_nick(struct server *s, struct irc_message *m)
 	do {
 		enum user_err ret;
 
-		if ((ret = user_list_rpl(&(c->users), m->from, nick)) == USER_ERR_NONE)
+		if ((ret = user_list_rpl(&(c->users), s->casemapping, m->from, nick)) == USER_ERR_NONE)
 			newlinef(c, BUFFER_LINE_NICK, FROM_NICK, "%s  >>  %s", m->from, nick);
 
 		else if (ret == USER_ERR_DUPLICATE)
-			server_err(s, "NICK: user '%s' alread on channel '%s'", m->from, c->name);
+			server_error(s, "NICK: user '%s' alread on channel '%s'", m->from, c->name);
 
 	} while ((c = c->next) != s->channel);
 
@@ -992,7 +1004,7 @@ recv_notice(struct server *s, struct irc_message *m)
 	if (!irc_message_param(m, &message))
 		failf(s, "NOTICE: message is null");
 
-	if (user_list_get(&(s->ignore), m->from, 0))
+	if (user_list_get(&(s->ignore), s->casemapping, m->from, 0))
 		return 0;
 
 	if (IS_CTCP(message))
@@ -1002,7 +1014,7 @@ recv_notice(struct server *s, struct irc_message *m)
 		c = s->channel;
 	} else if (!strcmp(target, s->nick)) {
 
-		if ((c = channel_list_get(&s->clist, m->from)) == NULL) {
+		if ((c = channel_list_get(&s->clist, m->from, s->casemapping)) == NULL) {
 			c = channel(m->from, CHANNEL_T_PRIVATE);
 			c->server = s;
 			channel_list_add(&s->clist, c);
@@ -1011,11 +1023,11 @@ recv_notice(struct server *s, struct irc_message *m)
 		if (c != current_channel())
 			urgent = 1;
 
-	} else if ((c = channel_list_get(&s->clist, target)) == NULL) {
+	} else if ((c = channel_list_get(&s->clist, target, s->casemapping)) == NULL) {
 		failf(s, "NOTICE: channel '%s' not found", target);
 	}
 
-	if (check_pinged(message, s->nick)) {
+	if (irc_pinged(s->casemapping, message, s->nick)) {
 
 		if (c != current_channel())
 			urgent = 1;
@@ -1052,7 +1064,7 @@ recv_part(struct server *s, struct irc_message *m)
 	if (!strcmp(m->from, s->nick)) {
 
 		/* If not found, assume channel was closed */
-		if ((c = channel_list_get(&s->clist, chan)) != NULL) {
+		if ((c = channel_list_get(&s->clist, chan, s->casemapping)) != NULL) {
 
 			if (irc_message_param(m, &message))
 				newlinef(c, BUFFER_LINE_PART, FROM_PART, "you have parted (%s)", message);
@@ -1063,10 +1075,10 @@ recv_part(struct server *s, struct irc_message *m)
 		}
 	} else {
 
-		if ((c = channel_list_get(&s->clist, chan)) == NULL)
+		if ((c = channel_list_get(&s->clist, chan, s->casemapping)) == NULL)
 			failf(s, "PART: channel '%s' not found", chan);
 
-		if (user_list_del(&(c->users), m->from) == USER_ERR_NOT_FOUND)
+		if (user_list_del(&(c->users), s->casemapping, m->from) == USER_ERR_NOT_FOUND)
 			failf(s, "PART: nick '%s' not found in '%s'", m->from, chan);
 
 		if (!part_threshold || c->users.count <= part_threshold) {
@@ -1127,7 +1139,7 @@ recv_privmsg(struct server *s, struct irc_message *m)
 	if (!irc_message_param(m, &message))
 		failf(s, "PRIVMSG: message is null");
 
-	if (user_list_get(&(s->ignore), m->from, 0))
+	if (user_list_get(&(s->ignore), s->casemapping, m->from, 0))
 		return 0;
 
 	if (IS_CTCP(message))
@@ -1135,7 +1147,7 @@ recv_privmsg(struct server *s, struct irc_message *m)
 
 	if (!strcmp(target, s->nick)) {
 
-		if ((c = channel_list_get(&s->clist, m->from)) == NULL) {
+		if ((c = channel_list_get(&s->clist, m->from, s->casemapping)) == NULL) {
 			c = channel(m->from, CHANNEL_T_PRIVATE);
 			c->server = s;
 			channel_list_add(&s->clist, c);
@@ -1144,11 +1156,11 @@ recv_privmsg(struct server *s, struct irc_message *m)
 		if (c != current_channel())
 			urgent = 1;
 
-	} else if ((c = channel_list_get(&s->clist, target)) == NULL) {
+	} else if ((c = channel_list_get(&s->clist, target, s->casemapping)) == NULL) {
 		failf(s, "PRIVMSG: channel '%s' not found", target);
 	}
 
-	if (check_pinged(message, s->nick)) {
+	if (irc_pinged(s->casemapping, message, s->nick)) {
 
 		if (c != current_channel())
 			urgent = 1;
@@ -1185,7 +1197,7 @@ recv_topic(struct server *s, struct irc_message *m)
 	if (!irc_message_param(m, &topic))
 		failf(s, "TOPIC: topic is null");
 
-	if ((c = channel_list_get(&s->clist, chan)) == NULL)
+	if ((c = channel_list_get(&s->clist, chan, s->casemapping)) == NULL)
 		failf(s, "TOPIC: target channel '%s' not found", chan);
 
 	if (*topic) {
@@ -1212,7 +1224,7 @@ recv_quit(struct server *s, struct irc_message *m)
 	irc_message_param(m, &message);
 
 	do {
-		if (user_list_del(&(c->users), m->from) == USER_ERR_NONE) {
+		if (user_list_del(&(c->users), s->casemapping, m->from) == USER_ERR_NONE) {
 			if (!quit_threshold || c->users.count <= quit_threshold) {
 				if (message)
 					newlinef(c, BUFFER_LINE_QUIT, FROM_QUIT, "%s!%s has quit (%s)", m->from, m->host, message);
