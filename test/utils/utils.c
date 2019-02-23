@@ -2,63 +2,6 @@
 #include "src/utils/utils.c"
 
 static void
-test_getarg(void)
-{
-	/* Test string token parsing */
-
-	char *ptr;
-
-	/* Test null pointer */
-	assert_strcmp(getarg(NULL, " "), NULL);
-
-	/* Test empty string */
-	char str1[] = "";
-
-	ptr = str1;
-	assert_strcmp(getarg(&ptr, " "), NULL);
-
-	/* Test only whitestapce */
-	char str2[] = "   ";
-
-	ptr = str2;
-	assert_strcmp(getarg(&ptr, " "), NULL);
-
-	/* Test single token */
-	char str3[] = "arg1";
-
-	ptr = str3;
-	assert_strcmp(getarg(&ptr, " "), "arg1");
-	assert_strcmp(getarg(&ptr, " "), NULL);
-
-	/* Test multiple tokens */
-	char str4[] = "arg2 arg3 arg4";
-
-	ptr = str4;
-	assert_strcmp(getarg(&ptr, " "), "arg2");
-	assert_strcmp(getarg(&ptr, " "), "arg3");
-	assert_strcmp(getarg(&ptr, " "), "arg4");
-	assert_strcmp(getarg(&ptr, " "), NULL);
-
-	/* Test multiple tokens with extraneous whitespace */
-	char str5[] = "   arg5   arg6   arg7   ";
-
-	ptr = str5;
-	assert_strcmp(getarg(&ptr, " "), "arg5");
-	assert_strcmp(getarg(&ptr, " "), "arg6");
-	assert_strcmp(getarg(&ptr, " "), "arg7");
-	assert_strcmp(getarg(&ptr, " "), NULL);
-
-	/* Test multiple separator characters */
-	char str6[] = "!!!arg8:!@#$arg9   :   arg10!@#";
-
-	ptr = str6;
-	assert_strcmp(getarg(&ptr, "!:"), "arg8");
-	assert_strcmp(getarg(&ptr, ":$#@! "), "arg9");
-	assert_strcmp(getarg(&ptr, " :"), "arg10!@#");
-	assert_strcmp(getarg(&ptr, " "), NULL);
-}
-
-static void
 test_irc_message_param(void)
 {
 	char *param;
@@ -407,52 +350,90 @@ test_irc_message_split(void)
 }
 
 static void
+test_irc_pinged(void)
+{
+	/* Test detecting user's nick in message */
+
+	const char *nick = "testnick";
+
+	/* Test message contains nick */
+	const char *mesg1 = "testing testnick testing";
+	assert_eq(irc_pinged(CASEMAPPING_RFC1459, mesg1, nick), 1);
+
+	/* Test common way of addressing messages to nicks */
+	const char *mesg2 = "testnick: testing";
+	assert_eq(irc_pinged(CASEMAPPING_RFC1459, mesg2, nick), 1);
+
+	/* Test non-nick char prefix */
+	const char *mesg3 = "testing !@#testnick testing";
+	assert_eq(irc_pinged(CASEMAPPING_RFC1459, mesg3, nick), 1);
+
+	/* Test non-nick char suffix */
+	const char *mesg4 = "testing testnick!@#$ testing";
+	assert_eq(irc_pinged(CASEMAPPING_RFC1459, mesg4, nick), 1);
+
+	/* Test non-nick char prefix and suffix */
+	const char *mesg5 = "testing !testnick! testing";
+	assert_eq(irc_pinged(CASEMAPPING_RFC1459, mesg5, nick), 1);
+
+	/* Test case insensitive nick detection */
+	const char *mesg6 = "testing TeStNiCk testing";
+	assert_eq(irc_pinged(CASEMAPPING_RFC1459, mesg6, nick), 1);
+
+	/* Error: message doesn't contain nick */
+	const char *mesg7 = "testing testing";
+	assert_eq(irc_pinged(CASEMAPPING_RFC1459, mesg7, nick), 0);
+
+	/* Error: message contains nick prefix */
+	const char *mesg8 = "testing testnickshouldfail testing";
+	assert_eq(irc_pinged(CASEMAPPING_RFC1459, mesg8, nick), 0);
+}
+
+static void
 test_irc_strcmp(void)
 {
-	/* Test case insensitive */
-	assert_eq(irc_strcmp("abc123[]\\~`_", "ABC123{}|^`_"), 0);
-
 	/* Test lexicographic order
 	 *
 	 * The character '`' is permitted along with '{', but are disjoint
 	 * in ascii, with lowercase letters between them. Ensure that in
 	 * lexicographic order, irc_strmp ranks:
-	 *  numeric > alpha > special
-	 */
+	 *  numeric > alpha > special */
 
-	assert_gt(irc_strcmp("0", "a"), 0);
-	assert_gt(irc_strcmp("a", "`"), 0);
-	assert_gt(irc_strcmp("a", "{"), 0);
-	assert_gt(irc_strcmp("z", "{"), 0);
-	assert_gt(irc_strcmp("Z", "`"), 0);
-	assert_gt(irc_strcmp("a", "Z"), 0);
-	assert_gt(irc_strcmp("A", "z"), 0);
+	assert_gt(irc_strcmp(CASEMAPPING_RFC1459, "0", "a"), 0);
+	assert_gt(irc_strcmp(CASEMAPPING_RFC1459, "a", "`"), 0);
+	assert_gt(irc_strcmp(CASEMAPPING_RFC1459, "a", "{"), 0);
+	assert_gt(irc_strcmp(CASEMAPPING_RFC1459, "z", "{"), 0);
+	assert_gt(irc_strcmp(CASEMAPPING_RFC1459, "Z", "`"), 0);
+	assert_gt(irc_strcmp(CASEMAPPING_RFC1459, "a", "Z"), 0);
+	assert_gt(irc_strcmp(CASEMAPPING_RFC1459, "A", "z"), 0);
+
+	/* Test case insensitive */
+
+	/* Passes for CASEMAPPING_RFC1459 */
+	assert_eq(irc_strcmp(CASEMAPPING_RFC1459, "abc123[]\\~`_", "ABC123{}|^`_"), 0);
+	assert_lt(irc_strcmp(CASEMAPPING_STRICT_RFC1459, "abc123[]\\~`_", "ABC123{}|^`_"), 0);
+	assert_gt(irc_strcmp(CASEMAPPING_ASCII, "abc123[]\\~`_", "ABC123{}|^`_"), 0);
+
+	/* Passes for CASEMAPPING_RFC1459, CASEMAPPING_STRICT_RFC1459 */
+	assert_eq(irc_strcmp(CASEMAPPING_RFC1459, "abc123[]\\`_", "ABC123{}|`_"), 0);
+	assert_eq(irc_strcmp(CASEMAPPING_STRICT_RFC1459, "abc123[]\\`_", "ABC123{}|`_"), 0);
+	assert_gt(irc_strcmp(CASEMAPPING_ASCII, "abc123[]\\`_", "ABC123{}|`_"), 0);
+
+	/* Passes for CASEMAPPING_RFC1459, CASEMAPPING_STRICT_RFC1459, CASEMAPPING_ASCII */
+	assert_eq(irc_strcmp(CASEMAPPING_RFC1459, "abc123", "ABC123"), 0);
+	assert_eq(irc_strcmp(CASEMAPPING_STRICT_RFC1459, "abc123", "ABC123"), 0);
+	assert_eq(irc_strcmp(CASEMAPPING_ASCII, "abc123", "ABC123"), 0);
 }
 
 static void
 test_irc_strncmp(void)
 {
 	/* Test case insensitive */
-	assert_eq(irc_strncmp("abc123[]\\~`_", "ABC123{}|^`_", 100), 0);
-
-	/* Test lexicographic order
-	 *
-	 * The character '`' is permitted along with '{', but are disjoint
-	 * in ascii, with lowercase letters between them. Ensure that in
-	 * lexicographic order, irc_strmp ranks:
-	 *  numeric > alpha > special
-	 */
-	assert_gt(irc_strncmp("0", "a", 1), 0);
-	assert_gt(irc_strncmp("a", "`", 1), 0);
-	assert_gt(irc_strncmp("a", "{", 1), 0);
-	assert_gt(irc_strncmp("z", "{", 1), 0);
-	assert_gt(irc_strncmp("Z", "`", 1), 0);
-	assert_gt(irc_strncmp("a", "Z", 1), 0);
-	assert_gt(irc_strncmp("A", "z", 1), 0);
+	assert_eq(irc_strncmp(CASEMAPPING_RFC1459, "abc123[]\\~`_", "ABC123{}|^`_", 100), 0);
 
 	/* Test n */
-	assert_eq(irc_strncmp("abcA", "abcZ", 3), 0);
-	assert_gt(irc_strncmp("abcA", "abcZ", 4), 0);
+	assert_eq(irc_strncmp(CASEMAPPING_RFC1459, "abcA", "abcZ", 3), 0);
+	assert_gt(irc_strncmp(CASEMAPPING_RFC1459, "abcA", "abcZ", 4), 0);
 }
 
 static void
@@ -463,48 +444,9 @@ test_irc_toupper(void)
 	char *p, str[] = "*az{}|^[]\\~*";
 
 	for (p = str; *p; p++)
-		*p = irc_toupper(*p);
+		*p = irc_toupper(CASEMAPPING_RFC1459, *p);
 
 	assert_strcmp(str, "*AZ[]\\~[]\\~*");
-}
-
-static void
-test_check_pinged(void)
-{
-	/* Test detecting user's nick in message */
-
-	// FIXME: check_pinged should take server argument
-	//        and use s->cmp to test nick case
-
-	char *nick = "testnick";
-
-	/* Test message contains username */
-	char *mesg1 = "testing testnick testing";
-	assert_eq(check_pinged(mesg1, nick), 1);
-
-	/* Test common way of addressing messages to users */
-	char *mesg2 = "testnick: testing";
-	assert_eq(check_pinged(mesg2, nick), 1);
-
-	/* Test non-nick char prefix */
-	char *mesg3 = "testing !@#testnick testing";
-	assert_eq(check_pinged(mesg3, nick), 1);
-
-	/* Test non-nick char suffix */
-	char *mesg4 = "testing testnick!@#$ testing";
-	assert_eq(check_pinged(mesg4, nick), 1);
-
-	/* Test non-nick char prefix and suffix */
-	char *mesg5 = "testing !testnick! testing";
-	assert_eq(check_pinged(mesg5, nick), 1);
-
-	/* Error: message doesn't contain username */
-	char *mesg6 = "testing testing";
-	assert_eq(check_pinged(mesg6, nick), 0);
-
-	/* Error: message contains username prefix */
-	char *mesg7 = "testing testnickshouldfail testing";
-	assert_eq(check_pinged(mesg7, nick), 0);
 }
 
 static void
@@ -647,11 +589,10 @@ int
 main(void)
 {
 	struct testcase tests[] = {
-		TESTCASE(test_check_pinged),
-		TESTCASE(test_getarg),
 		TESTCASE(test_irc_message_param),
 		TESTCASE(test_irc_message_parse),
 		TESTCASE(test_irc_message_split),
+		TESTCASE(test_irc_pinged),
 		TESTCASE(test_irc_strcmp),
 		TESTCASE(test_irc_strncmp),
 		TESTCASE(test_irc_toupper),

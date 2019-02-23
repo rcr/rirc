@@ -40,15 +40,13 @@ server(const char *host, const char *port, const char *pass, const char *user, c
 	s->username = strdup(user);
 	s->realname = strdup(real);
 	s->channel = channel(host, CHANNEL_T_SERVER);
+	s->casemapping = CASEMAPPING_RFC1459;
 	s->mode_str.type = MODE_STR_USERMODE;
 	mode_cfg(&(s->mode_cfg), NULL, MODE_CFG_DEFAULTS);
 	/* FIXME: remove server pointer from channel, remove
 	 * server's channel from clist */
 	s->channel->server = s;
 	channel_list_add(&(s->clist), s->channel);
-
-	/* TODO: CASEMAPPING */
-	s->cmp = strcmp;
 
 	return s;
 }
@@ -167,21 +165,22 @@ server_set_004(struct server *s, char *str)
 
 	struct channel *c = s->channel;
 
+	char *saveptr;
 	char *server_name, /* Not used */
 	     *version,     /* Not used */
 	     *user_modes,  /* Configure server usermodes */
 	     *chan_modes;  /* Configure server chanmodes */
 
-	if (!(server_name = getarg(&str, " ")))
+	if (!(server_name = strtok_r(str, " ", &saveptr)))
 		newline(c, 0, "-!!-", "invalid numeric 004: server_name is null");
 
-	if (!(version = getarg(&str, " ")))
+	if (!(version = strtok_r(NULL, " ", &saveptr)))
 		newline(c, 0, "-!!-", "invalid numeric 004: version is null");
 
-	if (!(user_modes = getarg(&str, " ")))
+	if (!(user_modes = strtok_r(NULL, " ", &saveptr)))
 		newline(c, 0, "-!!-", "invalid numeric 004: user_modes is null");
 
-	if (!(chan_modes = getarg(&str, " ")))
+	if (!(chan_modes = strtok_r(NULL, " ", &saveptr)))
 		newline(c, 0, "-!!-", "invalid numeric 004: chan_modes is null");
 
 	if (user_modes) {
@@ -345,11 +344,20 @@ parse_opt(struct opt *opt, char **str)
 static int
 server_set_CASEMAPPING(struct server *s, char *val)
 {
-	/* TODO: sets a function pointer to be used for
-	 * nick/chan string cmps specific to this server */
-	(void)(s);
-	(void)(val);
-	return 0;
+	if (val == NULL)
+		return 0;
+	else if (!strcmp(val, "ascii"))
+		s->casemapping = CASEMAPPING_ASCII;
+	else if (!strcmp(val, "rfc1459"))
+		s->casemapping = CASEMAPPING_RFC1459;
+	else if (!strcmp(val, "strict-rfc1459"))
+		s->casemapping = CASEMAPPING_STRICT_RFC1459;
+	else
+		return 0;
+
+	debug("Setting numeric 005 CASEMAPPING: %s", val);
+
+	return 1;
 }
 
 static int
