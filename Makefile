@@ -37,6 +37,7 @@ SUBDIRS += $(shell find $(DIR_S) -name '*.gperf' -exec dirname {} \; | sort -u)
 OBJS_D := $(patsubst $(DIR_S)/%.c, $(DIR_B)/%.db.o, $(SRC))
 OBJS_R := $(patsubst $(DIR_S)/%.c, $(DIR_B)/%.o,    $(SRC))
 OBJS_T := $(patsubst $(DIR_S)/%.c, $(DIR_B)/%.t,    $(SRC))
+OBJS_T += $(DIR_B)/utils/tree.t # Header only file
 
 # Gperf generated source files
 OBJS_G := $(patsubst %.gperf, %.gperf.out, $(SRC_G))

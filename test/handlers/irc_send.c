@@ -382,5 +382,8 @@ main(void)
 
 	int ret = run_tests(tests);
 	server_free(s);
+	channel_free(c_chan);
+	channel_free(c_priv);
+	channel_free(c_serv);
 	return ret;
 }
