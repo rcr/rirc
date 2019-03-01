@@ -206,7 +206,7 @@ static const irc_recv_f irc_numerics[] = {
 	[491] = irc_error,  /* ERR_NOOPERHOST */
 	[501] = irc_error,  /* ERR_UMODEUNKNOWNFLAG */
 	[502] = irc_error,  /* ERR_USERSDONTMATCH */
-	[704] = irc_ignore, /* RPL_HELPSTART */
+	[704] = irc_info,   /* RPL_HELPSTART */
 	[705] = irc_info,   /* RPL_HELP */
 	[706] = irc_ignore, /* RPL_ENDOFHELP */
 };
