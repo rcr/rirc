@@ -54,11 +54,11 @@ Edit `Makefile` to alter install path if needed, then:
 ## Usage:
 
     rirc [-hv] [-s server [-p port] [-w pass] [-u user] [-r real] [-n nicks] [-c chans]], ...]
-    
+
     Help:
       -h, --help      Print this message and exit
       -v, --version   Print rirc version and exit
-    
+
     Options:
       -s, --server=SERVER       Connect to SERVER
       -p, --port=PORT           Connect to SERVER using PORT
@@ -70,10 +70,11 @@ Edit `Makefile` to alter install path if needed, then:
 
 Commands:
 
-      :quit
       :clear
       :close
       :connect [host [port] [pass] [user] [real]]
+      :disconnect
+      :quit
 
 Keys:
 

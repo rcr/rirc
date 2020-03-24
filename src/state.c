@@ -79,7 +79,7 @@ static const char *irc_list[] = {
 // TODO: from command handler list
 /* List of rirc commands for tab completeion */
 static const char *cmd_list[] = {
-	"clear", "close", "connect", "quit", "set", NULL};
+	"clear", "close", "connect", "disconnect", "quit", "set", NULL};
 
 /* Set draw bits */
 #define X(BIT) void draw_##BIT(void) { state.draw.bits.BIT = 1; }
@@ -856,6 +856,11 @@ command(struct channel *c, char *buf)
 				draw_all();
 			}
 		}
+		return;
+	}
+
+	if (!strcasecmp(cmnd, "disconnect")) {
+		io_dx(c->server->connection);
 		return;
 	}
 

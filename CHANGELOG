@@ -3,6 +3,7 @@ Summary of notable changes and features
 
 ## Unreleased (dev)
 ### Features
+ - add command :disconnect
 ### Fixes
 
 ## [0.1.2]
