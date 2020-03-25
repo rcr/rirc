@@ -5,8 +5,8 @@ set -e
 CDIR="coverage"
 
 export CC=gcc
-export CC_EXT=-fprofile-arcs -ftest-coverage
-export LD_EXT=-fprofile-arcs
+export CC_EXT=-"fprofile-arcs -ftest-coverage"
+export LD_EXT=-"fprofile-arcs"
 
 make -e clean test
 

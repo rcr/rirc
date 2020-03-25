@@ -3,7 +3,7 @@
 set -e
 
 export CC=gcc
-export CC_EXT=-fstack-usage
+export CC_EXT="-fstack-usage"
 
 make -e clean debug
 
