@@ -9,7 +9,7 @@ Summary of notable changes and features
     - add CA_CERT_PATH define to config.h
     - changed default port to 6697 for SSL
  - changed standard versions
-    - c99 -> c17,
+    - c99 -> c11
     - POSIX.1-2001 -> POSIX.1-2008
 ### Fixes
 

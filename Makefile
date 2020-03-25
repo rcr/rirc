@@ -11,7 +11,7 @@ BIN_DIR = /usr/local/bin
 MAN_DIR = /usr/local/share/man/man1
 
 STDS := \
- -std=c17 \
+ -std=c11 \
  -D_BSD_VISIBLE \
  -D_DARWIN_C_SOURCE \
  -D_POSIX_C_SOURCE=200809L
