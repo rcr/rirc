@@ -81,6 +81,7 @@ $(DIR_B)/%.t: $(DIR_T)/%.c
 	@$(PP) $(CFLAGS_D) -MM -MP -MT $@ -MF $(@:.t=.d) $<
 	@$(CC) $(CFLAGS_D) $(LDFLAGS) -o $@ $<
 	-@./$@ || mv $@ $(@:.t=.td)
+	@[ ! -f $(@:.t=.td) ]
 
 # Build directories
 $(DIR_B):
