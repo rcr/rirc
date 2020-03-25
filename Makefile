@@ -17,13 +17,12 @@ STDS := \
  -D_POSIX_C_SOURCE=200809L
 
 TLS_INCLUDE := \
- -I./mbedtls/include \
- -I./mbedtls/crypto/include
+ -I./mbedtls/include
 
 TLS_LIBS := \
  ./mbedtls/library/libmbedtls.a \
  ./mbedtls/library/libmbedx509.a \
- ./mbedtls/crypto/library/libmbedcrypto.a
+ ./mbedtls/library/libmbedcrypto.a
 
 CC := cc
 PP := cc -E

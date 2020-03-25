@@ -35,7 +35,8 @@ Configure rirc by editing `config.h`
 
 ## Building:
 rirc requires the latest version of GNU gperf to compile.
-    See: https://www.gnu.org/software/gperf/
+
+See: https://www.gnu.org/software/gperf/
 
 Initialize, configure and build mbedtls:
 
