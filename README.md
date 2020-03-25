@@ -37,11 +37,16 @@ Configure rirc by editing `config.h`
 rirc requires the latest version of GNU gperf to compile.
     See: https://www.gnu.org/software/gperf/
 
-Initialize and build submodules:
+Initialize, configure and build mbedtls:
 
     git submodule init
     git submodule update --recursive
-    make -C mbedtls
+    cd mbedtls
+    ./scripts/config.pl set MBEDTLS_THREADING_C
+    ./scripts/config.pl set MBEDTLS_THREADING_PTHREAD
+    cmake .
+    cmake --build .
+    cd ..
 
 Build rirc:
 

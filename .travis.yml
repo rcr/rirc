@@ -39,6 +39,12 @@ before_install:
 
 script:
   - set -e
+  - cd mbedtls
+  - ./scripts/config.pl set MBEDTLS_THREADING_C
+  - ./scripts/config.pl set MBEDTLS_THREADING_PTHREAD
+  - cmake .
+  - cmake --build .
+  - cd ..
   - make -e clean test rirc debug
   - test "${TRAVIS_JOB_NUMBER##*.}" = "1" || exit 0
   - build-wrapper-linux-x86-64 --out-dir bw-output make clean debug test
