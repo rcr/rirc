@@ -2,8 +2,13 @@ image: alpine/edge
 
 packages:
   - cmake
+  - curl
   - gperf
   - perl
+  - unzip
+
+secrets:
+  - 6f8be661-72d4-4c66-ad76-e8eb5c66eb18
 
 sources:
   - https://git.sr.ht/~rcr/rirc
@@ -23,3 +28,22 @@ tasks:
       make rirc
       make debug
       make test
+  - sonar-scan: |
+      cd rirc
+      curl -o build-wrapper.zip https://sonarcloud.io/static/cpp/build-wrapper-linux-x86.zip
+      curl -o sonar-scanner.zip https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-4.2.0.1873-linux.zip
+      unzip build-wrapper.zip
+      unzip sonar-scanner.zip
+      ./scripts/coverage.sh
+      branch=$(git name-rev --name-only HEAD)
+      echo >> sonar-project.properties "sonar.branch.name=$branch"
+      echo >> sonar-project.properties "sonar.cfamily.build-wrapper-output=bw-output"
+      echo >> sonar-project.properties "sonar.cfamily.gcov.reportsPath=."
+      echo >> sonar-project.properties "sonar.coverage.exclusions=test"
+      echo >> sonar-project.properties "sonar.host.url=https://sonarcloud.io"
+      echo >> sonar-project.properties "sonar.organization=rcr-github"
+      echo >> sonar-project.properties "sonar.projectKey=rcr_rirc"
+      echo >> sonar-project.properties "sonar.sources=."
+      echo >> sonar-project.properties "sonar.tests=test"
+      cat ~/sonarcloud-login >> sonar-project.properties
+      cat sonar-project.properties
