@@ -39,7 +39,7 @@ git:
 
 before_install:
   - test "${TRAVIS_BRANCH}" != "static_analysis" -o "${TRAVIS_JOB_NUMBER##*.}" = "1" || exit 0
-  - sed -i 's/git@github.com:/https:\/\/github.com\//' .gitmodules
+  - sed -i "" 's/git@github.com:/https:\/\/github.com\//' .gitmodules
   - git submodule update --init --recursive
 
 script:
