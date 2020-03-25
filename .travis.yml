@@ -39,9 +39,6 @@ before_install:
 
 script:
   - set -e
-  - gperf --version
-  - cc --version
-  - ld --version
   - make -e clean test rirc debug
   - test "${TRAVIS_JOB_NUMBER##*.}" = "1" || exit 0
   - build-wrapper-linux-x86-64 --out-dir bw-output make clean debug test

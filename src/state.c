@@ -24,7 +24,7 @@
 
 static void _newline(struct channel*, enum buffer_line_t, const char*, const char*, va_list);
 static void state_io_cxed(struct server*);
-static void state_io_dxed(struct server*, va_list);
+static void state_io_dxed(struct server*);
 static void state_io_ping(struct server*, unsigned int);
 static void state_io_signal(enum io_sig_t);
 
@@ -133,7 +133,7 @@ state_term(void)
 	do {
 		s2 = s1;
 		s1 = s2->next;
-		io_free(s2->connection);
+		connection_free(s2->connection);
 		server_free(s2);
 	} while (s1 != state_server_list()->head);
 }
@@ -337,7 +337,7 @@ action_close_server(char c)
 			newlinef(s->channel, 0, "-!!-", "sendf fail: %s", io_err(ret));
 
 		io_dx(s->connection);
-		io_free(s->connection);
+		connection_free(s->connection);
 		server_list_del(state_server_list(), s);
 		server_free(s);
 
@@ -375,7 +375,7 @@ action(int (*a_handler)(char), const char *fmt, ...)
 /* Action line should be:
  *
  *
- * Find: [current result]/[(server if not current server[socket if not 6667])] : <search input> */
+ * Find: [current result]/[(server if not current server[socket if not 6697])] : <search input> */
 static int
 action_find_channel(char c)
 {
@@ -429,7 +429,7 @@ action_find_channel(char c)
 			action(action_find_channel, "Find: %s -- %s",
 					search_cptr->name, search_buf);
 		} else {
-			if (!strcmp(search_cptr->server->port, "6667"))
+			if (!strcmp(search_cptr->server->port, "6697"))
 				action(action_find_channel, "Find: %s/%s -- %s",
 						search_cptr->server->host, search_cptr->name, search_buf);
 			else
@@ -729,15 +729,12 @@ state_io_cxed(struct server *s)
 }
 
 static void
-state_io_dxed(struct server *s, va_list ap)
+state_io_dxed(struct server *s)
 {
 	struct channel *c = s->channel;
-	va_list ap_copy;
 
 	do {
-		va_copy(ap_copy, ap);
-		_newline(c, 0, "-!!-", va_arg(ap_copy, const char *), ap_copy);
-		va_end(ap_copy);
+		newline(c, 0, "-!!-", " -- disconnected --");
 		channel_reset(c);
 		c = c->next;
 	} while (c != s->channel);
@@ -779,10 +776,9 @@ io_cb(enum io_cb_t type, const void *cb_obj, ...)
 	switch (type) {
 		case IO_CB_CXED:
 			state_io_cxed(s);
-			_newline(s->channel, 0, "--", va_arg(ap, const char *), ap);
 			break;
 		case IO_CB_DXED:
-			state_io_dxed(s, ap);
+			state_io_dxed(s);
 			break;
 		case IO_CB_PING_0:
 		case IO_CB_PING_1:
@@ -820,11 +816,11 @@ command(struct channel *c, char *buf)
 	}
 
 	if (!strcasecmp(cmnd, "quit")) {
-		io_term();
+		io_stop();
 	}
 
 	if (!strcasecmp(cmnd, "connect")) {
-
+		// TODO: parse --args
 		const char *host = strtok_r(NULL, " ", &saveptr);
 		const char *port = strtok_r(NULL, " ", &saveptr);
 		const char *pass = strtok_r(NULL, " ", &saveptr);
@@ -840,7 +836,7 @@ command(struct channel *c, char *buf)
 				newlinef(c, 0, "-!!-", "%s", io_err(err));
 			}
 		} else {
-			port = (port ? port : "6667");
+			port = (port ? port : "6697");
 			user = (user ? user : default_username);
 			real = (real ? real : default_realname);
 
@@ -1047,14 +1043,36 @@ io_cb_read_inp(char *buf, size_t len)
 void
 io_cb_read_soc(char *buf, size_t len, const void *cb_obj)
 {
-	struct channel *c = ((struct server *)cb_obj)->channel;
+	struct server *s = (struct server *)cb_obj;
+	struct channel *c = s->channel;
+	size_t ci = s->read.i;
+	size_t n = len;
 
-	struct irc_message m;
+	for (size_t i = 0; i < n; i++) {
 
-	if (!(irc_message_parse(&m, buf, len)))
-		newlinef(c, 0, "-!!-", "failed to parse message");
-	else
-		irc_recv((struct server *)cb_obj, &m);
+		char cc = buf[i];
 
-	redraw();
+		if (ci && cc == '\n' && ((i && buf[i - 1] == '\r') || (!i && s->read.cl == '\r'))) {
+
+			s->read.buf[ci] = 0;
+
+			debug(" recv: (%zu) %s", ci, s->read.buf);
+
+			struct irc_message m;
+
+			if (!(irc_message_parse(&m, s->read.buf, ci)))
+				newlinef(c, 0, "-!!-", "failed to parse message");
+			else
+				irc_recv(s, &m);
+
+			redraw();
+
+			ci = 0;
+		} else if (ci < IRC_MESSAGE_LEN && (isprint(cc) || cc == 0x01)) {
+			s->read.buf[ci++] = cc;
+		}
+	}
+
+	s->read.cl = buf[n - 1];
+	s->read.i = ci;
 }

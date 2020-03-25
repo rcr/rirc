@@ -10,6 +10,8 @@
 #include "src/io.h"
 #include "src/state.h"
 
+#define MAX_CLI_SERVERS 16
+
 #define arg_error(...) \
 	do { fprintf(stderr, "%s: ", runtime_name); \
 	     fprintf(stderr, __VA_ARGS__); \
@@ -25,6 +27,12 @@ static int parse_args(int, char**);
 const char *runtime_name = "rirc";
 #else
 const char *runtime_name = "rirc.debug";
+#endif
+
+#ifdef CA_CERT_PATH
+const char *ca_cert_path = CA_CERT_PATH;
+#else
+#error "CA_CERT_PATH required"
 #endif
 
 #ifndef DEFAULT_NICK_SET
@@ -139,7 +147,7 @@ parse_args(int argc, char **argv)
 		const char *username;
 		const char *realname;
 		struct server *s;
-	} cli_servers[IO_MAX_CONNECTIONS];
+	} cli_servers[MAX_CLI_SERVERS];
 
 	/* FIXME: getopt_long is a GNU extension */
 	while (0 < (opt_c = getopt_long(argc, argv, ":s:p:w:n:c:r:u:hv", long_opts, &opt_i))) {
@@ -151,11 +159,11 @@ parse_args(int argc, char **argv)
 				if (*optarg == '-')
 					arg_error("-s/--server requires an argument");
 
-				if (++n_servers == IO_MAX_CONNECTIONS)
-					arg_error("exceeded maximum number of servers (%d)", IO_MAX_CONNECTIONS);
+				if (++n_servers == MAX_CLI_SERVERS)
+					arg_error("exceeded maximum number of servers (%d)", MAX_CLI_SERVERS);
 
 				cli_servers[n_servers - 1].host = optarg;
-				cli_servers[n_servers - 1].port = "6667";
+				cli_servers[n_servers - 1].port = "6697";
 				cli_servers[n_servers - 1].pass = NULL;
 				cli_servers[n_servers - 1].nicks = NULL;
 				cli_servers[n_servers - 1].chans = NULL;
@@ -233,6 +241,7 @@ parse_args(int argc, char **argv)
 		default_realname = getpwuid_pw_name();
 
 	state_init();
+	draw_init();
 
 	for (size_t i = 0; i < n_servers; i++) {
 
@@ -260,6 +269,8 @@ parse_args(int argc, char **argv)
 		channel_set_current(s->channel);
 	}
 
+	io_init();
+
 	for (size_t i = 0; i < n_servers; i++)
 		io_cx(cli_servers[i].s->connection);
 
@@ -273,8 +284,7 @@ main(int argc, char **argv)
 	int ret;
 
 	if ((ret = parse_args(argc, argv)) == 0) {
-		draw_init();
-		io_init();
+		io_start();
 		draw_term();
 		state_term();
 	}

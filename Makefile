@@ -3,24 +3,33 @@
 VERSION := 0.1.2
 
 # Release and debug build executable names
-EXE_R := rirc
-EXE_D := rirc.debug
+BIN_R := rirc
+BIN_D := rirc.debug
 
 # Install paths
-EXE_DIR = /usr/local/bin
+BIN_DIR = /usr/local/bin
 MAN_DIR = /usr/local/share/man/man1
 
 STDS := \
- -std=c99 \
- -D_POSIX_C_SOURCE=200112L \
- -D_DARWIN_C_SOURCE=200112L \
- -D_BSD_VISIBLE=1
+ -std=c17 \
+ -D_BSD_VISIBLE \
+ -D_DARWIN_C_SOURCE \
+ -D_POSIX_C_SOURCE=200809L
+
+TLS_INCLUDE := \
+ -I./mbedtls/include \
+ -I./mbedtls/crypto/include
+
+TLS_LIBS := \
+ ./mbedtls/library/libmbedtls.a \
+ ./mbedtls/library/libmbedx509.a \
+ ./mbedtls/crypto/library/libmbedcrypto.a
 
 CC := cc
 PP := cc -E
-CFLAGS   := $(CC_EXT) -I. $(STDS) -DVERSION=\"$(VERSION)\" -Wall -Wextra -pedantic -O2 -flto
-CFLAGS_D := $(CC_EXT) -I. $(STDS) -DVERSION=\"$(VERSION)\" -Wall -Wextra -pedantic -O0 -g -DDEBUG
-LDFLAGS  := $(LD_EXT) -pthread
+CFLAGS   := $(CC_EXT) -I. $(TLS_INCLUDE) $(STDS) -DVERSION=\"$(VERSION)\" -Wall -Wextra -pedantic -O2 -flto
+CFLAGS_D := $(CC_EXT) -I. $(TLS_INCLUDE) $(STDS) -DVERSION=\"$(VERSION)\" -Wall -Wextra -pedantic -O0 -g -DDEBUG
+LDFLAGS  := $(LD_EXT) -lpthread
 
 # Build, source, test source directories
 DIR_B := bld
@@ -43,14 +52,14 @@ OBJS_T += $(DIR_B)/utils/tree.t # Header only file
 OBJS_G := $(patsubst %.gperf, %.gperf.out, $(SRC_G))
 
 # Release build executable
-$(EXE_R): $(DIR_B) $(OBJS_G) $(OBJS_R)
+$(BIN_R): $(DIR_B) $(OBJS_G) $(OBJS_R)
 	@echo cc $@
-	@$(CC) $(LDFLAGS) -o $@ $(OBJS_R)
+	@$(CC) $(LDFLAGS) -o $@ $(OBJS_R) $(TLS_LIBS)
 
 # Debug build executable
-$(EXE_D): $(DIR_B) $(OBJS_G) $(OBJS_D)
+$(BIN_D): $(DIR_B) $(OBJS_G) $(OBJS_D)
 	@echo cc $@
-	@$(CC) $(LDFLAGS) -o $@ $(OBJS_D)
+	@$(CC) $(LDFLAGS) -o $@ $(OBJS_D) $(TLS_LIBS)
 
 # Release build objects
 $(DIR_B)/%.o: $(DIR_S)/%.c
@@ -79,24 +88,24 @@ $(DIR_B):
 	@for dir in $(patsubst $(DIR_S)/%, %, $(SUBDIRS)); do mkdir -p $(DIR_B)/$$dir; done
 
 clean:
-	rm -rf $(DIR_B) $(EXE_R) $(EXE_D)
+	rm -rf $(DIR_B) $(BIN_R) $(BIN_D)
 	find . -name "*gperf.out" -print0 | xargs -0 -I % rm %
 
-install: $(EXE_R)
-	@echo installing executable to $(EXE_DIR)
+install: $(BIN_R)
+	@echo installing executable to $(BIN_DIR)
 	@echo installing manual page to $(MAN_DIR)
-	@mkdir -p $(EXE_DIR)
+	@mkdir -p $(BIN_DIR)
 	@mkdir -p $(MAN_DIR)
-	@cp -f rirc $(EXE_DIR)
-	@chmod 755 $(EXE_DIR)/rirc
+	@cp -f rirc $(BIN_DIR)
+	@chmod 755 $(BIN_DIR)/rirc
 	@sed "s/VERSION/$(VERSION)/g" < rirc.1 > $(MAN_DIR)/rirc.1
 
 uninstall:
-	rm -f $(EXE_DIR)/rirc
+	rm -f $(BIN_DIR)/rirc
 	rm -f $(MAN_DIR)/rirc.1
 
-all:   $(EXE_R)
-debug: $(EXE_D)
+all:   $(BIN_R)
+debug: $(BIN_D)
 test:  $(DIR_B) $(OBJS_G) $(OBJS_T)
 
 -include $(OBJS_R:.o=.d)

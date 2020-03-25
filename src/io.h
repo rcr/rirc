@@ -69,10 +69,9 @@
  *   t(n) = t(n - 1) * factor
  *   t(0) = base
  *
- * Calling io_init starts the io context and doesn't return until io_term
+ * Calling io_start starts the io context and doesn't return until after
+ * a call to io_stop
  */
-
-#define IO_MAX_CONNECTIONS 8
 
 struct connection;
 
@@ -86,8 +85,8 @@ enum io_sig_t
 enum io_cb_t
 {
 	IO_CB_INVALID,
-	IO_CB_CXED,   /* <const char *fmt>, [args, ...] */
-	IO_CB_DXED,   /* <const char *fmt>, [args, ...] */
+	IO_CB_CXED,   /* no args */
+	IO_CB_DXED,   /* no args */
 	IO_CB_ERR,    /* <const char *fmt>, [args, ...] */
 	IO_CB_INFO,   /* <const char *fmt>, [args, ...] */
 	IO_CB_PING_0, /* <unsigned ping> */
@@ -103,7 +102,7 @@ struct connection* connection(
 	const char*,  /* host */
 	const char*); /* port */
 
-void io_free(struct connection*);
+void connection_free(struct connection*);
 
 /* Explicit direction of net state */
 int io_cx(struct connection*);
@@ -112,16 +111,10 @@ int io_dx(struct connection*);
 /* Formatted write to connection */
 int io_sendf(struct connection*, const char*, ...);
 
-/* IO state callback */
-void io_cb(enum io_cb_t, const void*, ...);
-
-/* IO data callback */
-void io_cb_read_inp(char*, size_t);
-void io_cb_read_soc(char*, size_t, const void*);
-
-/* Start/stop IO context */
+/* Init/start/stop IO context */
 void io_init(void);
-void io_term(void);
+void io_start(void);
+void io_stop(void);
 
 /* Get tty dimensions */
 unsigned io_tty_cols(void);
@@ -129,5 +122,12 @@ unsigned io_tty_rows(void);
 
 /* IO error string */
 const char* io_err(int);
+
+/* IO state callback */
+void io_cb(enum io_cb_t, const void*, ...);
+
+/* IO data callback */
+void io_cb_read_inp(char*, size_t);
+void io_cb_read_soc(char*, size_t, const void*);
 
 #endif

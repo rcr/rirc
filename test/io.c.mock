@@ -12,5 +12,7 @@ int io_dx(struct connection *c) { UNUSED(c); return 0; }
 int io_sendf(struct connection *c, const char *f, ...) { UNUSED(c); UNUSED(f); return 0; }
 unsigned io_tty_cols(void) { return 0; }
 unsigned io_tty_rows(void) { return 0; }
-void io_free(struct connection *c) { UNUSED(c); }
-void io_term(void) { ; }
+void connection_free(struct connection *c) { UNUSED(c); }
+void io_stop(void) { ; }
+void io_start(void) { ; }
+void io_init(void) { ; }

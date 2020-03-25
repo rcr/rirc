@@ -6,6 +6,9 @@
 #include "src/components/mode.h"
 #include "src/utils/utils.h"
 
+// TODO: move this to utils
+#define IRC_MESSAGE_LEN 510
+
 struct server
 {
 	const char *host;
@@ -33,6 +36,12 @@ struct server
 	unsigned ping;
 	unsigned quitting : 1;
 	void *connection;
+	// TODO: move this to utils
+	struct {
+		size_t i;
+		char cl;
+		char buf[IRC_MESSAGE_LEN + 1]; /* callback message buffer */
+	} read;
 };
 
 struct server_list
