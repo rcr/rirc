@@ -31,7 +31,7 @@ rirc supports only TLS connections, the default port is 6697
 
 ## Configuring:
 
-Configure rirc by editing `config.h`
+Configure rirc by editing `config.h`. Defaults are in `config.def.h`
 
 ## Building:
 rirc requires the latest version of GNU gperf to compile.

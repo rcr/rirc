@@ -61,13 +61,13 @@ $(BIN_D): $(DIR_B) $(OBJS_G) $(OBJS_D)
 	@$(CC) $(LDFLAGS) -o $@ $(OBJS_D) $(TLS_LIBS)
 
 # Release build objects
-$(DIR_B)/%.o: $(DIR_S)/%.c
+$(DIR_B)/%.o: $(DIR_S)/%.c config.h
 	@echo "cc $<..."
 	@$(PP) $(CFLAGS) -MM -MP -MT $@ -MF $(@:.o=.d) $<
 	@$(CC) $(CFLAGS) -c -o $@ $<
 
 # Debug build objects
-$(DIR_B)/%.db.o: $(DIR_S)/%.c
+$(DIR_B)/%.db.o: $(DIR_S)/%.c config.h
 	@echo "cc $<..."
 	@$(PP) $(CFLAGS_D) -MM -MP -MT $@ -MF $(@:.o=.d) $<
 	@$(CC) $(CFLAGS_D) -c -o $@ $<
@@ -86,6 +86,9 @@ $(DIR_B)/%.t: $(DIR_T)/%.c
 # Build directories
 $(DIR_B):
 	@for dir in $(patsubst $(DIR_S)/%, %, $(SUBDIRS)); do mkdir -p $(DIR_B)/$$dir; done
+
+config.h:
+	cp config.def.h config.h
 
 clean:
 	rm -rf $(DIR_B) $(BIN_R) $(BIN_D)
