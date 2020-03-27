@@ -807,10 +807,9 @@ static void
 command(struct channel *c, char *buf)
 {
 	const char *cmnd;
-	char *saveptr;
 	int err;
 
-	if (!(cmnd = strtok_r(buf, " ", &saveptr))) {
+	if (!(cmnd = strsep(&buf))) {
 		newline(c, 0, "-!!-", "Messages beginning with ':' require a command");
 		return;
 	}
@@ -821,11 +820,11 @@ command(struct channel *c, char *buf)
 
 	if (!strcasecmp(cmnd, "connect")) {
 		// TODO: parse --args
-		const char *host = strtok_r(NULL, " ", &saveptr);
-		const char *port = strtok_r(NULL, " ", &saveptr);
-		const char *pass = strtok_r(NULL, " ", &saveptr);
-		const char *user = strtok_r(NULL, " ", &saveptr);
-		const char *real = strtok_r(NULL, " ", &saveptr);
+		const char *host = strsep(&buf);
+		const char *port = strsep(&buf);
+		const char *pass = strsep(&buf);
+		const char *user = strsep(&buf);
+		const char *real = strsep(&buf);
 		const char *help = ":connect [host [port] [pass] [user] [real]]";
 		struct server *s;
 
@@ -1060,7 +1059,7 @@ io_cb_read_soc(char *buf, size_t len, const void *cb_obj)
 
 			struct irc_message m;
 
-			if (!(irc_message_parse(&m, s->read.buf, ci)))
+			if (!(irc_message_parse(&m, s->read.buf)))
 				newlinef(c, 0, "-!!-", "failed to parse message");
 			else
 				irc_recv(s, &m);

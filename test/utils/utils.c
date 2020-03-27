@@ -12,7 +12,7 @@ test_irc_message_param(void)
 	assert_strcmp(param, (S));
 
 #define CHECK_IRC_MESSAGE_PARSE(M, R) \
-	assert_eq(irc_message_parse(&m, (M), sizeof((M)) - 1), (R));
+	assert_eq(irc_message_parse(&m, (M)), (R));
 
 	/* Test ordinary args */
 	char mesg1[] = ":nick!user@host.domain.tld CMD arg1 arg2 arg3 :trailing arg";
@@ -86,7 +86,7 @@ test_irc_message_parse(void)
 	struct irc_message m;
 
 #define CHECK_IRC_MESSAGE_PARSE(M, R) \
-	assert_eq(irc_message_parse(&m, (M), sizeof((M)) - 1), (R));
+	assert_eq(irc_message_parse(&m, (M)), (R));
 
 	/* Test ordinary message */
 	char mesg1[] = ":nick!user@host.domain.tld CMD args :trailing";
@@ -187,7 +187,7 @@ test_irc_message_split(void)
 	assert_strcmp(param, (S));
 
 #define CHECK_IRC_MESSAGE_PARSE(M, R) \
-	assert_eq(irc_message_parse(&m, (M), sizeof((M)) - 1), (R));
+	assert_eq(irc_message_parse(&m, (M)), (R));
 
 #define CHECK_IRC_MESSAGE_SPLIT(R, P, T) \
 	assert_eq(irc_message_split(&m, &trailing), (R)); \
@@ -450,25 +450,64 @@ test_irc_toupper(void)
 }
 
 static void
-test_str_trim(void)
+test_strsep(void)
+{
+	char *p;
+
+	char mesg1[] = "";
+	char mesg2[] = " ";
+	char mesg3[] = "  ";
+
+	assert_ptr_null(strsep(NULL));
+
+	p = mesg1;
+	assert_ptr_null(strsep(&p));
+
+	p = mesg2;
+	assert_ptr_null(strsep(&p));
+
+	p = mesg3;
+	assert_ptr_null(strsep(&p));
+
+	char mesg4[] = "test1";
+	p = mesg4;
+	assert_strcmp(strsep(&p), "test1");
+	assert_ptr_null(strsep(&p));
+
+	char mesg5[] = "test2 test3";
+	p = mesg5;
+	assert_strcmp(strsep(&p), "test2");
+	assert_strcmp(strsep(&p), "test3");
+	assert_ptr_null(strsep(&p));
+
+	char mesg6[] = "  test4   test5  test6   ";
+	p = mesg6;
+	assert_strcmp(strsep(&p), "test4");
+	assert_strcmp(strsep(&p), "test5");
+	assert_strcmp(strsep(&p), "test6");
+	assert_ptr_null(strsep(&p));
+}
+
+static void
+test_strtrim(void)
 {
 	/* Test skipping space at the begging of a string pointer
 	 * and returning 0 when no non-space character is found */
 
 	char *mesg1 = "testing";
-	assert_eq(str_trim(&mesg1), 1);
+	assert_ptr_eq(strtrim(&mesg1), mesg1);
 	assert_strcmp(mesg1, "testing");
 
 	char *mesg2 = " testing ";
-	assert_eq(str_trim(&mesg2), 1);
+	assert_ptr_eq(strtrim(&mesg2), mesg2);
 	assert_strcmp(mesg2, "testing ");
 
 	char *mesg3 = "";
-	assert_eq(str_trim(&mesg3), 0);
+	assert_ptr_null(strtrim(&mesg3));
 	assert_strcmp(mesg3, "");
 
 	char *mesg4 = " ";
-	assert_eq(str_trim(&mesg4), 0);
+	assert_ptr_null(strtrim(&mesg4));
 	assert_strcmp(mesg4, "");
 }
 
@@ -596,7 +635,8 @@ main(void)
 		TESTCASE(test_irc_strcmp),
 		TESTCASE(test_irc_strncmp),
 		TESTCASE(test_irc_toupper),
-		TESTCASE(test_str_trim),
+		TESTCASE(test_strsep),
+		TESTCASE(test_strtrim),
 		TESTCASE(test_word_wrap)
 	};
 

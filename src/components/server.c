@@ -163,22 +163,21 @@ server_set_004(struct server *s, char *str)
 {
 	/* <server_name> <version> <user_modes> <chan_modes> */
 
-	char *saveptr;
 	const char *server_name; /* Not used */
 	const char *version;     /* Not used */
 	const char *user_modes;  /* Configure server usermodes */
 	const char *chan_modes;  /* Configure server chanmodes */
 
-	if (!(server_name = strtok_r(str, " ", &saveptr)))
+	if (!(server_name = strsep(&str)))
 		server_error(s, "invalid numeric 004: server_name is null");
 
-	if (!(version = strtok_r(NULL, " ", &saveptr)))
+	if (!(version = strsep(&str)))
 		server_error(s, "invalid numeric 004: version is null");
 
-	if (!(user_modes = strtok_r(NULL, " ", &saveptr)))
+	if (!(user_modes = strsep(&str)))
 		server_error(s, "invalid numeric 004: user_modes is null");
 
-	if (!(chan_modes = strtok_r(NULL, " ", &saveptr)))
+	if (!(chan_modes = strsep(&str)))
 		server_error(s, "invalid numeric 004: chan_modes is null");
 
 	if (user_modes) {
@@ -325,7 +324,7 @@ parse_005(struct opt *opt, char **str)
 	opt->arg = NULL;
 	opt->val = NULL;
 
-	if (!str_trim(&p))
+	if (!strtrim(&p))
 		return 0;
 
 	if (!isalnum(*p))

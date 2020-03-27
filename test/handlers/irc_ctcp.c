@@ -241,9 +241,8 @@ test_recv_ctcp_request_ping(void)
 	char m2[] = "\001PING 0\001";
 	char m3[] = "\001PING 1 123 abc 0\001";
 
-	CHECK_REQUEST("nick", "targ", m1, 0,
-		"CTCP PING from nick",
-		"NOTICE nick :\001PING \001");
+	/* empty PING message, do nothing */
+	CHECK_REQUEST("nick", "targ", m1, 0, "", "");
 
 	CHECK_REQUEST("nick", "targ", m2, 0,
 		"CTCP PING from nick",

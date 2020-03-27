@@ -20,6 +20,7 @@
  *   Pointer comparison:
  *    - assert_ptr_eq(expr, expected)
  *    - assert_ptr_null(expr)
+ *    - assert_ptr_not_null(expr)
  *
  *   Assert that the expression exits rirc fatally:
  *    - assert_fatal(expr)
@@ -195,8 +196,15 @@ static void _print_testcase_name_(const char*);
 #define assert_ptr_null(X) \
 	do { \
 		uintptr_t __ret_x = (uintptr_t)(X); \
-		if (__ret_x ) \
+		if (__ret_x) \
 			fail_testf(#X " expected NULL, got '%016" PRIxPTR "'", __ret_x); \
+	} while (0)
+
+#define assert_ptr_not_null(X) \
+	do { \
+		uintptr_t __ret_x = (uintptr_t)(X); \
+		if (!__ret_x) \
+			fail_test(#X " expected not NULL"); \
 	} while (0)
 
 #define assert_fatal(X) \
