@@ -1,7 +1,5 @@
 image: alpine/edge
 
-arch: x86
-
 packages:
   - cmake
   - gperf
