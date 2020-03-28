@@ -29,24 +29,25 @@ static const char* targ_or_type(struct channel*, char*, enum channel_t type);
 int
 irc_send_command(struct server *s, struct channel *c, char *m)
 {
-	char *saveptr;
-	char *command, *p;
+	char *command, *command_args, *p;
 	const struct send_handler *send;
 
 	if (!s)
 		failf(c, "This is not a server");
 
-	if (*m == ' ' || !(command = strtok_r(m, " ", &saveptr)))
+	if (*m == ' ' || !(command = strsep(&m)))
 		failf(c, "Messages beginning with '/' require a command");
 
 	for (p = command; *p; p++)
 		*p = toupper(*p);
 
-	if ((send = send_handler_lookup(command, strlen(command))))
-		return send->f(s, c, saveptr);
+	command_args = strtrim(&m);
 
-	if (str_trim(&saveptr))
-		sendf(s, c, "%s %s", command, saveptr);
+	if ((send = send_handler_lookup(command, strlen(command))))
+		return send->f(s, c, command_args);
+
+	if (strtrim(&command_args))
+		sendf(s, c, "%s %s", command, command_args);
 	else
 		sendf(s, c, "%s", command);
 
@@ -78,10 +79,9 @@ irc_send_privmsg(struct server *s, struct channel *c, char *m)
 static const char*
 targ_or_type(struct channel *c, char *m, enum channel_t type)
 {
-	char *saveptr;
 	const char *targ;
 
-	if ((targ = strtok_r(m, " ", &saveptr)))
+	if ((targ = strsep(&m)))
 		return targ;
 
 	if (c->type == type)
@@ -198,16 +198,15 @@ send_ctcp_version(struct server *s, struct channel *c, char *m)
 static int
 send_notice(struct server *s, struct channel *c, char *m)
 {
-	char *saveptr;
 	const char *targ;
 
-	if (!(targ = strtok_r(m, " ", &saveptr)))
+	if (!(targ = strsep(&m)))
 		failf(c, "Usage: /notice <target> <message>");
 
-	if (*saveptr == 0)
+	if (!m || !*m)
 		failf(c, "Usage: /notice <target> <message>");
 
-	sendf(s, c, "NOTICE %s :%s", targ, saveptr);
+	sendf(s, c, "NOTICE %s :%s", targ, m);
 
 	return 0;
 }
@@ -218,7 +217,7 @@ send_part(struct server *s, struct channel *c, char *m)
 	if (c->type != CHANNEL_T_CHANNEL)
 		failf(c, "This is not a channel");
 
-	if (str_trim(&m))
+	if (strtrim(&m))
 		sendf(s, c, "PART %s :%s", c->name, m);
 	else
 		sendf(s, c, "PART %s :%s", c->name, DEFAULT_PART_MESG);
@@ -229,16 +228,15 @@ send_part(struct server *s, struct channel *c, char *m)
 static int
 send_privmsg(struct server *s, struct channel *c, char *m)
 {
-	char *saveptr;
 	const char *targ;
 
-	if (!(targ = strtok_r(m, " ", &saveptr)))
+	if (!(targ = strsep(&m)))
 		failf(c, "Usage: /privmsg <target> <message>");
 
-	if (*saveptr == 0)
+	if (!m || !*m)
 		failf(c, "Usage: /privmsg <target> <message>");
 
-	sendf(s, c, "PRIVMSG %s :%s", targ, saveptr);
+	sendf(s, c, "PRIVMSG %s :%s", targ, m);
 
 	return 0;
 }
@@ -248,7 +246,7 @@ send_quit(struct server *s, struct channel *c, char *m)
 {
 	s->quitting = 1;
 
-	if (str_trim(&m))
+	if (strtrim(&m))
 		sendf(s, c, "QUIT :%s", m);
 	else
 		sendf(s, c, "QUIT :%s", DEFAULT_PART_MESG);
@@ -262,7 +260,7 @@ send_topic(struct server *s, struct channel *c, char *m)
 	if (c->type != CHANNEL_T_CHANNEL)
 		failf(c, "This is not a channel");
 
-	if (str_trim(&m))
+	if (strtrim(&m))
 		sendf(s, c, "TOPIC %s :%s", c->name, m);
 	else
 		sendf(s, c, "TOPIC %s", c->name);

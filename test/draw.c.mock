@@ -1,4 +1,5 @@
 void draw(union draw d) { UNUSED(d); }
+void draw_init(void) { ; }
 void draw_bell(void) { ; }
 void draw_term(void) { ; }
 void

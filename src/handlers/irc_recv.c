@@ -206,7 +206,7 @@ static const irc_recv_f irc_numerics[] = {
 	[491] = irc_error,  /* ERR_NOOPERHOST */
 	[501] = irc_error,  /* ERR_UMODEUNKNOWNFLAG */
 	[502] = irc_error,  /* ERR_USERSDONTMATCH */
-	[704] = irc_ignore, /* RPL_HELPSTART */
+	[704] = irc_info,   /* RPL_HELPSTART */
 	[705] = irc_info,   /* RPL_HELP */
 	[706] = irc_ignore, /* RPL_ENDOFHELP */
 };
@@ -230,7 +230,7 @@ irc_message(struct server *s, struct irc_message *m, const char *from)
 {
 	char *trailing;
 
-	if (!str_trim(&m->params))
+	if (!strtrim(&m->params))
 		return 0;
 
 	if (irc_message_split(m, &trailing)) {
@@ -481,7 +481,6 @@ irc_353(struct server *s, struct irc_message *m)
 {
 	/* 353 ("="/"*"/"@") <channel> *([ "@" / "+" ]<nick>) */
 
-	char *saveptr;
 	char *chan;
 	char *nick;
 	char *nicks;
@@ -503,7 +502,7 @@ irc_353(struct server *s, struct irc_message *m)
 	if (mode_chanmode_prefix(&(c->chanmodes), &(s->mode_cfg), *type) != MODE_ERR_NONE)
 		newlinef(c, 0, FROM_ERROR, "RPL_NAMEREPLY: invalid channel flag: '%c'", *type);
 
-	if ((nick = strtok_r(nicks, " ", &saveptr))) {
+	if ((nick = strsep(&nicks))) {
 		do {
 			char prefix = 0;
 			struct mode m = MODE_EMPTY;
@@ -517,7 +516,7 @@ irc_353(struct server *s, struct irc_message *m)
 			if (user_list_add(&(c->users), s->casemapping, nick, m) == USER_ERR_DUPLICATE)
 				newlinef(c, 0, FROM_ERROR, "Duplicate nick: '%s'", nick);
 
-		} while ((nick = strtok_r(NULL, " ", &saveptr)));
+		} while ((nick = strsep(&nicks)));
 	}
 
 	draw_status();

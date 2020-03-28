@@ -27,19 +27,31 @@
 # rirc
 A minimalistic irc client written in C.
 
-While still under development, it currently supports many
-features which you would expect from a basic irc client.
+rirc supports only TLS connections, the default port is 6697
+
+## Configuring:
+
+Configure rirc by editing `config.h`. Defaults are in `config.def.h`
 
 ## Building:
 rirc requires the latest version of GNU gperf to compile.
 
 See: https://www.gnu.org/software/gperf/
 
+Initialize, configure and build mbedtls:
+
+    git submodule init
+    git submodule update --recursive
+    cd mbedtls
+    ./scripts/config.pl set MBEDTLS_THREADING_C
+    ./scripts/config.pl set MBEDTLS_THREADING_PTHREAD
+    cmake .
+    cmake --build .
+    cd ..
+
+Build rirc:
+
     make
-
-Or
-
-    make debug
 
 ## Installing:
 Default install path:
@@ -54,11 +66,11 @@ Edit `Makefile` to alter install path if needed, then:
 ## Usage:
 
     rirc [-hv] [-s server [-p port] [-w pass] [-u user] [-r real] [-n nicks] [-c chans]], ...]
-    
+
     Help:
       -h, --help      Print this message and exit
       -v, --version   Print rirc version and exit
-    
+
     Options:
       -s, --server=SERVER       Connect to SERVER
       -p, --port=PORT           Connect to SERVER using PORT
@@ -70,10 +82,11 @@ Edit `Makefile` to alter install path if needed, then:
 
 Commands:
 
-      :quit
       :clear
       :close
       :connect [host [port] [pass] [user] [real]]
+      :disconnect
+      :quit
 
 Keys:
 

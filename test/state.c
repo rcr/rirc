@@ -69,8 +69,6 @@ test_state(void)
 	assert_ptr_eq(server_list_add(state_server_list(), s1), NULL);
 	assert_ptr_eq(server_list_add(state_server_list(), s2), NULL);
 	assert_ptr_eq(server_list_add(state_server_list(), s3), NULL);
-
-	state_term();
 }
 
 int

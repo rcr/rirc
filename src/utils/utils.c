@@ -9,64 +9,6 @@
 
 static inline int irc_toupper(enum casemapping_t, int);
 
-char*
-strdup(const char *str)
-{
-	return memdup(str, strlen(str) + 1);
-}
-
-void*
-memdup(const void *mem, size_t len)
-{
-	void *ret;
-
-	if ((ret = malloc(len)) == NULL)
-		fatal("malloc: %s", strerror(errno));
-
-	memcpy(ret, mem, len);
-
-	return ret;
-}
-
-int
-str_trim(char **str)
-{
-	char *p;
-
-	for (p = *str; *p && *p == ' '; p++)
-		;
-
-	*str = p;
-
-	return !!*p;
-}
-
-static inline int
-irc_toupper(enum casemapping_t casemapping, int c)
-{
-	/* RFC 2812, section 2.2
-	 *
-	 * Because of IRC's Scandinavian origin, the characters {}|^ are
-	 * considered to be the lower case equivalents of the characters []\~,
-	 * respectively. This is a critical issue when determining the
-	 * equivalence of two nicknames or channel names. */
-
-	switch (casemapping) {
-		case CASEMAPPING_RFC1459:
-			if (c == '^') return '~';
-			/* FALLTHROUGH */
-		case CASEMAPPING_STRICT_RFC1459:
-			if (c == '{') return '[';
-			if (c == '}') return ']';
-			if (c == '|') return '\\';
-			/* FALLTHROUGH */
-		case CASEMAPPING_ASCII:
-			return (c >= 'a' && c <= 'z') ? (c + 'A' - 'a') : c;
-		default:
-			fatal("Unknown CASEMAPPING");
-	}
-}
-
 int
 irc_isnickchar(char c, int first)
 {
@@ -208,7 +150,7 @@ irc_message_param(struct irc_message *m, char **param)
 	if (m->params == NULL)
 		return 0;
 
-	if (!str_trim(&m->params))
+	if (!strtrim(&m->params))
 		return 0;
 
 	if (!m->split && m->n_params >= 14) {
@@ -237,7 +179,7 @@ irc_message_param(struct irc_message *m, char **param)
 }
 
 int
-irc_message_parse(struct irc_message *m, char *buf, size_t len)
+irc_message_parse(struct irc_message *m, char *buf)
 {
 	/* RFC 2812, section 2.3.1
 	 *
@@ -256,11 +198,9 @@ irc_message_parse(struct irc_message *m, char *buf, size_t len)
 	 * crlf       =   %x0D %x0A   ; "carriage return" "linefeed"
 	 */
 
-	UNUSED(len);
-
 	memset(m, 0, sizeof(*m));
 
-	if (!str_trim(&buf))
+	if (!strtrim(&buf))
 		return 0;
 
 	if (*buf == ':') {
@@ -297,7 +237,7 @@ irc_message_parse(struct irc_message *m, char *buf, size_t len)
 			*buf++ = 0;
 	}
 
-	if (!str_trim(&buf))
+	if (!strtrim(&buf))
 		return 0;
 
 	m->command = buf;
@@ -310,7 +250,7 @@ irc_message_parse(struct irc_message *m, char *buf, size_t len)
 	if (*buf == ' ')
 		*buf++ = 0;
 
-	if (str_trim(&buf))
+	if (strtrim(&buf))
 		m->params = buf;
 
 	return 1;
@@ -378,6 +318,53 @@ irc_message_split(struct irc_message *m, char **trailing)
 }
 
 char*
+strdup(const char *str)
+{
+	return memdup(str, strlen(str) + 1);
+}
+
+char*
+strsep(char **str)
+{
+	char *p;
+	char *ret;
+
+	if (str == NULL || (p = *str) == NULL)
+		return NULL;
+
+	if ((ret = strtrim(&p)) == NULL)
+		return NULL;
+
+	while (*p && *p != ' ')
+		p++;
+
+	if (*p) {
+		*p = 0;
+		*str = (p + 1);
+	} else {
+		*str = NULL;
+	}
+
+	return *ret ? ret : NULL;
+}
+
+char*
+strtrim(char **str)
+{
+	char *p;
+
+	if (*str == NULL)
+		return NULL;
+
+	for (p = *str; *p && *p == ' '; p++)
+		;
+
+	*str = p;
+
+	return *p ? p : NULL;
+}
+
+char*
 word_wrap(int n, char **str, char *end)
 {
 	/* Greedy word wrap algorithm.
@@ -435,4 +422,43 @@ word_wrap(int n, char **str, char *end)
 	*str = tmp;
 
 	return ret;
+}
+
+void*
+memdup(const void *mem, size_t len)
+{
+	void *ret;
+
+	if ((ret = malloc(len)) == NULL)
+		fatal("malloc: %s", strerror(errno));
+
+	memcpy(ret, mem, len);
+
+	return ret;
+}
+
+static inline int
+irc_toupper(enum casemapping_t casemapping, int c)
+{
+	/* RFC 2812, section 2.2
+	 *
+	 * Because of IRC's Scandinavian origin, the characters {}|^ are
+	 * considered to be the lower case equivalents of the characters []\~,
+	 * respectively. This is a critical issue when determining the
+	 * equivalence of two nicknames or channel names. */
+
+	switch (casemapping) {
+		case CASEMAPPING_RFC1459:
+			if (c == '^') return '~';
+			/* FALLTHROUGH */
+		case CASEMAPPING_STRICT_RFC1459:
+			if (c == '{') return '[';
+			if (c == '}') return ']';
+			if (c == '|') return '\\';
+			/* FALLTHROUGH */
+		case CASEMAPPING_ASCII:
+			return (c >= 'a' && c <= 'z') ? (c + 'A' - 'a') : c;
+		default:
+			fatal("Unknown CASEMAPPING");
+	}
 }

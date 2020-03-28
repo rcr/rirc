@@ -1,0 +1,54 @@
+image: archlinux
+
+packages:
+  - cmake
+  - curl
+  - gperf
+  - perl
+  - unzip
+
+sources:
+  - https://git.sr.ht/~rcr/rirc
+
+environment:
+  SONAR_VER: 4.2.0.1873
+
+secrets:
+  - 3f03ec26-5538-4843-b43c-aea06c080cc2
+
+tasks:
+  - setup: |
+      cd rirc
+      git submodule init
+      git submodule update --recursive
+      cd mbedtls
+      ./scripts/config.pl set MBEDTLS_THREADING_C
+      ./scripts/config.pl set MBEDTLS_THREADING_PTHREAD
+      cmake .
+      cmake --build .
+  - build: |
+      cd rirc
+      make rirc
+      make debug
+      make test
+  - static-analysis: |
+      cd rirc
+      branch=$(git name-rev --name-only HEAD)
+      [ $branch = "remotes/origin/static_analysis" ] || complete-build
+      curl -o build-wrapper.zip https://sonarcloud.io/static/cpp/build-wrapper-linux-x86.zip
+      curl -o sonar-scanner.zip https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-$SONAR_VER-linux.zip
+      unzip build-wrapper.zip
+      unzip sonar-scanner.zip
+      ./scripts/coverage.sh
+      echo >> sonar-project.properties "sonar.branch.name=$branch"
+      echo >> sonar-project.properties "sonar.cfamily.build-wrapper-output=bw-output"
+      echo >> sonar-project.properties "sonar.cfamily.gcov.reportsPath=."
+      echo >> sonar-project.properties "sonar.coverage.exclusions=test"
+      echo >> sonar-project.properties "sonar.host.url=https://sonarcloud.io"
+      echo >> sonar-project.properties "sonar.organization=rcr-github"
+      echo >> sonar-project.properties "sonar.projectKey=rcr_rirc"
+      echo >> sonar-project.properties "sonar.sources=src"
+      echo >> sonar-project.properties "sonar.tests=test"
+      cat ~/sonarcloud-login >> sonar-project.properties
+      ./build-wrapper-linux-x86/build-wrapper-linux-x86-64 --out-dir bw-output make clean debug test
+      ./sonar-scanner-$SONAR_VER-linux/bin/sonar-scanner

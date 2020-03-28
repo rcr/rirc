@@ -4,14 +4,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#define TO_STR(X) #X
-#define STR(X) TO_STR(X)
-
 #define MAX(A, B) ((A) > (B) ? (A) : (B))
 #define MIN(A, B) ((A) > (B) ? (B) : (A))
 
 #define ELEMS(X) (sizeof((X)) / sizeof((X)[0]))
 #define ARR_ELEM(A, E) ((E) >= 0 && (size_t)(E) < ELEMS((A)))
+
+#define SEC_IN_MS(X) ((X) * 1000)
+#define SEC_IN_US(X) ((X) * 1000 * 1000)
 
 #define UNUSED(X) ((void)(X))
 
@@ -56,10 +56,6 @@ struct irc_message
 	unsigned split : 1;
 };
 
-int irc_message_param(struct irc_message*, char**);
-int irc_message_parse(struct irc_message*, char*, size_t);
-int irc_message_split(struct irc_message*, char**);
-
 int irc_ischan(const char*);
 int irc_ischanchar(char, int);
 int irc_isnick(const char*);
@@ -68,9 +64,14 @@ int irc_pinged(enum casemapping_t, const char*, const char*);
 int irc_strcmp(enum casemapping_t, const char*, const char*);
 int irc_strncmp(enum casemapping_t, const char*, const char*, size_t);
 
-int str_trim(char**);
-char* word_wrap(int, char**, char*);
+int irc_message_param(struct irc_message*, char**);
+int irc_message_parse(struct irc_message*, char*);
+int irc_message_split(struct irc_message*, char**);
+
 char* strdup(const char*);
+char* strsep(char**);
+char* strtrim(char**);
+char* word_wrap(int, char**, char*);
 void* memdup(const void*, size_t);
 
 #endif

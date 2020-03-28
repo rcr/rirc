@@ -23,6 +23,8 @@ rirc \- a minimalistic irc client written in C
 .P
 rirc is a lightweight Internet Relay Chat client.
 .P
+rirc only supports TLS connections, the default port is 6697
+.P
 Customization of rirc can be accomplished by editing the
 .I config.h
 file and (re)compiling the source code.
@@ -112,6 +114,7 @@ Commands:
   :clear;
   :close;
   :connect;[host [port] [pass] [user] [real]]
+  :disconnect
   :quit;
 .TE
 
@@ -144,10 +147,7 @@ See the
 file in the source directory for the terms of redistribution.
 .SH SEE ALSO
 See
-.UR http://rcr.io/rirc/
+.UR
+http://rcr.io/rirc/
 .UE
 for additional documentation.
-.SH BUGS
-See the
-.I TODO
-file in the source directory for current known issues.

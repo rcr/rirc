@@ -4,12 +4,11 @@ set -e
 
 CDIR="coverage"
 
-ENV=""
-ENV="$ENV CC=\"gcc\""
-ENV="$ENV CC_EXT=\"-fprofile-arcs -ftest-coverage\""
-ENV="$ENV LD_EXT=\"-fprofile-arcs\""
+export CC=gcc
+export CC_EXT=-"fprofile-arcs -ftest-coverage"
+export LD_EXT=-"fprofile-arcs"
 
-eval $ENV make -e clean test
+make -e clean test
 
 rm -rf $CDIR
 mkdir -p $CDIR
