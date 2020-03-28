@@ -5,20 +5,20 @@
 ---
 
 <p align="center">
-  <a href="https://sonarcloud.io/dashboard?id=rcr_rirc">
-    <img alt="sonarcloud" src="https://sonarcloud.io/api/project_badges/measure?project=rcr_rirc&metric=ncloc"/>
+  <a href="https://sonarcloud.io/dashboard?id=rirc">
+    <img alt="sonarcloud" src="https://sonarcloud.io/api/project_badges/measure?project=rirc&metric=ncloc"/>
   </a>
   <a href="https://scan.coverity.com/projects/4940">
     <img alt="coverity" src="https://scan.coverity.com/projects/4940/badge.svg"/>
   </a>
-  <a href="https://sonarcloud.io/dashboard?id=rcr_rirc">
-    <img alt="sonarcloud" src="https://sonarcloud.io/api/project_badges/measure?project=rcr_rirc&metric=sqale_rating"/>
+  <a href="https://sonarcloud.io/dashboard?id=rirc">
+    <img alt="sonarcloud" src="https://sonarcloud.io/api/project_badges/measure?project=rirc&metric=sqale_rating"/>
   </a>
-  <a href="https://sonarcloud.io/dashboard?id=rcr_rirc">
-    <img alt="sonarcloud" src="https://sonarcloud.io/api/project_badges/measure?project=rcr_rirc&metric=reliability_rating"/>
+  <a href="https://sonarcloud.io/dashboard?id=rirc">
+    <img alt="sonarcloud" src="https://sonarcloud.io/api/project_badges/measure?project=rirc&metric=reliability_rating"/>
   </a>
-  <a href="https://sonarcloud.io/dashboard?id=rcr_rirc">
-    <img alt="sonarcloud" src="https://sonarcloud.io/api/project_badges/measure?project=rcr_rirc&metric=security_rating"/>
+  <a href="https://sonarcloud.io/dashboard?id=rirc">
+    <img alt="sonarcloud" src="https://sonarcloud.io/api/project_badges/measure?project=rirc&metric=security_rating"/>
   </a>
 </p>
 
