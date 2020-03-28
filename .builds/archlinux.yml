@@ -1,4 +1,4 @@
-image: alpine/edge
+image: archlinux
 
 packages:
   - cmake
@@ -14,7 +14,7 @@ environment:
   SONAR_VER: 4.2.0.1873
 
 secrets:
-  - 474b45b2-a37b-460d-878a-d17c79a4677f
+  - 3f03ec26-5538-4843-b43c-aea06c080cc2
 
 tasks:
   - setup: |
@@ -32,9 +32,9 @@ tasks:
       make debug
       make test
   - static-analysis: |
-      branch=$(git name-rev --name-only HEAD)
-      [ ! $branch = "remotes/origin/static_analysis" ] || complete-build
       cd rirc
+      branch=$(git name-rev --name-only HEAD)
+      [ $branch = "remotes/origin/static_analysis" ] || complete-build
       curl -o build-wrapper.zip https://sonarcloud.io/static/cpp/build-wrapper-linux-x86.zip
       curl -o sonar-scanner.zip https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-$SONAR_VER-linux.zip
       unzip build-wrapper.zip
