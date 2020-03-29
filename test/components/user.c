@@ -70,7 +70,7 @@ test_user_list(void)
 	assert_eq(user_list_rpl(&ulist, CASEMAPPING_RFC1459, "ccc", "ddd"), USER_ERR_NONE);
 
 	if ((u4 = user_list_get(&ulist, CASEMAPPING_RFC1459, "ddd", 0)) == NULL)
-		test_abort("Failed to retrieve u4 by prefix");
+		test_abort("Failed to retrieve u4");
 
 	assert_eq(u4->prfxmodes.lower, 0x123);
 	assert_eq(u4->prfxmodes.upper, 0x456);

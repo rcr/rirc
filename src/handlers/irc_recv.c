@@ -6,6 +6,7 @@
 #include "src/handlers/irc_ctcp.h"
 #include "src/handlers/irc_recv.gperf.out"
 #include "src/handlers/irc_recv.h"
+#include "src/handlers/ircv3.h"
 #include "src/io.h"
 #include "src/state.h"
 #include "src/utils/utils.h"
@@ -55,7 +56,7 @@ static int irc_353(struct server*, struct irc_message*);
 static int irc_433(struct server*, struct irc_message*);
 
 static int irc_recv_numeric(struct server*, struct irc_message*);
-static int recv_mode_chanmodes(struct irc_message*, const struct mode_cfg*, struct channel*);
+static int recv_mode_chanmodes(struct irc_message*, const struct mode_cfg*, struct server*, struct channel*);
 static int recv_mode_usermodes(struct irc_message*, const struct mode_cfg*, struct server*);
 
 static const unsigned quit_threshold = QUIT_THRESHOLD;
@@ -349,7 +350,7 @@ irc_324(struct server *s, struct irc_message *m)
 	if ((c = channel_list_get(&s->clist, chan, s->casemapping)) == NULL)
 		failf(s, "RPL_CHANNELMODEIS: channel '%s' not found", chan);
 
-	return recv_mode_chanmodes(m, &(s->mode_cfg), c);
+	return recv_mode_chanmodes(m, &(s->mode_cfg), s, c);
 }
 
 static int
@@ -507,11 +508,13 @@ irc_353(struct server *s, struct irc_message *m)
 			char prefix = 0;
 			struct mode m = MODE_EMPTY;
 
-			if (!irc_isnickchar(*nick, 1))
+			while (!irc_isnickchar(*nick, 1)) {
+
 				prefix = *nick++;
 
-			if (prefix && mode_prfxmode_prefix(&m, &(s->mode_cfg), prefix) != MODE_ERR_NONE)
-				newlinef(c, 0, FROM_ERROR, "Invalid user prefix: '%c'", prefix);
+				if (mode_prfxmode_prefix(&m, &(s->mode_cfg), prefix) != MODE_ERR_NONE)
+					newlinef(c, 0, FROM_ERROR, "Invalid user prefix: '%c'", prefix);
+			}
 
 			if (user_list_add(&(c->users), s->casemapping, nick, m) == USER_ERR_DUPLICATE)
 				newlinef(c, 0, FROM_ERROR, "Duplicate nick: '%s'", nick);
@@ -588,6 +591,12 @@ irc_recv_numeric(struct server *s, struct irc_message *m)
 		failf(s, "Numeric type '%u' unknown: %s", code, m->params);
 	else
 		failf(s, "Numeric type '%u' unknown", code);
+}
+
+static int
+recv_cap(struct server *s, struct irc_message *m)
+{
+	return irc_recv_ircv3(s, m);
 }
 
 static int
@@ -764,13 +773,13 @@ recv_mode(struct server *s, struct irc_message *m)
 		return recv_mode_usermodes(m, &(s->mode_cfg), s);
 
 	if ((c = channel_list_get(&s->clist, targ, s->casemapping)))
-		return recv_mode_chanmodes(m, &(s->mode_cfg), c);
+		return recv_mode_chanmodes(m, &(s->mode_cfg), s, c);
 
 	failf(s, "MODE: target '%s' not found", targ);
 }
 
 static int
-recv_mode_chanmodes(struct irc_message *m, const struct mode_cfg *cfg, struct channel *c)
+recv_mode_chanmodes(struct irc_message *m, const struct mode_cfg *cfg, struct server *s, struct channel *c)
 {
 	char flag;
 	char *modestring;
@@ -779,6 +788,8 @@ recv_mode_chanmodes(struct irc_message *m, const struct mode_cfg *cfg, struct ch
 	enum mode_set_t mode_set;
 	struct mode *chanmodes = &(c->chanmodes);
 	struct user *user;
+
+	// TODO: mode string segfaults if args out of order
 
 	if (!irc_message_param(m, &modestring)) {
 		newlinef(c, 0, FROM_ERROR, "MODE: modestring is null");
@@ -849,7 +860,7 @@ recv_mode_chanmodes(struct irc_message *m, const struct mode_cfg *cfg, struct ch
 						continue;
 					}
 
-					if (!(user = user_list_get(&(c->users), c->server->casemapping, modearg, 0))) {
+					if (!(user = user_list_get(&(c->users), s->casemapping, modearg, 0))) {
 						newlinef(c, 0, FROM_ERROR, "MODE: flag '%c' user '%s' not found", flag, modearg);
 						continue;
 					}

@@ -1,6 +1,9 @@
 #ifndef TEST_H
 #define TEST_H
 
+#define TOKEN_PASTE(x, y) x##y
+#define TOKEN(x, y) TOKEN_PASTE(x, y)
+
 /* test.h -- unit test framework for rirc
  *
  * Defines the following macros:

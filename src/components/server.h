@@ -42,6 +42,7 @@ struct server
 		char cl;
 		char buf[IRC_MESSAGE_LEN + 1]; /* callback message buffer */
 	} read;
+	unsigned ircv3_multiprefix : 1;
 };
 
 struct server_list

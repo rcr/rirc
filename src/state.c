@@ -712,9 +712,11 @@ static void
 state_io_cxed(struct server *s)
 {
 	int ret;
-
 	server_reset(s);
 	server_nicks_next(s);
+
+	if ((ret = io_sendf(s->connection, "CAP LS 302")))
+		newlinef(s->channel, 0, "-!!-", "sendf fail: %s", io_err(ret));
 
 	if (s->pass && (ret = io_sendf(s->connection, "PASS %s", s->pass)))
 		newlinef(s->channel, 0, "-!!-", "sendf fail: %s", io_err(ret));

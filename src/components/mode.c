@@ -396,6 +396,18 @@ mode_prfxmode_prefix(struct mode *m, const struct mode_cfg *cfg, int flag)
 	else
 		MODE_SET(m->upper, bit, MODE_SET_ON);
 
+	f = cfg->PREFIX.F,
+	t = cfg->PREFIX.T;
+
+	while (*f) {
+
+		if (mode_isset(m, *f))
+			break;
+
+		f++;
+		t++;
+	}
+
 	m->prefix = *t;
 
 	return MODE_ERR_NONE;
