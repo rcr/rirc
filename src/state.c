@@ -1061,7 +1061,7 @@ io_cb_read_soc(char *buf, size_t len, const void *cb_obj)
 
 			struct irc_message m;
 
-			if (!(irc_message_parse(&m, s->read.buf)))
+			if (irc_message_parse(&m, s->read.buf) == 0)
 				newlinef(c, 0, "-!!-", "failed to parse message");
 			else
 				irc_recv(s, &m);
