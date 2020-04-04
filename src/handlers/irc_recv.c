@@ -569,6 +569,8 @@ irc_recv_numeric(struct server *s, struct irc_message *m)
 			failf(s, "NUMERIC: out of range");
 	}
 
+	// TODO: 353 ENDs the CAP negotiation
+
 	/* Message target is only used to establish s->nick when registering with a server */
 	if (!(irc_message_param(m, &targ))) {
 		io_dx(s->connection);
@@ -596,7 +598,7 @@ irc_recv_numeric(struct server *s, struct irc_message *m)
 static int
 recv_cap(struct server *s, struct irc_message *m)
 {
-	return irc_recv_ircv3(s, m);
+	return ircv3_CAP(s, m);
 }
 
 static int

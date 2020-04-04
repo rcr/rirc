@@ -132,6 +132,8 @@ test_353(void)
 		char TOKEN(buf, __LINE__)[] = S; \
 		assert_eq(irc_message_parse(&m, TOKEN(buf, __LINE__)), 0);
 
+	// TODO: line_buf can be used to check the error message
+
 	server_nick_set(s, "mynick");
 
 	IRC_MESSAGE_PARSE("353 c1");
@@ -186,6 +188,8 @@ test_353(void)
 	assert_eq(u4->prfxmodes.prefix, '@');
 
 	#undef IRC_MESSAGE_PARSE
+
+	server_free(s);
 }
 
 int

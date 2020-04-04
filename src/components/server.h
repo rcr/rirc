@@ -9,6 +9,16 @@
 // TODO: move this to utils
 #define IRC_MESSAGE_LEN 510
 
+#ifndef IRCV3_CAPS
+#define IRCV3_CAPS \
+	X("multi-prefix", multi_prefix)
+
+struct ircv3_caps
+{
+	int multi_prefix;
+};
+#endif
+
 struct server
 {
 	const char *host;
@@ -27,6 +37,7 @@ struct server
 	struct channel *channel;
 	struct channel_list clist;
 	struct channel_list ulist; // TODO: seperate privmsg
+	struct ircv3_caps ircv3_caps;
 	struct mode usermodes;
 	struct mode_str mode_str;
 	struct mode_cfg mode_cfg;
@@ -42,7 +53,6 @@ struct server
 		char cl;
 		char buf[IRC_MESSAGE_LEN + 1]; /* callback message buffer */
 	} read;
-	unsigned ircv3_multiprefix : 1;
 };
 
 struct server_list

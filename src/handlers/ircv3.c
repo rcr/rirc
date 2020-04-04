@@ -14,131 +14,192 @@
 	         failf((S), "Send fail: %s", io_err(ret)); \
 	} while (0)
 
-// TODO: some of these are server-only (e.g. END)
 #define IRCV3_HANDLERS \
-	X(ack) \
-	X(del) \
-	X(end) \
-	X(list) \
-	X(ls) \
-	X(nak) \
-	X(new) \
-	X(req)
+	X(LIST) \
+	X(LS) \
+	X(ACK) \
+	X(NAK) \
+	X(DEL) \
+	X(NEW)
 
-#define X(cmd) static int ircv3_##cmd(struct server*, char*);
+#define X(CMD) \
+static int ircv3_CAP_##CMD(struct server*, struct irc_message*);
 IRCV3_HANDLERS
 #undef X
 
-// Freenode:
-#if 0
- 13:44                 -- ~ arg: 'account-notify'
- 13:44                 -- ~ arg: 'away-notify'
- 13:44                 -- ~ arg: 'cap-notify'
- 13:44                 -- ~ arg: 'chghost'
- 13:44                 -- ~ arg: 'extended-join'
- 13:44                 -- ~ arg: 'identify-msg'
- 13:44                 -- ~ arg: 'multi-prefix'
- 13:44                 -- ~ arg: 'sasl'
- 13:44                 -- ~ arg: 'tls'
-#endif
-
 int
-irc_recv_ircv3(struct server *s, struct irc_message *m)
+ircv3_CAP(struct server *s, struct irc_message *m)
 {
-	const char *targ;
-	const char *cmnd;
+	char *targ;
+	char *cmnd;
 
-	if (!(targ = strsep(&m->params)))
+	if (!irc_message_param(m, &targ))
 		failf(s, "CAP: target is null");
 
-	if (!(cmnd = strsep(&m->params)))
+	if (!irc_message_param(m, &cmnd))
 		failf(s, "CAP: command is null");
 
-	if (*m->params == ':')
-		m->params++;
-
-	#define X(cmd) if (!strcmp(cmnd, #cmd)) return ircv3_##cmd(s, m->params);
+	#define X(CMD) \
+	if (!strcmp(cmnd, #CMD)) return ircv3_CAP_##CMD(s, m);
 	IRCV3_HANDLERS
 	#undef X
 
-	// FIXME: error for non-recognized message
-	return 0;
+	failf(s, "CAP: unrecognized subcommand '%s'", cmnd);
 }
 
 static int
-ircv3_ack(struct server *s, char *m)
+ircv3_CAP_LS(struct server *s, struct irc_message *m)
 {
-	const char *arg;
+	/* The last parameter is a space-separated list of
+	 * capabilities. If no capabilities are available,
+	 * an empty parameter MUST be sent.
+	 *
+	 * Servers MAY send multiple lines in response to
+	 * CAP LS and CAP LIST. If the reply contains
+	 * multiple lines, all but the last reply MUST
+	 * have a parameter containing only an asterisk (*)
+	 * preceding the capability list
+	 *
+	 * E.g.:
+	 *   - CAP targ LS :
+	 *   - CAP targ LS :cap-1 cap-2 ...
+	 *   - CAP targ LS cap-1
+	 *   - CAP targ LS * :cap-1 ...
+	 *     CAP targ LS * :cap-2 ...
+	 *     CAP targ LS :cap-3 ...
+	 */
 
-	while ((arg = strsep(&(m)))) {
+	char *cap;
+	char *caps;
+	char *multiline;
 
-		debug("Setting ircv3 cap: %s", arg);
+	irc_message_param(m, &multiline);
+	irc_message_param(m, &caps);
 
-		if (!strcmp(arg, "multi-prefix")) {
-			s->ircv3_multiprefix = 1;
+	if (!multiline)
+		failf(s, "CAP: parameter is null");
+
+	if (multiline && caps && strcmp(multiline, "*"))
+		failf(s, "CAP: invalid parameters");
+
+	if (!strcmp(multiline, "*") && !caps)
+		failf(s, "CAP: parameter is null");
+
+	if (!caps) {
+		caps = multiline;
+		multiline = NULL;
+	}
+
+	while ((cap = strsep(&(caps)))) {
+
+		debug("%s:%s -- CAP %s", s->host, s->port, cap);
+
+		#define X(CAP, VAR) \
+		if (!strcmp(cap, CAP)) \
+			s->ircv3_caps.VAR = IRCV3_CAP_PENDING_SEND;
+		IRCV3_CAPS
+		#undef X
+	}
+
+	if (!multiline) {
+		#define X(CAP, VAR) \
+		if (s->ircv3_caps.VAR == IRCV3_CAP_PENDING_SEND) { \
+			s->ircv3_caps.VAR = IRCV3_CAP_PENDING_RECV; \
+			sendf(s, "CAP REQ :"CAP); \
 		}
+		IRCV3_CAPS
+		#undef X
 	}
 
 	return 0;
 }
 
 static int
-ircv3_ls(struct server *s, char *m)
+ircv3_CAP_LIST(struct server *s, struct irc_message *m)
 {
+	(void)s;
+	(void)m;
+	return 0;
+}
+
+static int
+ircv3_CAP_ACK(struct server *s, struct irc_message *m)
+{
+#if 0
 	const char *arg;
 
 	while ((arg = strsep(&(m)))) {
 
-		debug("Requesting ircv3 cap: %s", arg);
+		debug("ircv3 cap ACK: %s", arg);
 
-		if (!strcmp(arg, "multi-prefix")) {
-			sendf(s, "CAP REQ :multi-prefix");
+		#define X(CAP, VAR) \
+		if (!strcmp(arg, CAP)) {               \
+			s->ircv3_caps.VAR = IRCV3_CAP_ACK; \
 		}
+		IRCV3_CAPS
+		#undef X
 	}
 
+	// TODO: this should actually check if any are pending?
+	// TODO: this should check cap_ls is done
+	if (1
+	#define X(CAP, VAR) \
+		&& s->ircv3_caps.VAR
+		IRCV3_CAPS
+	#undef X
+	   ) {
+		sendf(s, "CAP END");
+	}
+#endif
+	(void)s;
+	(void)m;
 	return 0;
 }
 
+static int
+ircv3_CAP_NAK(struct server *s, struct irc_message *m)
+{
+#if 0
+	const char *arg;
 
+	while ((arg = strsep(&(m)))) {
 
+		debug("ircv3 cap NAK: %s", arg);
+
+		#define X(CAP, VAR) \
+		if (!strcmp(arg, CAP)) {               \
+			s->ircv3_caps.VAR = IRCV3_CAP_NAK; \
+		}
+		IRCV3_CAPS
+		#undef X
+	}
+
+	// TODO: this should actually check if any are pending?
+	// TODO: this should check cap_ls is done
+	if (1
+	#define X(CAP, VAR) \
+		&& s->ircv3_caps.VAR
+		IRCV3_CAPS
+	#undef X
+	   ) {
+		sendf(s, "CAP END");
+	}
+#endif
+	(void)s;
+	(void)m;
+	return 0;
+}
 
 static int
-ircv3_list(struct server *s, char *m)
+ircv3_CAP_DEL(struct server *s, struct irc_message *m)
 {
 	(void)s;
 	(void)m;
 	return 0;
 }
+
 static int
-ircv3_req(struct server *s, char *m)
-{
-	(void)s;
-	(void)m;
-	return 0;
-}
-static int
-ircv3_nak(struct server *s, char *m)
-{
-	(void)s;
-	(void)m;
-	return 0;
-}
-static int
-ircv3_end(struct server *s, char *m)
-{
-	(void)s;
-	(void)m;
-	return 0;
-}
-static int
-ircv3_new(struct server *s, char *m)
-{
-	(void)s;
-	(void)m;
-	return 0;
-}
-static int
-ircv3_del(struct server *s, char *m)
+ircv3_CAP_NEW(struct server *s, struct irc_message *m)
 {
 	(void)s;
 	(void)m;
