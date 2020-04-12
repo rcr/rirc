@@ -708,35 +708,30 @@ static void
 io_ssl_init(void)
 {
 	const char *tls_pers = "rirc-drbg-ctr-pers";
-	int ret;
 
 	mbedtls_ssl_config_init(&ssl_conf);
 	mbedtls_ctr_drbg_init(&ssl_ctr_drbg);
 	mbedtls_entropy_init(&ssl_entropy);
 	mbedtls_x509_crt_init(&ssl_cacert);
 
-	if ((ret = mbedtls_x509_crt_parse_path(&ssl_cacert, ca_cert_path)) <= 0) {
-		if (ret == 0) {
-			fatal("no certs found");
-		} else {
-			fatal("ssl init failed: mbedtls_x509_crt_parse_path");
-		}
+	if (mbedtls_x509_crt_parse_path(&ssl_cacert, ca_cert_path) != 0) {
+		fatal("ssl init failed: mbedtls_x509_crt_parse_path");
 	}
 
-	if ((ret = mbedtls_ctr_drbg_seed(
-					&ssl_ctr_drbg,
-					mbedtls_entropy_func,
-					&ssl_entropy,
-					(unsigned char *)tls_pers,
-					strlen(tls_pers))) != 0) {
+	if (mbedtls_ctr_drbg_seed(
+			&ssl_ctr_drbg,
+			mbedtls_entropy_func,
+			&ssl_entropy,
+			(unsigned char *)tls_pers,
+			strlen(tls_pers)) != 0) {
 		fatal("ssl init failed: mbedtls_ctr_drbg_seed");
 	}
 
-	if ((ret = mbedtls_ssl_config_defaults(
-					&ssl_conf,
-					MBEDTLS_SSL_IS_CLIENT,
-					MBEDTLS_SSL_TRANSPORT_STREAM,
-					MBEDTLS_SSL_PRESET_DEFAULT)) != 0) {
+	if (mbedtls_ssl_config_defaults(
+			&ssl_conf,
+			MBEDTLS_SSL_IS_CLIENT,
+			MBEDTLS_SSL_TRANSPORT_STREAM,
+			MBEDTLS_SSL_PRESET_DEFAULT) != 0) {
 		fatal("ssl init failed: mbedtls_ssl_config_defaults");
 	}
 
