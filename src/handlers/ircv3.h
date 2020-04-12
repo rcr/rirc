@@ -1,28 +1,27 @@
-// TODO: non ircv3 servers? if the server sends 001, cancel all CAP negotiations
-//             Client: CAP LS 302
-//             Client: NICK dan
-//             Client: USER d * 0 :This is a really good name
-//             Server: 001 dan :Welcome to the Internet Relay Network dan
-//
-// empty CAP list
-//      Client: CAP LS
-//      Server: CAP * LS :
-//
-//
-// CAP END
-//
-// 410 (ERR_INVALIDCAPCMD)
-//	- and what other ERR types?
-//
-// cap ls can come in multi-lines... this is a 302 thing
-// and so should be handled if sent as 301... see standard
-//
-//
-// what happens if i REQ something that doesn't exist?
-//
-// client should respond to CAP NEW with CAP REQ if it wants it
-//
-// cap notify is implicit but might be advertised
+/* TODO
+ *  - cap NEW/DEL
+ *  - 0001 -> server registered
+ *      - void ircv3_CAP_start(struct server*);
+ *      - void ircv3_CAP_end(struct server*);
+ *  - cap commands (after registration)
+ *      - /cap-list
+ *      - /cap-ls
+ *      - /cap-req [-]cap [...]
+ *  - print LS caps when registered instead of auto caps
+ *  - CAP ACK handling for REQS
+ *      - CAP ACK when REQ
+ *      - CAP -ACK when REQ
+ *      - CAP ACK when REQ
+ *      - CAP -ACK when -REQ
+ *  - cap setting for auto on connect/NEW
+ *  - 410 ERR_INVALIDCAPCMD
+ *  - handle invalid command on LS during registration
+ *    for servers that don't support it
+ *  - caps need a current state so they can
+ *    return to it on NAK
+ *  - replace test cap names with actual cap names
+ *  - cap-notify handling
+ */
 
 #ifndef IRCV3_H
 #define IRCV3_H
@@ -42,9 +41,5 @@ enum ircv3_cap
 #include "src/state.h"
 
 int ircv3_CAP(struct server*, struct irc_message*);
-
-// TODO
-// void ircv3_CAP_start(struct server*);
-// void ircv3_CAP_end(struct server*);
 
 #endif

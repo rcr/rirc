@@ -23,7 +23,7 @@
 	X(NEW)
 
 #define X(CMD) \
-static int ircv3_CAP_##CMD(struct server*, struct irc_message*);
+static int ircv3_cap_##CMD(struct server*, struct irc_message*);
 IRCV3_HANDLERS
 #undef X
 
@@ -40,7 +40,7 @@ ircv3_CAP(struct server *s, struct irc_message *m)
 		failf(s, "CAP: command is null");
 
 	#define X(CMD) \
-	if (!strcmp(cmnd, #CMD)) return ircv3_CAP_##CMD(s, m);
+	if (!strcmp(cmnd, #CMD)) return ircv3_cap_##CMD(s, m);
 	IRCV3_HANDLERS
 	#undef X
 
@@ -48,11 +48,10 @@ ircv3_CAP(struct server *s, struct irc_message *m)
 }
 
 static int
-ircv3_CAP_LS(struct server *s, struct irc_message *m)
+ircv3_cap_LS(struct server *s, struct irc_message *m)
 {
-	/* The last parameter is a space-separated list of
-	 * capabilities. If no capabilities are available,
-	 * an empty parameter MUST be sent.
+	/* If no capabilities are available, an empty
+	 * parameter MUST be sent.
 	 *
 	 * Servers MAY send multiple lines in response to
 	 * CAP LS and CAP LIST. If the reply contains
@@ -60,13 +59,7 @@ ircv3_CAP_LS(struct server *s, struct irc_message *m)
 	 * have a parameter containing only an asterisk (*)
 	 * preceding the capability list
 	 *
-	 * E.g.:
-	 *   - CAP targ LS :
-	 *   - CAP targ LS :cap-1 cap-2 ...
-	 *   - CAP targ LS cap-1
-	 *   - CAP targ LS * :cap-1 ...
-	 *     CAP targ LS * :cap-2 ...
-	 *     CAP targ LS :cap-3 ...
+	 * CAP <targ> LS [*] :[<cap 1> [...]]
 	 */
 
 	char *cap;
@@ -111,96 +104,120 @@ ircv3_CAP_LS(struct server *s, struct irc_message *m)
 		#undef X
 	}
 
+	// TODO: message for no CAPS available when sending a cap-ls 
+	// after registered... combine this with how cap LIST is printed
+	// in some other function that gets type string and error
+	// message string?
+	//
+	// ircv3_cap_print
+
 	return 0;
 }
 
 static int
-ircv3_CAP_LIST(struct server *s, struct irc_message *m)
+ircv3_cap_LIST(struct server *s, struct irc_message *m)
 {
+	/* If no capabilities are available, an empty
+	 * parameter MUST be sent.
+	 *
+	 * Servers MAY send multiple lines in response to
+	 * CAP LS and CAP LIST. If the reply contains
+	 * multiple lines, all but the last reply MUST
+	 * have a parameter containing only an asterisk (*)
+	 * preceding the capability list
+	 *
+	 * CAP <targ> LIST [*] :[<cap 1> [...]]
+	 */
+
+	char *caps;
+	char *multiline;
+
+	irc_message_param(m, &multiline);
+	irc_message_param(m, &caps);
+
+	if (!multiline)
+		failf(s, "CAP: parameter is null");
+
+	if (multiline && caps && strcmp(multiline, "*"))
+		failf(s, "CAP: invalid parameters");
+
+	if (!strcmp(multiline, "*") && !caps)
+		failf(s, "CAP: parameter is null");
+
+	if (!caps)
+		caps = multiline;
+
+	if (!caps[0])
+		server_info(s, "CAP LIST: (no caps set)");
+	else
+		server_info(s, "CAP LIST: %s", caps);
+
+	return 0;
+}
+
+static int
+ircv3_cap_ACK(struct server *s, struct irc_message *m)
+{
+	/* Each capability name may be prefixed with a
+	 * dash (-), indicating that this capability has
+	 * been disabled as requested.
+	 *
+	 * If an ACK reply originating from the server is
+	 * spread across multiple lines, a client MUST NOT
+	 * change capabilities until the last ACK of the
+	 * set is received. Equally, a server MUST NOT change
+	 * the capabilities of the client until the last ACK
+	 * of the set has been sent.
+	 *
+	 * CAP <targ> ACK :[-]<cap 1> [[-]<cap 2> [...]]
+	 */
+
 	(void)s;
 	(void)m;
 	return 0;
 }
 
 static int
-ircv3_CAP_ACK(struct server *s, struct irc_message *m)
+ircv3_cap_NAK(struct server *s, struct irc_message *m)
 {
-#if 0
-	const char *arg;
+	/* The server MUST NOT make any change to any
+	 * capabilities if it replies with a NAK subcommand.
+	 *
+	 * CAP <targ> NAK :<cap 1> [<cap 2> [...]]
+	 */
 
-	while ((arg = strsep(&(m)))) {
-
-		debug("ircv3 cap ACK: %s", arg);
-
-		#define X(CAP, VAR) \
-		if (!strcmp(arg, CAP)) {               \
-			s->ircv3_caps.VAR = IRCV3_CAP_ACK; \
-		}
-		IRCV3_CAPS
-		#undef X
-	}
-
-	// TODO: this should actually check if any are pending?
-	// TODO: this should check cap_ls is done
-	if (1
-	#define X(CAP, VAR) \
-		&& s->ircv3_caps.VAR
-		IRCV3_CAPS
-	#undef X
-	   ) {
-		sendf(s, "CAP END");
-	}
-#endif
 	(void)s;
 	(void)m;
 	return 0;
 }
 
 static int
-ircv3_CAP_NAK(struct server *s, struct irc_message *m)
+ircv3_cap_DEL(struct server *s, struct irc_message *m)
 {
-#if 0
-	const char *arg;
+	/* Upon receiving a CAP DEL message, the client MUST
+	 * treat the listed capabilities as cancelled and no
+	 * longer available. Clients SHOULD NOT send CAP REQ
+	 * messages to cancel the capabilities in CAP DEL,
+	 * as they have already been cancelled by the server.
+	 *
+	 * CAP <targ> DEL :<cap 1> [<cap 2> [...]]
+	 */
 
-	while ((arg = strsep(&(m)))) {
-
-		debug("ircv3 cap NAK: %s", arg);
-
-		#define X(CAP, VAR) \
-		if (!strcmp(arg, CAP)) {               \
-			s->ircv3_caps.VAR = IRCV3_CAP_NAK; \
-		}
-		IRCV3_CAPS
-		#undef X
-	}
-
-	// TODO: this should actually check if any are pending?
-	// TODO: this should check cap_ls is done
-	if (1
-	#define X(CAP, VAR) \
-		&& s->ircv3_caps.VAR
-		IRCV3_CAPS
-	#undef X
-	   ) {
-		sendf(s, "CAP END");
-	}
-#endif
 	(void)s;
 	(void)m;
 	return 0;
 }
 
 static int
-ircv3_CAP_DEL(struct server *s, struct irc_message *m)
+ircv3_cap_NEW(struct server *s, struct irc_message *m)
 {
-	(void)s;
-	(void)m;
-	return 0;
-}
+	/* Clients that support CAP NEW messages SHOULD respond
+	 * with a CAP REQ message if they wish to enable one or
+	 * more of the newly-offered capabilities.
+	 *
+	 * CAP <targ> NEW :<cap 1> [<cap 2> [...]]
+	 */
 
-static int
-ircv3_CAP_NEW(struct server *s, struct irc_message *m)
-{
 	(void)s;
 	(void)m;
 	return 0;
