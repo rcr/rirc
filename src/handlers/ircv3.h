@@ -1,19 +1,17 @@
 /* TODO
- *  - cap NEW/DEL
  *  - 0001 -> server registered
  *      - void ircv3_CAP_start(struct server*);
  *      - void ircv3_CAP_end(struct server*);
  *  - cap commands (after registration)
- *      - /cap-list
- *      - /cap-ls
  *      - /cap-req [-]cap [...]
- *  - print LS caps when registered instead of auto caps
+ *  - cap NEW/DEL
  *  - CAP ACK handling for REQS
  *      - CAP ACK when REQ
  *      - CAP -ACK when REQ
  *      - CAP ACK when REQ
  *      - CAP -ACK when -REQ
  *  - cap setting for auto on connect/NEW
+ *      - :set, set/unset auto, and for printing state
  *  - 410 ERR_INVALIDCAPCMD
  *  - handle invalid command on LS during registration
  *    for servers that don't support it
@@ -21,6 +19,13 @@
  *    return to it on NAK
  *  - replace test cap names with actual cap names
  *  - cap-notify handling
+ *  - dont allow /cap-req of CAPs that arent supported
+ *  - list caps with `(unsupported)` when printing LS results?
+ *  - LS caps:
+ *      [name] [set/unset] [auto]
+ *      [name] [unsupported]
+ *  - LIST caps:
+ *      [name] [auto]
  */
 
 #ifndef IRCV3_H

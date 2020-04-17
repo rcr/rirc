@@ -3,21 +3,12 @@
 
 #include "src/components/buffer.h"
 #include "src/components/channel.h"
+#include "src/components/ircv3_cap.h"
 #include "src/components/mode.h"
 #include "src/utils/utils.h"
 
 // TODO: move this to utils
 #define IRC_MESSAGE_LEN 510
-
-#ifndef IRCV3_CAPS
-#define IRCV3_CAPS \
-	X("multi-prefix", multi_prefix)
-
-struct ircv3_caps
-{
-	int multi_prefix;
-};
-#endif
 
 struct server
 {
@@ -46,6 +37,7 @@ struct server
 	struct user_list ignore;
 	unsigned ping;
 	unsigned quitting : 1;
+	unsigned registered : 1;
 	void *connection;
 	// TODO: move this to utils
 	struct {

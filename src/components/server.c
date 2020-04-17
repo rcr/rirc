@@ -133,6 +133,7 @@ server_reset(struct server *s)
 	mode_reset(&(s->usermodes), &(s->mode_str));
 	s->ping = 0;
 	s->quitting = 0;
+	s->registered = 0;
 	s->nicks.next = 0;
 }
 

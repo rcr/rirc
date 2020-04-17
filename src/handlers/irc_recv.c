@@ -281,6 +281,8 @@ irc_001(struct server *s, struct irc_message *m)
 	char *trailing;
 	struct channel *c = s->channel;
 
+	s->registered = 1;
+
 	do {
 		if (c->type == CHANNEL_T_CHANNEL && !c->parted)
 			sendf(s, "JOIN %s", c->name);
@@ -978,7 +980,7 @@ recv_nick(struct server *s, struct irc_message *m)
 
 	if (!strcmp(m->from, s->nick)) {
 		server_nick_set(s, nick);
-		newlinef(s->channel, BUFFER_LINE_NICK, FROM_NICK, "Youn nick is '%s'", nick);
+		newlinef(s->channel, BUFFER_LINE_NICK, FROM_NICK, "Your nick is now '%s'", nick);
 	}
 
 	do {

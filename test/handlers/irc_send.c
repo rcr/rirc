@@ -98,6 +98,7 @@ test_irc_send_command(void)
 	char m3[] = "test";
 	char m4[] = "test arg1 arg2 arg3";
 	char m5[] = "privmsg targ test message";
+	char m6[] = "testing not registered";
 
 	send_buf[0] = 0;
 	fail_buf[0] = 0;
@@ -110,6 +111,12 @@ test_irc_send_command(void)
 	CHECK_SEND_COMMAND(c_chan, m3, 0, "", "TEST");
 	CHECK_SEND_COMMAND(c_chan, m4, 0, "", "TEST arg1 arg2 arg3");
 	CHECK_SEND_COMMAND(c_chan, m5, 0, "", "PRIVMSG targ :test message");
+
+	s->registered = 0;
+
+	CHECK_SEND_COMMAND(c_chan, m6, 1, "Not registered with server", "");
+
+	s->registered = 1;
 }
 
 static void
@@ -366,6 +373,7 @@ main(void)
 	c_priv = channel("priv", CHANNEL_T_PRIVATE);
 	c_serv = channel("serv", CHANNEL_T_SERVER);
 	s = server("h1", "p1", NULL, "u1", "r1");
+	s->registered = 1;
 	server_nick_set(s, "mynick");
 
 	struct testcase tests[] = {

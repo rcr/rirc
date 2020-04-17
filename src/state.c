@@ -60,6 +60,8 @@ current_channel(void)
 
 /* List of IRC commands for tab completion */
 static const char *irc_list[] = {
+	"cap-ls",
+	"cap-list",
 	"ctcp-action",
 	"ctcp-clientinfo",
 	"ctcp-finger",

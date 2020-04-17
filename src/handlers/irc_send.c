@@ -35,6 +35,9 @@ irc_send_command(struct server *s, struct channel *c, char *m)
 	if (!s)
 		failf(c, "This is not a server");
 
+	if (!s->registered)
+		failf(c, "Not registered with server");
+
 	if (*m == ' ' || !(command = strsep(&m)))
 		failf(c, "Messages beginning with '/' require a command");
 
@@ -59,6 +62,9 @@ irc_send_privmsg(struct server *s, struct channel *c, char *m)
 {
 	if (!s)
 		failf(c, "This is not a server");
+
+	if (!s->registered)
+		failf(c, "Not registered with server");
 
 	if (!(c->type == CHANNEL_T_CHANNEL || c->type == CHANNEL_T_PRIVATE))
 		failf(c, "This is not a channel");
@@ -88,6 +94,28 @@ targ_or_type(struct channel *c, char *m, enum channel_t type)
 		return c->name;
 
 	return NULL;
+}
+
+static int
+send_ircv3_cap_ls(struct server *s, struct channel *c, char *m)
+{
+	if (strtrim(&m))
+		failf(c, "Usage: /cap-ls");
+
+	sendf(s, c, "CAP LS 302");
+
+	return 0;
+}
+
+static int
+send_ircv3_cap_list(struct server *s, struct channel *c, char *m)
+{
+	if (strtrim(&m))
+		failf(c, "Usage: /cap-list");
+
+	sendf(s, c, "CAP LIST");
+
+	return 0;
 }
 
 static int

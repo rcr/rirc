@@ -8,6 +8,9 @@ Summary of notable changes and features
     - add mbedtls git submodule
     - add CA_CERT_PATH define to config.h
     - changed default port to 6697 for SSL
+ - add ircv3 CAP support
+    - add command /cap-ls
+    - add command /cap-list
  - changed standard versions
     - c99 -> c11
     - POSIX.1-2001 -> POSIX.1-2008

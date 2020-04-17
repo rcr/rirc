@@ -27,6 +27,8 @@ static int ircv3_cap_##CMD(struct server*, struct irc_message*);
 IRCV3_HANDLERS
 #undef X
 
+static int ircv3_cap_print(struct server*, const char*, char*);
+
 int
 ircv3_CAP(struct server *s, struct irc_message *m)
 {
@@ -82,6 +84,9 @@ ircv3_cap_LS(struct server *s, struct irc_message *m)
 		caps = multiline;
 		multiline = NULL;
 	}
+
+	if (s->registered)
+		return ircv3_cap_print(s, "LS", caps);
 
 	while ((cap = strsep(&(caps)))) {
 
@@ -147,12 +152,7 @@ ircv3_cap_LIST(struct server *s, struct irc_message *m)
 	if (!caps)
 		caps = multiline;
 
-	if (!caps[0])
-		server_info(s, "CAP LIST: (no caps set)");
-	else
-		server_info(s, "CAP LIST: %s", caps);
-
-	return 0;
+	return ircv3_cap_print(s, "LIST", caps);
 }
 
 static int
@@ -220,5 +220,16 @@ ircv3_cap_NEW(struct server *s, struct irc_message *m)
 
 	(void)s;
 	(void)m;
+	return 0;
+}
+
+static int
+ircv3_cap_print(struct server *s, const char *cmnd, char *caps)
+{
+	if (!caps[0])
+		server_info(s, "CAP %s: (no caps set)", cmnd);
+	else
+		server_info(s, "CAP %s: %s", cmnd, caps);
+
 	return 0;
 }
