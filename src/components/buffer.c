@@ -187,3 +187,31 @@ buffer(struct buffer *b)
 
 	memset(b, 0, sizeof(*b));
 }
+
+void
+buffer_line_split(
+	struct buffer_line *line,
+	unsigned *head_w,
+	unsigned *text_w,
+	unsigned cols,
+	unsigned pad)
+{
+	unsigned _head_w = sizeof(" HH:MM   "VERTICAL_SEPARATOR" ");
+
+	if (BUFFER_PADDING)
+		_head_w += pad;
+	else
+		_head_w += line->from_len;
+
+	/* If header won't fit, split in half */
+	if (_head_w >= cols)
+		_head_w = cols / 2;
+
+	_head_w -= 1;
+
+	if (head_w)
+		*head_w = _head_w;
+
+	if (text_w)
+		*text_w = cols - _head_w + 1;
+}

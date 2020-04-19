@@ -1,7 +1,8 @@
 #include <string.h>
 
-#include "src/io.h"
 #include "src/handlers/ircv3.h"
+#include "src/io.h"
+#include "src/state.h"
 
 #define failf(S, ...) \
 	do { server_error((S), __VA_ARGS__); \

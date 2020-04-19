@@ -1,3 +1,6 @@
+// TODO:
+// combine all mocked out io functions in the handler tests, etc
+
 struct connection*
 connection(const void *o, const char *h, const char *p)
 {

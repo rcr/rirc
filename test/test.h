@@ -1,20 +1,3 @@
-/* TODO:
- *
- * all the .mock files need to have ifndef guards.
- * anything that is mocked by something else needs to have
- * a .mock file. no file should be mocking functions
- * in place (see the recv handlers, multiple draw.c mocks)
- *
- * these values can be turned into mock functions for
- * retrieval by test cases
-
-static char chan_buf[1024];
-static char line_buf[1024];
-static char send_buf[1024];
-
- *
- * */
-
 #ifndef TEST_H
 #define TEST_H
 

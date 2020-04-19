@@ -7,6 +7,7 @@
 #include <unistd.h>
 
 #include "config.h"
+#include "src/draw.h"
 #include "src/io.h"
 #include "src/state.h"
 

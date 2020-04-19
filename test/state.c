@@ -10,10 +10,10 @@
 #include "src/state.c"
 #include "src/utils/utils.c"
 
-#include "test/draw.c.mock"
-#include "test/io.c.mock"
-#include "test/rirc.c.mock"
-#include "test/handlers/irc_recv.c.mock"
+#include "test/draw.mock.c"
+#include "test/handlers/irc_recv.mock.c"
+#include "test/io.mock.c"
+#include "test/rirc.mock.c"
 
 #define INP_S(S) io_cb_read_inp((S), strlen(S))
 #define INP_C(C) io_cb_read_inp((char[]){(C)}, 1)

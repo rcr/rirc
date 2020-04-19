@@ -7,6 +7,7 @@
 #include "src/handlers/irc_recv.gperf.out"
 #include "src/handlers/irc_recv.h"
 #include "src/handlers/ircv3.h"
+#include "src/draw.h"
 #include "src/io.h"
 #include "src/state.h"
 #include "src/utils/utils.h"
@@ -524,7 +525,7 @@ irc_353(struct server *s, struct irc_message *m)
 		} while ((nick = strsep(&nicks)));
 	}
 
-	draw_status();
+	draw(DRAW_STATUS);
 
 	return 0;
 }
@@ -666,7 +667,7 @@ recv_join(struct server *s, struct irc_message *m)
 		c->parted = 0;
 		newlinef(c, BUFFER_LINE_JOIN, FROM_JOIN, "Joined %s", chan);
 		sendf(s, "MODE %s", chan);
-		draw_all();
+		draw(DRAW_ALL);
 		return 0;
 	}
 
@@ -679,7 +680,7 @@ recv_join(struct server *s, struct irc_message *m)
 	if (!join_threshold || c->users.count <= join_threshold)
 		newlinef(c, BUFFER_LINE_JOIN, FROM_JOIN, "%s!%s has joined", m->from, m->host);
 
-	draw_status();
+	draw(DRAW_STATUS);
 
 	return 0;
 }
@@ -735,7 +736,7 @@ recv_kick(struct server *s, struct irc_message *m)
 			newlinef(c, 0, FROM_INFO, "%s has kicked %s", m->from, user);
 	}
 
-	draw_status();
+	draw(DRAW_STATUS);
 
 	return 0;
 }
@@ -909,7 +910,7 @@ recv_mode_chanmodes(struct irc_message *m, const struct mode_cfg *cfg, struct se
 	} while (irc_message_param(m, &modestring));
 
 	mode_str(&(c->chanmodes), &(c->chanmodes_str));
-	draw_status();
+	draw(DRAW_STATUS);
 
 	return 0;
 }
@@ -959,7 +960,7 @@ recv_mode_usermodes(struct irc_message *m, const struct mode_cfg *cfg, struct se
 	} while (irc_message_param(m, &modestring));
 
 	mode_str(usermodes, &(s->mode_str));
-	draw_status();
+	draw(DRAW_STATUS);
 
 	return 0;
 }
@@ -1051,8 +1052,8 @@ recv_notice(struct server *s, struct irc_message *m)
 
 	if (urgent) {
 		c->activity = ACTIVITY_PINGED;
-		draw_bell();
-		draw_nav();
+		draw(DRAW_BELL);
+		draw(DRAW_NAV);
 	}
 
 	return 0;
@@ -1101,7 +1102,7 @@ recv_part(struct server *s, struct irc_message *m)
 		}
 	}
 
-	draw_status();
+	draw(DRAW_STATUS);
 
 	return 0;
 }
@@ -1184,8 +1185,8 @@ recv_privmsg(struct server *s, struct irc_message *m)
 
 	if (urgent) {
 		c->activity = ACTIVITY_PINGED;
-		draw_bell();
-		draw_nav();
+		draw(DRAW_BELL);
+		draw(DRAW_NAV);
 	}
 
 	return 0;
@@ -1246,7 +1247,7 @@ recv_quit(struct server *s, struct irc_message *m)
 		}
 	} while ((c = c->next) != s->channel);
 
-	draw_status();
+	draw(DRAW_STATUS);
 
 	return 0;
 }

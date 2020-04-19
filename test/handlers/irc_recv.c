@@ -10,6 +10,8 @@
 #include "src/handlers/ircv3.c"
 #include "src/utils/utils.c"
 
+#include "test/draw.mock.c"
+
 static char chan_buf[1024];
 static char line_buf[1024];
 static char send_buf[1024];
@@ -83,12 +85,6 @@ io_dx(struct connection *c)
 
 	return 0;
 }
-
-/* Mock draw.c */
-void draw_all(void) { ; }
-void draw_bell(void) { ; }
-void draw_nav(void) { ; }
-void draw_status(void) { ; }
 
 /* Mock irc_ctcp.c */
 int

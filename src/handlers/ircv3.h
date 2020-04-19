@@ -43,7 +43,6 @@ enum ircv3_cap
 
 #include "src/components/server.h"
 #include "src/utils/utils.h"
-#include "src/state.h"
 
 int ircv3_CAP(struct server*, struct irc_message*);
 

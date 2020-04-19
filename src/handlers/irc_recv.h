@@ -361,6 +361,9 @@
  *         --- NOT IMPLEMENTED ---
  */
 
+#include "src/components/server.h"
+#include "src/utils/utils.h"
+
 int irc_recv(struct server*, struct irc_message*);
 
 #endif

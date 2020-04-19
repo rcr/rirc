@@ -27,6 +27,8 @@ struct ircv3_caps
 #include "src/handlers/ircv3.c"
 #include "src/utils/utils.c"
 
+#include "test/draw.mock.c"
+
 #define IRC_MESSAGE_PARSE(S) \
 	char TOKEN(buf, __LINE__)[] = S; \
 	assert_eq(irc_message_parse(&m, TOKEN(buf, __LINE__)), 0);
@@ -141,12 +143,6 @@ io_dx(struct connection *c)
 
 	return 0;
 }
-
-/* Mock draw.c */
-void draw_all(void) { ; }
-void draw_bell(void) { ; }
-void draw_nav(void) { ; }
-void draw_status(void) { ; }
 
 /* Mock irc_ctcp.c */
 int
