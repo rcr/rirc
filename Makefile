@@ -26,8 +26,9 @@ TLS_LIBS := \
 
 CC := cc
 PP := cc -E
-CFLAGS   := $(CC_EXT) -I. $(TLS_INCLUDE) $(STDS) -DVERSION=\"$(VERSION)\" -Wall -Wextra -pedantic -O2 -flto
-CFLAGS_D := $(CC_EXT) -I. $(TLS_INCLUDE) $(STDS) -DVERSION=\"$(VERSION)\" -Wall -Wextra -pedantic -O0 -g -DDEBUG
+CFLAGS   := $(CC_EXT) -I. $(TLS_INCLUDE) $(STDS) -DVERSION=\"$(VERSION)\" -Wall -Wextra -pedantic
+CFLAGS_R := $(CFLAGS) -O2 -flto -DNDEBUG
+CFLAGS_D := $(CFLAGS) -O0 -g
 LDFLAGS  := $(LD_EXT) -lpthread
 
 # Build, source, test source directories
@@ -63,8 +64,8 @@ $(BIN_D): $(DIR_B) $(OBJS_G) $(OBJS_D)
 # Release build objects
 $(DIR_B)/%.o: $(DIR_S)/%.c config.h
 	@echo "cc $<..."
-	@$(PP) $(CFLAGS) -MM -MP -MT $@ -MF $(@:.o=.d) $<
-	@$(CC) $(CFLAGS) -c -o $@ $<
+	@$(PP) $(CFLAGS_R) -MM -MP -MT $@ -MF $(@:.o=.d) $<
+	@$(CC) $(CFLAGS_R) -c -o $@ $<
 
 # Debug build objects
 $(DIR_B)/%.db.o: $(DIR_S)/%.c config.h

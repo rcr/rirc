@@ -95,7 +95,7 @@ state_init(void)
 	newline(state.default_channel, 0, "--", "");
 	newline(state.default_channel, 0, "--", " - version " VERSION);
 	newline(state.default_channel, 0, "--", " - compiled " __DATE__ ", " __TIME__);
-#ifdef DEBUG
+#ifndef NDEBUG
 	newline(state.default_channel, 0, "--", " - compiled with DEBUG flags");
 #endif
 }

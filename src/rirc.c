@@ -24,12 +24,6 @@ static const char* opt_arg_str(char);
 static const char* getpwuid_pw_name(void);
 static int parse_args(int, char**);
 
-#ifndef DEBUG
-const char *runtime_name = "rirc";
-#else
-const char *runtime_name = "rirc.debug";
-#endif
-
 #ifdef CA_CERT_PATH
 const char *ca_cert_path = CA_CERT_PATH;
 #else
@@ -54,6 +48,12 @@ const char *default_realname = DEFAULT_REALNAME;
 const char *default_realname;
 #endif
 
+#ifndef NDEBUG
+const char *runtime_name = "rirc.debug";
+#else
+const char *runtime_name = "rirc";
+#endif
+
 static const char *const rirc_usage =
 "\nrirc v"VERSION" ~ Richard C. Robbins <mail@rcr.io>"
 "\n"
@@ -75,7 +75,7 @@ static const char *const rirc_usage =
 "\n";
 
 static const char *const rirc_version =
-#ifdef DEBUG
+#ifndef NDEBUG
 "rirc v"VERSION" (debug build)";
 #else
 "rirc v"VERSION;

@@ -20,7 +20,7 @@
 	fprintf(stderr, __VA_ARGS__); \
 	fprintf(stderr, "\n");
 
-#if (defined DEBUG) && !(defined TESTING)
+#if !(defined NDEBUG) && !(defined TESTING)
 #define debug(...) \
 	do { MESSAGE("DEBUG", __VA_ARGS__); } while (0)
 #else
