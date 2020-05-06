@@ -30,19 +30,19 @@ const char *ca_cert_path = CA_CERT_PATH;
 #error "CA_CERT_PATH required"
 #endif
 
-#ifndef DEFAULT_NICK_SET
+#ifdef DEFAULT_NICK_SET
 const char *default_nick_set = DEFAULT_NICK_SET;
 #else
 const char *default_nick_set;
 #endif
 
-#ifndef DEFAULT_USERNAME
+#ifdef DEFAULT_USERNAME
 const char *default_username = DEFAULT_USERNAME;
 #else
 const char *default_username;
 #endif
 
-#ifndef DEFAULT_REALNAME
+#ifdef DEFAULT_REALNAME
 const char *default_realname = DEFAULT_REALNAME;
 #else
 const char *default_realname;
