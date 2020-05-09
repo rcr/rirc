@@ -255,7 +255,7 @@ io_sendf(struct connection *cx, const char *fmt, ...)
 	if (len >= sizeof(sendbuf) - 2)
 		return IO_ERR_TRUNC;
 
-	debug("send: (%zu) %s", len, sendbuf);
+	debug_send(len, sendbuf);
 
 	sendbuf[len++] = '\r';
 	sendbuf[len++] = '\n';

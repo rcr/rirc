@@ -23,8 +23,16 @@
 #if !(defined NDEBUG) && !(defined TESTING)
 #define debug(...) \
 	do { MESSAGE("DEBUG", __VA_ARGS__); } while (0)
+#define debug_send(L, M) \
+	do { fprintf(stderr, "DEBUG (--> %3zu) %s\n", (L), (M)); } while (0)
+#define debug_recv(L, M) \
+	do { fprintf(stderr, "DEBUG (<-- %3zu) %s\n", (L), (M)); } while (0)
 #else
 #define debug(...) \
+	do { ; } while (0)
+#define debug_send(L, M) \
+	do { ; } while (0)
+#define debug_recv(L, M) \
 	do { ; } while (0)
 #endif
 

@@ -1041,7 +1041,7 @@ io_cb_read_soc(char *buf, size_t len, const void *cb_obj)
 
 			s->read.buf[ci] = 0;
 
-			debug(" recv: (%zu) %s", ci, s->read.buf);
+			debug_recv(ci, s->read.buf);
 
 			struct irc_message m;
 
