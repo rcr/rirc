@@ -42,69 +42,83 @@ See: https://www.gnu.org/software/gperf/
 
 Initialize, configure and build mbedtls:
 
-    git submodule init
-    git submodule update --recursive
-    cd mbedtls
-    ./scripts/config.pl set MBEDTLS_THREADING_C
-    ./scripts/config.pl set MBEDTLS_THREADING_PTHREAD
-    cmake .
-    cmake --build .
-    cd ..
+```bash
+git submodule init
+git submodule update --recursive
+cd mbedtls
+./scripts/config.pl set MBEDTLS_THREADING_C
+./scripts/config.pl set MBEDTLS_THREADING_PTHREAD
+cmake .
+cmake --build .
+cd ..
+```
 
 Build rirc:
 
-    make
+```
+make
+```
 
 ### Installing:
 
 Default install path:
 
-    BIN_DIR = /usr/local/bin
-    MAN_DIR = /usr/local/share/man/man1
+```
+BIN_DIR = /usr/local/bin
+MAN_DIR = /usr/local/share/man/man1
+```
 
 Edit `Makefile` to alter install path if needed, then:
 
-    make install
+```
+make install
+```
 
 ### Usage:
 
-    rirc [-hv] [-s server [-p port] [-w pass] [-u user] [-r real] [-n nicks] [-c chans]], ...]
+```
+rirc [-hv] [-s server [-p port] [-w pass] [-u user] [-r real] [-n nicks] [-c chans]], ...]
 
-    Help:
-      -h, --help      Print this message and exit
-      -v, --version   Print rirc version and exit
+Help:
+  -h, --help      Print this message and exit
+  -v, --version   Print rirc version and exit
 
-    Options:
-      -s, --server=SERVER       Connect to SERVER
-      -p, --port=PORT           Connect to SERVER using PORT
-      -w, --pass=PASS           Connect to SERVER using PASS
-      -u, --username=USERNAME   Connect to SERVER using USERNAME
-      -r, --realname=REALNAME   Connect to SERVER using REALNAME
-      -n, --nicks=NICKS         Comma separated list of nicks to use for SERVER
-      -c, --chans=CHANNELS      Comma separated list of channels to join for SERVER
+Options:
+  -s, --server=SERVER       Connect to SERVER
+  -p, --port=PORT           Connect to SERVER using PORT
+  -w, --pass=PASS           Connect to SERVER using PASS
+  -u, --username=USERNAME   Connect to SERVER using USERNAME
+  -r, --realname=REALNAME   Connect to SERVER using REALNAME
+  -n, --nicks=NICKS         Comma separated list of nicks to use for SERVER
+  -c, --chans=CHANNELS      Comma separated list of channels to join for SERVER
+```
 
 Commands:
 
-      :clear
-      :close
-      :connect [host [port] [pass] [user] [real]]
-      :disconnect
-      :quit
+```
+  :clear
+  :close
+  :connect [host [port] [pass] [user] [real]]
+  :disconnect
+  :quit
+```
 
 Keys:
 
-      ^N : go to next channel
-      ^P : go to previous channel
-      ^L : clear channel
-      ^X : close channel
-      ^F : find channel
-      ^C : cancel input/action
-      ^U : scroll buffer up
-      ^D : scroll buffer down
-       ← : input cursor back
-       → : input cursor forward
-       ↑ : input history back
-       ↓ : input history forward
+```
+  ^N : go to next channel
+  ^P : go to previous channel
+  ^L : clear channel
+  ^X : close channel
+  ^F : find channel
+  ^C : cancel input/action
+  ^U : scroll buffer up
+  ^D : scroll buffer down
+   ← : input cursor back
+   → : input cursor forward
+   ↑ : input history back
+   ↓ : input history forward
+```
 
 ### More info:
 
