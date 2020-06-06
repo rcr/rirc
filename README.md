@@ -25,15 +25,17 @@
 ---
 
 # rirc
+
 A minimalistic irc client written in C.
 
 rirc supports only TLS connections, the default port is 6697
 
-## Configuring:
+### Configuring:
 
 Configure rirc by editing `config.h`. Defaults are in `config.def.h`
 
-## Building:
+### Building:
+
 rirc requires the latest version of GNU gperf to compile.
 
 See: https://www.gnu.org/software/gperf/
@@ -53,17 +55,18 @@ Build rirc:
 
     make
 
-## Installing:
+### Installing:
+
 Default install path:
 
-    EXE_DIR = /usr/local/bin
+    BIN_DIR = /usr/local/bin
     MAN_DIR = /usr/local/share/man/man1
 
 Edit `Makefile` to alter install path if needed, then:
 
     make install
 
-## Usage:
+### Usage:
 
     rirc [-hv] [-s server [-p port] [-w pass] [-u user] [-r real] [-n nicks] [-c chans]], ...]
 
@@ -103,5 +106,6 @@ Keys:
        ↑ : input history back
        ↓ : input history forward
 
-## More info:
+### More info:
+
 [rcr.io/rirc/](http://rcr.io/rirc/)
