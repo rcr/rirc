@@ -697,10 +697,8 @@ state_io_cxed(struct server *s)
 	server_reset(s);
 	server_nicks_next(s);
 
-	/* TODO: disabled until CAP is finished
-	if ((ret = io_sendf(s->connection, "CAP LS 302")))
+	if ((ret = io_sendf(s->connection, "CAP LS " IRCV3_CAP_VERSION)))
 		newlinef(s->channel, 0, "-!!-", "sendf fail: %s", io_err(ret));
-	*/
 
 	if (s->pass && (ret = io_sendf(s->connection, "PASS %s", s->pass)))
 		newlinef(s->channel, 0, "-!!-", "sendf fail: %s", io_err(ret));

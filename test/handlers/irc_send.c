@@ -3,6 +3,7 @@
 #include "src/components/buffer.c"
 #include "src/components/channel.c"
 #include "src/components/input.c"
+#include "src/components/ircv3_cap.c"
 #include "src/components/mode.c"
 #include "src/components/server.c"
 #include "src/components/user.c"
@@ -141,6 +142,80 @@ test_irc_send_privmsg(void)
 	assert_eq(irc_send_privmsg(NULL, c_chan, "test"), 1);
 	assert_strcmp(fail_buf, "This is not a server");
 	assert_strcmp(send_buf, "");
+}
+
+static void
+test_send_notice(void)
+{
+	char m1[] = "notice";
+	char m2[] = "notice test1";
+	char m3[] = "notice test2 ";
+	char m4[] = "notice test3  ";
+	char m5[] = "notice test4 test notice message";
+
+	CHECK_SEND_COMMAND(c_chan, m1, 1, "Usage: /notice <target> <message>", "");
+	CHECK_SEND_COMMAND(c_chan, m2, 1, "Usage: /notice <target> <message>", "");
+	CHECK_SEND_COMMAND(c_chan, m3, 1, "Usage: /notice <target> <message>", "");
+	CHECK_SEND_COMMAND(c_chan, m4, 0, "", "NOTICE test3 : ");
+	CHECK_SEND_COMMAND(c_chan, m5, 0, "", "NOTICE test4 :test notice message");
+}
+
+static void
+test_send_part(void)
+{
+	char m1[] = "part";
+	char m2[] = "part";
+	char m3[] = "part";
+	char m4[] = "part test part message";
+
+	CHECK_SEND_COMMAND(c_serv, m1, 1, "This is not a channel", "");
+	CHECK_SEND_COMMAND(c_priv, m2, 1, "This is not a channel", "");
+	CHECK_SEND_COMMAND(c_chan, m3, 0, "", "PART chan :" DEFAULT_PART_MESG);
+	CHECK_SEND_COMMAND(c_chan, m4, 0, "", "PART chan :test part message");
+}
+
+static void
+test_send_privmsg(void)
+{
+	char m1[] = "privmsg";
+	char m2[] = "privmsg test1";
+	char m3[] = "privmsg test2 ";
+	char m4[] = "privmsg test3  ";
+	char m5[] = "privmsg test4 test privmsg message";
+
+	CHECK_SEND_COMMAND(c_chan, m1, 1, "Usage: /privmsg <target> <message>", "");
+	CHECK_SEND_COMMAND(c_chan, m2, 1, "Usage: /privmsg <target> <message>", "");
+	CHECK_SEND_COMMAND(c_chan, m3, 1, "Usage: /privmsg <target> <message>", "");
+	CHECK_SEND_COMMAND(c_chan, m4, 0, "", "PRIVMSG test3 : ");
+	CHECK_SEND_COMMAND(c_chan, m5, 0, "", "PRIVMSG test4 :test privmsg message");
+}
+
+static void
+test_send_quit(void)
+{
+	char m1[] = "quit";
+	char m2[] = "quit";
+	char m3[] = "quit";
+	char m4[] = "quit test quit message";
+
+	CHECK_SEND_COMMAND(c_serv, m1, 0, "", "QUIT :" DEFAULT_QUIT_MESG);
+	CHECK_SEND_COMMAND(c_priv, m2, 0, "", "QUIT :" DEFAULT_QUIT_MESG);
+	CHECK_SEND_COMMAND(c_chan, m3, 0, "", "QUIT :" DEFAULT_QUIT_MESG);
+	CHECK_SEND_COMMAND(c_chan, m4, 0, "", "QUIT :test quit message");
+}
+
+static void
+test_send_topic(void)
+{
+	char m1[] = "topic";
+	char m2[] = "topic";
+	char m3[] = "topic";
+	char m4[] = "topic test new topic";
+
+	CHECK_SEND_COMMAND(c_serv, m1, 1, "This is not a channel", "");
+	CHECK_SEND_COMMAND(c_priv, m2, 1, "This is not a channel", "");
+	CHECK_SEND_COMMAND(c_chan, m3, 0, "", "TOPIC chan");
+	CHECK_SEND_COMMAND(c_chan, m4, 0, "", "TOPIC chan :test new topic");
 }
 
 static void
@@ -293,77 +368,23 @@ test_send_ctcp_version(void)
 }
 
 static void
-test_send_notice(void)
+test_send_ircv3_cap_ls(void)
 {
-	char m1[] = "notice";
-	char m2[] = "notice test1";
-	char m3[] = "notice test2 ";
-	char m4[] = "notice test3  ";
-	char m5[] = "notice test4 test notice message";
+	char m1[] = "cap-ls";
+	char m2[] = "cap-ls xxx";
 
-	CHECK_SEND_COMMAND(c_chan, m1, 1, "Usage: /notice <target> <message>", "");
-	CHECK_SEND_COMMAND(c_chan, m2, 1, "Usage: /notice <target> <message>", "");
-	CHECK_SEND_COMMAND(c_chan, m3, 1, "Usage: /notice <target> <message>", "");
-	CHECK_SEND_COMMAND(c_chan, m4, 0, "", "NOTICE test3 : ");
-	CHECK_SEND_COMMAND(c_chan, m5, 0, "", "NOTICE test4 :test notice message");
+	CHECK_SEND_COMMAND(c_chan, m1, 0, "", "CAP LS " IRCV3_CAP_VERSION);
+	CHECK_SEND_COMMAND(c_chan, m2, 1, "Usage: /cap-ls", "");
 }
 
 static void
-test_send_part(void)
+test_send_ircv3_cap_list(void)
 {
-	char m1[] = "part";
-	char m2[] = "part";
-	char m3[] = "part";
-	char m4[] = "part test part message";
+	char m1[] = "cap-list";
+	char m2[] = "cap-list xxx";
 
-	CHECK_SEND_COMMAND(c_serv, m1, 1, "This is not a channel", "");
-	CHECK_SEND_COMMAND(c_priv, m2, 1, "This is not a channel", "");
-	CHECK_SEND_COMMAND(c_chan, m3, 0, "", "PART chan :" DEFAULT_PART_MESG);
-	CHECK_SEND_COMMAND(c_chan, m4, 0, "", "PART chan :test part message");
-}
-
-static void
-test_send_privmsg(void)
-{
-	char m1[] = "privmsg";
-	char m2[] = "privmsg test1";
-	char m3[] = "privmsg test2 ";
-	char m4[] = "privmsg test3  ";
-	char m5[] = "privmsg test4 test privmsg message";
-
-	CHECK_SEND_COMMAND(c_chan, m1, 1, "Usage: /privmsg <target> <message>", "");
-	CHECK_SEND_COMMAND(c_chan, m2, 1, "Usage: /privmsg <target> <message>", "");
-	CHECK_SEND_COMMAND(c_chan, m3, 1, "Usage: /privmsg <target> <message>", "");
-	CHECK_SEND_COMMAND(c_chan, m4, 0, "", "PRIVMSG test3 : ");
-	CHECK_SEND_COMMAND(c_chan, m5, 0, "", "PRIVMSG test4 :test privmsg message");
-}
-
-static void
-test_send_quit(void)
-{
-	char m1[] = "quit";
-	char m2[] = "quit";
-	char m3[] = "quit";
-	char m4[] = "quit test quit message";
-
-	CHECK_SEND_COMMAND(c_serv, m1, 0, "", "QUIT :" DEFAULT_QUIT_MESG);
-	CHECK_SEND_COMMAND(c_priv, m2, 0, "", "QUIT :" DEFAULT_QUIT_MESG);
-	CHECK_SEND_COMMAND(c_chan, m3, 0, "", "QUIT :" DEFAULT_QUIT_MESG);
-	CHECK_SEND_COMMAND(c_chan, m4, 0, "", "QUIT :test quit message");
-}
-
-static void
-test_send_topic(void)
-{
-	char m1[] = "topic";
-	char m2[] = "topic";
-	char m3[] = "topic";
-	char m4[] = "topic test new topic";
-
-	CHECK_SEND_COMMAND(c_serv, m1, 1, "This is not a channel", "");
-	CHECK_SEND_COMMAND(c_priv, m2, 1, "This is not a channel", "");
-	CHECK_SEND_COMMAND(c_chan, m3, 0, "", "TOPIC chan");
-	CHECK_SEND_COMMAND(c_chan, m4, 0, "", "TOPIC chan :test new topic");
+	CHECK_SEND_COMMAND(c_chan, m1, 0, "", "CAP LIST");
+	CHECK_SEND_COMMAND(c_chan, m2, 1, "Usage: /cap-list", "");
 }
 
 int
@@ -384,6 +405,9 @@ main(void)
 #undef X
 #define X(cmd) TESTCASE(test_send_ctcp_##cmd),
 		SEND_CTCP_HANDLERS
+#undef X
+#define X(cmd) TESTCASE(test_send_ircv3_cap_##cmd),
+		SEND_IRCV3_CAP_HANDLERS
 #undef X
 	};
 

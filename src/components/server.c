@@ -3,6 +3,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "src/components/ircv3_cap.h"
+
 #include "src/components/server.h"
 #include "src/state.h"
 #include "src/utils/utils.h"
@@ -42,6 +44,7 @@ server(const char *host, const char *port, const char *pass, const char *user, c
 	s->channel = channel(host, CHANNEL_T_SERVER);
 	s->casemapping = CASEMAPPING_RFC1459;
 	s->mode_str.type = MODE_STR_USERMODE;
+	ircv3_caps(&(s->ircv3_caps));
 	mode_cfg(&(s->mode_cfg), NULL, MODE_CFG_DEFAULTS);
 	/* FIXME: remove server pointer from channel, remove
 	 * server's channel from clist */
@@ -130,6 +133,7 @@ server_list_del(struct server_list *sl, struct server *s)
 void
 server_reset(struct server *s)
 {
+	ircv3_caps_reset(&(s->ircv3_caps));
 	mode_reset(&(s->usermodes), &(s->mode_str));
 	s->ping = 0;
 	s->quitting = 0;

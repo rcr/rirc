@@ -4,6 +4,7 @@
 #include "config.h"
 #include "src/components/buffer.h"
 #include "src/components/channel.h"
+#include "src/components/ircv3_cap.h"
 #include "src/components/server.h"
 #include "src/handlers/irc_send.gperf.out"
 #include "src/handlers/irc_send.h"
@@ -97,23 +98,74 @@ targ_or_type(struct channel *c, char *m, enum channel_t type)
 }
 
 static int
-send_ircv3_cap_ls(struct server *s, struct channel *c, char *m)
+send_notice(struct server *s, struct channel *c, char *m)
 {
-	if (strtrim(&m))
-		failf(c, "Usage: /cap-ls");
+	const char *targ;
 
-	sendf(s, c, "CAP LS 302");
+	if (!(targ = strsep(&m)))
+		failf(c, "Usage: /notice <target> <message>");
+
+	if (!m || !*m)
+		failf(c, "Usage: /notice <target> <message>");
+
+	sendf(s, c, "NOTICE %s :%s", targ, m);
 
 	return 0;
 }
 
 static int
-send_ircv3_cap_list(struct server *s, struct channel *c, char *m)
+send_part(struct server *s, struct channel *c, char *m)
 {
-	if (strtrim(&m))
-		failf(c, "Usage: /cap-list");
+	if (c->type != CHANNEL_T_CHANNEL)
+		failf(c, "This is not a channel");
 
-	sendf(s, c, "CAP LIST");
+	if (strtrim(&m))
+		sendf(s, c, "PART %s :%s", c->name, m);
+	else
+		sendf(s, c, "PART %s :%s", c->name, DEFAULT_PART_MESG);
+
+	return 0;
+}
+
+static int
+send_privmsg(struct server *s, struct channel *c, char *m)
+{
+	const char *targ;
+
+	if (!(targ = strsep(&m)))
+		failf(c, "Usage: /privmsg <target> <message>");
+
+	if (!m || !*m)
+		failf(c, "Usage: /privmsg <target> <message>");
+
+	sendf(s, c, "PRIVMSG %s :%s", targ, m);
+
+	return 0;
+}
+
+static int
+send_quit(struct server *s, struct channel *c, char *m)
+{
+	s->quitting = 1;
+
+	if (strtrim(&m))
+		sendf(s, c, "QUIT :%s", m);
+	else
+		sendf(s, c, "QUIT :%s", DEFAULT_PART_MESG);
+
+	return 0;
+}
+
+static int
+send_topic(struct server *s, struct channel *c, char *m)
+{
+	if (c->type != CHANNEL_T_CHANNEL)
+		failf(c, "This is not a channel");
+
+	if (strtrim(&m))
+		sendf(s, c, "TOPIC %s :%s", c->name, m);
+	else
+		sendf(s, c, "TOPIC %s", c->name);
 
 	return 0;
 }
@@ -224,74 +276,23 @@ send_ctcp_version(struct server *s, struct channel *c, char *m)
 }
 
 static int
-send_notice(struct server *s, struct channel *c, char *m)
+send_ircv3_cap_ls(struct server *s, struct channel *c, char *m)
 {
-	const char *targ;
-
-	if (!(targ = strsep(&m)))
-		failf(c, "Usage: /notice <target> <message>");
-
-	if (!m || !*m)
-		failf(c, "Usage: /notice <target> <message>");
-
-	sendf(s, c, "NOTICE %s :%s", targ, m);
-
-	return 0;
-}
-
-static int
-send_part(struct server *s, struct channel *c, char *m)
-{
-	if (c->type != CHANNEL_T_CHANNEL)
-		failf(c, "This is not a channel");
-
 	if (strtrim(&m))
-		sendf(s, c, "PART %s :%s", c->name, m);
-	else
-		sendf(s, c, "PART %s :%s", c->name, DEFAULT_PART_MESG);
+		failf(c, "Usage: /cap-ls");
+
+	sendf(s, c, "CAP LS " IRCV3_CAP_VERSION);
 
 	return 0;
 }
 
 static int
-send_privmsg(struct server *s, struct channel *c, char *m)
+send_ircv3_cap_list(struct server *s, struct channel *c, char *m)
 {
-	const char *targ;
-
-	if (!(targ = strsep(&m)))
-		failf(c, "Usage: /privmsg <target> <message>");
-
-	if (!m || !*m)
-		failf(c, "Usage: /privmsg <target> <message>");
-
-	sendf(s, c, "PRIVMSG %s :%s", targ, m);
-
-	return 0;
-}
-
-static int
-send_quit(struct server *s, struct channel *c, char *m)
-{
-	s->quitting = 1;
-
 	if (strtrim(&m))
-		sendf(s, c, "QUIT :%s", m);
-	else
-		sendf(s, c, "QUIT :%s", DEFAULT_PART_MESG);
+		failf(c, "Usage: /cap-list");
 
-	return 0;
-}
-
-static int
-send_topic(struct server *s, struct channel *c, char *m)
-{
-	if (c->type != CHANNEL_T_CHANNEL)
-		failf(c, "This is not a channel");
-
-	if (strtrim(&m))
-		sendf(s, c, "TOPIC %s :%s", c->name, m);
-	else
-		sendf(s, c, "TOPIC %s", c->name);
+	sendf(s, c, "CAP LIST");
 
 	return 0;
 }

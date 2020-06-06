@@ -34,6 +34,10 @@ Stateful component hierarchy
        |
        |__connection
        |
+       |__ircv3_caps
+       |   |
+       |   |__*ircv3_cap
+       |
        |__mode
        |__mode_str
        |__mode_cfg

@@ -599,7 +599,7 @@ irc_recv_numeric(struct server *s, struct irc_message *m)
 static int
 recv_cap(struct server *s, struct irc_message *m)
 {
-	return ircv3_CAP(s, m);
+	return ircv3_recv_CAP(s, m);
 }
 
 static int
