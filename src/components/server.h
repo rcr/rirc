@@ -3,9 +3,8 @@
 
 #include "src/components/buffer.h"
 #include "src/components/channel.h"
-#include "src/components/ircv3_cap.h"
+#include "src/components/ircv3.h"
 #include "src/components/mode.h"
-#include "src/utils/utils.h"
 
 // TODO: move this to utils
 #define IRC_MESSAGE_LEN 510

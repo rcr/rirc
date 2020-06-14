@@ -167,6 +167,7 @@ static const irc_recv_f irc_numerics[] = {
 	[407] = irc_error,  /* ERR_TOOMANYTARGETS */
 	[408] = irc_error,  /* ERR_NOSUCHSERVICE */
 	[409] = irc_error,  /* ERR_NOORIGIN */
+	[410] = irc_error,  /* ERR_INVALIDCAPCMD */
 	[411] = irc_error,  /* ERR_NORECIPIENT */
 	[412] = irc_error,  /* ERR_NOTEXTTOSEND */
 	[413] = irc_error,  /* ERR_NOTOPLEVEL */

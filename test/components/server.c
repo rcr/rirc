@@ -2,7 +2,7 @@
 #include "src/components/buffer.c"
 #include "src/components/channel.c"
 #include "src/components/input.c"
-#include "src/components/ircv3_cap.c"
+#include "src/components/ircv3.c"
 #include "src/components/mode.c"
 #include "src/components/server.c"
 #include "src/components/user.c"

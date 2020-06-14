@@ -42,7 +42,7 @@ See: https://www.gnu.org/software/gperf/
 
 Initialize, configure and build mbedtls:
 
-```bash
+```
 git submodule init
 git submodule update --recursive
 cd mbedtls

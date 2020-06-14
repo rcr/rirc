@@ -3,8 +3,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "src/components/ircv3_cap.h"
-
 #include "src/components/server.h"
 #include "src/state.h"
 #include "src/utils/utils.h"

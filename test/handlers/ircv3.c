@@ -6,12 +6,12 @@
 	X("cap-2", cap_2, 0) \
 	X("cap-3", cap_3, IRCV3_CAP_AUTO) \
 	X("cap-4", cap_4, IRCV3_CAP_AUTO) \
-	X("cap-5", cap_5, IRCV3_CAP_AUTO)
+	X("cap-5", cap_5, (IRCV3_CAP_AUTO | IRCV3_CAP_NO_DEL))
 
 #include "src/components/buffer.c"
 #include "src/components/channel.c"
 #include "src/components/input.c"
-#include "src/components/ircv3_cap.c"
+#include "src/components/ircv3.c"
 #include "src/components/mode.c"
 #include "src/components/server.c"
 #include "src/components/user.c"
@@ -227,29 +227,41 @@ test_ircv3_CAP_LS(void)
 
 	/* test with leading ':' */
 	test_buf_reset();
+	ircv3_caps_reset(&(s->ircv3_caps));
 	IRC_MESSAGE_PARSE("CAP * LS :cap-1");
 	assert_eq(irc_recv(s, &m), 0);
 	assert_eq(send_buf_n, 1);
 	assert_strcmp(send_buf[0], "CAP REQ :cap-1");
+	assert_eq(s->ircv3_caps.cap_1.supported, 1);
+	assert_eq(s->ircv3_caps.cap_2.supported, 0);
 
 	/* test multiple caps, cap_2 is non-auto */
 	test_buf_reset();
+	ircv3_caps_reset(&(s->ircv3_caps));
 	IRC_MESSAGE_PARSE("CAP * LS :cap-1 cap-2 cap-3");
 	assert_eq(irc_recv(s, &m), 0);
 	assert_eq(send_buf_n, 2);
 	assert_strcmp(send_buf[0], "CAP REQ :cap-1");
 	assert_strcmp(send_buf[1], "CAP REQ :cap-3");
+	assert_eq(s->ircv3_caps.cap_1.supported, 1);
+	assert_eq(s->ircv3_caps.cap_2.supported, 1);
+	assert_eq(s->ircv3_caps.cap_3.supported, 1);
 
 	/* test multiple caps, with unsupported */
 	test_buf_reset();
+	ircv3_caps_reset(&(s->ircv3_caps));
 	IRC_MESSAGE_PARSE("CAP * LS :cap-1 foo cap-2 bar cap-3");
 	assert_eq(irc_recv(s, &m), 0);
 	assert_eq(send_buf_n, 2);
 	assert_strcmp(send_buf[0], "CAP REQ :cap-1");
 	assert_strcmp(send_buf[1], "CAP REQ :cap-3");
+	assert_eq(s->ircv3_caps.cap_1.supported, 1);
+	assert_eq(s->ircv3_caps.cap_2.supported, 1);
+	assert_eq(s->ircv3_caps.cap_3.supported, 1);
 
 	/* test multiline */
 	test_buf_reset();
+	ircv3_caps_reset(&(s->ircv3_caps));
 	IRC_MESSAGE_PARSE("CAP * LS * cap-1");
 	assert_eq(irc_recv(s, &m), 0);
 	assert_eq(send_buf_n, 0);
@@ -262,6 +274,10 @@ test_ircv3_CAP_LS(void)
 	assert_strcmp(send_buf[0], "CAP REQ :cap-1");
 	assert_strcmp(send_buf[1], "CAP REQ :cap-3");
 	assert_strcmp(send_buf[2], "CAP REQ :cap-4");
+	assert_eq(s->ircv3_caps.cap_1.supported, 1);
+	assert_eq(s->ircv3_caps.cap_2.supported, 1);
+	assert_eq(s->ircv3_caps.cap_3.supported, 1);
+	assert_eq(s->ircv3_caps.cap_4.supported, 1);
 
 	/* test registered */
 	test_buf_reset();
@@ -388,9 +404,9 @@ test_ircv3_CAP_ACK(void)
 	assert_eq(send_buf_n, 0);
 	assert_eq(line_buf_n, 5);
 	assert_strcmp(line_buf[0], "capability change accepted: cap-1");
-	assert_strcmp(line_buf[1], "capability change accepted: cap-aaa (error: not supported)");
+	assert_strcmp(line_buf[1], "CAP ACK: 'cap-aaa' not supported");
 	assert_strcmp(line_buf[2], "capability change accepted: cap-2");
-	assert_strcmp(line_buf[3], "capability change accepted: cap-bbb (error: not supported)");
+	assert_strcmp(line_buf[3], "CAP ACK: 'cap-bbb' not supported");
 	assert_strcmp(line_buf[4], "CAP ACK: parameter errors");
 
 	/* unregistered, no error */
@@ -398,33 +414,44 @@ test_ircv3_CAP_ACK(void)
 	s->registered = 0;
 	s->ircv3_caps.cap_1.set = 0;
 	s->ircv3_caps.cap_2.set = 1;
+	s->ircv3_caps.cap_3.set = 1;
 	s->ircv3_caps.cap_1.req = 1;
 	s->ircv3_caps.cap_2.req = 1;
+	s->ircv3_caps.cap_3.req = 1;
 	IRC_MESSAGE_PARSE("CAP * ACK :cap-1 -cap-2");
 	assert_eq(irc_recv(s, &m), 0);
-	assert_eq(send_buf_n, 1);
+	assert_eq(send_buf_n, 0);
 	assert_eq(line_buf_n, 2);
 	assert_strcmp(line_buf[0], "capability change accepted: cap-1");
 	assert_strcmp(line_buf[1], "capability change accepted: -cap-2");
-	assert_strcmp(send_buf[0], "CAP END");
 	assert_eq(s->ircv3_caps.cap_1.set, 1);
 	assert_eq(s->ircv3_caps.cap_2.set, 0);
+	IRC_MESSAGE_PARSE("CAP * ACK :-cap-3");
+	assert_eq(irc_recv(s, &m), 0);
+	assert_eq(send_buf_n, 1);
+	assert_eq(line_buf_n, 3);
+	assert_strcmp(line_buf[2], "capability change accepted: -cap-3");
+	assert_strcmp(send_buf[0], "CAP END");
 
 	/* registered, error */
 	test_buf_reset();
 	s->registered = 1;
 	s->ircv3_caps.cap_1.set = 0;
-	s->ircv3_caps.cap_2.set = 0;
+	s->ircv3_caps.cap_2.set = 1;
+	s->ircv3_caps.cap_3.set = 0;
+	s->ircv3_caps.cap_4.set = 1;
 	s->ircv3_caps.cap_1.req = 1;
 	s->ircv3_caps.cap_2.req = 1;
-	IRC_MESSAGE_PARSE("CAP * ACK :cap-1 cap-aaa cap-2 cap-bbb");
+	s->ircv3_caps.cap_3.req = 1;
+	s->ircv3_caps.cap_4.req = 0;
+	IRC_MESSAGE_PARSE("CAP * ACK :cap-1 cap-2 -cap-3 -cap-4");
 	assert_eq(irc_recv(s, &m), 1);
 	assert_eq(send_buf_n, 0);
 	assert_eq(line_buf_n, 5);
 	assert_strcmp(line_buf[0], "capability change accepted: cap-1");
-	assert_strcmp(line_buf[1], "capability change accepted: cap-aaa (error: not supported)");
-	assert_strcmp(line_buf[2], "capability change accepted: cap-2");
-	assert_strcmp(line_buf[3], "capability change accepted: cap-bbb (error: not supported)");
+	assert_strcmp(line_buf[1], "CAP ACK: 'cap-2' was set");
+	assert_strcmp(line_buf[2], "CAP ACK: 'cap-3' was not set");
+	assert_strcmp(line_buf[3], "CAP ACK: '-cap-4' was not requested");
 	assert_strcmp(line_buf[4], "CAP ACK: parameter errors");
 
 	/* registered, no error */
@@ -452,8 +479,6 @@ test_ircv3_CAP_NAK(void)
 	struct server *s = server("host", "post", NULL, "user", "real");
 	struct irc_message m;
 
-	s->registered = 0;
-
 	/* test empty NAK */
 	test_buf_reset();
 	IRC_MESSAGE_PARSE("CAP * NAK");
@@ -470,72 +495,188 @@ test_ircv3_CAP_NAK(void)
 	assert_eq(line_buf_n, 1);
 	assert_strcmp(line_buf[0], "CAP NAK: parameter is empty");
 
-	/* unregisterd, error */
+	/* test unsupported caps */
 	test_buf_reset();
-	s->registered = 0;
-	s->ircv3_caps.cap_1.set = 0;
-	s->ircv3_caps.cap_2.set = 0;
-	s->ircv3_caps.cap_1.req = 1;
-	s->ircv3_caps.cap_2.req = 1;
-	IRC_MESSAGE_PARSE("CAP * NAK :cap-1 cap-aaa cap-2 cap-bbb");
-	assert_eq(irc_recv(s, &m), 1);
-	assert_eq(send_buf_n, 0);
-	assert_eq(line_buf_n, 5);
-	assert_strcmp(line_buf[0], "capability change rejected: cap-1");
-	assert_strcmp(line_buf[1], "capability change rejected: cap-aaa (error: not supported)");
-	assert_strcmp(line_buf[2], "capability change rejected: cap-2");
-	assert_strcmp(line_buf[3], "capability change rejected: cap-bbb (error: not supported)");
-	assert_strcmp(line_buf[4], "CAP NAK: parameter errors");
-
-	/* unregistered, no error */
-	test_buf_reset();
-	s->registered = 0;
-	s->ircv3_caps.cap_1.set = 0;
-	s->ircv3_caps.cap_2.set = 1;
-	s->ircv3_caps.cap_1.req = 1;
-	s->ircv3_caps.cap_2.req = 1;
-	IRC_MESSAGE_PARSE("CAP * NAK :cap-1 -cap-2");
+	IRC_MESSAGE_PARSE("CAP * NAK :cap-aaa cap-bbb cap-ccc");
 	assert_eq(irc_recv(s, &m), 0);
 	assert_eq(send_buf_n, 1);
-	assert_eq(line_buf_n, 2);
-	assert_strcmp(line_buf[0], "capability change rejected: cap-1");
-	assert_strcmp(line_buf[1], "capability change rejected: -cap-2");
+	assert_eq(line_buf_n, 3);
+	assert_strcmp(line_buf[0], "capability change rejected: cap-aaa");
+	assert_strcmp(line_buf[1], "capability change rejected: cap-bbb");
+	assert_strcmp(line_buf[2], "capability change rejected: cap-ccc");
 	assert_strcmp(send_buf[0], "CAP END");
-	assert_eq(s->ircv3_caps.cap_1.set, 0);
-	assert_eq(s->ircv3_caps.cap_2.set, 1);
 
-	/* registered, error */
+	/* test supported caps */
 	test_buf_reset();
-	s->registered = 1;
-	s->ircv3_caps.cap_1.set = 0;
-	s->ircv3_caps.cap_2.set = 0;
-	s->ircv3_caps.cap_1.req = 1;
+	s->registered = 0;
+	s->ircv3_caps.cap_1.req = 0;
 	s->ircv3_caps.cap_2.req = 1;
-	IRC_MESSAGE_PARSE("CAP * NAK :cap-1 cap-aaa cap-2 cap-bbb");
-	assert_eq(irc_recv(s, &m), 1);
-	assert_eq(send_buf_n, 0);
-	assert_eq(line_buf_n, 5);
-	assert_strcmp(line_buf[0], "capability change rejected: cap-1");
-	assert_strcmp(line_buf[1], "capability change rejected: cap-aaa (error: not supported)");
-	assert_strcmp(line_buf[2], "capability change rejected: cap-2");
-	assert_strcmp(line_buf[3], "capability change rejected: cap-bbb (error: not supported)");
-	assert_strcmp(line_buf[4], "CAP NAK: parameter errors");
-
-	/* registered, no error */
-	test_buf_reset();
-	s->registered = 1;
+	s->ircv3_caps.cap_3.req = 1;
 	s->ircv3_caps.cap_1.set = 0;
 	s->ircv3_caps.cap_2.set = 1;
-	s->ircv3_caps.cap_1.req = 1;
-	s->ircv3_caps.cap_2.req = 1;
-	IRC_MESSAGE_PARSE("CAP * NAK :cap-1 -cap-2");
+	s->ircv3_caps.cap_3.set = 1;
+	IRC_MESSAGE_PARSE("CAP * NAK :cap-1 cap-2");
 	assert_eq(irc_recv(s, &m), 0);
 	assert_eq(send_buf_n, 0);
 	assert_eq(line_buf_n, 2);
 	assert_strcmp(line_buf[0], "capability change rejected: cap-1");
-	assert_strcmp(line_buf[1], "capability change rejected: -cap-2");
+	assert_strcmp(line_buf[1], "capability change rejected: cap-2");
+	assert_eq(s->ircv3_caps.cap_1.req, 0);
+	assert_eq(s->ircv3_caps.cap_2.req, 0);
 	assert_eq(s->ircv3_caps.cap_1.set, 0);
 	assert_eq(s->ircv3_caps.cap_2.set, 1);
+	IRC_MESSAGE_PARSE("CAP * NAK :cap-3");
+	assert_eq(irc_recv(s, &m), 0);
+	assert_eq(send_buf_n, 1);
+	assert_eq(line_buf_n, 3);
+	assert_strcmp(line_buf[2], "capability change rejected: cap-3");
+	assert_strcmp(send_buf[0], "CAP END");
+
+	/* test registered - don't send END */
+	test_buf_reset();
+	s->registered = 1;
+	s->ircv3_caps.cap_1.req = 0;
+	s->ircv3_caps.cap_2.req = 1;
+	s->ircv3_caps.cap_1.set = 0;
+	s->ircv3_caps.cap_2.set = 1;
+	IRC_MESSAGE_PARSE("CAP * NAK :cap-1 cap-2");
+	assert_eq(irc_recv(s, &m), 0);
+	assert_eq(send_buf_n, 0);
+	assert_eq(line_buf_n, 2);
+	assert_strcmp(line_buf[0], "capability change rejected: cap-1");
+	assert_strcmp(line_buf[1], "capability change rejected: cap-2");
+	assert_eq(s->ircv3_caps.cap_1.req, 0);
+	assert_eq(s->ircv3_caps.cap_2.req, 0);
+	assert_eq(s->ircv3_caps.cap_1.set, 0);
+	assert_eq(s->ircv3_caps.cap_2.set, 1);
+
+	server_free(s);
+}
+
+static void
+test_ircv3_CAP_DEL(void)
+{
+	struct server *s = server("host", "post", NULL, "user", "real");
+	struct irc_message m;
+
+	/* test empty DEL */
+	test_buf_reset();
+	IRC_MESSAGE_PARSE("CAP * DEL");
+	assert_eq(irc_recv(s, &m), 1);
+	assert_eq(send_buf_n, 0);
+	assert_eq(line_buf_n, 1);
+	assert_strcmp(line_buf[0], "CAP DEL: parameter is null");
+
+	/* test empty DEL, with leading ':' */
+	test_buf_reset();
+	IRC_MESSAGE_PARSE("CAP * DEL :");
+	assert_eq(irc_recv(s, &m), 1);
+	assert_eq(send_buf_n, 0);
+	assert_eq(line_buf_n, 1);
+	assert_strcmp(line_buf[0], "CAP DEL: parameter is empty");
+
+	/* test cap-5 doesn't support DEL */
+	test_buf_reset();
+	IRC_MESSAGE_PARSE("CAP * DEL :cap-5");
+	assert_eq(irc_recv(s, &m), 1);
+	assert_eq(send_buf_n, 0);
+	assert_eq(line_buf_n, 1);
+	assert_strcmp(line_buf[0], "CAP DEL: 'cap-5' doesn't support DEL");
+
+	/* test unsupported caps */
+	test_buf_reset();
+	IRC_MESSAGE_PARSE("CAP * DEL :cap-aaa cap-bbb cap-ccc");
+	assert_eq(irc_recv(s, &m), 0);
+	assert_eq(send_buf_n, 0);
+	assert_eq(line_buf_n, 0);
+
+	/* test supported caps */
+	test_buf_reset();
+	s->ircv3_caps.cap_1.req = 0;
+	s->ircv3_caps.cap_2.req = 1;
+	s->ircv3_caps.cap_1.set = 1;
+	s->ircv3_caps.cap_2.set = 0;
+	s->ircv3_caps.cap_1.supported = 1;
+	s->ircv3_caps.cap_2.supported = 1;
+	IRC_MESSAGE_PARSE("CAP * DEL :cap-1 cap-2");
+	assert_eq(irc_recv(s, &m), 0);
+	assert_eq(send_buf_n, 0);
+	assert_eq(line_buf_n, 2);
+	assert_strcmp(line_buf[0], "capability lost: cap-1");
+	assert_strcmp(line_buf[1], "capability lost: cap-2");
+	assert_eq(s->ircv3_caps.cap_1.req, 0);
+	assert_eq(s->ircv3_caps.cap_2.req, 0);
+	assert_eq(s->ircv3_caps.cap_1.set, 0);
+	assert_eq(s->ircv3_caps.cap_2.set, 0);
+	assert_eq(s->ircv3_caps.cap_1.supported, 0);
+	assert_eq(s->ircv3_caps.cap_2.supported, 0);
+
+	server_free(s);
+}
+
+static void
+test_ircv3_CAP_NEW(void)
+{
+	struct server *s = server("host", "post", NULL, "user", "real");
+	struct irc_message m;
+
+	/* test empty NEW */
+	test_buf_reset();
+	IRC_MESSAGE_PARSE("CAP * NEW");
+	assert_eq(irc_recv(s, &m), 1);
+	assert_eq(send_buf_n, 0);
+	assert_eq(line_buf_n, 1);
+	assert_strcmp(line_buf[0], "CAP NEW: parameter is null");
+
+	/* test empty DEL, with leading ':' */
+	test_buf_reset();
+	IRC_MESSAGE_PARSE("CAP * NEW :");
+	assert_eq(irc_recv(s, &m), 1);
+	assert_eq(send_buf_n, 0);
+	assert_eq(line_buf_n, 1);
+	assert_strcmp(line_buf[0], "CAP NEW: parameter is empty");
+
+	/* test unsupported caps */
+	test_buf_reset();
+	IRC_MESSAGE_PARSE("CAP * NEW :cap-aaa cap-bbb cap-ccc");
+	assert_eq(irc_recv(s, &m), 0);
+	assert_eq(send_buf_n, 0);
+	assert_eq(line_buf_n, 0);
+
+	/* test supported caps */
+	test_buf_reset();
+	s->ircv3_caps.cap_3.req = 0;
+	s->ircv3_caps.cap_4.req = 0;
+	s->ircv3_caps.cap_5.req = 1; /* cap req - don't send REQ */
+	s->ircv3_caps.cap_3.set = 1; /* cap set - don't send REQ */
+	s->ircv3_caps.cap_4.set = 0;
+	s->ircv3_caps.cap_5.set = 0;
+	s->ircv3_caps.cap_3.supported = 0;
+	s->ircv3_caps.cap_4.supported = 0;
+	s->ircv3_caps.cap_5.supported = 0;
+	IRC_MESSAGE_PARSE("CAP * NEW :cap-3 cap-4 cap-5");
+	assert_eq(irc_recv(s, &m), 0);
+	assert_eq(send_buf_n, 1);
+	assert_eq(line_buf_n, 3);
+	assert_strcmp(line_buf[0], "new capability: cap-3");
+	assert_strcmp(line_buf[1], "new capability: cap-4");
+	assert_strcmp(line_buf[2], "new capability: cap-5");
+	assert_strcmp(send_buf[0], "CAP REQ :cap-4");
+	assert_eq(s->ircv3_caps.cap_3.supported, 1);
+	assert_eq(s->ircv3_caps.cap_4.supported, 1);
+	assert_eq(s->ircv3_caps.cap_5.supported, 1);
+
+	/* test supported caps, cap_2 is non-auto */
+	test_buf_reset();
+	s->ircv3_caps.cap_2.req = 0;
+	s->ircv3_caps.cap_2.set = 1;
+	s->ircv3_caps.cap_2.supported = 0;
+	IRC_MESSAGE_PARSE("CAP * NEW :cap-2");
+	assert_eq(irc_recv(s, &m), 0);
+	assert_eq(send_buf_n, 0);
+	assert_eq(line_buf_n, 1);
+	assert_strcmp(line_buf[0], "new capability: cap-2");
+	assert_eq(s->ircv3_caps.cap_2.supported, 1);
 
 	server_free(s);
 }
@@ -549,6 +690,8 @@ main(void)
 		TESTCASE(test_ircv3_CAP_LIST),
 		TESTCASE(test_ircv3_CAP_ACK),
 		TESTCASE(test_ircv3_CAP_NAK),
+		TESTCASE(test_ircv3_CAP_DEL),
+		TESTCASE(test_ircv3_CAP_NEW),
 	};
 
 	return run_tests(tests);
