@@ -252,13 +252,17 @@ test_recv_ctcp_request_finger(void)
 static void
 test_recv_ctcp_request_ping(void)
 {
-	CHECK_REQUEST(":nick!user@host PRIVMSG me :\001PING 0\001", 0, 1, 1,
+	CHECK_REQUEST(":nick!user@host PRIVMSG me :\001PING", 0, 1, 1,
 		"CTCP PING from nick",
+		"NOTICE nick :\001PING\001");
+
+	CHECK_REQUEST(":nick!user@host PRIVMSG me :\001PING 0\001", 0, 1, 1,
+		"CTCP PING from nick (0)",
 		"NOTICE nick :\001PING 0\001");
 
-	CHECK_REQUEST(":nick!user@host PRIVMSG me :\001PING 1 123 abc 0\001", 0, 1, 1,
-		"CTCP PING from nick",
-		"NOTICE nick :\001PING 1 123 abc 0\001");
+	CHECK_REQUEST(":nick!user@host PRIVMSG me :\001PING 1 123 abc\001", 0, 1, 1,
+		"CTCP PING from nick (1 123 abc)",
+		"NOTICE nick :\001PING 1 123 abc\001");
 }
 
 static void
