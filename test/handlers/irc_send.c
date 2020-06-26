@@ -233,10 +233,15 @@ test_send_ctcp_ping(void)
 
 	char *p1;
 	char *p2;
+	const char *arg1;
+	const char *arg2;
+	const char *arg3;
 
 	CHECK_SEND_COMMAND(c_chan, m1, 1, 1, 0, "Usage: /ctcp-ping <target>", "");
 	CHECK_SEND_COMMAND(c_serv, m2, 1, 1, 0, "Usage: /ctcp-ping <target>", "");
 
+	/* test send to channel */
+	errno = 0;
 	mock_reset_io();
 	mock_reset_state();
 
@@ -250,12 +255,22 @@ test_send_ctcp_ping(void)
 	*p1++ = 0;
 	*p2++ = 0;
 
-	assert_ptr_not_null(strsep(&p1));
-	assert_ptr_not_null(strsep(&p1));
-
-	assert_strcmp(mock_line[0], "");
+	assert_eq(mock_line_n, 0);
+	assert_eq(mock_send_n, 1);
+	/* truncated by ctcp delimeter */
 	assert_strcmp(mock_send[0], "PRIVMSG priv :");
 
+	assert_ptr_not_null((arg1 = strsep(&p1)));
+	assert_ptr_not_null((arg2 = strsep(&p1)));
+	assert_ptr_not_null((arg3 = strsep(&p1)));
+
+	assert_strcmp(arg1, "PING");
+	assert_gt(strtoul(arg2, NULL, 10), 0); /* sec */
+	assert_gt(strtoul(arg3, NULL, 10), 0); /* usec */
+	assert_eq(errno, 0);
+
+	/* test send to target */
+	errno = 0;
 	mock_reset_io();
 	mock_reset_state();
 
@@ -269,11 +284,19 @@ test_send_ctcp_ping(void)
 	*p1++ = 0;
 	*p2++ = 0;
 
-	assert_ptr_not_null(strsep(&p1));
-	assert_ptr_not_null(strsep(&p1));
-
-	assert_strcmp(mock_line[0], "");
+	assert_eq(mock_line_n, 0);
+	assert_eq(mock_send_n, 1);
+	/* truncated by ctcp delimeter */
 	assert_strcmp(mock_send[0], "PRIVMSG targ :");
+
+	assert_ptr_not_null((arg1 = strsep(&p1)));
+	assert_ptr_not_null((arg2 = strsep(&p1)));
+	assert_ptr_not_null((arg3 = strsep(&p1)));
+
+	assert_strcmp(arg1, "PING");
+	assert_gt(strtoul(arg2, NULL, 10), 0); /* sec */
+	assert_gt(strtoul(arg3, NULL, 10), 0); /* usec */
+	assert_eq(errno, 0);
 }
 
 static void
