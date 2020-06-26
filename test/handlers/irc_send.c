@@ -10,22 +10,29 @@
 #include "src/handlers/irc_send.c"
 #include "src/utils/utils.c"
 
-#define CHECK_SEND_PRIVMSG(C, M, R, F, S) \
+#include "test/io.mock.c"
+#include "test/state.mock.c"
+
+#define CHECK_SEND_PRIVMSG(C, M, RET, LINE_N, SEND_N, LINE, SEND) \
 	do { \
-	    send_buf[0] = 0; \
-	    fail_buf[0] = 0; \
-	    assert_eq(irc_send_privmsg(s, (C), (M)), (R)); \
-	    assert_strcmp(fail_buf, (F)); \
-	    assert_strcmp(send_buf, (S)); \
+		mock_reset_io(); \
+		mock_reset_state(); \
+		assert_eq(irc_send_privmsg(s, (C), (M)), (RET)); \
+		assert_eq(mock_line_n, (LINE_N)); \
+		assert_eq(mock_send_n, (SEND_N)); \
+		assert_strcmp(mock_line[0], (LINE)); \
+		assert_strcmp(mock_send[0], (SEND)); \
 	} while (0)
 
-#define CHECK_SEND_COMMAND(C, M, R, F, S) \
+#define CHECK_SEND_COMMAND(C, M, RET, LINE_N, SEND_N, LINE, SEND) \
 	do { \
-	    send_buf[0] = 0; \
-	    fail_buf[0] = 0; \
-	    assert_eq(irc_send_command(s, (C), (M)), (R)); \
-	    assert_strcmp(fail_buf, (F)); \
-	    assert_strcmp(send_buf, (S)); \
+		mock_reset_io(); \
+		mock_reset_state(); \
+		assert_eq(irc_send_command(s, (C), (M)), (RET)); \
+		assert_eq(mock_line_n, (LINE_N)); \
+		assert_eq(mock_send_n, (SEND_N)); \
+		assert_strcmp(mock_line[0], (LINE)); \
+		assert_strcmp(mock_send[0], (SEND)); \
 	} while (0)
 
 #define X(cmd) static void test_send_##cmd(void);
@@ -36,60 +43,10 @@ SEND_HANDLERS
 SEND_CTCP_HANDLERS
 #undef X
 
-static char send_buf[1024];
-static char fail_buf[1024];
 static struct channel *c_chan;
 static struct channel *c_priv;
 static struct channel *c_serv;
 static struct server *s;
-
-/* Mock state.c */
-void
-newlinef(struct channel *c, enum buffer_line_t t, const char *f, const char *fmt, ...)
-{
-	va_list ap;
-
-	UNUSED(c);
-	UNUSED(f);
-	UNUSED(t);
-
-	va_start(ap, fmt);
-	assert_gt(vsnprintf(fail_buf, sizeof(fail_buf), fmt, ap), 0);
-	va_end(ap);
-}
-
-void
-newline(struct channel *c, enum buffer_line_t t, const char *f, const char *fmt)
-{
-	UNUSED(c);
-	UNUSED(f);
-	UNUSED(t);
-
-	assert_gt(snprintf(fail_buf, sizeof(fail_buf), fmt, sizeof(fail_buf)), 0);
-}
-
-/* Mock io.c */
-const char*
-io_err(int err)
-{
-	UNUSED(err);
-
-	return "err";
-}
-
-int
-io_sendf(struct connection *c, const char *fmt, ...)
-{
-	va_list ap;
-
-	UNUSED(c);
-
-	va_start(ap, fmt);
-	assert_gt(vsnprintf(send_buf, sizeof(send_buf), fmt, ap), 0);
-	va_end(ap);
-
-	return 0;
-}
 
 static void
 test_irc_send_command(void)
@@ -99,23 +56,24 @@ test_irc_send_command(void)
 	char m3[] = "test";
 	char m4[] = "test arg1 arg2 arg3";
 	char m5[] = "privmsg targ test message";
-	char m6[] = "testing not registered";
+	char m6[] = "privmsg not registered";
 
-	send_buf[0] = 0;
-	fail_buf[0] = 0;
+	mock_reset_io();
+	mock_reset_state();
 	assert_eq(irc_send_command(NULL, c_chan, ""), 1);
-	assert_strcmp(fail_buf, "This is not a server");
-	assert_strcmp(send_buf, "");
+	assert_eq(mock_line_n, 1);
+	assert_eq(mock_send_n, 0);
+	assert_strcmp(mock_line[0], "This is not a server");
 
-	CHECK_SEND_COMMAND(c_chan, m1, 1, "Messages beginning with '/' require a command", "");
-	CHECK_SEND_COMMAND(c_chan, m2, 1, "Messages beginning with '/' require a command", "");
-	CHECK_SEND_COMMAND(c_chan, m3, 0, "", "TEST");
-	CHECK_SEND_COMMAND(c_chan, m4, 0, "", "TEST arg1 arg2 arg3");
-	CHECK_SEND_COMMAND(c_chan, m5, 0, "", "PRIVMSG targ :test message");
+	CHECK_SEND_COMMAND(c_chan, m1, 1, 1, 0, "Messages beginning with '/' require a command", "");
+	CHECK_SEND_COMMAND(c_chan, m2, 1, 1, 0, "Messages beginning with '/' require a command", "");
+	CHECK_SEND_COMMAND(c_chan, m3, 0, 0, 1, "", "TEST");
+	CHECK_SEND_COMMAND(c_chan, m4, 0, 0, 1, "", "TEST arg1 arg2 arg3");
+	CHECK_SEND_COMMAND(c_chan, m5, 0, 0, 1, "", "PRIVMSG targ :test message");
 
 	s->registered = 0;
 
-	CHECK_SEND_COMMAND(c_chan, m6, 1, "Not registered with server", "");
+	CHECK_SEND_COMMAND(c_chan, m6, 1, 1, 0, "Not registered with server", "");
 
 	s->registered = 1;
 }
@@ -127,21 +85,28 @@ test_irc_send_privmsg(void)
 	char m2[] = "serv test 2";
 	char m3[] = "priv test 3";
 	char m4[] = "chan test 4";
+	char m5[] = "chan not registered";
 
-	CHECK_SEND_PRIVMSG(c_chan, m1, 1, "Not on channel", "");
-	CHECK_SEND_PRIVMSG(c_serv, m2, 1, "This is not a channel", "");
+	CHECK_SEND_PRIVMSG(c_chan, m1, 1, 1, 0, "Not on channel", "");
+	CHECK_SEND_PRIVMSG(c_serv, m2, 1, 1, 0, "This is not a channel", "");
 
 	c_chan->joined = 1;
 
-	CHECK_SEND_PRIVMSG(c_priv, m3, 0, "priv test 3", "PRIVMSG priv :priv test 3");
-	CHECK_SEND_PRIVMSG(c_chan, m4, 0, "chan test 4", "PRIVMSG chan :chan test 4");
-	CHECK_SEND_PRIVMSG(c_chan, "", 1, "Message is empty", "");
+	CHECK_SEND_PRIVMSG(c_priv, m3, 0, 1, 1, "priv test 3", "PRIVMSG priv :priv test 3");
+	CHECK_SEND_PRIVMSG(c_chan, m4, 0, 1, 1, "chan test 4", "PRIVMSG chan :chan test 4");
+	CHECK_SEND_PRIVMSG(c_chan, "", 1, 1, 0, "Message is empty", "");
 
-	send_buf[0] = 0;
-	fail_buf[0] = 0;
+	mock_reset_io();
+	mock_reset_state();
 	assert_eq(irc_send_privmsg(NULL, c_chan, "test"), 1);
-	assert_strcmp(fail_buf, "This is not a server");
-	assert_strcmp(send_buf, "");
+	assert_strcmp(mock_line[0], "This is not a server");
+	assert_strcmp(mock_send[0], "");
+
+	s->registered = 0;
+
+	CHECK_SEND_PRIVMSG(c_chan, m5, 1, 1, 0, "Not registered with server", "");
+
+	s->registered = 1;
 }
 
 static void
@@ -153,11 +118,11 @@ test_send_notice(void)
 	char m4[] = "notice test3  ";
 	char m5[] = "notice test4 test notice message";
 
-	CHECK_SEND_COMMAND(c_chan, m1, 1, "Usage: /notice <target> <message>", "");
-	CHECK_SEND_COMMAND(c_chan, m2, 1, "Usage: /notice <target> <message>", "");
-	CHECK_SEND_COMMAND(c_chan, m3, 1, "Usage: /notice <target> <message>", "");
-	CHECK_SEND_COMMAND(c_chan, m4, 0, "", "NOTICE test3 : ");
-	CHECK_SEND_COMMAND(c_chan, m5, 0, "", "NOTICE test4 :test notice message");
+	CHECK_SEND_COMMAND(c_chan, m1, 1, 1, 0, "Usage: /notice <target> <message>", "");
+	CHECK_SEND_COMMAND(c_chan, m2, 1, 1, 0, "Usage: /notice <target> <message>", "");
+	CHECK_SEND_COMMAND(c_chan, m3, 1, 1, 0, "Usage: /notice <target> <message>", "");
+	CHECK_SEND_COMMAND(c_chan, m4, 0, 0, 1, "", "NOTICE test3 : ");
+	CHECK_SEND_COMMAND(c_chan, m5, 0, 0, 1, "", "NOTICE test4 :test notice message");
 }
 
 static void
@@ -168,10 +133,10 @@ test_send_part(void)
 	char m3[] = "part";
 	char m4[] = "part test part message";
 
-	CHECK_SEND_COMMAND(c_serv, m1, 1, "This is not a channel", "");
-	CHECK_SEND_COMMAND(c_priv, m2, 1, "This is not a channel", "");
-	CHECK_SEND_COMMAND(c_chan, m3, 0, "", "PART chan :" DEFAULT_PART_MESG);
-	CHECK_SEND_COMMAND(c_chan, m4, 0, "", "PART chan :test part message");
+	CHECK_SEND_COMMAND(c_serv, m1, 1, 1, 0, "This is not a channel", "");
+	CHECK_SEND_COMMAND(c_priv, m2, 1, 1, 0, "This is not a channel", "");
+	CHECK_SEND_COMMAND(c_chan, m3, 0, 0, 1, "", "PART chan :" DEFAULT_PART_MESG);
+	CHECK_SEND_COMMAND(c_chan, m4, 0, 0, 1, "", "PART chan :test part message");
 }
 
 static void
@@ -183,11 +148,11 @@ test_send_privmsg(void)
 	char m4[] = "privmsg test3  ";
 	char m5[] = "privmsg test4 test privmsg message";
 
-	CHECK_SEND_COMMAND(c_chan, m1, 1, "Usage: /privmsg <target> <message>", "");
-	CHECK_SEND_COMMAND(c_chan, m2, 1, "Usage: /privmsg <target> <message>", "");
-	CHECK_SEND_COMMAND(c_chan, m3, 1, "Usage: /privmsg <target> <message>", "");
-	CHECK_SEND_COMMAND(c_chan, m4, 0, "", "PRIVMSG test3 : ");
-	CHECK_SEND_COMMAND(c_chan, m5, 0, "", "PRIVMSG test4 :test privmsg message");
+	CHECK_SEND_COMMAND(c_chan, m1, 1, 1, 0, "Usage: /privmsg <target> <message>", "");
+	CHECK_SEND_COMMAND(c_chan, m2, 1, 1, 0, "Usage: /privmsg <target> <message>", "");
+	CHECK_SEND_COMMAND(c_chan, m3, 1, 1, 0, "Usage: /privmsg <target> <message>", "");
+	CHECK_SEND_COMMAND(c_chan, m4, 0, 0, 1, "", "PRIVMSG test3 : ");
+	CHECK_SEND_COMMAND(c_chan, m5, 0, 0, 1, "", "PRIVMSG test4 :test privmsg message");
 }
 
 static void
@@ -198,10 +163,10 @@ test_send_quit(void)
 	char m3[] = "quit";
 	char m4[] = "quit test quit message";
 
-	CHECK_SEND_COMMAND(c_serv, m1, 0, "", "QUIT :" DEFAULT_QUIT_MESG);
-	CHECK_SEND_COMMAND(c_priv, m2, 0, "", "QUIT :" DEFAULT_QUIT_MESG);
-	CHECK_SEND_COMMAND(c_chan, m3, 0, "", "QUIT :" DEFAULT_QUIT_MESG);
-	CHECK_SEND_COMMAND(c_chan, m4, 0, "", "QUIT :test quit message");
+	CHECK_SEND_COMMAND(c_serv, m1, 0, 0, 1, "", "QUIT :" DEFAULT_QUIT_MESG);
+	CHECK_SEND_COMMAND(c_priv, m2, 0, 0, 1, "", "QUIT :" DEFAULT_QUIT_MESG);
+	CHECK_SEND_COMMAND(c_chan, m3, 0, 0, 1, "", "QUIT :" DEFAULT_QUIT_MESG);
+	CHECK_SEND_COMMAND(c_chan, m4, 0, 0, 1, "", "QUIT :test quit message");
 }
 
 static void
@@ -212,10 +177,10 @@ test_send_topic(void)
 	char m3[] = "topic";
 	char m4[] = "topic test new topic";
 
-	CHECK_SEND_COMMAND(c_serv, m1, 1, "This is not a channel", "");
-	CHECK_SEND_COMMAND(c_priv, m2, 1, "This is not a channel", "");
-	CHECK_SEND_COMMAND(c_chan, m3, 0, "", "TOPIC chan");
-	CHECK_SEND_COMMAND(c_chan, m4, 0, "", "TOPIC chan :test new topic");
+	CHECK_SEND_COMMAND(c_serv, m1, 1, 1, 0, "This is not a channel", "");
+	CHECK_SEND_COMMAND(c_priv, m2, 1, 1, 0, "This is not a channel", "");
+	CHECK_SEND_COMMAND(c_chan, m3, 0, 0, 1, "", "TOPIC chan");
+	CHECK_SEND_COMMAND(c_chan, m4, 0, 0, 1, "", "TOPIC chan :test new topic");
 }
 
 static void
@@ -225,9 +190,9 @@ test_send_ctcp_action(void)
 	char m2[] = "ctcp-action test action";
 	char m3[] = "ctcp-action test action";
 
-	CHECK_SEND_COMMAND(c_chan, m1, 0, "", "PRIVMSG chan :\001ACTION test action\001");
-	CHECK_SEND_COMMAND(c_priv, m2, 0, "", "PRIVMSG priv :\001ACTION test action\001");
-	CHECK_SEND_COMMAND(c_serv, m3, 1, "This is not a channel", "");
+	CHECK_SEND_COMMAND(c_chan, m1, 0, 0, 1, "", "PRIVMSG chan :\001ACTION test action\001");
+	CHECK_SEND_COMMAND(c_priv, m2, 0, 0, 1, "", "PRIVMSG priv :\001ACTION test action\001");
+	CHECK_SEND_COMMAND(c_serv, m3, 1, 1, 0, "This is not a channel", "");
 }
 
 static void
@@ -238,10 +203,10 @@ test_send_ctcp_clientinfo(void)
 	char m3[] = "ctcp-clientinfo";
 	char m4[] = "ctcp-clientinfo targ";
 
-	CHECK_SEND_COMMAND(c_chan, m1, 1, "Usage: /ctcp-clientinfo <target>", "");
-	CHECK_SEND_COMMAND(c_serv, m2, 1, "Usage: /ctcp-clientinfo <target>", "");
-	CHECK_SEND_COMMAND(c_priv, m3, 0, "", "PRIVMSG priv :\001CLIENTINFO\001");
-	CHECK_SEND_COMMAND(c_priv, m4, 0, "", "PRIVMSG targ :\001CLIENTINFO\001");
+	CHECK_SEND_COMMAND(c_chan, m1, 1, 1, 0, "Usage: /ctcp-clientinfo <target>", "");
+	CHECK_SEND_COMMAND(c_serv, m2, 1, 1, 0, "Usage: /ctcp-clientinfo <target>", "");
+	CHECK_SEND_COMMAND(c_priv, m3, 0, 0, 1, "", "PRIVMSG priv :\001CLIENTINFO\001");
+	CHECK_SEND_COMMAND(c_priv, m4, 0, 0, 1, "", "PRIVMSG targ :\001CLIENTINFO\001");
 }
 
 static void
@@ -252,10 +217,10 @@ test_send_ctcp_finger(void)
 	char m3[] = "ctcp-finger";
 	char m4[] = "ctcp-finger targ";
 
-	CHECK_SEND_COMMAND(c_chan, m1, 1, "Usage: /ctcp-finger <target>", "");
-	CHECK_SEND_COMMAND(c_serv, m2, 1, "Usage: /ctcp-finger <target>", "");
-	CHECK_SEND_COMMAND(c_priv, m3, 0, "", "PRIVMSG priv :\001FINGER\001");
-	CHECK_SEND_COMMAND(c_priv, m4, 0, "", "PRIVMSG targ :\001FINGER\001");
+	CHECK_SEND_COMMAND(c_chan, m1, 1, 1, 0, "Usage: /ctcp-finger <target>", "");
+	CHECK_SEND_COMMAND(c_serv, m2, 1, 1, 0, "Usage: /ctcp-finger <target>", "");
+	CHECK_SEND_COMMAND(c_priv, m3, 0, 0, 1, "", "PRIVMSG priv :\001FINGER\001");
+	CHECK_SEND_COMMAND(c_priv, m4, 0, 0, 1, "", "PRIVMSG targ :\001FINGER\001");
 }
 
 static void
@@ -269,15 +234,15 @@ test_send_ctcp_ping(void)
 	char *p1;
 	char *p2;
 
-	CHECK_SEND_COMMAND(c_chan, m1, 1, "Usage: /ctcp-ping <target>", "");
-	CHECK_SEND_COMMAND(c_serv, m2, 1, "Usage: /ctcp-ping <target>", "");
+	CHECK_SEND_COMMAND(c_chan, m1, 1, 1, 0, "Usage: /ctcp-ping <target>", "");
+	CHECK_SEND_COMMAND(c_serv, m2, 1, 1, 0, "Usage: /ctcp-ping <target>", "");
 
-	send_buf[0] = 0;
-	fail_buf[0] = 0;
+	mock_reset_io();
+	mock_reset_state();
 
 	assert_eq(irc_send_command(s, c_priv, m3), 0);
 
-	p1 = strchr(send_buf, '\001');
+	p1 = strchr(mock_send[0], '\001');
 	p2 = strchr(p1 + 1, '\001');
 	assert_true(p1 != NULL);
 	assert_true(p2 != NULL);
@@ -288,15 +253,15 @@ test_send_ctcp_ping(void)
 	assert_ptr_not_null(strsep(&p1));
 	assert_ptr_not_null(strsep(&p1));
 
-	assert_strcmp(fail_buf, "");
-	assert_strcmp(send_buf, "PRIVMSG priv :");
+	assert_strcmp(mock_line[0], "");
+	assert_strcmp(mock_send[0], "PRIVMSG priv :");
 
-	send_buf[0] = 0;
-	fail_buf[0] = 0;
+	mock_reset_io();
+	mock_reset_state();
 
 	assert_eq(irc_send_command(s, c_priv, m4), 0);
 
-	p1 = strchr(send_buf, '\001');
+	p1 = strchr(mock_send[0], '\001');
 	p2 = strchr(p1 + 1, '\001');
 	assert_true(p1 != NULL);
 	assert_true(p2 != NULL);
@@ -307,8 +272,8 @@ test_send_ctcp_ping(void)
 	assert_ptr_not_null(strsep(&p1));
 	assert_ptr_not_null(strsep(&p1));
 
-	assert_strcmp(fail_buf, "");
-	assert_strcmp(send_buf, "PRIVMSG targ :");
+	assert_strcmp(mock_line[0], "");
+	assert_strcmp(mock_send[0], "PRIVMSG targ :");
 }
 
 static void
@@ -319,10 +284,10 @@ test_send_ctcp_source(void)
 	char m3[] = "ctcp-source";
 	char m4[] = "ctcp-source targ";
 
-	CHECK_SEND_COMMAND(c_chan, m1, 1, "Usage: /ctcp-source <target>", "");
-	CHECK_SEND_COMMAND(c_serv, m2, 1, "Usage: /ctcp-source <target>", "");
-	CHECK_SEND_COMMAND(c_priv, m3, 0, "", "PRIVMSG priv :\001SOURCE\001");
-	CHECK_SEND_COMMAND(c_priv, m4, 0, "", "PRIVMSG targ :\001SOURCE\001");
+	CHECK_SEND_COMMAND(c_chan, m1, 1, 1, 0, "Usage: /ctcp-source <target>", "");
+	CHECK_SEND_COMMAND(c_serv, m2, 1, 1, 0, "Usage: /ctcp-source <target>", "");
+	CHECK_SEND_COMMAND(c_priv, m3, 0, 0, 1, "", "PRIVMSG priv :\001SOURCE\001");
+	CHECK_SEND_COMMAND(c_priv, m4, 0, 0, 1, "", "PRIVMSG targ :\001SOURCE\001");
 }
 
 static void
@@ -333,10 +298,10 @@ test_send_ctcp_time(void)
 	char m3[] = "ctcp-time";
 	char m4[] = "ctcp-time targ";
 
-	CHECK_SEND_COMMAND(c_chan, m1, 1, "Usage: /ctcp-time <target>", "");
-	CHECK_SEND_COMMAND(c_serv, m2, 1, "Usage: /ctcp-time <target>", "");
-	CHECK_SEND_COMMAND(c_priv, m3, 0, "", "PRIVMSG priv :\001TIME\001");
-	CHECK_SEND_COMMAND(c_priv, m4, 0, "", "PRIVMSG targ :\001TIME\001");
+	CHECK_SEND_COMMAND(c_chan, m1, 1, 1, 0, "Usage: /ctcp-time <target>", "");
+	CHECK_SEND_COMMAND(c_serv, m2, 1, 1, 0, "Usage: /ctcp-time <target>", "");
+	CHECK_SEND_COMMAND(c_priv, m3, 0, 0, 1, "", "PRIVMSG priv :\001TIME\001");
+	CHECK_SEND_COMMAND(c_priv, m4, 0, 0, 1, "", "PRIVMSG targ :\001TIME\001");
 }
 
 static void
@@ -347,10 +312,10 @@ test_send_ctcp_userinfo(void)
 	char m3[] = "ctcp-userinfo";
 	char m4[] = "ctcp-userinfo targ";
 
-	CHECK_SEND_COMMAND(c_chan, m1, 1, "Usage: /ctcp-userinfo <target>", "");
-	CHECK_SEND_COMMAND(c_serv, m2, 1, "Usage: /ctcp-userinfo <target>", "");
-	CHECK_SEND_COMMAND(c_priv, m3, 0, "", "PRIVMSG priv :\001USERINFO\001");
-	CHECK_SEND_COMMAND(c_priv, m4, 0, "", "PRIVMSG targ :\001USERINFO\001");
+	CHECK_SEND_COMMAND(c_chan, m1, 1, 1, 0, "Usage: /ctcp-userinfo <target>", "");
+	CHECK_SEND_COMMAND(c_serv, m2, 1, 1, 0, "Usage: /ctcp-userinfo <target>", "");
+	CHECK_SEND_COMMAND(c_priv, m3, 0, 0, 1, "", "PRIVMSG priv :\001USERINFO\001");
+	CHECK_SEND_COMMAND(c_priv, m4, 0, 0, 1, "", "PRIVMSG targ :\001USERINFO\001");
 }
 
 static void
@@ -361,10 +326,10 @@ test_send_ctcp_version(void)
 	char m3[] = "ctcp-version";
 	char m4[] = "ctcp-version targ";
 
-	CHECK_SEND_COMMAND(c_chan, m1, 1, "Usage: /ctcp-version <target>", "");
-	CHECK_SEND_COMMAND(c_serv, m2, 1, "Usage: /ctcp-version <target>", "");
-	CHECK_SEND_COMMAND(c_priv, m3, 0, "", "PRIVMSG priv :\001VERSION\001");
-	CHECK_SEND_COMMAND(c_priv, m4, 0, "", "PRIVMSG targ :\001VERSION\001");
+	CHECK_SEND_COMMAND(c_chan, m1, 1, 1, 0, "Usage: /ctcp-version <target>", "");
+	CHECK_SEND_COMMAND(c_serv, m2, 1, 1, 0, "Usage: /ctcp-version <target>", "");
+	CHECK_SEND_COMMAND(c_priv, m3, 0, 0, 1, "", "PRIVMSG priv :\001VERSION\001");
+	CHECK_SEND_COMMAND(c_priv, m4, 0, 0, 1, "", "PRIVMSG targ :\001VERSION\001");
 }
 
 static void
@@ -373,8 +338,8 @@ test_send_ircv3_cap_ls(void)
 	char m1[] = "cap-ls";
 	char m2[] = "cap-ls xxx";
 
-	CHECK_SEND_COMMAND(c_chan, m1, 0, "", "CAP LS " IRCV3_CAP_VERSION);
-	CHECK_SEND_COMMAND(c_chan, m2, 1, "Usage: /cap-ls", "");
+	CHECK_SEND_COMMAND(c_chan, m1, 0, 0, 1, "", "CAP LS " IRCV3_CAP_VERSION);
+	CHECK_SEND_COMMAND(c_chan, m2, 1, 1, 0, "Usage: /cap-ls", "");
 }
 
 static void
@@ -383,8 +348,8 @@ test_send_ircv3_cap_list(void)
 	char m1[] = "cap-list";
 	char m2[] = "cap-list xxx";
 
-	CHECK_SEND_COMMAND(c_chan, m1, 0, "", "CAP LIST");
-	CHECK_SEND_COMMAND(c_chan, m2, 1, "Usage: /cap-list", "");
+	CHECK_SEND_COMMAND(c_chan, m1, 0, 0, 1, "", "CAP LIST");
+	CHECK_SEND_COMMAND(c_chan, m2, 1, 1, 0, "Usage: /cap-list", "");
 }
 
 int
@@ -392,10 +357,18 @@ main(void)
 {
 	c_chan = channel("chan", CHANNEL_T_CHANNEL);
 	c_priv = channel("priv", CHANNEL_T_PRIVATE);
-	c_serv = channel("serv", CHANNEL_T_SERVER);
+
 	s = server("h1", "p1", NULL, "u1", "r1");
+
+	if (!s || !c_chan || !c_priv)
+		test_abort_main("Failed test setup");
+
+	channel_list_add(&s->clist, c_chan);
+	channel_list_add(&s->clist, c_priv);
+
+	c_serv = s->channel;
+
 	s->registered = 1;
-	server_nick_set(s, "mynick");
 
 	struct testcase tests[] = {
 		TESTCASE(test_irc_send_command),
@@ -412,9 +385,8 @@ main(void)
 	};
 
 	int ret = run_tests(tests);
+
 	server_free(s);
-	channel_free(c_chan);
-	channel_free(c_priv);
-	channel_free(c_serv);
+
 	return ret;
 }

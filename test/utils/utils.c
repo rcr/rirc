@@ -599,7 +599,7 @@ test_word_wrap(void)
 #undef CHECK_WORD_WRAP
 
 	if (seg1 != seg2 || seg2 != end)
-		fail_test("seg1 should be advanced to end of string");
+		test_fail("seg1 should be advanced to end of string");
 
 	/* Test edge case: nowhere to wrap */
 	char m1[] = "test1test2 test3";

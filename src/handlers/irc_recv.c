@@ -144,7 +144,7 @@ static const irc_recv_f irc_numerics[] = {
 	[349] = irc_ignore, /* RPL_ENDOFEXCEPTLIST */
 	[351] = irc_info,   /* RPL_VERSION */
 	[352] = irc_info,   /* RPL_WHOREPLY */
-	[353] = irc_353,    /* RPL_NAMREPLY */
+	[353] = irc_353,    /* RPL_NAMEREPLY */
 	[364] = irc_info,   /* RPL_LINKS */
 	[365] = irc_ignore, /* RPL_ENDOFLINKS */
 	[366] = irc_ignore, /* RPL_ENDOFNAMES */
@@ -505,7 +505,7 @@ irc_353(struct server *s, struct irc_message *m)
 		failf(s, "RPL_NAMEREPLY: channel '%s' not found", chan);
 
 	if (mode_chanmode_prefix(&(c->chanmodes), &(s->mode_cfg), *type) != MODE_ERR_NONE)
-		newlinef(c, 0, FROM_ERROR, "RPL_NAMEREPLY: invalid channel flag: '%c'", *type);
+		failf(s, "RPL_NAMEREPLY: invalid channel flag: '%c'", *type);
 
 	if ((nick = strsep(&nicks))) {
 		do {
@@ -517,11 +517,11 @@ irc_353(struct server *s, struct irc_message *m)
 				prefix = *nick++;
 
 				if (mode_prfxmode_prefix(&m, &(s->mode_cfg), prefix) != MODE_ERR_NONE)
-					newlinef(c, 0, FROM_ERROR, "Invalid user prefix: '%c'", prefix);
+					newlinef(c, 0, FROM_ERROR, "RPL_NAMEREPLY: invalid user prefix: '%c'", prefix);
 			}
 
 			if (user_list_add(&(c->users), s->casemapping, nick, m) == USER_ERR_DUPLICATE)
-				newlinef(c, 0, FROM_ERROR, "Duplicate nick: '%s'", nick);
+				newlinef(c, 0, FROM_ERROR, "RPL_NAMEREPLY: duplicate nick: '%s'", nick);
 
 		} while ((nick = strsep(&nicks)));
 	}

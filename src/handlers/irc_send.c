@@ -12,8 +12,6 @@
 #include "src/state.h"
 #include "src/utils/utils.h"
 
-// TODO: should privmsg/notice open a PRIVATE/CHANNEL buffer for the target?
-
 #define failf(C, ...) \
 	do { newlinef((C), 0, FROM_ERROR, __VA_ARGS__); \
 	     return 1; \
