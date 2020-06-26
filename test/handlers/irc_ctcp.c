@@ -326,6 +326,21 @@ test_recv_ctcp_request_version(void)
 }
 
 static void
+test_recv_ctcp_response_action(void)
+{
+	/* CTCP `extended formatting` messages generate no response */
+
+	CHECK_RESPONSE(":nick!user@host NOTICE me :\001ACTION", 1,
+		"Received unsupported CTCP response 'ACTION' from nick");
+
+	CHECK_RESPONSE(":nick!user@host NOTICE me :\001ACTION\001", 1,
+		"Received unsupported CTCP response 'ACTION' from nick");
+
+	CHECK_RESPONSE(":nick!user@host NOTICE me :\001ACTION foo bar baz\001", 1,
+		"Received unsupported CTCP response 'ACTION' from nick");
+}
+
+static void
 test_recv_ctcp_response_clientinfo(void)
 {
 	CHECK_RESPONSE(":nick!user@host NOTICE me :\001CLIENTINFO", 1,
@@ -478,6 +493,7 @@ main(void)
 		CTCP_METADATA_QUERY
 #undef X
 #define X(cmd) TESTCASE(test_recv_ctcp_response_##cmd),
+		CTCP_EXTENDED_FORMATTING
 		CTCP_EXTENDED_QUERY
 		CTCP_METADATA_QUERY
 #undef X

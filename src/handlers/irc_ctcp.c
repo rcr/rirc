@@ -62,10 +62,10 @@ ctcp_request(struct server *s, const char *from, const char *targ, char *message
 	if ((ret = parse_ctcp(s, from, &message, &command)) != 0)
 		return ret;
 
-	if ((ctcp = ctcp_handler_lookup(command, strlen(command))))
-		return ctcp->f_request(s, from, targ, message);
+	if (!(ctcp = ctcp_handler_lookup(command, strlen(command))))
+		failf(s, "Received unsupported CTCP request '%s' from %s", command, from);
 
-	failf(s, "Received unsupported CTCP request '%s' from %s", command, from);
+	return ctcp->f_request(s, from, targ, message);
 }
 
 int
@@ -78,10 +78,10 @@ ctcp_response(struct server *s, const char *from, const char *targ, char *messag
 	if ((ret = parse_ctcp(s, from, &message, &command)) != 0)
 		return ret;
 
-	if ((ctcp = ctcp_handler_lookup(command, strlen(command))))
-		return ctcp->f_response(s, from, targ, message);
+	if (!(ctcp = ctcp_handler_lookup(command, strlen(command))) || !ctcp->f_response)
+		failf(s, "Received unsupported CTCP response '%s' from %s", command, from);
 
-	failf(s, "Received unsupported CTCP response '%s' from %s", command, from);
+	return ctcp->f_response(s, from, targ, message);
 }
 
 static int
