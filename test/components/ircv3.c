@@ -1,6 +1,7 @@
 #include "test/test.h"
 
-#define IRCV3_CAPS \
+/* Extends the definition in server.h */
+#define IRCV3_CAPS_TEST \
 	X("cap-1", cap_1, IRCV3_CAP_AUTO) \
 	X("cap-2", cap_2, 0) \
 	X("cap-3", cap_3, (IRCV3_CAP_NO_DEL | IRCV3_CAP_NO_REQ))

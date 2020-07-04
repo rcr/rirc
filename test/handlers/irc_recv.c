@@ -37,69 +37,86 @@ static struct irc_message m;
 static void
 test_353(void)
 {
-	/* 353 ("="/"*"/"@") <channel> *([ "@" / "+" ]<nick>) */
+	/* 353 <nick> <type> <channel> 1*(<modes><nick>) */
 
-	struct channel *c1 = channel("c1", CHANNEL_T_CHANNEL);
-	struct channel *c2 = channel("c2", CHANNEL_T_CHANNEL);
-	struct channel *c3 = channel("c3", CHANNEL_T_CHANNEL);
-	struct channel *c4 = channel("c4", CHANNEL_T_CHANNEL);
+	struct channel *c = channel("#chan", CHANNEL_T_CHANNEL);
 	struct server *s = server("host", "post", NULL, "user", "real");
 	struct user *u1;
 	struct user *u2;
 	struct user *u3;
 	struct user *u4;
 
-	channel_list_add(&s->clist, c1);
-	channel_list_add(&s->clist, c2);
-	channel_list_add(&s->clist, c3);
-	channel_list_add(&s->clist, c4);
-
+	channel_list_add(&s->clist, c);
 	server_nick_set(s, "me");
 
 	/* test errors */
+	channel_reset(c);
 	CHECK_REQUEST("353 me", 1, 1, 0,
 		"RPL_NAMEREPLY: type is null", "");
 
+	channel_reset(c);
 	CHECK_REQUEST("353 me =", 1, 1, 0,
 		"RPL_NAMEREPLY: channel is null", "");
 
-	CHECK_REQUEST("353 me = c1", 1, 1, 0,
+	channel_reset(c);
+	CHECK_REQUEST("353 me = #chan", 1, 1, 0,
 		"RPL_NAMEREPLY: nicks is null", "");
 
-	CHECK_REQUEST("353 me = cx :n1", 1, 1, 0,
-		"RPL_NAMEREPLY: channel 'cx' not found", "");
+	channel_reset(c);
+	CHECK_REQUEST("353 me = #x :n1", 1, 1, 0,
+		"RPL_NAMEREPLY: channel '#x' not found", "");
 
-	CHECK_REQUEST("353 me x c1 :n1", 1, 1, 0,
+	channel_reset(c);
+	CHECK_REQUEST("353 me x #chan :n1", 1, 1, 0,
 		"RPL_NAMEREPLY: invalid channel flag: 'x'", "");
 
-	// TODO:
-	// newlinef(c, 0, FROM_ERROR, "RPL_NAMEREPLY: invalid user prefix: '%c'", prefix);
-	// newlinef(c, 0, FROM_ERROR, "RPL_NAMEREPLY: duplicate nick: '%s'", nick);
+	channel_reset(c);
+	CHECK_REQUEST("353 me = #chan :!n1", 1, 1, 0,
+		"RPL_NAMEREPLY: invalid user prefix: '!'", "");
+
+	channel_reset(c);
+	CHECK_REQUEST("353 me = #chan :+@n1", 1, 1, 0,
+		"RPL_NAMEREPLY: invalid nick: '@n1'", "");
+
+	channel_reset(c);
+	CHECK_REQUEST("353 me = #chan :n1 n2 n1", 1, 1, 0,
+		"RPL_NAMEREPLY: duplicate nick: 'n1'", "");
 
 	/* test single nick */
-	IRC_MESSAGE_PARSE("353 = c1 :n1");
-	assert_eq(irc_353(s, &m), 0);
+	channel_reset(c);
+	CHECK_REQUEST("353 me = #chan n1", 0, 0, 0, "", "");
 
-	if (user_list_get(&(c1->users), CASEMAPPING_RFC1459, "n1", 0) == NULL)
-		test_abort("Failed to retrieve u");
+	if (user_list_get(&(c->users), s->casemapping, "n1", 0) == NULL)
+		test_fail("Failed to retrieve user n1");
+
+	channel_reset(c);
+	CHECK_REQUEST("353 me = #chan :@n1", 0, 0, 0, "", "");
+
+	if (user_list_get(&(c->users), s->casemapping, "n1", 0) == NULL)
+		test_fail("Failed to retrieve user n1");
 
 	/* test multiple nicks */
-	IRC_MESSAGE_PARSE("353 = c2 :n1 n2 n3");
-	assert_eq(irc_353(s, &m), 0);
+	channel_reset(c);
+	CHECK_REQUEST("353 me = #chan :@n1 +n2 n3", 0, 0, 0, "", "");
 
-	if ((user_list_get(&(c2->users), CASEMAPPING_RFC1459, "n1", 0) == NULL)
-	 || (user_list_get(&(c2->users), CASEMAPPING_RFC1459, "n2", 0) == NULL)
-	 || (user_list_get(&(c2->users), CASEMAPPING_RFC1459, "n3", 0) == NULL))
+	if (!(u1 = user_list_get(&(c->users), CASEMAPPING_RFC1459, "n1", 0))
+	 || !(u2 = user_list_get(&(c->users), CASEMAPPING_RFC1459, "n2", 0))
+	 || !(u3 = user_list_get(&(c->users), CASEMAPPING_RFC1459, "n3", 0)))
 		test_abort("Failed to retrieve users");
 
-	/* test multiple nicks, multiprefix enabled */
-	IRC_MESSAGE_PARSE("353 = c3 :@n1 +n2 @+n3 +@n4");
-	assert_eq(irc_353(s, &m), 0);
+	assert_eq(u1->prfxmodes.lower, (flag_bit('o')));
+	assert_eq(u2->prfxmodes.lower, (flag_bit('v')));
+	assert_eq(u3->prfxmodes.lower, 0);
 
-	if (((u1 = user_list_get(&(c3->users), CASEMAPPING_RFC1459, "n1", 0)) == NULL)
-	 || ((u2 = user_list_get(&(c3->users), CASEMAPPING_RFC1459, "n2", 0)) == NULL)
-	 || ((u3 = user_list_get(&(c3->users), CASEMAPPING_RFC1459, "n3", 0)) == NULL)
-	 || ((u4 = user_list_get(&(c3->users), CASEMAPPING_RFC1459, "n4", 0)) == NULL))
+	/* test multiple nicks, multiprefix enabled */
+	s->ircv3_caps.multi_prefix.set = 1;
+	channel_reset(c);
+	CHECK_REQUEST("353 me = #chan :@n1 +n2 @+n3 +@n4", 0, 0, 0, "", "");
+
+	if (!(u1 = user_list_get(&(c->users), CASEMAPPING_RFC1459, "n1", 0))
+	 || !(u2 = user_list_get(&(c->users), CASEMAPPING_RFC1459, "n2", 0))
+	 || !(u3 = user_list_get(&(c->users), CASEMAPPING_RFC1459, "n3", 0))
+	 || !(u4 = user_list_get(&(c->users), CASEMAPPING_RFC1459, "n4", 0)))
 		test_abort("Failed to retrieve users");
 
 	assert_eq(u1->prfxmodes.prefix, '@');

@@ -484,7 +484,7 @@ irc_333(struct server *s, struct irc_message *m)
 static int
 irc_353(struct server *s, struct irc_message *m)
 {
-	/* 353 ("="/"*"/"@") <channel> *([ "@" / "+" ]<nick>) */
+	/* 353 <nick> <type> <channel> 1*(<modes><nick>) */
 
 	char *chan;
 	char *nick;
@@ -512,16 +512,22 @@ irc_353(struct server *s, struct irc_message *m)
 			char prefix = 0;
 			struct mode m = MODE_EMPTY;
 
-			while (!irc_isnickchar(*nick, 1)) {
+			do {
+				if (irc_isnickchar(*nick, 1))
+					break;
 
 				prefix = *nick++;
 
 				if (mode_prfxmode_prefix(&m, &(s->mode_cfg), prefix) != MODE_ERR_NONE)
-					newlinef(c, 0, FROM_ERROR, "RPL_NAMEREPLY: invalid user prefix: '%c'", prefix);
-			}
+					failf(s, "RPL_NAMEREPLY: invalid user prefix: '%c'", prefix);
+
+			} while (s->ircv3_caps.multi_prefix.set);
+
+			if (!irc_isnick(nick))
+				failf(s, "RPL_NAMEREPLY: invalid nick: '%s'", nick);
 
 			if (user_list_add(&(c->users), s->casemapping, nick, m) == USER_ERR_DUPLICATE)
-				newlinef(c, 0, FROM_ERROR, "RPL_NAMEREPLY: duplicate nick: '%s'", nick);
+				failf(s, "RPL_NAMEREPLY: duplicate nick: '%s'", nick);
 
 		} while ((nick = strsep(&nicks)));
 	}

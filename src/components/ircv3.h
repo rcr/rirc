@@ -6,10 +6,17 @@
 #define IRCV3_CAP_NO_REQ (1 << 2)
 #define IRCV3_CAP_VERSION "302"
 
-#ifndef IRCV3_CAPS
-#define IRCV3_CAPS \
+#define IRCV3_CAPS_DEF \
 	X("multi-prefix", multi_prefix, IRCV3_CAP_AUTO)
+
+/* Extended by testcases */
+#ifndef IRCV3_CAPS_TEST
+#define IRCV3_CAPS_TEST
 #endif
+
+#define IRCV3_CAPS \
+	IRCV3_CAPS_DEF \
+	IRCV3_CAPS_TEST
 
 struct ircv3_cap
 {
