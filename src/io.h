@@ -12,33 +12,39 @@
  *  - cxed: connected    ~ Socket connected
  *  - ping: timing out   ~ Socket connected, network state in question
  *
- *                            +--------+
- *                 +----(B)-- |  rxng  |
- *                 |          +--------+
- *                 |           |      ^
- *   INIT          |         (A,C)    |
- *    v            |           |     (E)
- *    |            v           v      |
- *    |    +--------+ --(A)-> +--------+
- *    +--> |  dxed  |         |  cxng  | <--+
- *         +--------+ <-(B)-- +--------+    |
- *          ^      ^           |      ^    (F)
- *          |      |          (D)     |     |
- *          |      |           |     (F)    |
- *          |      |           v      |     |
- *          |      |          +--------+    |
- *          |      +----(B)-- |  cxed  |    |
- *          |                 +--------+    |
- *          |                  |      ^     |
- *          |                 (G)     |     |
- *          |                  |     (I)    |
- *          |                  v      |     |
- *          |                 +--------+    |
- *          +-----------(B)-- |  ping  | ---+
- *                            +--------+
- *                             v      ^
- *                             |      |
- *                             +--(H)-+
+ *
+ *    TODO: how to we label the difference between A, and (A,C) ?
+ *          just for the sake of consistency should it be A1, (A2, C)
+ *
+ *          is the H transition necessary?
+ *
+ *                             +--------+
+ *                 +----(B1)-- |  rxng  |
+ *                 |           +--------+
+ *                 |            |      ^
+ *   INIT          |         (A2,C)    |
+ *    v            |            |     (E)
+ *    |            v            v      |
+ *    |    +--------+ --(A1)-> +--------+
+ *    +--> |  dxed  |          |  cxng  | <--+
+ *         +--------+ <-(B2)-- +--------+    |
+ *          ^      ^            |      ^   (F2)
+ *          |      |           (D)     |     |
+ *          |      |            |    (F1)    |
+ *          |      |            v      |     |
+ *          |      |           +--------+    |
+ *          |      +----(B3)-- |  cxed  |    |
+ *          |                  +--------+    |
+ *          |                   |      ^     |
+ *          |                  (G)     |     |
+ *          |                   |     (I)    |
+ *          |                   v      |     |
+ *          |                  +--------+    |
+ *          +-----------(B4)-- |  ping  | ---+
+ *                             +--------+
+ *                              v      ^
+ *                              |      |
+ *                              +--(H)-+
  *
  * This module exposes functions for explicitly directing network
  * state as well declaring callback functions for state transitions

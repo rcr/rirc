@@ -18,15 +18,16 @@
 #define MESSAGE(TYPE, ...) \
 	fprintf(stderr, "%s %s:%d:%s ", (TYPE), __FILE__, __LINE__, __func__); \
 	fprintf(stderr, __VA_ARGS__); \
-	fprintf(stderr, "\n");
+	fprintf(stderr, "\n"); \
+	fflush(stderr);
 
 #if !(defined NDEBUG) && !(defined TESTING)
 #define debug(...) \
 	do { MESSAGE("DEBUG", __VA_ARGS__); } while (0)
 #define debug_send(L, M) \
-	do { fprintf(stderr, "DEBUG (--> %3zu) %s\n", (L), (M)); } while (0)
+	do { fprintf(stderr, "DEBUG (--> %3zu) %s\n", (L), (M)); fflush(stderr); } while (0)
 #define debug_recv(L, M) \
-	do { fprintf(stderr, "DEBUG (<-- %3zu) %s\n", (L), (M)); } while (0)
+	do { fprintf(stderr, "DEBUG (<-- %3zu) %s\n", (L), (M)); fflush(stderr); } while (0)
 #else
 #define debug(...) \
 	do { ; } while (0)

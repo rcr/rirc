@@ -79,6 +79,9 @@
 		PT_UL(&cb_mutex);   \
 	} while (0)
 
+/* state transition */
+#define ST_X(OLD, NEW) (((OLD) << 3) | (NEW))
+
 #define io_cb_cxed(C)        PT_CB(IO_CB_CXED, (C)->obj)
 #define io_cb_dxed(C)        PT_CB(IO_CB_DXED, (C)->obj)
 #define io_cb_err(C, ...)    PT_CB(IO_CB_ERR, (C)->obj, __VA_ARGS__)
@@ -119,6 +122,7 @@ struct connection
 	mbedtls_ssl_context ssl_ctx;
 	pthread_mutex_t mtx;
 	pthread_t tid;
+	unsigned ping;
 	unsigned rx_sleep;
 };
 
@@ -472,11 +476,10 @@ io_state_cxng(struct connection *cx)
 	if ((cert_ret = mbedtls_ssl_get_verify_result(&(cx->ssl_ctx))) != 0) {
 		if (mbedtls_x509_crt_verify_info(vrfy_buf, sizeof(vrfy_buf), "", cert_ret) <= 0) {
 			io_cb_err(cx, " ... failed to verify cert: unknown failure");
-			goto error_ssl;
 		} else {
 			io_cb_err(cx, " ... failed to verify cert: %s", vrfy_buf);
-			goto error_ssl;
 		}
+		goto error_ssl;
 	}
 
 	io_cb_info(cx, " ... SSL connection established");
@@ -500,7 +503,7 @@ static enum io_state_t
 io_state_cxed(struct connection *cx)
 {
 	int ret;
-	enum io_state_t st = IO_ST_RXNG;
+	enum io_state_t st = IO_ST_CXNG;
 
 	mbedtls_ssl_conf_read_timeout(&(cx->ssl_conf), SEC_IN_MS(IO_PING_MIN));
 
@@ -510,10 +513,8 @@ io_state_cxed(struct connection *cx)
 	switch (ret) {
 		case MBEDTLS_ERR_SSL_WANT_READ:
 		case MBEDTLS_ERR_SSL_WANT_WRITE:
-			/* EINTR */
 			break;
 		case MBEDTLS_ERR_SSL_PEER_CLOSE_NOTIFY:
-			/* Graceful termination */
 			break;
 		case MBEDTLS_ERR_SSL_TIMEOUT:
 			return IO_ST_PING;
@@ -536,15 +537,16 @@ io_state_cxed(struct connection *cx)
 static enum io_state_t
 io_state_ping(struct connection *cx)
 {
-	int ping = IO_PING_MIN;
 	int ret;
-	enum io_state_t st = IO_ST_RXNG;
+	enum io_state_t st = IO_ST_CXNG;
 
 	mbedtls_ssl_conf_read_timeout(&(cx->ssl_conf), SEC_IN_MS(IO_PING_REFRESH));
 
 	while ((ret = io_cx_read(cx)) <= 0 && ret == MBEDTLS_ERR_SSL_TIMEOUT) {
-		if ((ping += IO_PING_REFRESH) < IO_PING_MAX) {
-			io_cb_ping_n(cx, ping);
+		if ((cx->ping += IO_PING_REFRESH) < IO_PING_MAX) {
+			io_cb_ping_n(cx, cx->ping);
+		} else {
+			break;
 		}
 	}
 
@@ -552,13 +554,13 @@ io_state_ping(struct connection *cx)
 		return IO_ST_CXED;
 
 	switch (ret) {
-		case MBEDTLS_ERR_SSL_WANT_READ:         /* io_dx EINTR */
-		case MBEDTLS_ERR_SSL_WANT_WRITE:        /* io_dx EINTR */
-		case MBEDTLS_ERR_SSL_PEER_CLOSE_NOTIFY: /* Graceful termination */
-			st = IO_ST_DXED;
+		case MBEDTLS_ERR_SSL_WANT_READ:
+		case MBEDTLS_ERR_SSL_WANT_WRITE:
 			break;
-		case MBEDTLS_ERR_SSL_TIMEOUT:
-			io_cb_err(cx, "connection timeout (%u)", ping);
+		case MBEDTLS_ERR_SSL_PEER_CLOSE_NOTIFY:
+			break;
+		case MBEDTLS_ERR_SSL_TIMEOUT: /* read timeout */
+			io_cb_err(cx, "connection timeout (%u)", cx->ping);
 			break;
 		case MBEDTLS_ERR_NET_CONN_RESET:
 		case 0:
@@ -589,65 +591,76 @@ io_thread(void *arg)
 	PT_CF(sigaddset(&sigset, SIGUSR1));
 	PT_CF(pthread_sigmask(SIG_UNBLOCK, &sigset, NULL));
 
-	cx->st_new = IO_ST_CXNG;
+	cx->st_cur = IO_ST_CXNG;
 
-	for (;;) {
-
-		enum io_state_t st_from;
-		enum io_state_t st_to;
+	do {
+		enum io_state_t st_new;
+		enum io_state_t st_old;
 
 		switch (cx->st_cur) {
-			case IO_ST_CXED: st_to = io_state_cxed(cx); break;
-			case IO_ST_CXNG: st_to = io_state_cxng(cx); break;
-			case IO_ST_PING: st_to = io_state_ping(cx); break;
-			case IO_ST_RXNG: st_to = io_state_rxng(cx); break;
-			case IO_ST_DXED: st_to = IO_ST_INVALID; break;
+			case IO_ST_CXED: st_new = io_state_cxed(cx); break;
+			case IO_ST_CXNG: st_new = io_state_cxng(cx); break;
+			case IO_ST_PING: st_new = io_state_ping(cx); break;
+			case IO_ST_RXNG: st_new = io_state_rxng(cx); break;
 			default:
 				fatal("invalid state: %d", cx->st_cur);
 		}
 
-		st_from = cx->st_cur;
+		st_old = cx->st_cur;
 
 		PT_LK(&(cx->mtx));
 
 		/* New state set by io_cx/io_dx */
 		if (cx->st_new != IO_ST_INVALID) {
-			cx->st_cur = st_to = cx->st_new;
 			cx->st_new = IO_ST_INVALID;
+			cx->st_cur = st_new = cx->st_new;
 		} else {
-			cx->st_cur = st_to;
+			cx->st_cur = st_new;
 		}
 
 		PT_UL(&(cx->mtx));
 
-		if (st_from == IO_ST_CXNG && st_to == IO_ST_RXNG)
-			io_cb_err(cx, " ... Connection failed -- retrying");
-
-		if (st_from == IO_ST_CXNG && st_to == IO_ST_CXED) {
-			io_cb_info(cx, " ... Connection successful");
-			io_cb_cxed(cx);
-			cx->rx_sleep = 0;
+		/* State transitions */
+		switch (ST_X(st_old, st_new)) {
+			case ST_X(IO_ST_CXED, IO_ST_CXNG): /* F1 */
+			case ST_X(IO_ST_PING, IO_ST_CXNG): /* F2 */
+				io_cb_dxed(cx);
+			case ST_X(IO_ST_DXED, IO_ST_CXNG): /* A1 */
+			case ST_X(IO_ST_RXNG, IO_ST_CXNG): /* A2,C */
+				break;
+			case ST_X(IO_ST_RXNG, IO_ST_DXED): /* B1 */
+			case ST_X(IO_ST_CXNG, IO_ST_DXED): /* B2 */
+				io_cb_info(cx, "Connection cancelled");
+				break;
+			case ST_X(IO_ST_CXED, IO_ST_DXED): /* B3 */
+			case ST_X(IO_ST_PING, IO_ST_DXED): /* B4 */
+				io_cb_info(cx, "Connection closed");
+				io_cb_dxed(cx);
+				break;
+			case ST_X(IO_ST_CXNG, IO_ST_CXED): /* D */
+				io_cb_info(cx, " ... Connection successful");
+				io_cb_cxed(cx);
+				cx->rx_sleep = 0;
+				break;
+			case ST_X(IO_ST_CXNG, IO_ST_RXNG): /* E */
+				io_cb_err(cx, " ... Connection failed -- retrying");
+				break;
+			case ST_X(IO_ST_CXED, IO_ST_PING): /* G */
+				cx->ping = IO_PING_MIN;
+				io_cb_ping_1(cx, cx->ping);
+				break;
+			case ST_X(IO_ST_PING, IO_ST_PING): /* H */
+				io_cb_ping_n(cx, cx->ping);
+				break;
+			case ST_X(IO_ST_PING, IO_ST_CXED): /* I */
+				cx->ping = 0;
+				io_cb_ping_0(cx, cx->ping);
+				break;
+			default:
+				fatal("BAD ST_X from: %d to: %d", st_old, st_new);
 		}
 
-		if ((st_from == IO_ST_RXNG || st_from == IO_ST_CXNG) && st_to == IO_ST_DXED)
-			io_cb_info(cx, "Connection cancelled");
-
-		if ((st_from == IO_ST_CXED || st_from == IO_ST_PING) && st_to == IO_ST_DXED)
-			io_cb_info(cx, "Connection closed");
-
-		if (st_from == IO_ST_PING && st_to == IO_ST_CXED)
-			io_cb_ping_0(cx, 0);
-
-		if (st_from == IO_ST_CXED && st_to == IO_ST_PING)
-			io_cb_ping_1(cx, IO_PING_MIN);
-
-		/* Exit the thread */
-		if (cx->st_cur == IO_ST_DXED) {
-			io_cb_dxed(cx);
-			cx->rx_sleep = 0;
-			break;
-		}
-	}
+	} while (cx->st_cur != IO_ST_DXED);
 
 	return NULL;
 }
