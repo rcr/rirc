@@ -79,6 +79,8 @@
  * a call to io_stop
  */
 
+#include <stddef.h>
+
 struct connection;
 
 enum io_sig_t
