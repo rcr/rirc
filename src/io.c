@@ -418,25 +418,27 @@ io_state_cxng(struct connection *cx)
 		switch (ret) {
 			case IO_NET_ERR_EINTR:
 				st = IO_ST_DXED;
-				goto err_net;
+				goto err_soc;
 			case IO_NET_ERR_SOCKET_FAILED:
 				io_cb_err(cx, " ... Failed to obtain socket");
-				goto err_net;
+				goto err_soc;
 			case IO_NET_ERR_UNKNOWN_HOST:
 				io_cb_err(cx, " ... Failed to resolve host");
-				goto err_net;
+				goto err_soc;
 			case IO_NET_ERR_CONNECT_FAILED:
 				io_cb_err(cx, " ... Failed to connect to host");
-				goto err_net;
+				goto err_soc;
 			default:
 				fatal("unknown net error");
 		}
 	}
 
+	cx->tls_fd.fd = soc;
+
 	if ((ret = io_net_ip_str(soc, buf, sizeof(buf))) != 0) {
 		if (ret == IO_NET_ERR_EINTR) {
 			st = IO_ST_DXED;
-			goto err_net;
+			goto err_ip_str;
 		}
 		io_cb_info(cx, " ... Connected (failed to optain IP address)");
 	} else {
@@ -448,8 +450,6 @@ io_state_cxng(struct connection *cx)
 	mbedtls_net_init(&(cx->tls_fd));
 	mbedtls_ssl_init(&(cx->tls_ctx));
 	mbedtls_ssl_config_init(&(cx->tls_conf));
-
-	cx->tls_fd.fd = soc;
 
 	if (mbedtls_ssl_config_defaults(
 			&(cx->tls_conf),
@@ -514,9 +514,11 @@ err_tls:
 	mbedtls_ssl_config_free(&(cx->tls_conf));
 	mbedtls_ssl_free(&(cx->tls_ctx));
 
-err_net:
+err_ip_str:
 
 	mbedtls_net_free(&(cx->tls_fd));
+
+err_soc:
 
 	return st;
 }
