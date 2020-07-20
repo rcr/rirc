@@ -409,36 +409,37 @@ io_state_cxng(struct connection *cx)
 	char buf[MIN(INET6_ADDRSTRLEN, 512)];
 	enum io_state_t st = IO_ST_RXNG;
 	int ret;
-	int soc;
 	uint32_t cert_ret;
+
+	mbedtls_net_init(&(cx->tls_fd));
+	mbedtls_ssl_init(&(cx->tls_ctx));
+	mbedtls_ssl_config_init(&(cx->tls_conf));
 
 	io_cb_info(cx, "Connecting to %s:%s", cx->host, cx->port);
 
-	if ((ret = io_net_connect(&soc, cx->host, cx->port)) != 0) {
+	if ((ret = io_net_connect(&(cx->tls_fd.fd), cx->host, cx->port)) != 0) {
 		switch (ret) {
 			case IO_NET_ERR_EINTR:
 				st = IO_ST_DXED;
-				goto err_soc;
+				goto err;
 			case IO_NET_ERR_SOCKET_FAILED:
 				io_cb_err(cx, " ... Failed to obtain socket");
-				goto err_soc;
+				goto err;
 			case IO_NET_ERR_UNKNOWN_HOST:
 				io_cb_err(cx, " ... Failed to resolve host");
-				goto err_soc;
+				goto err;
 			case IO_NET_ERR_CONNECT_FAILED:
 				io_cb_err(cx, " ... Failed to connect to host");
-				goto err_soc;
+				goto err;
 			default:
 				fatal("unknown net error");
 		}
 	}
 
-	cx->tls_fd.fd = soc;
-
-	if ((ret = io_net_ip_str(soc, buf, sizeof(buf))) != 0) {
+	if ((ret = io_net_ip_str(cx->tls_fd.fd, buf, sizeof(buf))) != 0) {
 		if (ret == IO_NET_ERR_EINTR) {
 			st = IO_ST_DXED;
-			goto err_ip_str;
+			goto err;
 		}
 		io_cb_info(cx, " ... Connected (failed to optain IP address)");
 	} else {
@@ -447,17 +448,13 @@ io_state_cxng(struct connection *cx)
 
 	io_cb_info(cx, " ... Establishing TLS connection");
 
-	mbedtls_net_init(&(cx->tls_fd));
-	mbedtls_ssl_init(&(cx->tls_ctx));
-	mbedtls_ssl_config_init(&(cx->tls_conf));
-
 	if (mbedtls_ssl_config_defaults(
 			&(cx->tls_conf),
 			MBEDTLS_SSL_IS_CLIENT,
 			MBEDTLS_SSL_TRANSPORT_STREAM,
 			MBEDTLS_SSL_PRESET_DEFAULT) != 0) {
 		io_cb_err(cx, " ... mbedtls_ssl_config_defaults: %s", io_tls_strerror(ret, buf, sizeof(buf)));
-		goto err_tls;
+		goto err;
 	}
 
 	mbedtls_ssl_conf_ca_chain(&(cx->tls_conf), &tls_x509_crt, NULL);
@@ -465,17 +462,17 @@ io_state_cxng(struct connection *cx)
 
 	if ((ret = mbedtls_net_set_block(&(cx->tls_fd))) != 0) {
 		io_cb_err(cx, " ... mbedtls_net_set_block: %s", io_tls_strerror(ret, buf, sizeof(buf)));
-		goto err_tls;
+		goto err;
 	}
 
 	if ((ret = mbedtls_ssl_setup(&(cx->tls_ctx), &(cx->tls_conf))) != 0) {
 		io_cb_err(cx, " ... mbedtls_ssl_setup: %s", io_tls_strerror(ret, buf, sizeof(buf)));
-		goto err_tls;
+		goto err;
 	}
 
 	if ((ret = mbedtls_ssl_set_hostname(&(cx->tls_ctx), cx->host)) != 0) {
 		io_cb_err(cx, " ... mbedtls_ssl_set_hostname: %s", io_tls_strerror(ret, buf, sizeof(buf)));
-		goto err_tls;
+		goto err;
 	}
 
 	mbedtls_ssl_set_bio(
@@ -488,7 +485,7 @@ io_state_cxng(struct connection *cx)
 	while ((ret = mbedtls_ssl_handshake(&(cx->tls_ctx))) != 0) {
 		if (ret != MBEDTLS_ERR_SSL_WANT_READ && ret != MBEDTLS_ERR_SSL_WANT_WRITE) {
 			io_cb_err(cx, " ... mbedtls_ssl_handshake: %s", io_tls_strerror(ret, buf, sizeof(buf)));
-			goto err_tls;
+			goto err;
 		}
 	}
 
@@ -498,7 +495,7 @@ io_state_cxng(struct connection *cx)
 		} else {
 			io_cb_err(cx, " ... failed to verify cert: %s", buf);
 		}
-		goto err_tls;
+		goto err;
 	}
 
 	io_cb_info(cx, " ... TLS connection established");
@@ -507,18 +504,13 @@ io_state_cxng(struct connection *cx)
 
 	return IO_ST_CXED;
 
-err_tls:
+err:
 
 	io_cb_err(cx, " ... TLS connection failure");
 
 	mbedtls_ssl_config_free(&(cx->tls_conf));
 	mbedtls_ssl_free(&(cx->tls_ctx));
-
-err_ip_str:
-
 	mbedtls_net_free(&(cx->tls_fd));
-
-err_soc:
 
 	return st;
 }
