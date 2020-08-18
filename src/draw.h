@@ -1,29 +1,20 @@
 #ifndef DRAW_H
 #define DRAW_H
 
-#include "src/components/buffer.h"
-
-/* Draw component, e.g. draw_buffer(); */
-#define DRAW_BITS \
-	X(buffer) \
-	X(input)  \
-	X(nav)    \
-	X(status)
-
-union draw
+enum draw_bit
 {
-	struct {
-		#define X(bit) unsigned int bit : 1;
-		DRAW_BITS
-		#undef X
-	} bits;
-	unsigned int all_bits;
+	DRAW_INVALID,
+	DRAW_FLUSH,  /* immediately draw all set bits */
+	DRAW_BELL,   /* set bit to print terminal bell */
+	DRAW_BUFFER, /* set bit to draw buffer */
+	DRAW_INPUT,  /* set bit to draw input */
+	DRAW_NAV,    /* set bit to draw nav */
+	DRAW_STATUS, /* set bit to draw status */
+	DRAW_ALL,    /* set all draw bits aside from bell */
 };
 
-void draw(union draw);
-void draw_bell(void);
+void draw(enum draw_bit);
 void draw_init(void);
 void draw_term(void);
-void split_buffer_cols(struct buffer_line*, unsigned int*, unsigned int*, unsigned int, unsigned int);
 
 #endif

@@ -7,6 +7,7 @@
 #include <unistd.h>
 
 #include "config.h"
+#include "src/draw.h"
 #include "src/io.h"
 #include "src/state.h"
 
@@ -23,34 +24,34 @@ static const char* opt_arg_str(char);
 static const char* getpwuid_pw_name(void);
 static int parse_args(int, char**);
 
-#ifndef DEBUG
-const char *runtime_name = "rirc";
-#else
-const char *runtime_name = "rirc.debug";
-#endif
-
 #ifdef CA_CERT_PATH
 const char *ca_cert_path = CA_CERT_PATH;
 #else
 #error "CA_CERT_PATH required"
 #endif
 
-#ifndef DEFAULT_NICK_SET
+#ifdef DEFAULT_NICK_SET
 const char *default_nick_set = DEFAULT_NICK_SET;
 #else
 const char *default_nick_set;
 #endif
 
-#ifndef DEFAULT_USERNAME
+#ifdef DEFAULT_USERNAME
 const char *default_username = DEFAULT_USERNAME;
 #else
 const char *default_username;
 #endif
 
-#ifndef DEFAULT_REALNAME
+#ifdef DEFAULT_REALNAME
 const char *default_realname = DEFAULT_REALNAME;
 #else
 const char *default_realname;
+#endif
+
+#ifndef NDEBUG
+const char *runtime_name = "rirc.debug";
+#else
+const char *runtime_name = "rirc";
 #endif
 
 static const char *const rirc_usage =
@@ -74,7 +75,7 @@ static const char *const rirc_usage =
 "\n";
 
 static const char *const rirc_version =
-#ifdef DEBUG
+#ifndef NDEBUG
 "rirc v"VERSION" (debug build)";
 #else
 "rirc v"VERSION;

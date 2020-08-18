@@ -2,6 +2,7 @@
 #include <string.h>
 
 #define RECV_HANDLERS \
+	X(cap) \
 	X(error) \
 	X(invite) \
 	X(join) \
@@ -40,6 +41,7 @@ struct recv_handler
 %define initializer-suffix ,(irc_recv_f)0
 struct recv_handler;
 %%
+CAP,     recv_cap
 ERROR,   recv_error
 INVITE,  recv_invite
 JOIN,    recv_join

@@ -3,9 +3,7 @@
 
 #include "src/components/buffer.h"
 #include "src/components/channel.h"
-#include "src/components/input.h"
 #include "src/components/server.h"
-#include "src/draw.h"
 
 #define FROM_INFO "--"
 #define FROM_ERROR "-!!-"
@@ -53,15 +51,6 @@ void channel_set_current(struct channel*);
 
 void newlinef(struct channel*, enum buffer_line_t, const char*, const char*, ...);
 void newline(struct channel*, enum buffer_line_t, const char*, const char*);
-
-/* TODO: refactor, should be static in state */
-/* Function prototypes for setting draw bits */
-#define X(bit) void draw_##bit(void);
-DRAW_BITS
-#undef X
-void draw_all(void);
-
-void redraw(void);
 
 extern char *action_message;
 

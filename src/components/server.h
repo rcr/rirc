@@ -3,8 +3,8 @@
 
 #include "src/components/buffer.h"
 #include "src/components/channel.h"
+#include "src/components/ircv3.h"
 #include "src/components/mode.h"
-#include "src/utils/utils.h"
 
 // TODO: move this to utils
 #define IRC_MESSAGE_LEN 510
@@ -27,6 +27,7 @@ struct server
 	struct channel *channel;
 	struct channel_list clist;
 	struct channel_list ulist; // TODO: seperate privmsg
+	struct ircv3_caps ircv3_caps;
 	struct mode usermodes;
 	struct mode_str mode_str;
 	struct mode_cfg mode_cfg;
@@ -35,6 +36,7 @@ struct server
 	struct user_list ignore;
 	unsigned ping;
 	unsigned quitting : 1;
+	unsigned registered : 1;
 	void *connection;
 	// TODO: move this to utils
 	struct {

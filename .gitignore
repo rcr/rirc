@@ -5,11 +5,11 @@
 *.o
 *.t
 *.td
+.clangd
 bld
 compile_commands.json
 config.h
 coverage
-mbedtls
 rirc
 rirc.debug
 rirc.out

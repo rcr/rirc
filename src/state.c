@@ -12,12 +12,12 @@
 #include <stdio.h>
 
 #include "src/draw.h"
+#include "src/handlers/irc_recv.h"
+#include "src/handlers/irc_send.h"
 #include "src/io.h"
 #include "src/rirc.h"
 #include "src/state.h"
 #include "src/utils/utils.h"
-#include "src/handlers/irc_recv.h"
-#include "src/handlers/irc_send.h"
 
 /* See: https://vt100.net/docs/vt100-ug/chapter3.html */
 #define CTRL(k) ((k) & 0x1f)
@@ -43,7 +43,6 @@ static struct
 	struct channel *current_channel; /* the current channel being drawn */
 	struct channel *default_channel; /* the default rirc channel at startup */
 	struct server_list servers;
-	union draw draw;
 } state;
 
 struct server_list*
@@ -60,6 +59,8 @@ current_channel(void)
 
 /* List of IRC commands for tab completion */
 static const char *irc_list[] = {
+	"cap-ls",
+	"cap-list",
 	"ctcp-action",
 	"ctcp-clientinfo",
 	"ctcp-finger",
@@ -81,25 +82,6 @@ static const char *irc_list[] = {
 static const char *cmd_list[] = {
 	"clear", "close", "connect", "disconnect", "quit", "set", NULL};
 
-/* Set draw bits */
-#define X(BIT) void draw_##BIT(void) { state.draw.bits.BIT = 1; }
-DRAW_BITS
-#undef X
-
-void
-draw_all(void)
-{
-	state.draw.all_bits = -1;
-}
-
-void
-redraw(void)
-{
-	draw(state.draw);
-
-	state.draw.all_bits = 0;
-}
-
 void
 state_init(void)
 {
@@ -113,7 +95,7 @@ state_init(void)
 	newline(state.default_channel, 0, "--", "");
 	newline(state.default_channel, 0, "--", " - version " VERSION);
 	newline(state.default_channel, 0, "--", " - compiled " __DATE__ ", " __TIME__);
-#ifdef DEBUG
+#ifndef NDEBUG
 	newline(state.default_channel, 0, "--", " - compiled with DEBUG flags");
 #endif
 }
@@ -205,10 +187,10 @@ _newline(struct channel *c, enum buffer_line_t type, const char *from, const cha
 		prefix);
 
 	if (c == current_channel()) {
-		draw_buffer();
+		draw(DRAW_BUFFER);
 	} else {
 		c->activity = MAX(c->activity, ACTIVITY_ACTIVE);
-		draw_nav();
+		draw(DRAW_NAV);
 	}
 }
 
@@ -252,7 +234,7 @@ void
 channel_clear(struct channel *c)
 {
 	memset(&(c->buffer), 0, sizeof(c->buffer));
-	draw_buffer();
+	draw(DRAW_BUFFER);
 }
 
 /* WIP:
@@ -341,7 +323,7 @@ action_close_server(char c)
 		server_list_del(state_server_list(), s);
 		server_free(s);
 
-		draw_all();
+		draw(DRAW_ALL);
 
 		return 1;
 	}
@@ -369,7 +351,7 @@ action(int (*a_handler)(char), const char *fmt, ...)
 	} else {
 		action_handler = a_handler;
 		action_message = action_buff;
-		draw_input();
+		draw(DRAW_INPUT);
 	}
 }
 /* Action line should be:
@@ -480,7 +462,7 @@ channel_close(struct channel *c)
 		if (c == current_channel()) {
 			channel_set_current(c->next);
 		} else {
-			draw_nav();
+			draw(DRAW_NAV);
 		}
 
 		channel_list_del(&c->server->clist, c);
@@ -512,7 +494,7 @@ buffer_scrollback_back(struct channel *c)
 	/* Find top line */
 	for (;;) {
 
-		split_buffer_cols(line, NULL, &text_w, cols, b->pad);
+		buffer_line_split(line, NULL, &text_w, cols, b->pad);
 
 		count += buffer_line_rows(line, text_w);
 
@@ -531,8 +513,8 @@ buffer_scrollback_back(struct channel *c)
 	if (count == rows && line != buffer_tail(b))
 		b->scrollback--;
 
-	draw_buffer();
-	draw_status();
+	draw(DRAW_BUFFER);
+	draw(DRAW_STATUS);
 }
 
 void
@@ -556,7 +538,7 @@ buffer_scrollback_forw(struct channel *c)
 	/* Find top line */
 	for (;;) {
 
-		split_buffer_cols(line, NULL, &text_w, cols, b->pad);
+		buffer_line_split(line, NULL, &text_w, cols, b->pad);
 
 		count += buffer_line_rows(line, text_w);
 
@@ -573,8 +555,8 @@ buffer_scrollback_forw(struct channel *c)
 	if (count == rows && line != buffer_head(b))
 		b->scrollback++;
 
-	draw_buffer();
-	draw_status();
+	draw(DRAW_BUFFER);
+	draw(DRAW_STATUS);
 }
 
 /* FIXME:
@@ -625,7 +607,7 @@ channel_set_current(struct channel *c)
 {
 	/* Set the state to an arbitrary channel */
 	state.current_channel = c;
-	draw_all();
+	draw(DRAW_ALL);
 }
 
 void
@@ -637,7 +619,7 @@ channel_move_prev(void)
 
 	if (c != state.current_channel) {
 		state.current_channel = c;
-		draw_all();
+		draw(DRAW_ALL);
 	}
 }
 
@@ -650,7 +632,7 @@ channel_move_next(void)
 
 	if (c != state.current_channel) {
 		state.current_channel = c;
-		draw_all();
+		draw(DRAW_ALL);
 	}
 }
 
@@ -712,9 +694,11 @@ static void
 state_io_cxed(struct server *s)
 {
 	int ret;
-
 	server_reset(s);
 	server_nicks_next(s);
+
+	if ((ret = io_sendf(s->connection, "CAP LS " IRCV3_CAP_VERSION)))
+		newlinef(s->channel, 0, "-!!-", "sendf fail: %s", io_err(ret));
 
 	if (s->pass && (ret = io_sendf(s->connection, "PASS %s", s->pass)))
 		newlinef(s->channel, 0, "-!!-", "sendf fail: %s", io_err(ret));
@@ -725,7 +709,7 @@ state_io_cxed(struct server *s)
 	if ((ret = io_sendf(s->connection, "USER %s 8 * :%s", s->username, s->realname)))
 		newlinef(s->channel, 0, "-!!-", "sendf fail: %s", io_err(ret));
 
-	draw_status();
+	draw(DRAW_STATUS);
 }
 
 static void
@@ -748,7 +732,7 @@ state_io_ping(struct server *s, unsigned int ping)
 	s->ping = ping;
 
 	if (ping != IO_PING_MIN)
-		draw_status();
+		draw(DRAW_STATUS);
 	else if ((ret = io_sendf(s->connection, "PING :%s", s->host)))
 		newlinef(s->channel, 0, "-!!-", "sendf fail: %s", io_err(ret));
 }
@@ -758,7 +742,7 @@ state_io_signal(enum io_sig_t sig)
 {
 	switch (sig) {
 		case IO_SIGWINCH:
-			draw_all();
+			draw(DRAW_ALL);
 			break;
 		default:
 			newlinef(state.default_channel, 0, "-!!-", "unhandled signal %d", sig);
@@ -800,7 +784,7 @@ io_cb(enum io_cb_t type, const void *cb_obj, ...)
 
 	va_end(ap);
 
-	redraw();
+	draw(DRAW_FLUSH);
 }
 
 static void
@@ -848,7 +832,7 @@ command(struct channel *c, char *buf)
 				server_list_add(state_server_list(), s);
 				channel_set_current(s->channel);
 				io_cx(s->connection);
-				draw_all();
+				draw(DRAW_ALL);
 			}
 		}
 		return;
@@ -1034,9 +1018,9 @@ io_cb_read_inp(char *buf, size_t len)
 		redraw_input = input_insert(&current_channel()->input, buf, len);
 
 	if (redraw_input)
-		draw_input();
+		draw(DRAW_INPUT);
 
-	redraw();
+	draw(DRAW_FLUSH);
 }
 
 void
@@ -1055,16 +1039,14 @@ io_cb_read_soc(char *buf, size_t len, const void *cb_obj)
 
 			s->read.buf[ci] = 0;
 
-			debug(" recv: (%zu) %s", ci, s->read.buf);
+			debug_recv(ci, s->read.buf);
 
 			struct irc_message m;
 
-			if (!(irc_message_parse(&m, s->read.buf)))
+			if (irc_message_parse(&m, s->read.buf) != 0)
 				newlinef(c, 0, "-!!-", "failed to parse message");
 			else
 				irc_recv(s, &m);
-
-			redraw();
 
 			ci = 0;
 		} else if (ci < IRC_MESSAGE_LEN && (isprint(cc) || cc == 0x01)) {
@@ -1074,4 +1056,6 @@ io_cb_read_soc(char *buf, size_t len, const void *cb_obj)
 
 	s->read.cl = buf[n - 1];
 	s->read.i = ci;
+
+	draw(DRAW_FLUSH);
 }

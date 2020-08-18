@@ -3,6 +3,7 @@
 #include "src/components/buffer.c"
 #include "src/components/channel.c"
 #include "src/components/input.c"
+#include "src/components/ircv3.c"
 #include "src/components/mode.c"
 #include "src/components/server.c"
 #include "src/components/user.c"
@@ -10,10 +11,10 @@
 #include "src/state.c"
 #include "src/utils/utils.c"
 
-#include "test/draw.c.mock"
-#include "test/io.c.mock"
-#include "test/rirc.c.mock"
-#include "test/handlers/irc_recv.c.mock"
+#include "test/draw.mock.c"
+#include "test/handlers/irc_recv.mock.c"
+#include "test/io.mock.c"
+#include "test/rirc.mock.c"
 
 #define INP_S(S) io_cb_read_inp((S), strlen(S))
 #define INP_C(C) io_cb_read_inp((char[]){(C)}, 1)
