@@ -40,22 +40,11 @@ rirc requires the latest version of GNU gperf to compile.
 
 See: https://www.gnu.org/software/gperf/
 
-Initialize, configure and build mbedtls:
+Build rirc:
 
 ```
 git submodule init
 git submodule update --recursive
-cd mbedtls
-./scripts/config.pl set MBEDTLS_THREADING_C
-./scripts/config.pl set MBEDTLS_THREADING_PTHREAD
-cmake .
-cmake --build .
-cd ..
-```
-
-Build rirc:
-
-```
 make
 ```
 

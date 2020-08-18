@@ -11,22 +11,20 @@ BIN_DIR = /usr/local/bin
 MAN_DIR = /usr/local/share/man/man1
 
 STDS := \
- -std=c11 \
- -D_BSD_VISIBLE \
- -D_DARWIN_C_SOURCE \
- -D_POSIX_C_SOURCE=200809L
+	-std=c11 \
+	-D_BSD_VISIBLE \
+	-D_DARWIN_C_SOURCE \
+	-D_POSIX_C_SOURCE=200809L
 
-TLS_INCLUDE := \
- -I./mbedtls/include
-
+TLS_CONF := ./lib/mbedtls.h
 TLS_LIBS := \
- ./mbedtls/library/libmbedtls.a \
- ./mbedtls/library/libmbedx509.a \
- ./mbedtls/library/libmbedcrypto.a
+	./lib/mbedtls/library/libmbedtls.a \
+	./lib/mbedtls/library/libmbedx509.a \
+	./lib/mbedtls/library/libmbedcrypto.a
 
 CC := cc
 PP := cc -E
-CFLAGS   := $(CC_EXT) -I. $(TLS_INCLUDE) $(STDS) -DVERSION=\"$(VERSION)\" -Wall -Wextra -pedantic
+CFLAGS   := $(CC_EXT) -I. $(STDS) -DVERSION=\"$(VERSION)\" -Wall -Wextra -pedantic
 CFLAGS_R := $(CFLAGS) -O2 -flto -DNDEBUG
 CFLAGS_D := $(CFLAGS) -O0 -g
 LDFLAGS  := $(LD_EXT) -lpthread
@@ -52,12 +50,12 @@ OBJS_T += $(DIR_B)/utils/tree.t # Header only file
 OBJS_G := $(patsubst %.gperf, %.gperf.out, $(SRC_G))
 
 # Release build executable
-$(BIN_R): $(DIR_B) $(OBJS_G) $(OBJS_R)
+$(BIN_R): $(TLS_LIBS) $(DIR_B) $(OBJS_G) $(OBJS_R)
 	@echo cc $@
 	@$(CC) $(LDFLAGS) -o $@ $(OBJS_R) $(TLS_LIBS)
 
 # Debug build executable
-$(BIN_D): $(DIR_B) $(OBJS_G) $(OBJS_D)
+$(BIN_D): $(TLS_LIBS) $(DIR_B) $(OBJS_G) $(OBJS_D)
 	@echo cc $@
 	@$(CC) $(LDFLAGS) -o $@ $(OBJS_D) $(TLS_LIBS)
 
@@ -83,6 +81,10 @@ $(DIR_B)/%.t: $(DIR_T)/%.c
 	@$(CC) $(CFLAGS_D) $(LDFLAGS) -o $@ $<
 	-@rm -f $(@:.t=.td) && $(TEST_EXT) ./$@ || mv $@ $(@:.t=.td)
 	@[ ! -f $(@:.t=.td) ]
+
+# TLS libraries
+$(TLS_LIBS): $(TLS_CONF)
+	@CFLAGS="-I$(PWD) -DMBEDTLS_CONFIG_FILE='<$(TLS_CONF)>'" $(MAKE) -C ./lib/mbedtls clean lib
 
 # Build directories
 $(DIR_B):

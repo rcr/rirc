@@ -12,17 +12,20 @@
 #include <termios.h>
 #include <unistd.h>
 
-#include "mbedtls/ctr_drbg.h"
-#include "mbedtls/entropy.h"
-#include "mbedtls/error.h"
-#include "mbedtls/net_sockets.h"
-#include "mbedtls/ssl.h"
-#include "mbedtls/x509_crt.h"
-
 #include "config.h"
 #include "rirc.h"
 #include "src/io_net.h"
 #include "utils/utils.h"
+
+/* lib/mbedtls.h is the compile time config
+ * and must precede the other mbedtls headers */
+#include "lib/mbedtls.h"
+#include "lib/mbedtls/include/mbedtls/ctr_drbg.h"
+#include "lib/mbedtls/include/mbedtls/entropy.h"
+#include "lib/mbedtls/include/mbedtls/error.h"
+#include "lib/mbedtls/include/mbedtls/net_sockets.h"
+#include "lib/mbedtls/include/mbedtls/ssl.h"
+#include "lib/mbedtls/include/mbedtls/x509_crt.h"
 
 /* RFC 2812, section 2.3 */
 #ifndef IO_MESG_LEN
@@ -406,7 +409,7 @@ io_state_rxng(struct connection *cx)
 static enum io_state_t
 io_state_cxng(struct connection *cx)
 {
-	char buf[MIN(INET6_ADDRSTRLEN, 512)];
+	char buf[MAX(INET6_ADDRSTRLEN, 512)];
 	enum io_state_t st = IO_ST_RXNG;
 	int ret;
 	uint32_t cert_ret;
@@ -456,6 +459,16 @@ io_state_cxng(struct connection *cx)
 		io_cb_err(cx, " ... mbedtls_ssl_config_defaults: %s", io_tls_strerror(ret, buf, sizeof(buf)));
 		goto err;
 	}
+
+	mbedtls_ssl_conf_max_version(
+			&(cx->tls_conf),
+			MBEDTLS_SSL_MAJOR_VERSION_3,
+			MBEDTLS_SSL_MINOR_VERSION_3);
+
+	mbedtls_ssl_conf_min_version(
+			&(cx->tls_conf),
+			MBEDTLS_SSL_MAJOR_VERSION_3,
+			MBEDTLS_SSL_MINOR_VERSION_3);
 
 	mbedtls_ssl_conf_ca_chain(&(cx->tls_conf), &tls_x509_crt, NULL);
 	mbedtls_ssl_conf_rng(&(cx->tls_conf), mbedtls_ctr_drbg_random, &tls_ctr_drbg);
@@ -761,7 +774,7 @@ io_tls_init(void)
 		fatal("mbedtls_ctr_drbg_seed: %s", io_tls_strerror(err, buf, sizeof(buf)));
 	}
 
-	if ((err = mbedtls_x509_crt_parse_path(&tls_x509_crt, ca_cert_path)) != 0)
+	if ((err = mbedtls_x509_crt_parse_path(&tls_x509_crt, ca_cert_path)) < 0)
 		fatal("mbedtls_x509_crt_parse_path: %s", io_tls_strerror(err, buf, sizeof(buf)));
 }
 
