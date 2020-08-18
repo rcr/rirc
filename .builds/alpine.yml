@@ -13,11 +13,6 @@ tasks:
       cd rirc
       git submodule init
       git submodule update --recursive
-      cd mbedtls
-      ./scripts/config.pl set MBEDTLS_THREADING_C
-      ./scripts/config.pl set MBEDTLS_THREADING_PTHREAD
-      cmake .
-      cmake --build .
   - build: |
       cd rirc
       make rirc debug test
