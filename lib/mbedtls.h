@@ -111,6 +111,6 @@
 /* Error strings */
 #define MBEDTLS_ERROR_C
 
-#include "mbedtls/check_config.h"
+#include "lib/mbedtls/include/mbedtls/check_config.h"
 
 #endif
