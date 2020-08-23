@@ -11,7 +11,7 @@ sources:
   - https://git.sr.ht/~rcr/rirc
 
 environment:
-  SONAR_VER: 4.2.0.1873
+  SONAR_VER: 4.4.0.2170
 
 secrets:
   - 3f911e54-9186-487d-b9b4-bc8338b478c4
@@ -28,6 +28,7 @@ tasks:
       cd rirc
       branch=$(git name-rev --name-only HEAD)
       [ $branch = "remotes/origin/static_analysis" ] || complete-build
+      # Sonarcloud
       curl -o build-wrapper.zip https://sonarcloud.io/static/cpp/build-wrapper-linux-x86.zip
       curl -o sonar-scanner.zip https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-$SONAR_VER-linux.zip
       unzip build-wrapper.zip
@@ -35,7 +36,9 @@ tasks:
       ./scripts/coverage.sh
       echo >> sonar-project.properties "sonar.branch.name=$branch"
       echo >> sonar-project.properties "sonar.cfamily.build-wrapper-output=bw-output"
+      echo >> sonar-project.properties "sonar.cfamily.cache.enabled=false"
       echo >> sonar-project.properties "sonar.cfamily.gcov.reportsPath=."
+      echo >> sonar-project.properties "sonar.cfamily.threads=1"
       echo >> sonar-project.properties "sonar.coverage.exclusions=test"
       echo >> sonar-project.properties "sonar.host.url=https://sonarcloud.io"
       echo >> sonar-project.properties "sonar.organization=rirc"
