@@ -34,8 +34,8 @@ tasks:
       source ~/export_sonarscan
       set -x
       # Coverity
-      ./scripts/coverity_get.sh
-      ./scripts/coverity_run.sh
+      ./scripts/coverity_get.sh coverity
+      ./scripts/coverity_run.sh coverity
       # Sonarcloud
       curl -o build-wrapper.zip https://sonarcloud.io/static/cpp/build-wrapper-linux-x86.zip
       curl -o sonar-scanner.zip https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-$SONAR_VER-linux.zip
