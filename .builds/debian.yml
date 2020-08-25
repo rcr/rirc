@@ -1,4 +1,4 @@
-image: archlinux
+image: debian/stable
 
 packages:
   - cmake
@@ -14,7 +14,8 @@ environment:
   SONAR_VER: 4.4.0.2170
 
 secrets:
-  - 3f911e54-9186-487d-b9b4-bc8338b478c4
+  - 8c2439c9-5f91-4b19-b3c3-33d82f1b861f
+  - a58d0951-f57f-44ef-8ef2-25f2f84f0e89
 
 tasks:
   - setup: |
@@ -28,6 +29,13 @@ tasks:
       cd rirc
       branch=$(git name-rev --name-only HEAD)
       [ $branch = "remotes/origin/static_analysis" ] || complete-build
+      set +x
+      source ~/export_coverity
+      source ~/export_sonarscan
+      set -x
+      # Coverity
+      ./scripts/coverity_get.sh
+      ./scripts/coverity_run.sh
       # Sonarcloud
       curl -o build-wrapper.zip https://sonarcloud.io/static/cpp/build-wrapper-linux-x86.zip
       curl -o sonar-scanner.zip https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-$SONAR_VER-linux.zip
@@ -45,6 +53,5 @@ tasks:
       echo >> sonar-project.properties "sonar.projectKey=rirc"
       echo >> sonar-project.properties "sonar.sources=src"
       echo >> sonar-project.properties "sonar.tests=test"
-      cat ~/sonarcloud-login >> sonar-project.properties
       ./build-wrapper-linux-x86/build-wrapper-linux-x86-64 --out-dir bw-output make clean debug test
       ./sonar-scanner-$SONAR_VER-linux/bin/sonar-scanner
