@@ -16,8 +16,8 @@ if [[ -z "${COVERITY_TOKEN}" ]]; then
 	fail "missing env COVERITY_TOKEN"
 fi
 
-COVERITY_OUT="coverity-out"
-COVERITY_TAR="coverity-out.tgz"
+COVERITY_OUT="cov-int"
+COVERITY_TAR="cov-int.tgz"
 
 VERSION=$(git rev-parse --short HEAD)
 
