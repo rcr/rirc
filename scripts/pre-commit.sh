@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 #
 # pre-commit testing hook, setup:
 #   ln -s ../../scripts/pre-commit.sh .git/hooks/pre-commit
