@@ -615,10 +615,10 @@ io_thread(void *arg)
 	cx->st_cur = IO_ST_CXNG;
 
 	do {
+		enum io_state_t st_cur;
 		enum io_state_t st_new;
-		enum io_state_t st_old;
 
-		switch (cx->st_cur) {
+		switch ((st_cur = cx->st_cur)) {
 			case IO_ST_CXED: st_new = io_state_cxed(cx); break;
 			case IO_ST_CXNG: st_new = io_state_cxng(cx); break;
 			case IO_ST_PING: st_new = io_state_ping(cx); break;
@@ -627,22 +627,19 @@ io_thread(void *arg)
 				fatal("invalid state: %d", cx->st_cur);
 		}
 
-		st_old = cx->st_cur;
-
 		PT_LK(&(cx->mtx));
 
-		/* New state set by io_cx/io_dx */
-		if (cx->st_new != IO_ST_INVALID) {
-			cx->st_new = IO_ST_INVALID;
-			cx->st_cur = st_new = cx->st_new;
-		} else {
-			cx->st_cur = st_new;
-		}
+		/* state set by io_cx/io_dx */
+		if (cx->st_new != IO_ST_INVALID)
+			st_new = cx->st_cur;
+
+		cx->st_cur = st_new;
+		cx->st_new = IO_ST_INVALID;
 
 		PT_UL(&(cx->mtx));
 
 		/* State transitions */
-		switch (ST_X(st_old, st_new)) {
+		switch (ST_X(st_cur, st_new)) {
 			case ST_X(IO_ST_DXED, IO_ST_CXNG): /* A1 */
 			case ST_X(IO_ST_RXNG, IO_ST_CXNG): /* A2,C */
 				break;
@@ -683,7 +680,7 @@ io_thread(void *arg)
 				io_cb_ping_0(cx, cx->ping);
 				break;
 			default:
-				fatal("BAD ST_X from: %d to: %d", st_old, st_new);
+				fatal("BAD ST_X from: %d to: %d", st_cur, st_new);
 		}
 
 	} while (cx->st_cur != IO_ST_DXED);
