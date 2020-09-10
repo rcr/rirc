@@ -12,12 +12,6 @@
  *  - cxed: connected    ~ Socket connected
  *  - ping: timing out   ~ Socket connected, network state in question
  *
- *
- *    TODO: how to we label the difference between A, and (A,C) ?
- *          just for the sake of consistency should it be A1, (A2, C)
- *
- *          is the H transition necessary?
- *
  *                             +--------+
  *                 +----(B1)-- |  rxng  |
  *                 |           +--------+
@@ -80,15 +74,9 @@
  */
 
 #include <stddef.h>
+#include <stdarg.h>
 
 struct connection;
-
-enum io_sig_t
-{
-	IO_SIG_INVALID,
-	IO_SIGWINCH,
-	IO_SIG_SIZE
-};
 
 enum io_cb_t
 {
@@ -102,6 +90,21 @@ enum io_cb_t
 	IO_CB_PING_N, /* <unsigned ping> */
 	IO_CB_SIGNAL, /* <io_sig_t sig> */
 	IO_CB_SIZE
+};
+
+enum io_log_level
+{
+	IO_LOG_ERROR,
+	IO_LOG_WARN,
+	IO_LOG_INFO,
+	IO_LOG_DEBUG,
+};
+
+enum io_sig_t
+{
+	IO_SIG_INVALID,
+	IO_SIGWINCH,
+	IO_SIG_SIZE
 };
 
 /* Returns a connection, or NULL if limit is reached */
@@ -137,5 +140,13 @@ void io_cb(enum io_cb_t, const void*, ...);
 /* IO data callback */
 void io_cb_read_inp(char*, size_t);
 void io_cb_read_soc(char*, size_t, const void*);
+
+/* Log message callback */
+void io_cb_log(const void*, enum io_log_level, const char*, ...);
+
+#ifdef IO_INTERNAL
+void io_cb_lk(void);
+void io_cb_ul(void);
+#endif
 
 #endif

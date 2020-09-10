@@ -1,20 +1,13 @@
 #ifndef IO_NET_H
 #define IO_NET_H
 
-#include <stddef.h>
-
 enum io_net_err
 {
-	IO_NET_ERR_NONE = 0,
-	IO_NET_ERR_SOCKET_FAILED,
-	IO_NET_ERR_UNKNOWN_HOST,
-	IO_NET_ERR_CONNECT_FAILED,
-	IO_NET_ERR_EINTR,
-	IO_NET_ERR_IP,
-	IO_NET_ERR_UNKNOWN
+	IO_NET_ERR_FAIL  = -1,
+	IO_NET_ERR_EINTR = -2,
 };
 
-enum io_net_err io_net_connect(int*, const char*, const char*);
-enum io_net_err io_net_ip_str(int, char*, size_t);
+/* Returns a socket on success, or io_net_err value on eror */
+int io_net_connect(const void*, const char*, const char*);
 
 #endif

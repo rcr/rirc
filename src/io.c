@@ -79,9 +79,9 @@
 #define PT_UL(X) PT_CF(pthread_mutex_unlock((X)))
 #define PT_CB(...) \
 	do {                    \
-		PT_LK(&cb_mutex);   \
+		PT_LK(&io_cb_mutex);   \
 		io_cb(__VA_ARGS__); \
-		PT_UL(&cb_mutex);   \
+		PT_UL(&io_cb_mutex);   \
 	} while (0)
 
 /* state transition */
@@ -151,7 +151,7 @@ static int io_running;
 static mbedtls_ctr_drbg_context tls_ctr_drbg;
 static mbedtls_entropy_context  tls_entropy;
 static mbedtls_x509_crt         tls_x509_crt;
-static pthread_mutex_t cb_mutex = PTHREAD_MUTEX_INITIALIZER;
+static pthread_mutex_t io_cb_mutex = PTHREAD_MUTEX_INITIALIZER;
 static struct termios term;
 static unsigned io_cols;
 static unsigned io_rows;
@@ -309,9 +309,9 @@ io_start(void)
 		ssize_t ret = read(STDIN_FILENO, buf, sizeof(buf));
 
 		if (ret > 0) {
-			PT_LK(&cb_mutex);
+			PT_LK(&io_cb_mutex);
 			io_cb_read_inp(buf, ret);
-			PT_UL(&cb_mutex);
+			PT_UL(&io_cb_mutex);
 		} else {
 			if (errno == EINTR) {
 				if (flag_sigwinch_cb) {
@@ -329,6 +329,18 @@ void
 io_stop(void)
 {
 	io_running = 0;
+}
+
+void
+io_cb_lk(void)
+{
+	PT_LK(&io_cb_mutex);
+}
+
+void
+io_cb_ul(void)
+{
+	PT_UL(&io_cb_mutex);
 }
 
 static void
@@ -378,7 +390,7 @@ io_err(int err)
 	}
 }
 
-const char*
+static const char*
 io_tls_strerror(int err, char *buf, size_t len)
 {
 	mbedtls_strerror(err, buf, len);
@@ -410,52 +422,28 @@ static enum io_state_t
 io_state_cxng(struct connection *cx)
 {
 	char buf[MAX(INET6_ADDRSTRLEN, 512)];
-	enum io_state_t st = IO_ST_RXNG;
 	int ret;
+	int soc;
 	uint32_t cert_ret;
+
+	io_cb_info(cx, "Connecting to %s:%s", cx->host, cx->port);
+
+	if ((soc = io_net_connect(cx->obj, cx->host, cx->port)) < 0)
+		goto err_net;
+
+	io_cb_info(cx, " ... Establishing TLS connection");
 
 	mbedtls_net_init(&(cx->tls_fd));
 	mbedtls_ssl_init(&(cx->tls_ctx));
 	mbedtls_ssl_config_init(&(cx->tls_conf));
 
-	io_cb_info(cx, "Connecting to %s:%s", cx->host, cx->port);
+	cx->tls_fd.fd = soc;
 
-	if ((ret = io_net_connect(&(cx->tls_fd.fd), cx->host, cx->port)) != 0) {
-		switch (ret) {
-			case IO_NET_ERR_EINTR:
-				st = IO_ST_DXED;
-				goto err;
-			case IO_NET_ERR_SOCKET_FAILED:
-				io_cb_err(cx, " ... Failed to obtain socket");
-				goto err;
-			case IO_NET_ERR_UNKNOWN_HOST:
-				io_cb_err(cx, " ... Failed to resolve host");
-				goto err;
-			case IO_NET_ERR_CONNECT_FAILED:
-				io_cb_err(cx, " ... Failed to connect to host");
-				goto err;
-			default:
-				fatal("unknown net error");
-		}
-	}
-
-	if ((ret = io_net_ip_str(cx->tls_fd.fd, buf, sizeof(buf))) != 0) {
-		if (ret == IO_NET_ERR_EINTR) {
-			st = IO_ST_DXED;
-			goto err;
-		}
-		io_cb_info(cx, " ... Connected (failed to optain IP address)");
-	} else {
-		io_cb_info(cx, " ... Connected to [%s]", buf);
-	}
-
-	io_cb_info(cx, " ... Establishing TLS connection");
-
-	if (mbedtls_ssl_config_defaults(
+	if ((ret = mbedtls_ssl_config_defaults(
 			&(cx->tls_conf),
 			MBEDTLS_SSL_IS_CLIENT,
 			MBEDTLS_SSL_TRANSPORT_STREAM,
-			MBEDTLS_SSL_PRESET_DEFAULT) != 0) {
+			MBEDTLS_SSL_PRESET_DEFAULT)) != 0) {
 		io_cb_err(cx, " ... mbedtls_ssl_config_defaults: %s", io_tls_strerror(ret, buf, sizeof(buf)));
 		goto err;
 	}
@@ -525,7 +513,9 @@ err:
 	mbedtls_ssl_free(&(cx->tls_ctx));
 	mbedtls_net_free(&(cx->tls_fd));
 
-	return st;
+err_net:
+
+	return IO_ST_RXNG;
 }
 
 static enum io_state_t
@@ -697,9 +687,9 @@ io_cx_read(struct connection *cx, unsigned timeout)
 	mbedtls_ssl_conf_read_timeout(&(cx->tls_conf), SEC_IN_MS(timeout));
 
 	if ((ret = mbedtls_ssl_read(&(cx->tls_ctx), ssl_readbuf, sizeof(ssl_readbuf))) > 0) {
-		PT_LK(&cb_mutex);
+		PT_LK(&io_cb_mutex);
 		io_cb_read_soc((char *)ssl_readbuf, (size_t)ret,  cx->obj);
-		PT_UL(&cb_mutex);
+		PT_UL(&io_cb_mutex);
 	}
 
 	return ret;

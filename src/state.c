@@ -1059,3 +1059,27 @@ io_cb_read_soc(char *buf, size_t len, const void *cb_obj)
 
 	draw(DRAW_FLUSH);
 }
+
+void
+io_cb_log(const void *cb_obj, enum io_log_level lvl, const char *fmt, ...)
+{
+	struct server *s = (struct server *)cb_obj;
+
+	va_list ap;
+	va_start(ap, fmt);
+
+	switch (lvl) {
+		case IO_LOG_ERROR:
+			_newline(s->channel, 0, "-!!-", fmt, ap);
+			break;
+		case IO_LOG_WARN:
+		case IO_LOG_INFO:
+		case IO_LOG_DEBUG:
+			_newline(s->channel, 0, "--", fmt, ap);
+			break;
+		default:
+			fatal("invalid log level");
+	}
+
+	va_end(ap);
+}
