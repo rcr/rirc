@@ -871,9 +871,9 @@ io_net_connect(struct connection *cx)
 	}
 
 	if (p->ai_family == AF_INET)
-		addr = &(((struct sockaddr_in*)p)->sin_addr);
+		addr = &(((struct sockaddr_in*)p->ai_addr)->sin_addr);
 	else
-		addr = &(((struct sockaddr_in6*)p)->sin6_addr);
+		addr = &(((struct sockaddr_in6*)p->ai_addr)->sin6_addr);
 
 	if (inet_ntop(p->ai_family, addr, buf, sizeof(buf)))
 		io_cb_info(cx, " ... Connected [%s]", buf);
