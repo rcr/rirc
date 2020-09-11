@@ -1,5 +1,6 @@
 #include "src/io.h"
 
+#include <arpa/inet.h>
 #include <errno.h>
 #include <netdb.h>
 #include <pthread.h>
@@ -14,7 +15,6 @@
 
 #include "config.h"
 #include "rirc.h"
-#include "src/io_net.h"
 #include "utils/utils.h"
 
 /* lib/mbedtls.h is the compile time config
@@ -157,6 +157,10 @@ static unsigned io_cols;
 static unsigned io_rows;
 static volatile sig_atomic_t flag_sigwinch_cb; /* sigwinch callback */
 static volatile sig_atomic_t flag_tty_resized; /* sigwinch ws resize */
+
+static const char* io_strerror(char*, size_t);
+static int io_net_connect(struct connection*);
+static void io_net_close(int);
 
 struct connection*
 connection(const void *obj, const char *host, const char *port)
@@ -428,7 +432,7 @@ io_state_cxng(struct connection *cx)
 
 	io_cb_info(cx, "Connecting to %s:%s", cx->host, cx->port);
 
-	if ((soc = io_net_connect(cx->obj, cx->host, cx->port)) < 0)
+	if ((soc = io_net_connect(cx)) < 0)
 		goto err_net;
 
 	io_cb_info(cx, " ... Establishing TLS connection");
@@ -621,7 +625,7 @@ io_thread(void *arg)
 
 		/* state set by io_cx/io_dx */
 		if (cx->st_new != IO_ST_INVALID)
-			st_new = cx->st_cur;
+			st_new = cx->st_new;
 
 		cx->st_cur = st_new;
 		cx->st_new = IO_ST_INVALID;
@@ -805,4 +809,99 @@ io_tty_term(void)
 
 	if (tcsetattr(STDIN_FILENO, TCSADRAIN, &term) < 0)
 		fatal_noexit("tcsetattr: %s", strerror(errno));
+}
+
+static int
+io_net_connect(struct connection *cx)
+{
+	char buf[MAX(INET6_ADDRSTRLEN, 512)];
+	const void *addr;
+	int ret;
+	int soc;
+	struct addrinfo *p, *res;
+	struct addrinfo hints = {
+		.ai_family   = AF_UNSPEC,
+		.ai_flags    = AI_PASSIVE,
+		.ai_protocol = IPPROTO_TCP,
+		.ai_socktype = SOCK_STREAM,
+	};
+
+	errno = 0;
+
+	if ((ret = getaddrinfo(cx->host, cx->port, &hints, &res)) != 0) {
+
+		if (ret == EAI_SYSTEM && errno == EINTR)
+			return -1;
+
+		if (ret == EAI_SYSTEM) {
+			io_cb_err(cx, " ... Failed to resolve host: %s",
+				io_strerror(buf, sizeof(buf)));
+		} else {
+			io_cb_err(cx, " ... Failed to resolve host: %s",
+				gai_strerror(ret));
+		}
+
+		return -1;
+	}
+
+	ret = -1;
+
+	for (p = res; p; p = p->ai_next) {
+
+		if ((soc = socket(p->ai_family, p->ai_socktype, p->ai_protocol)) == -1)
+			continue;
+
+		if (connect(soc, p->ai_addr, p->ai_addrlen) == 0)
+			break;
+
+		io_net_close(soc);
+
+		if (errno == EINTR)
+			goto err;
+	}
+
+	if (!p && soc == -1) {
+		io_cb_err(cx, " ... Failed to obtain socket: %s", io_strerror(buf, sizeof(buf)));
+		goto err;
+	}
+
+	if (!p && soc >= 0) {
+		io_cb_err(cx, " ... Failed to connect: %s", io_strerror(buf, sizeof(buf)));
+		goto err;
+	}
+
+	if (p->ai_family == AF_INET)
+		addr = &(((struct sockaddr_in*)p)->sin_addr);
+	else
+		addr = &(((struct sockaddr_in6*)p)->sin6_addr);
+
+	if (inet_ntop(p->ai_family, addr, buf, sizeof(buf)))
+		io_cb_info(cx, " ... Connected [%s]", buf);
+
+	ret = soc;
+
+err:
+	freeaddrinfo(res);
+
+	return ret;
+}
+
+static void
+io_net_close(int soc)
+{
+	int errno_save = errno;
+
+	while (close(soc) && errno == EINTR)
+		errno_save = EINTR;
+
+	errno = errno_save;
+}
+
+static const char*
+io_strerror(char *buf, size_t buflen)
+{
+	if (strerror_r(errno, buf, buflen))
+		snprintf(buf, buflen, "(failed to get error message)");
+
+	return buf;
 }
