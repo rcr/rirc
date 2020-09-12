@@ -92,6 +92,8 @@ opt_arg_str(char c)
 		case 'c': return "-c/--chans";
 		case 'u': return "-u/--username";
 		case 'r': return "-r/--realname";
+		case '4': return "--ipv4";
+		case '6': return "--ipv6";
 		default:
 			fatal("unknown option flag '%c'", c);
 	}
@@ -136,6 +138,8 @@ parse_args(int argc, char **argv)
 		{"realname", required_argument, 0, 'r'},
 		{"help",     no_argument,       0, 'h'},
 		{"version",  no_argument,       0, 'v'},
+		{"ipv4",     no_argument,       0, '4'},
+		{"ipv6",     no_argument,       0, '6'},
 		{0, 0, 0, 0}
 	};
 
@@ -147,6 +151,7 @@ parse_args(int argc, char **argv)
 		const char *chans;
 		const char *username;
 		const char *realname;
+		uint8_t flags;
 		struct server *s;
 	} cli_servers[MAX_CLI_SERVERS];
 
@@ -170,42 +175,53 @@ parse_args(int argc, char **argv)
 				cli_servers[n_servers - 1].chans = NULL;
 				cli_servers[n_servers - 1].username = NULL;
 				cli_servers[n_servers - 1].realname = NULL;
+				cli_servers[n_servers - 1].flags = 0;
 				break;
 
-			#define CHECK_SERVER_OPTARG(OPT_C) \
-				if (*optarg == '-') \
+			#define CHECK_SERVER_OPTARG(OPT_C, REQ) \
+				if ((REQ) && *optarg == '-') \
 					arg_error("option '%s' requires an argument", opt_arg_str((OPT_C))); \
 				if (n_servers == 0) \
 					arg_error("option '%s' requires a server argument first", opt_arg_str((OPT_C)));
 
 			case 'p': /* Connect using port */
-				CHECK_SERVER_OPTARG(opt_c);
+				CHECK_SERVER_OPTARG(opt_c, 1);
 				cli_servers[n_servers - 1].port = optarg;
 				break;
 
 			case 'w': /* Connect using port */
-				CHECK_SERVER_OPTARG(opt_c);
+				CHECK_SERVER_OPTARG(opt_c, 1);
 				cli_servers[n_servers - 1].pass = optarg;
 				break;
 
 			case 'n': /* Comma separated list of nicks to use */
-				CHECK_SERVER_OPTARG(opt_c);
+				CHECK_SERVER_OPTARG(opt_c, 1);
 				cli_servers[n_servers - 1].nicks = optarg;
 				break;
 
 			case 'c': /* Comma separated list of channels to join */
-				CHECK_SERVER_OPTARG(opt_c);
+				CHECK_SERVER_OPTARG(opt_c, 1);
 				cli_servers[n_servers - 1].chans = optarg;
 				break;
 
 			case 'u': /* Connect using username */
-				CHECK_SERVER_OPTARG(opt_c);
+				CHECK_SERVER_OPTARG(opt_c, 1);
 				cli_servers[n_servers - 1].username = optarg;
 				break;
 
 			case 'r': /* Connect using realname */
-				CHECK_SERVER_OPTARG(opt_c);
+				CHECK_SERVER_OPTARG(opt_c, 1);
 				cli_servers[n_servers - 1].realname = optarg;
+				break;
+
+			case '4':
+				CHECK_SERVER_OPTARG(opt_c, 0);
+				cli_servers[n_servers -1].flags |= IO_IPV_4;
+				break;
+
+			case '6':
+				CHECK_SERVER_OPTARG(opt_c, 0);
+				cli_servers[n_servers -1].flags |= IO_IPV_6;
 				break;
 
 			#undef CHECK_SERVER_OPTARG
@@ -254,7 +270,7 @@ parse_args(int argc, char **argv)
 			(cli_servers[i].realname ? cli_servers[i].realname : default_realname)
 		);
 
-		s->connection = connection(s, cli_servers[i].host, cli_servers[i].port);
+		s->connection = connection(s, cli_servers[i].host, cli_servers[i].port, cli_servers[i].flags);
 
 		if (server_list_add(state_server_list(), s))
 			arg_error("duplicate server: %s:%s", cli_servers[i].host, cli_servers[i].port);

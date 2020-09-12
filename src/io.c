@@ -127,6 +127,7 @@ struct connection
 	mbedtls_ssl_context tls_ctx;
 	pthread_mutex_t mtx;
 	pthread_t tid;
+	uint8_t flags;
 	unsigned ping;
 	unsigned rx_sleep;
 };
@@ -163,7 +164,7 @@ static int io_net_connect(struct connection*);
 static void io_net_close(int);
 
 struct connection*
-connection(const void *obj, const char *host, const char *port)
+connection(const void *obj, const char *host, const char *port, uint8_t flags)
 {
 	struct connection *cx;
 
@@ -171,6 +172,7 @@ connection(const void *obj, const char *host, const char *port)
 		fatal("malloc: %s", strerror(errno));
 
 	cx->obj = obj;
+	cx->flags = flags;
 	cx->host = strdup(host);
 	cx->port = strdup(port);
 	cx->st_cur = IO_ST_DXED;
@@ -825,6 +827,12 @@ io_net_connect(struct connection *cx)
 		.ai_protocol = IPPROTO_TCP,
 		.ai_socktype = SOCK_STREAM,
 	};
+
+	if (cx->flags & IO_IPV_4)
+		hints.ai_family = AF_INET;
+
+	if (cx->flags & IO_IPV_6)
+		hints.ai_family = AF_INET6;
 
 	errno = 0;
 

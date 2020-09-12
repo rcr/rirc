@@ -73,8 +73,9 @@
  * a call to io_stop
  */
 
-#include <stddef.h>
 #include <stdarg.h>
+#include <stddef.h>
+#include <stdint.h>
 
 struct connection;
 
@@ -107,11 +108,15 @@ enum io_sig_t
 	IO_SIG_SIZE
 };
 
+#define IO_IPV_4 (1 << 1)
+#define IO_IPV_6 (1 << 2)
+
 /* Returns a connection, or NULL if limit is reached */
 struct connection* connection(
-	const void*,  /* callback object */
-	const char*,  /* host */
-	const char*); /* port */
+	const void*, /* callback object */
+	const char*, /* host */
+	const char*, /* port */
+	uint8_t);    /* flags */
 
 void connection_free(struct connection*);
 

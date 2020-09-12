@@ -828,7 +828,7 @@ command(struct channel *c, char *buf)
 				newlinef(s->channel, 0, "-!!-", "already connected to %s:%s", host, port);
 			} else {
 				s = server(host, port, pass, user, real);
-				s->connection = connection(s, host, port);
+				s->connection = connection(s, host, port, 0);
 				server_list_add(state_server_list(), s);
 				channel_set_current(s->channel);
 				io_cx(s->connection);

@@ -72,7 +72,7 @@ Help:
   -h, --help      Print this message and exit
   -v, --version   Print rirc version and exit
 
-Options:
+Server options:
   -s, --server=SERVER       Connect to SERVER
   -p, --port=PORT           Connect to SERVER using PORT
   -w, --pass=PASS           Connect to SERVER using PASS
@@ -80,6 +80,10 @@ Options:
   -r, --realname=REALNAME   Connect to SERVER using REALNAME
   -n, --nicks=NICKS         Comma separated list of nicks to use for SERVER
   -c, --chans=CHANNELS      Comma separated list of channels to join for SERVER
+
+Connection options:
+      --ipv4                Connect to only ipv4 addresses
+      --ipv6                Connect to only ipv6 addresses
 ```
 
 Commands:
