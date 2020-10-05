@@ -66,10 +66,10 @@ make install
 ### Usage:
 
 ```
-rirc [-hv] [-s server [-p port] [-w pass] [-u user] [-r real] [-n nicks] [-c chans]], ...]
+rirc [-hv] [-s server [...]]
 
-Help:
-  -h, --help      Print this message and exit
+Info:
+  -h, --help      Print help message and exit
   -v, --version   Print rirc version and exit
 
 Server options:
@@ -81,9 +81,10 @@ Server options:
   -n, --nicks=NICKS         Comma separated list of nicks to use for SERVER
   -c, --chans=CHANNELS      Comma separated list of channels to join for SERVER
 
-Connection options:
-      --ipv4                Connect to only ipv4 addresses
-      --ipv6                Connect to only ipv6 addresses
+Server connection options:
+   --ipv4                   Connect to server using only ipv4 addresses
+   --ipv6                   Connect to server using only ipv6 addresses
+   --tls-verify=<mode>      Set server TLS peer certificate verify mode
 ```
 
 Commands:

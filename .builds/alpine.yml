@@ -15,4 +15,4 @@ tasks:
       git submodule update --recursive
   - build: |
       cd rirc
-      make rirc debug test
+      make rirc rirc.debug test

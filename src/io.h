@@ -108,8 +108,11 @@ enum io_sig_t
 	IO_SIG_SIZE
 };
 
-#define IO_IPV_4 (1 << 1)
-#define IO_IPV_6 (1 << 2)
+#define IO_IPV_4             (1 << 1)
+#define IO_IPV_6             (1 << 2)
+#define IO_TLS_VRFY_DISABLED (1 << 3)
+#define IO_TLS_VRFY_OPTIONAL (1 << 4)
+#define IO_TLS_VRFY_REQUIRED (1 << 5)
 
 /* Returns a connection, or NULL if limit is reached */
 struct connection* connection(
@@ -148,10 +151,5 @@ void io_cb_read_soc(char*, size_t, const void*);
 
 /* Log message callback */
 void io_cb_log(const void*, enum io_log_level, const char*, ...);
-
-#ifdef IO_INTERNAL
-void io_cb_lk(void);
-void io_cb_ul(void);
-#endif
 
 #endif

@@ -17,15 +17,12 @@
 #include "rirc.h"
 #include "utils/utils.h"
 
-/* lib/mbedtls.h is the compile time config
- * and must precede the other mbedtls headers */
-#include "lib/mbedtls.h"
-#include "lib/mbedtls/include/mbedtls/ctr_drbg.h"
-#include "lib/mbedtls/include/mbedtls/entropy.h"
-#include "lib/mbedtls/include/mbedtls/error.h"
-#include "lib/mbedtls/include/mbedtls/net_sockets.h"
-#include "lib/mbedtls/include/mbedtls/ssl.h"
-#include "lib/mbedtls/include/mbedtls/x509_crt.h"
+#include "mbedtls/ctr_drbg.h"
+#include "mbedtls/entropy.h"
+#include "mbedtls/error.h"
+#include "mbedtls/net_sockets.h"
+#include "mbedtls/ssl.h"
+#include "mbedtls/x509_crt.h"
 
 /* RFC 2812, section 2.3 */
 #ifndef IO_MESG_LEN
@@ -122,6 +119,7 @@ struct connection
 		IO_ST_PING, /* Socket connected, network state in question */
 	} st_cur, /* current thread state */
 	  st_new; /* new thread state */
+	int soc;
 	mbedtls_net_context tls_fd;
 	mbedtls_ssl_config  tls_conf;
 	mbedtls_ssl_context tls_ctx;
@@ -132,7 +130,6 @@ struct connection
 	unsigned rx_sleep;
 };
 
-static const char* io_tls_strerror(int, char*, size_t);
 static enum io_state_t io_state_cxed(struct connection*);
 static enum io_state_t io_state_cxng(struct connection*);
 static enum io_state_t io_state_ping(struct connection*);
@@ -141,8 +138,6 @@ static int io_cx_read(struct connection*, unsigned);
 static void io_fatal(const char*, int);
 static void io_sig_handle(int);
 static void io_sig_init(void);
-static void io_tls_init(void);
-static void io_tls_term(void);
 static void io_tty_init(void);
 static void io_tty_term(void);
 static void io_tty_winsize(void);
@@ -162,6 +157,13 @@ static volatile sig_atomic_t flag_tty_resized; /* sigwinch ws resize */
 static const char* io_strerror(char*, size_t);
 static int io_net_connect(struct connection*);
 static void io_net_close(int);
+
+/* TLS */
+static const char* io_tls_err(int);
+static int io_tls_establish(struct connection*);
+static int io_tls_x509_vrfy(struct connection*);
+static void io_tls_init(void);
+static void io_tls_term(void);
 
 struct connection*
 connection(const void *obj, const char *host, const char *port, uint8_t flags)
@@ -337,18 +339,6 @@ io_stop(void)
 	io_running = 0;
 }
 
-void
-io_cb_lk(void)
-{
-	PT_LK(&io_cb_mutex);
-}
-
-void
-io_cb_ul(void)
-{
-	PT_UL(&io_cb_mutex);
-}
-
 static void
 io_tty_winsize(void)
 {
@@ -396,13 +386,6 @@ io_err(int err)
 	}
 }
 
-static const char*
-io_tls_strerror(int err, char *buf, size_t len)
-{
-	mbedtls_strerror(err, buf, len);
-	return buf;
-}
-
 static enum io_state_t
 io_state_rxng(struct connection *cx)
 {
@@ -427,101 +410,13 @@ io_state_rxng(struct connection *cx)
 static enum io_state_t
 io_state_cxng(struct connection *cx)
 {
-	char buf[MAX(INET6_ADDRSTRLEN, 512)];
-	int ret;
-	int soc;
-	uint32_t cert_ret;
+	if ((cx->soc = io_net_connect(cx)) < 0)
+		return IO_ST_RXNG;
 
-	io_cb_info(cx, "Connecting to %s:%s", cx->host, cx->port);
-
-	if ((soc = io_net_connect(cx)) < 0)
-		goto err_net;
-
-	io_cb_info(cx, " ... Establishing TLS connection");
-
-	mbedtls_net_init(&(cx->tls_fd));
-	mbedtls_ssl_init(&(cx->tls_ctx));
-	mbedtls_ssl_config_init(&(cx->tls_conf));
-
-	cx->tls_fd.fd = soc;
-
-	if ((ret = mbedtls_ssl_config_defaults(
-			&(cx->tls_conf),
-			MBEDTLS_SSL_IS_CLIENT,
-			MBEDTLS_SSL_TRANSPORT_STREAM,
-			MBEDTLS_SSL_PRESET_DEFAULT)) != 0) {
-		io_cb_err(cx, " ... mbedtls_ssl_config_defaults: %s", io_tls_strerror(ret, buf, sizeof(buf)));
-		goto err;
-	}
-
-	mbedtls_ssl_conf_max_version(
-			&(cx->tls_conf),
-			MBEDTLS_SSL_MAJOR_VERSION_3,
-			MBEDTLS_SSL_MINOR_VERSION_3);
-
-	mbedtls_ssl_conf_min_version(
-			&(cx->tls_conf),
-			MBEDTLS_SSL_MAJOR_VERSION_3,
-			MBEDTLS_SSL_MINOR_VERSION_3);
-
-	mbedtls_ssl_conf_ca_chain(&(cx->tls_conf), &tls_x509_crt, NULL);
-	mbedtls_ssl_conf_rng(&(cx->tls_conf), mbedtls_ctr_drbg_random, &tls_ctr_drbg);
-
-	if ((ret = mbedtls_net_set_block(&(cx->tls_fd))) != 0) {
-		io_cb_err(cx, " ... mbedtls_net_set_block: %s", io_tls_strerror(ret, buf, sizeof(buf)));
-		goto err;
-	}
-
-	if ((ret = mbedtls_ssl_setup(&(cx->tls_ctx), &(cx->tls_conf))) != 0) {
-		io_cb_err(cx, " ... mbedtls_ssl_setup: %s", io_tls_strerror(ret, buf, sizeof(buf)));
-		goto err;
-	}
-
-	if ((ret = mbedtls_ssl_set_hostname(&(cx->tls_ctx), cx->host)) != 0) {
-		io_cb_err(cx, " ... mbedtls_ssl_set_hostname: %s", io_tls_strerror(ret, buf, sizeof(buf)));
-		goto err;
-	}
-
-	mbedtls_ssl_set_bio(
-		&(cx->tls_ctx),
-		&(cx->tls_fd),
-		mbedtls_net_send,
-		NULL,
-		mbedtls_net_recv_timeout);
-
-	while ((ret = mbedtls_ssl_handshake(&(cx->tls_ctx))) != 0) {
-		if (ret != MBEDTLS_ERR_SSL_WANT_READ && ret != MBEDTLS_ERR_SSL_WANT_WRITE) {
-			io_cb_err(cx, " ... mbedtls_ssl_handshake: %s", io_tls_strerror(ret, buf, sizeof(buf)));
-			goto err;
-		}
-	}
-
-	if ((cert_ret = mbedtls_ssl_get_verify_result(&(cx->tls_ctx))) != 0) {
-		if (mbedtls_x509_crt_verify_info(buf, sizeof(buf), "", cert_ret) <= 0) {
-			io_cb_err(cx, " ... failed to verify cert: unknown failure");
-		} else {
-			io_cb_err(cx, " ... failed to verify cert: %s", buf);
-		}
-		goto err;
-	}
-
-	io_cb_info(cx, " ... TLS connection established");
-	io_cb_info(cx, " ...   - version:     %s", mbedtls_ssl_get_version(&(cx->tls_ctx)));
-	io_cb_info(cx, " ...   - ciphersuite: %s", mbedtls_ssl_get_ciphersuite(&(cx->tls_ctx)));
+	if (io_tls_establish(cx) < 0)
+		return IO_ST_RXNG;
 
 	return IO_ST_CXED;
-
-err:
-
-	io_cb_err(cx, " ... TLS connection failure");
-
-	mbedtls_ssl_config_free(&(cx->tls_conf));
-	mbedtls_ssl_free(&(cx->tls_ctx));
-	mbedtls_net_free(&(cx->tls_fd));
-
-err_net:
-
-	return IO_ST_RXNG;
 }
 
 static enum io_state_t
@@ -638,12 +533,13 @@ io_thread(void *arg)
 		switch (ST_X(st_cur, st_new)) {
 			case ST_X(IO_ST_DXED, IO_ST_CXNG): /* A1 */
 			case ST_X(IO_ST_RXNG, IO_ST_CXNG): /* A2,C */
+				io_cb_info(cx, "Connecting to %s:%s", cx->host, cx->port);
 				break;
 			case ST_X(IO_ST_CXED, IO_ST_CXNG): /* F1 */
 				io_cb_dxed(cx);
 				break;
 			case ST_X(IO_ST_PING, IO_ST_CXNG): /* F2 */
-				io_cb_err(cx, "connection timeout (%u)", cx->ping);
+				io_cb_err(cx, "Connection timeout (%u)", cx->ping);
 				io_cb_dxed(cx);
 				break;
 			case ST_X(IO_ST_RXNG, IO_ST_DXED): /* B1 */
@@ -656,12 +552,12 @@ io_thread(void *arg)
 				io_cb_dxed(cx);
 				break;
 			case ST_X(IO_ST_CXNG, IO_ST_CXED): /* D */
-				io_cb_info(cx, " ... Connection successful");
+				io_cb_info(cx, " .. Connection successful");
 				io_cb_cxed(cx);
 				cx->rx_sleep = 0;
 				break;
 			case ST_X(IO_ST_CXNG, IO_ST_RXNG): /* E */
-				io_cb_err(cx, " ... Connection failed -- retrying");
+				io_cb_err(cx, " .. Connection failed -- retrying");
 				break;
 			case ST_X(IO_ST_CXED, IO_ST_PING): /* G */
 				cx->ping = IO_PING_MIN;
@@ -739,49 +635,6 @@ io_sig_init(void)
 }
 
 static void
-io_tls_init(void)
-{
-	char buf[512];
-	int err;
-	struct timespec ts;
-
-	mbedtls_ctr_drbg_init(&tls_ctr_drbg);
-	mbedtls_entropy_init(&tls_entropy);
-	mbedtls_x509_crt_init(&tls_x509_crt);
-
-	if (atexit(io_tls_term) != 0)
-		fatal("atexit");
-
-	if (timespec_get(&ts, TIME_UTC) != TIME_UTC)
-		fatal("timespec_get");
-
-	if (snprintf(buf, sizeof(buf), "rirc-%lu-%lu", ts.tv_sec, ts.tv_nsec) < 0)
-		fatal("snprintf");
-
-	if ((err = mbedtls_ctr_drbg_seed(
-			&tls_ctr_drbg,
-			mbedtls_entropy_func,
-			&tls_entropy,
-			(const unsigned char *)buf,
-			strlen(buf))) != 0) {
-		fatal("mbedtls_ctr_drbg_seed: %s", io_tls_strerror(err, buf, sizeof(buf)));
-	}
-
-	if ((err = mbedtls_x509_crt_parse_path(&tls_x509_crt, ca_cert_path)) < 0)
-		fatal("mbedtls_x509_crt_parse_path: %s", io_tls_strerror(err, buf, sizeof(buf)));
-}
-
-static void
-io_tls_term(void)
-{
-	/* Exit handler, must return normally */
-
-	mbedtls_ctr_drbg_free(&tls_ctr_drbg);
-	mbedtls_entropy_free(&tls_entropy);
-	mbedtls_x509_crt_free(&tls_x509_crt);
-}
-
-static void
 io_tty_init(void)
 {
 	struct termios nterm;
@@ -800,7 +653,7 @@ io_tty_init(void)
 	if (tcsetattr(STDIN_FILENO, TCSANOW, &nterm) < 0)
 		fatal("tcsetattr: %s", strerror(errno));
 
-	if (atexit(io_tty_term) != 0)
+	if (atexit(io_tty_term))
 		fatal("atexit");
 }
 
@@ -836,16 +689,16 @@ io_net_connect(struct connection *cx)
 
 	errno = 0;
 
-	if ((ret = getaddrinfo(cx->host, cx->port, &hints, &res)) != 0) {
+	if ((ret = getaddrinfo(cx->host, cx->port, &hints, &res))) {
 
 		if (ret == EAI_SYSTEM && errno == EINTR)
 			return -1;
 
 		if (ret == EAI_SYSTEM) {
-			io_cb_err(cx, " ... Failed to resolve host: %s",
+			io_cb_err(cx, " .. Failed to resolve host: %s",
 				io_strerror(buf, sizeof(buf)));
 		} else {
-			io_cb_err(cx, " ... Failed to resolve host: %s",
+			io_cb_err(cx, " .. Failed to resolve host: %s",
 				gai_strerror(ret));
 		}
 
@@ -869,12 +722,12 @@ io_net_connect(struct connection *cx)
 	}
 
 	if (!p && soc == -1) {
-		io_cb_err(cx, " ... Failed to obtain socket: %s", io_strerror(buf, sizeof(buf)));
+		io_cb_err(cx, " .. Failed to obtain socket: %s", io_strerror(buf, sizeof(buf)));
 		goto err;
 	}
 
 	if (!p && soc >= 0) {
-		io_cb_err(cx, " ... Failed to connect: %s", io_strerror(buf, sizeof(buf)));
+		io_cb_err(cx, " .. Failed to connect: %s", io_strerror(buf, sizeof(buf)));
 		goto err;
 	}
 
@@ -884,7 +737,7 @@ io_net_connect(struct connection *cx)
 		addr = &(((struct sockaddr_in6*)p->ai_addr)->sin6_addr);
 
 	if (inet_ntop(p->ai_family, addr, buf, sizeof(buf)))
-		io_cb_info(cx, " ... Connected [%s]", buf);
+		io_cb_info(cx, " .. Connected [%s]", buf);
 
 	ret = soc;
 
@@ -912,4 +765,194 @@ io_strerror(char *buf, size_t buflen)
 		snprintf(buf, buflen, "(failed to get error message)");
 
 	return buf;
+}
+
+static int
+io_tls_establish(struct connection *cx)
+{
+	int ret;
+
+	io_cb_info(cx, " .. Establishing TLS connection");
+
+	mbedtls_net_init(&(cx->tls_fd));
+	mbedtls_ssl_init(&(cx->tls_ctx));
+	mbedtls_ssl_config_init(&(cx->tls_conf));
+
+	cx->tls_fd.fd = cx->soc;
+
+	if ((ret = mbedtls_ssl_config_defaults(
+			&(cx->tls_conf),
+			MBEDTLS_SSL_IS_CLIENT,
+			MBEDTLS_SSL_TRANSPORT_STREAM,
+			MBEDTLS_SSL_PRESET_DEFAULT))) {
+		io_cb_err(cx, " .. %s ", io_tls_err(ret));
+		goto err;
+	}
+
+	mbedtls_ssl_conf_max_version(
+			&(cx->tls_conf),
+			MBEDTLS_SSL_MAJOR_VERSION_3,
+			MBEDTLS_SSL_MINOR_VERSION_3);
+
+	mbedtls_ssl_conf_min_version(
+			&(cx->tls_conf),
+			MBEDTLS_SSL_MAJOR_VERSION_3,
+			MBEDTLS_SSL_MINOR_VERSION_3);
+
+	mbedtls_ssl_conf_rng(&(cx->tls_conf), mbedtls_ctr_drbg_random, &tls_ctr_drbg);
+
+	if (cx->flags & IO_TLS_VRFY_DISABLED) {
+		mbedtls_ssl_conf_authmode(&(cx->tls_conf), MBEDTLS_SSL_VERIFY_NONE);
+	} else {
+		mbedtls_ssl_conf_ca_chain(&(cx->tls_conf), &tls_x509_crt, NULL);
+
+		if (cx->flags & IO_TLS_VRFY_OPTIONAL)
+			mbedtls_ssl_conf_authmode(&(cx->tls_conf), MBEDTLS_SSL_VERIFY_OPTIONAL);
+
+		if (cx->flags & IO_TLS_VRFY_REQUIRED)
+			mbedtls_ssl_conf_authmode(&(cx->tls_conf), MBEDTLS_SSL_VERIFY_REQUIRED);
+	}
+
+	if ((ret = mbedtls_net_set_block(&(cx->tls_fd)))) {
+		io_cb_err(cx, " .. %s ", io_tls_err(ret));
+		goto err;
+	}
+
+	if ((ret = mbedtls_ssl_setup(&(cx->tls_ctx), &(cx->tls_conf)))) {
+		io_cb_err(cx, " .. %s ", io_tls_err(ret));
+		goto err;
+	}
+
+	if ((ret = mbedtls_ssl_set_hostname(&(cx->tls_ctx), cx->host))) {
+		io_cb_err(cx, " .. %s ", io_tls_err(ret));
+		goto err;
+	}
+
+	mbedtls_ssl_set_bio(
+		&(cx->tls_ctx),
+		&(cx->tls_fd),
+		mbedtls_net_send,
+		NULL,
+		mbedtls_net_recv_timeout);
+
+	while ((ret = mbedtls_ssl_handshake(&(cx->tls_ctx)))) {
+		if (ret != MBEDTLS_ERR_SSL_WANT_READ
+		 && ret != MBEDTLS_ERR_SSL_WANT_WRITE)
+			break;
+	}
+
+	if (ret && cx->flags & IO_TLS_VRFY_DISABLED) {
+		io_cb_err(cx, " .. %s ", io_tls_err(ret));
+		goto err;
+	}
+
+	if (io_tls_x509_vrfy(cx) < 0)
+		io_cb_err(cx, " .... Unknown x509 error");
+
+	if (ret) {
+		io_cb_err(cx, " .. %s ", io_tls_err(ret));
+		goto err;
+	}
+
+	io_cb_info(cx, " .. TLS connection established");
+	io_cb_info(cx, " ..   - version:     %s", mbedtls_ssl_get_version(&(cx->tls_ctx)));
+	io_cb_info(cx, " ..   - ciphersuite: %s", mbedtls_ssl_get_ciphersuite(&(cx->tls_ctx)));
+
+	return 0;
+
+err:
+
+	io_cb_err(cx, " .. TLS connection failure");
+
+	mbedtls_ssl_config_free(&(cx->tls_conf));
+	mbedtls_ssl_free(&(cx->tls_ctx));
+	mbedtls_net_free(&(cx->tls_fd));
+
+	return -1;
+}
+
+static int
+io_tls_x509_vrfy(struct connection *cx)
+{
+	char *s, *p;
+	char buf[1024];
+	uint32_t ret;
+
+	if (!(ret = mbedtls_ssl_get_verify_result(&(cx->tls_ctx))))
+		return 0;
+
+	if (ret == (uint32_t)(-1))
+		return -1;
+
+	if (mbedtls_x509_crt_verify_info(buf, sizeof(buf), "", ret) < 0)
+		return -1;
+
+	s = buf;
+
+	do {
+		if ((p = strchr(buf, '\n')))
+			*p++ = 0;
+
+		io_cb_err(cx, " .... %s", s);
+
+	} while ((s = p));
+
+	return 0;
+}
+
+static const char*
+io_tls_err(int err)
+{
+	const char *str;
+
+	if ((str = mbedtls_high_level_strerr(err)))
+		return str;
+
+	if ((str = mbedtls_low_level_strerr(err)))
+		return str;
+
+	return "Unknown error";
+}
+
+static void
+io_tls_init(void)
+{
+	char buf[512];
+	int ret;
+	struct timespec ts;
+
+	mbedtls_ctr_drbg_init(&tls_ctr_drbg);
+	mbedtls_entropy_init(&tls_entropy);
+	mbedtls_x509_crt_init(&tls_x509_crt);
+
+	if (atexit(io_tls_term))
+		fatal("atexit");
+
+	if (timespec_get(&ts, TIME_UTC) != TIME_UTC)
+		fatal("timespec_get");
+
+	if (snprintf(buf, sizeof(buf), "rirc-%lu-%lu", ts.tv_sec, ts.tv_nsec) < 0)
+		fatal("snprintf");
+
+	if ((ret = mbedtls_ctr_drbg_seed(
+			&tls_ctr_drbg,
+			mbedtls_entropy_func,
+			&tls_entropy,
+			(const unsigned char *)buf,
+			strlen(buf)))) {
+		fatal("mbedtls_ctr_drbg_seed: %s", io_tls_err(ret));
+	}
+
+	if ((ret = mbedtls_x509_crt_parse_path(&tls_x509_crt, ca_cert_path)) < 0)
+		fatal("mbedtls_x509_crt_parse_path: %s", io_tls_err(ret));
+}
+
+static void
+io_tls_term(void)
+{
+	/* Exit handler, must return normally */
+
+	mbedtls_ctr_drbg_free(&tls_ctr_drbg);
+	mbedtls_entropy_free(&tls_entropy);
+	mbedtls_x509_crt_free(&tls_x509_crt);
 }

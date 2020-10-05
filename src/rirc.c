@@ -14,7 +14,7 @@
 #define MAX_CLI_SERVERS 16
 
 #define arg_error(...) \
-	do { fprintf(stderr, "%s: ", runtime_name); \
+	do { fprintf(stderr, "%s ", runtime_name); \
 	     fprintf(stderr, __VA_ARGS__); \
 	     fprintf(stderr, "\n%s --help for usage\n", runtime_name); \
 	     return 1; \
@@ -54,17 +54,17 @@ const char *runtime_name = "rirc.debug";
 const char *runtime_name = "rirc";
 #endif
 
-static const char *const rirc_usage =
+static const char *const rirc_help =
 "\nrirc v"VERSION" ~ Richard C. Robbins <mail@rcr.io>"
 "\n"
 "\nUsage:"
-"\n  rirc [-hv] [-s server [-p port] [-w pass] [-n nicks] [-c chans] [-u user] [-r real]], ...]"
+"\n  rirc [-hv] [-s server [...]]"
 "\n"
-"\nHelp:"
-"\n  -h, --help      Print this message and exit"
+"\nInfo:"
+"\n  -h, --help      Print help message and exit"
 "\n  -v, --version   Print rirc version and exit"
 "\n"
-"\nOptions:"
+"\nServer options:"
 "\n  -s, --server=SERVER       Connect to SERVER"
 "\n  -p, --port=PORT           Connect to SERVER using PORT"
 "\n  -w, --pass=PASS           Connect to SERVER using PASS"
@@ -72,6 +72,11 @@ static const char *const rirc_usage =
 "\n  -r, --realname=REALNAME   Connect to SERVER using REALNAME"
 "\n  -n, --nicks=NICKS         Comma separated list of nicks to use for SERVER"
 "\n  -c, --chans=CHANNELS      Comma separated list of channels to join for SERVER"
+"\n"
+"\nServer connection options:"
+"\n   --ipv4                   Connect to server using only ipv4 addresses"
+"\n   --ipv6                   Connect to server using only ipv6 addresses"
+"\n   --tls-verify=<mode>      Set server TLS peer certificate verify mode"
 "\n";
 
 static const char *const rirc_version =
@@ -94,6 +99,7 @@ opt_arg_str(char c)
 		case 'r': return "-r/--realname";
 		case '4': return "--ipv4";
 		case '6': return "--ipv6";
+		case 'y': return "--tls-verify";
 		default:
 			fatal("unknown option flag '%c'", c);
 	}
@@ -129,17 +135,18 @@ parse_args(int argc, char **argv)
 	opterr = 0;
 
 	struct option long_opts[] = {
-		{"server",   required_argument, 0, 's'},
-		{"port",     required_argument, 0, 'p'},
-		{"pass",     required_argument, 0, 'w'},
-		{"nicks",    required_argument, 0, 'n'},
-		{"chans",    required_argument, 0, 'c'},
-		{"username", required_argument, 0, 'u'},
-		{"realname", required_argument, 0, 'r'},
-		{"help",     no_argument,       0, 'h'},
-		{"version",  no_argument,       0, 'v'},
-		{"ipv4",     no_argument,       0, '4'},
-		{"ipv6",     no_argument,       0, '6'},
+		{"server",     required_argument, 0, 's'},
+		{"port",       required_argument, 0, 'p'},
+		{"pass",       required_argument, 0, 'w'},
+		{"nicks",      required_argument, 0, 'n'},
+		{"chans",      required_argument, 0, 'c'},
+		{"username",   required_argument, 0, 'u'},
+		{"realname",   required_argument, 0, 'r'},
+		{"help",       no_argument,       0, 'h'},
+		{"version",    no_argument,       0, 'v'},
+		{"ipv4",       no_argument,       0, '4'},
+		{"ipv6",       no_argument,       0, '6'},
+		{"tls-verify", required_argument, 0, 'y'},
 		{0, 0, 0, 0}
 	};
 
@@ -151,7 +158,8 @@ parse_args(int argc, char **argv)
 		const char *chans;
 		const char *username;
 		const char *realname;
-		uint8_t flags;
+		int ipv;
+		int tls_vrfy;
 		struct server *s;
 	} cli_servers[MAX_CLI_SERVERS];
 
@@ -175,7 +183,8 @@ parse_args(int argc, char **argv)
 				cli_servers[n_servers - 1].chans = NULL;
 				cli_servers[n_servers - 1].username = NULL;
 				cli_servers[n_servers - 1].realname = NULL;
-				cli_servers[n_servers - 1].flags = 0;
+				cli_servers[n_servers - 1].ipv = 0;
+				cli_servers[n_servers - 1].tls_vrfy = IO_TLS_VRFY_REQUIRED;
 				break;
 
 			#define CHECK_SERVER_OPTARG(OPT_C, REQ) \
@@ -214,20 +223,36 @@ parse_args(int argc, char **argv)
 				cli_servers[n_servers - 1].realname = optarg;
 				break;
 
-			case '4':
+			case '4': /* Connect using ipv4 only */
 				CHECK_SERVER_OPTARG(opt_c, 0);
-				cli_servers[n_servers -1].flags |= IO_IPV_4;
+				cli_servers[n_servers -1].ipv = IO_IPV_4;
 				break;
 
-			case '6':
+			case '6': /* Connect using ipv6 only */
 				CHECK_SERVER_OPTARG(opt_c, 0);
-				cli_servers[n_servers -1].flags |= IO_IPV_6;
+				cli_servers[n_servers -1].ipv = IO_IPV_6;
 				break;
+
+			case 'y': /* Set TLS peer certificate verification mode */
+				CHECK_SERVER_OPTARG(opt_c, 1);
+				if (!strcmp(optarg, "0") || !strcmp(optarg, "disabled")) {
+					cli_servers[n_servers -1].tls_vrfy = IO_TLS_VRFY_DISABLED;
+					break;
+				}
+				if (!strcmp(optarg, "1") || !strcmp(optarg, "optional")) {
+					cli_servers[n_servers -1].tls_vrfy = IO_TLS_VRFY_OPTIONAL;
+					break;
+				}
+				if (!strcmp(optarg, "2") || !strcmp(optarg, "required")) {
+					cli_servers[n_servers -1].tls_vrfy = IO_TLS_VRFY_REQUIRED;
+					break;
+				}
+				arg_error("option '--tls-verify' mode must be 'disabled', 'optional', or 'required'");
 
 			#undef CHECK_SERVER_OPTARG
 
 			case 'h':
-				puts(rirc_usage);
+				puts(rirc_help);
 				exit(EXIT_SUCCESS);
 
 			case 'v':
@@ -262,6 +287,10 @@ parse_args(int argc, char **argv)
 
 	for (size_t i = 0; i < n_servers; i++) {
 
+		uint8_t flags =
+			cli_servers[i].ipv |
+			cli_servers[i].tls_vrfy;
+
 		struct server *s = server(
 			cli_servers[i].host,
 			cli_servers[i].port,
@@ -270,7 +299,7 @@ parse_args(int argc, char **argv)
 			(cli_servers[i].realname ? cli_servers[i].realname : default_realname)
 		);
 
-		s->connection = connection(s, cli_servers[i].host, cli_servers[i].port, cli_servers[i].flags);
+		s->connection = connection(s, cli_servers[i].host, cli_servers[i].port, flags);
 
 		if (server_list_add(state_server_list(), s))
 			arg_error("duplicate server: %s:%s", cli_servers[i].host, cli_servers[i].port);

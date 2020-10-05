@@ -21,7 +21,7 @@ COVERITY_TAR="cov-int.tgz"
 
 VERSION=$(git rev-parse --short HEAD)
 
-PATH=$(pwd)/$1/bin:$PATH cov-build --dir "$COVERITY_OUT" make clean rirc debug test
+PATH=$(pwd)/$1/bin:$PATH cov-build --dir "$COVERITY_OUT" make clean rirc rirc.debug test
 
 tar czf "$COVERITY_TAR" "$COVERITY_OUT"
 
