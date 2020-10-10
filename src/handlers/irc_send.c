@@ -216,7 +216,9 @@ send_ctcp_ping(struct server *s, struct channel *c, char *m)
 
 	(void) gettimeofday(&t, NULL);
 
-	sendf(s, c, "PRIVMSG %s :\001PING %llu %llu\001", targ, t.tv_sec, t.tv_usec);
+	sendf(s, c, "PRIVMSG %s :\001PING %llu %llu\001", targ,
+		(unsigned long long)t.tv_sec,
+		(unsigned long long)t.tv_usec);
 
 	return 0;
 }

@@ -693,7 +693,7 @@ io_net_connect(struct connection *cx)
 	char buf[MAX(INET6_ADDRSTRLEN, 512)];
 	const void *addr;
 	int ret;
-	int soc;
+	int soc = -1;
 	struct addrinfo *p, *res;
 	struct addrinfo hints = {
 		.ai_family   = AF_UNSPEC,
@@ -742,7 +742,7 @@ io_net_connect(struct connection *cx)
 			goto err;
 	}
 
-	if (!p && soc == -1) {
+	if (!p && soc < -1) {
 		io_cb_err(cx, " .. Failed to obtain socket: %s", io_strerror(buf, sizeof(buf)));
 		goto err;
 	}

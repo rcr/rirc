@@ -896,7 +896,7 @@ recv_mode_chanmodes(struct irc_message *m, const struct mode_cfg *cfg, struct se
 					break;
 
 				default:
-					newlinef(c, 0, FROM_ERROR, "MODE: unhandled error, flag '%c'");
+					newlinef(c, 0, FROM_ERROR, "MODE: unhandled error, flag '%c'", flag);
 					continue;
 			}
 
