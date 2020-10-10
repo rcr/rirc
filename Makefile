@@ -1,5 +1,3 @@
-.POSIX:
-
 VERSION := 0.1.2
 
 # Release and debug build executable names
@@ -7,24 +5,20 @@ BIN_R := rirc
 BIN_D := rirc.debug
 
 # Install paths
-BIN_DIR = /usr/local/bin
-MAN_DIR = /usr/local/share/man/man1
+BIN_DIR := /usr/local/bin
+MAN_DIR := /usr/local/share/man/man1
 
-STDS := \
-	-std=c11 \
-	-D_BSD_VISIBLE \
-	-D_DARWIN_C_SOURCE \
-	-D_POSIX_C_SOURCE=200809L
+TLS_CONF := $(PWD)/lib/mbedtls.h
+TLS_INCL := -I $(PWD)/lib/mbedtls/include/ -DMBEDTLS_CONFIG_FILE='<$(TLS_CONF)>'
+TLS_LIBS := ./lib/mbedtls/library/libmbedtls.a \
+            ./lib/mbedtls/library/libmbedx509.a \
+            ./lib/mbedtls/library/libmbedcrypto.a
 
-TLS_CONF := ./lib/mbedtls.h
-TLS_LIBS := \
-	./lib/mbedtls/library/libmbedtls.a \
-	./lib/mbedtls/library/libmbedx509.a \
-	./lib/mbedtls/library/libmbedcrypto.a
+STDS := -std=c11 -D_POSIX_C_SOURCE=200809L
 
 CC := cc
 PP := cc -E
-CFLAGS   := $(CC_EXT) -I. $(STDS) -DVERSION=\"$(VERSION)\" -Wall -Wextra -pedantic
+CFLAGS   := $(CC_EXT) $(STDS) $(TLS_INCL) -I. -DVERSION=\"$(VERSION)\" -Wall -Wextra -pedantic
 CFLAGS_R := $(CFLAGS) -O2 -flto -DNDEBUG
 CFLAGS_D := $(CFLAGS) -O0 -g
 LDFLAGS  := $(LD_EXT) -lpthread
@@ -71,6 +65,10 @@ $(DIR_B)/%.db.o: $(DIR_S)/%.c config.h
 	@$(PP) $(CFLAGS_D) -MM -MP -MT $@ -MF $(@:.o=.d) $<
 	@$(CC) $(CFLAGS_D) -c -o $@ $<
 
+# Default config file
+config.h:
+	cp config.def.h config.h
+
 # Gperf generated source
 %.gperf.out: %.gperf
 	gperf --output-file=$@ $<
@@ -82,16 +80,13 @@ $(DIR_B)/%.t: $(DIR_T)/%.c
 	-@rm -f $(@:.t=.td) && $(TEST_EXT) ./$@ || mv $@ $(@:.t=.td)
 	@[ ! -f $(@:.t=.td) ]
 
-# TLS libraries
-$(TLS_LIBS): $(TLS_CONF)
-	@CFLAGS="-I$(PWD) -DMBEDTLS_CONFIG_FILE='<$(TLS_CONF)>'" $(MAKE) -C ./lib/mbedtls clean lib
-
 # Build directories
 $(DIR_B):
 	@for dir in $(patsubst $(DIR_S)/%, %, $(SUBDIRS)); do mkdir -p $(DIR_B)/$$dir; done
 
-config.h:
-	cp config.def.h config.h
+# TLS libraries
+$(TLS_LIBS): $(TLS_CONF)
+	@CFLAGS="$(TLS_INCL)" $(MAKE) -C ./lib/mbedtls clean lib
 
 clean:
 	rm -rf $(DIR_B) $(BIN_R) $(BIN_D)
@@ -110,12 +105,10 @@ uninstall:
 	rm -f $(BIN_DIR)/rirc
 	rm -f $(MAN_DIR)/rirc.1
 
-all:   $(BIN_R)
-debug: $(BIN_D)
-test:  $(DIR_B) $(OBJS_G) $(OBJS_T)
+test: $(DIR_B) $(OBJS_G) $(OBJS_T)
 
 -include $(OBJS_R:.o=.d)
 -include $(OBJS_D:.o=.d)
 -include $(OBJS_T:.t=.d)
 
-.PHONY: all clean default install uninstall test
+.PHONY: clean install uninstall test

@@ -828,7 +828,7 @@ command(struct channel *c, char *buf)
 				newlinef(s->channel, 0, "-!!-", "already connected to %s:%s", host, port);
 			} else {
 				s = server(host, port, pass, user, real);
-				s->connection = connection(s, host, port);
+				s->connection = connection(s, host, port, 0);
 				server_list_add(state_server_list(), s);
 				channel_set_current(s->channel);
 				io_cx(s->connection);
@@ -1058,4 +1058,28 @@ io_cb_read_soc(char *buf, size_t len, const void *cb_obj)
 	s->read.i = ci;
 
 	draw(DRAW_FLUSH);
+}
+
+void
+io_cb_log(const void *cb_obj, enum io_log_level lvl, const char *fmt, ...)
+{
+	struct server *s = (struct server *)cb_obj;
+
+	va_list ap;
+	va_start(ap, fmt);
+
+	switch (lvl) {
+		case IO_LOG_ERROR:
+			_newline(s->channel, 0, "-!!-", fmt, ap);
+			break;
+		case IO_LOG_WARN:
+		case IO_LOG_INFO:
+		case IO_LOG_DEBUG:
+			_newline(s->channel, 0, "--", fmt, ap);
+			break;
+		default:
+			fatal("invalid log level");
+	}
+
+	va_end(ap);
 }

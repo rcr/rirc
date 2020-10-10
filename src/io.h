@@ -12,12 +12,6 @@
  *  - cxed: connected    ~ Socket connected
  *  - ping: timing out   ~ Socket connected, network state in question
  *
- *
- *    TODO: how to we label the difference between A, and (A,C) ?
- *          just for the sake of consistency should it be A1, (A2, C)
- *
- *          is the H transition necessary?
- *
  *                             +--------+
  *                 +----(B1)-- |  rxng  |
  *                 |           +--------+
@@ -79,16 +73,11 @@
  * a call to io_stop
  */
 
+#include <stdarg.h>
 #include <stddef.h>
+#include <stdint.h>
 
 struct connection;
-
-enum io_sig_t
-{
-	IO_SIG_INVALID,
-	IO_SIGWINCH,
-	IO_SIG_SIZE
-};
 
 enum io_cb_t
 {
@@ -104,11 +93,36 @@ enum io_cb_t
 	IO_CB_SIZE
 };
 
+enum io_log_level
+{
+	IO_LOG_ERROR,
+	IO_LOG_WARN,
+	IO_LOG_INFO,
+	IO_LOG_DEBUG,
+};
+
+enum io_sig_t
+{
+	IO_SIG_INVALID,
+	IO_SIGWINCH,
+	IO_SIG_SIZE
+};
+
+#define IO_IPV_UNSPEC        (1 << 1)
+#define IO_IPV_4             (1 << 2)
+#define IO_IPV_6             (1 << 3)
+#define IO_TLS_ENABLED       (1 << 4)
+#define IO_TLS_DISABLED      (1 << 5)
+#define IO_TLS_VRFY_DISABLED (1 << 6)
+#define IO_TLS_VRFY_OPTIONAL (1 << 7)
+#define IO_TLS_VRFY_REQUIRED (1 << 8)
+
 /* Returns a connection, or NULL if limit is reached */
 struct connection* connection(
-	const void*,  /* callback object */
-	const char*,  /* host */
-	const char*); /* port */
+	const void*, /* callback object */
+	const char*, /* host */
+	const char*, /* port */
+	uint32_t);   /* flags */
 
 void connection_free(struct connection*);
 
@@ -137,5 +151,8 @@ void io_cb(enum io_cb_t, const void*, ...);
 /* IO data callback */
 void io_cb_read_inp(char*, size_t);
 void io_cb_read_soc(char*, size_t, const void*);
+
+/* Log message callback */
+void io_cb_log(const void*, enum io_log_level, const char*, ...);
 
 #endif

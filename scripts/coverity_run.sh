@@ -16,12 +16,12 @@ if [[ -z "${COVERITY_TOKEN}" ]]; then
 	fail "missing env COVERITY_TOKEN"
 fi
 
-COVERITY_OUT="coverity-out"
-COVERITY_TAR="coverity-out.tgz"
+COVERITY_OUT="cov-int"
+COVERITY_TAR="cov-int.tgz"
 
 VERSION=$(git rev-parse --short HEAD)
 
-PATH=$(pwd)/$1/bin:$PATH cov-build --dir "$COVERITY_OUT" make clean rirc debug test
+PATH=$(pwd)/$1/bin:$PATH cov-build --dir "$COVERITY_OUT" make clean rirc rirc.debug test
 
 tar czf "$COVERITY_TAR" "$COVERITY_OUT"
 
