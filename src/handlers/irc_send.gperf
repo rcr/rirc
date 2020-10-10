@@ -18,12 +18,20 @@
 	X(userinfo) \
 	X(version)
 
+#define SEND_IRCV3_CAP_HANDLERS \
+	X(ls) \
+	X(list)
+
 #define X(cmd) static int send_##cmd(struct server*, struct channel*, char*);
 SEND_HANDLERS
 #undef X
 
 #define X(cmd) static int send_ctcp_##cmd(struct server*, struct channel*, char*);
 SEND_CTCP_HANDLERS
+#undef X
+
+#define X(cmd) static int send_ircv3_cap_##cmd(struct server*, struct channel*, char*);
+SEND_IRCV3_CAP_HANDLERS
 #undef X
 
 typedef int (*irc_send_f)(struct server*, struct channel*, char*);
@@ -46,6 +54,8 @@ struct send_handler
 %define initializer-suffix ,(irc_send_f)0
 struct send_handler;
 %%
+CAP-LS,          send_ircv3_cap_ls
+CAP-LIST,        send_ircv3_cap_list
 CTCP-ACTION,     send_ctcp_action
 CTCP-CLIENTINFO, send_ctcp_clientinfo
 CTCP-FINGER,     send_ctcp_finger

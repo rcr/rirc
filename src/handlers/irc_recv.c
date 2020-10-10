@@ -6,6 +6,8 @@
 #include "src/handlers/irc_ctcp.h"
 #include "src/handlers/irc_recv.gperf.out"
 #include "src/handlers/irc_recv.h"
+#include "src/handlers/ircv3.h"
+#include "src/draw.h"
 #include "src/io.h"
 #include "src/state.h"
 #include "src/utils/utils.h"
@@ -55,7 +57,7 @@ static int irc_353(struct server*, struct irc_message*);
 static int irc_433(struct server*, struct irc_message*);
 
 static int irc_recv_numeric(struct server*, struct irc_message*);
-static int recv_mode_chanmodes(struct irc_message*, const struct mode_cfg*, struct channel*);
+static int recv_mode_chanmodes(struct irc_message*, const struct mode_cfg*, struct server*, struct channel*);
 static int recv_mode_usermodes(struct irc_message*, const struct mode_cfg*, struct server*);
 
 static const unsigned quit_threshold = QUIT_THRESHOLD;
@@ -142,7 +144,7 @@ static const irc_recv_f irc_numerics[] = {
 	[349] = irc_ignore, /* RPL_ENDOFEXCEPTLIST */
 	[351] = irc_info,   /* RPL_VERSION */
 	[352] = irc_info,   /* RPL_WHOREPLY */
-	[353] = irc_353,    /* RPL_NAMREPLY */
+	[353] = irc_353,    /* RPL_NAMEREPLY */
 	[364] = irc_info,   /* RPL_LINKS */
 	[365] = irc_ignore, /* RPL_ENDOFLINKS */
 	[366] = irc_ignore, /* RPL_ENDOFNAMES */
@@ -165,6 +167,7 @@ static const irc_recv_f irc_numerics[] = {
 	[407] = irc_error,  /* ERR_TOOMANYTARGETS */
 	[408] = irc_error,  /* ERR_NOSUCHSERVICE */
 	[409] = irc_error,  /* ERR_NOORIGIN */
+	[410] = irc_error,  /* ERR_INVALIDCAPCMD */
 	[411] = irc_error,  /* ERR_NORECIPIENT */
 	[412] = irc_error,  /* ERR_NOTEXTTOSEND */
 	[413] = irc_error,  /* ERR_NOTOPLEVEL */
@@ -206,7 +209,7 @@ static const irc_recv_f irc_numerics[] = {
 	[491] = irc_error,  /* ERR_NOOPERHOST */
 	[501] = irc_error,  /* ERR_UMODEUNKNOWNFLAG */
 	[502] = irc_error,  /* ERR_USERSDONTMATCH */
-	[704] = irc_ignore, /* RPL_HELPSTART */
+	[704] = irc_info,   /* RPL_HELPSTART */
 	[705] = irc_info,   /* RPL_HELP */
 	[706] = irc_ignore, /* RPL_ENDOFHELP */
 };
@@ -230,7 +233,7 @@ irc_message(struct server *s, struct irc_message *m, const char *from)
 {
 	char *trailing;
 
-	if (!str_trim(&m->params))
+	if (!strtrim(&m->params))
 		return 0;
 
 	if (irc_message_split(m, &trailing)) {
@@ -279,6 +282,8 @@ irc_001(struct server *s, struct irc_message *m)
 
 	char *trailing;
 	struct channel *c = s->channel;
+
+	s->registered = 1;
 
 	do {
 		if (c->type == CHANNEL_T_CHANNEL && !c->parted)
@@ -349,7 +354,7 @@ irc_324(struct server *s, struct irc_message *m)
 	if ((c = channel_list_get(&s->clist, chan, s->casemapping)) == NULL)
 		failf(s, "RPL_CHANNELMODEIS: channel '%s' not found", chan);
 
-	return recv_mode_chanmodes(m, &(s->mode_cfg), c);
+	return recv_mode_chanmodes(m, &(s->mode_cfg), s, c);
 }
 
 static int
@@ -479,9 +484,8 @@ irc_333(struct server *s, struct irc_message *m)
 static int
 irc_353(struct server *s, struct irc_message *m)
 {
-	/* 353 ("="/"*"/"@") <channel> *([ "@" / "+" ]<nick>) */
+	/* 353 <nick> <type> <channel> 1*(<modes><nick>) */
 
-	char *saveptr;
 	char *chan;
 	char *nick;
 	char *nicks;
@@ -501,26 +505,34 @@ irc_353(struct server *s, struct irc_message *m)
 		failf(s, "RPL_NAMEREPLY: channel '%s' not found", chan);
 
 	if (mode_chanmode_prefix(&(c->chanmodes), &(s->mode_cfg), *type) != MODE_ERR_NONE)
-		newlinef(c, 0, FROM_ERROR, "RPL_NAMEREPLY: invalid channel flag: '%c'", *type);
+		failf(s, "RPL_NAMEREPLY: invalid channel flag: '%c'", *type);
 
-	if ((nick = strtok_r(nicks, " ", &saveptr))) {
+	if ((nick = strsep(&nicks))) {
 		do {
 			char prefix = 0;
 			struct mode m = MODE_EMPTY;
 
-			if (!irc_isnickchar(*nick, 1))
+			do {
+				if (irc_isnickchar(*nick, 1))
+					break;
+
 				prefix = *nick++;
 
-			if (prefix && mode_prfxmode_prefix(&m, &(s->mode_cfg), prefix) != MODE_ERR_NONE)
-				newlinef(c, 0, FROM_ERROR, "Invalid user prefix: '%c'", prefix);
+				if (mode_prfxmode_prefix(&m, &(s->mode_cfg), prefix) != MODE_ERR_NONE)
+					failf(s, "RPL_NAMEREPLY: invalid user prefix: '%c'", prefix);
+
+			} while (s->ircv3_caps.multi_prefix.set);
+
+			if (!irc_isnick(nick))
+				failf(s, "RPL_NAMEREPLY: invalid nick: '%s'", nick);
 
 			if (user_list_add(&(c->users), s->casemapping, nick, m) == USER_ERR_DUPLICATE)
-				newlinef(c, 0, FROM_ERROR, "Duplicate nick: '%s'", nick);
+				failf(s, "RPL_NAMEREPLY: duplicate nick: '%s'", nick);
 
-		} while ((nick = strtok_r(NULL, " ", &saveptr)));
+		} while ((nick = strsep(&nicks)));
 	}
 
-	draw_status();
+	draw(DRAW_STATUS);
 
 	return 0;
 }
@@ -592,6 +604,12 @@ irc_recv_numeric(struct server *s, struct irc_message *m)
 }
 
 static int
+recv_cap(struct server *s, struct irc_message *m)
+{
+	return ircv3_recv_CAP(s, m);
+}
+
+static int
 recv_error(struct server *s, struct irc_message *m)
 {
 	/* ERROR <message> */
@@ -656,7 +674,7 @@ recv_join(struct server *s, struct irc_message *m)
 		c->parted = 0;
 		newlinef(c, BUFFER_LINE_JOIN, FROM_JOIN, "Joined %s", chan);
 		sendf(s, "MODE %s", chan);
-		draw_all();
+		draw(DRAW_ALL);
 		return 0;
 	}
 
@@ -669,7 +687,7 @@ recv_join(struct server *s, struct irc_message *m)
 	if (!join_threshold || c->users.count <= join_threshold)
 		newlinef(c, BUFFER_LINE_JOIN, FROM_JOIN, "%s!%s has joined", m->from, m->host);
 
-	draw_status();
+	draw(DRAW_STATUS);
 
 	return 0;
 }
@@ -725,7 +743,7 @@ recv_kick(struct server *s, struct irc_message *m)
 			newlinef(c, 0, FROM_INFO, "%s has kicked %s", m->from, user);
 	}
 
-	draw_status();
+	draw(DRAW_STATUS);
 
 	return 0;
 }
@@ -765,13 +783,13 @@ recv_mode(struct server *s, struct irc_message *m)
 		return recv_mode_usermodes(m, &(s->mode_cfg), s);
 
 	if ((c = channel_list_get(&s->clist, targ, s->casemapping)))
-		return recv_mode_chanmodes(m, &(s->mode_cfg), c);
+		return recv_mode_chanmodes(m, &(s->mode_cfg), s, c);
 
 	failf(s, "MODE: target '%s' not found", targ);
 }
 
 static int
-recv_mode_chanmodes(struct irc_message *m, const struct mode_cfg *cfg, struct channel *c)
+recv_mode_chanmodes(struct irc_message *m, const struct mode_cfg *cfg, struct server *s, struct channel *c)
 {
 	char flag;
 	char *modestring;
@@ -780,6 +798,8 @@ recv_mode_chanmodes(struct irc_message *m, const struct mode_cfg *cfg, struct ch
 	enum mode_set_t mode_set;
 	struct mode *chanmodes = &(c->chanmodes);
 	struct user *user;
+
+	// TODO: mode string segfaults if args out of order
 
 	if (!irc_message_param(m, &modestring)) {
 		newlinef(c, 0, FROM_ERROR, "MODE: modestring is null");
@@ -850,7 +870,7 @@ recv_mode_chanmodes(struct irc_message *m, const struct mode_cfg *cfg, struct ch
 						continue;
 					}
 
-					if (!(user = user_list_get(&(c->users), c->server->casemapping, modearg, 0))) {
+					if (!(user = user_list_get(&(c->users), s->casemapping, modearg, 0))) {
 						newlinef(c, 0, FROM_ERROR, "MODE: flag '%c' user '%s' not found", flag, modearg);
 						continue;
 					}
@@ -876,7 +896,7 @@ recv_mode_chanmodes(struct irc_message *m, const struct mode_cfg *cfg, struct ch
 					break;
 
 				default:
-					newlinef(c, 0, FROM_ERROR, "MODE: unhandled error, flag '%c'");
+					newlinef(c, 0, FROM_ERROR, "MODE: unhandled error, flag '%c'", flag);
 					continue;
 			}
 
@@ -897,7 +917,7 @@ recv_mode_chanmodes(struct irc_message *m, const struct mode_cfg *cfg, struct ch
 	} while (irc_message_param(m, &modestring));
 
 	mode_str(&(c->chanmodes), &(c->chanmodes_str));
-	draw_status();
+	draw(DRAW_STATUS);
 
 	return 0;
 }
@@ -947,7 +967,7 @@ recv_mode_usermodes(struct irc_message *m, const struct mode_cfg *cfg, struct se
 	} while (irc_message_param(m, &modestring));
 
 	mode_str(usermodes, &(s->mode_str));
-	draw_status();
+	draw(DRAW_STATUS);
 
 	return 0;
 }
@@ -968,7 +988,7 @@ recv_nick(struct server *s, struct irc_message *m)
 
 	if (!strcmp(m->from, s->nick)) {
 		server_nick_set(s, nick);
-		newlinef(s->channel, BUFFER_LINE_NICK, FROM_NICK, "Youn nick is '%s'", nick);
+		newlinef(s->channel, BUFFER_LINE_NICK, FROM_NICK, "Your nick is now '%s'", nick);
 	}
 
 	do {
@@ -1039,8 +1059,8 @@ recv_notice(struct server *s, struct irc_message *m)
 
 	if (urgent) {
 		c->activity = ACTIVITY_PINGED;
-		draw_bell();
-		draw_nav();
+		draw(DRAW_BELL);
+		draw(DRAW_NAV);
 	}
 
 	return 0;
@@ -1089,7 +1109,7 @@ recv_part(struct server *s, struct irc_message *m)
 		}
 	}
 
-	draw_status();
+	draw(DRAW_STATUS);
 
 	return 0;
 }
@@ -1172,8 +1192,8 @@ recv_privmsg(struct server *s, struct irc_message *m)
 
 	if (urgent) {
 		c->activity = ACTIVITY_PINGED;
-		draw_bell();
-		draw_nav();
+		draw(DRAW_BELL);
+		draw(DRAW_NAV);
 	}
 
 	return 0;
@@ -1234,7 +1254,7 @@ recv_quit(struct server *s, struct irc_message *m)
 		}
 	} while ((c = c->next) != s->channel);
 
-	draw_status();
+	draw(DRAW_STATUS);
 
 	return 0;
 }

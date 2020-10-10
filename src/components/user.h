@@ -14,7 +14,7 @@ enum user_err
 
 struct user
 {
-	AVL_NODE(user) ul;
+	TREE_NODE(user) ul;
 	const char *nick;
 	size_t nick_len;
 	struct mode prfxmodes;
@@ -23,7 +23,7 @@ struct user
 
 struct user_list
 {
-	AVL_HEAD(user);
+	TREE_HEAD(user);
 	unsigned int count;
 };
 

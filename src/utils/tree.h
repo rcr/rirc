@@ -1,8 +1,6 @@
 #ifndef TREE_H
 #define TREE_H
 
-/* FIXME: undefined behaviour reported by clang in AVL/SPLAY implementations */
-
 #include <stddef.h>
 
 #define MAX(A, B) ((A) > (B) ? (A) : (B))
@@ -12,29 +10,23 @@
 #define TREE_RIGHT(elm, field) (elm)->field.tree_right
 #define TREE_ROOT(head)        (head)->tree_root
 
-/* AVL Tree */
-
-#define AVL_HEIGHT(elm, field) (elm)->field.height
-
 #define AVL_ADD(name, x, y, z)     name##_AVL_ADD(x, y, z)
 #define AVL_DEL(name, x, y, z)     name##_AVL_DEL(x, y, z)
 #define AVL_GET(name, x, y, z)     name##_AVL_GET(x, y, z)
 #define AVL_NGET(name, x, y, z, n) name##_AVL_NGET(x, y, z, n)
+#define AVL_FOREACH(name, x, y)    name##_AVL_FOREACH(x, y)
 
-#define AVL_FOREACH(name, x, y) name##_AVL_FOREACH(x, y)
-
-#define AVL_HEAD(type) \
+#define TREE_HEAD(type) \
     struct type *tree_root
 
-
-#define AVL_NODE(type)           \
+#define TREE_NODE(type)          \
     struct {                     \
         int height;              \
         struct type *tree_left;  \
         struct type *tree_right; \
     }
 
-/* FIXME: scan-build showing NULL pointer dereferences on add */
+#define AVL_HEIGHT(elm, field) (elm)->field.height
 
 #define AVL_GENERATE(name, type, field, cmp, ncmp) \
     static struct type* name##_AVL_ADD(struct name*, struct type*, void*);        \
@@ -218,7 +210,7 @@ name##_AVL_DEL_REC(struct type **p, struct type *elm, void *arg)                
 {                                                                                 \
     int comp, balance;                                                            \
     struct type *n = *p;                                                          \
-    struct type *ret;                                                             \
+    struct type *ret = NULL;                                                      \
                                                                                   \
     if (n == NULL)                                                                \
         return NULL;                                                              \
@@ -297,192 +289,5 @@ name##_AVL_DEL_REC(struct type **p, struct type *elm, void *arg)                
                                                                                   \
     return ret;                                                                   \
 }
-
-/* Splay Tree */
-
-#define SPLAY_ADD(name, x, y)  name##_SPLAY_ADD(x, y)
-#define SPLAY_DEL(name, x, y)  name##_SPLAY_DEL(x, y)
-#define SPLAY_GET(name, x, y)  name##_SPLAY_GET(x, y)
-#define SPLAY_MAX(name, x)     (TREE_EMPTY(x) ? NULL : name##_SPLAY_MAX(x))
-#define SPLAY_MIN(name, x)     (TREE_EMPTY(x) ? NULL : name##_SPLAY_MIN(x))
-
-
-#define SPLAY_HEAD(type) \
-    struct type *tree_root
-
-
-#define SPLAY_NODE(type)         \
-    struct {                     \
-        struct type *tree_left;  \
-        struct type *tree_right; \
-    }
-
-
-#define SPLAY_INIT(root) do {   \
-        TREE_ROOT(root) = NULL; \
-    } while (0)
-
-
-#define SPLAY_ROTATE_RIGHT(head, tmp, field) do {                   \
-        TREE_LEFT(TREE_ROOT(head), field) = TREE_RIGHT(tmp, field); \
-        TREE_RIGHT(tmp, field) = TREE_ROOT(head);                   \
-        TREE_ROOT(head) = tmp;                                      \
-    } while (0)
-
-
-#define SPLAY_ROTATE_LEFT(head, tmp, field) do {                    \
-        TREE_RIGHT(TREE_ROOT(head), field) = TREE_LEFT(tmp, field); \
-        TREE_LEFT(tmp, field) = TREE_ROOT(head);                    \
-        TREE_ROOT(head) = tmp;                                      \
-    } while (0)
-
-
-#define SPLAY_LINK_RIGHT(head, tmp, field) do {               \
-        TREE_RIGHT(tmp, field) = TREE_ROOT(head);             \
-        tmp = TREE_ROOT(head);                                \
-        TREE_ROOT(head) = TREE_RIGHT(TREE_ROOT(head), field); \
-    } while (0)
-
-
-#define SPLAY_LINK_LEFT(head, tmp, field) do {               \
-        TREE_LEFT(tmp, field) = TREE_ROOT(head);             \
-        tmp = TREE_ROOT(head);                               \
-        TREE_ROOT(head) = TREE_LEFT(TREE_ROOT(head), field); \
-    } while (0)
-
-
-#define SPLAY_ASSEMBLE(head, node, left, right, field) do {           \
-        TREE_RIGHT(left, field) = TREE_LEFT(TREE_ROOT(head), field);  \
-        TREE_LEFT(right, field) = TREE_RIGHT(TREE_ROOT(head), field); \
-        TREE_LEFT(TREE_ROOT(head), field) = TREE_RIGHT(node, field);  \
-        TREE_RIGHT(TREE_ROOT(head), field) = TREE_LEFT(node, field);  \
-    } while (0)
-
-
-#define SPLAY_GENERATE(name, type, field, cmp)                           \
-    struct type* name##_SPLAY_ADD(struct name*, struct type*);           \
-    struct type* name##_SPLAY_DEL(struct name*, struct type*);           \
-    void name##_SPLAY(struct name*, struct type*);                       \
-                                                                         \
-static inline struct type*                                               \
-name##_SPLAY_MIN(struct name *head)                                      \
-{                                                                        \
-    struct type *x = TREE_ROOT(head);                                    \
-                                                                         \
-    while (TREE_LEFT(x, field) != NULL)                                  \
-        x = TREE_LEFT(x, field);                                         \
-                                                                         \
-    return x;                                                            \
-}                                                                        \
-                                                                         \
-static inline struct type*                                               \
-name##_SPLAY_MAX(struct name *head)                                      \
-{                                                                        \
-    struct type *x = TREE_ROOT(head);                                    \
-                                                                         \
-    while (TREE_RIGHT(x, field) != NULL)                                 \
-        x = TREE_RIGHT(x, field);                                        \
-                                                                         \
-    return x;                                                            \
-}                                                                        \
-                                                                         \
-static inline struct type*                                               \
-name##_SPLAY_GET(struct name *head, struct type *elm)                    \
-{                                                                        \
-    if (TREE_EMPTY(head))                                                \
-        return NULL;                                                     \
-                                                                         \
-    name##_SPLAY(head, elm);                                             \
-                                                                         \
-    if (cmp(elm, TREE_ROOT(head)) == 0)                                  \
-        return TREE_ROOT(head);                                          \
-                                                                         \
-    return NULL;                                                         \
-}                                                                        \
-                                                                         \
-struct type*                                                             \
-name##_SPLAY_ADD(struct name *head, struct type *elm)                    \
-{                                                                        \
-    if (TREE_EMPTY(head)) {                                              \
-        TREE_LEFT(elm, field) = TREE_RIGHT(elm, field) = NULL;           \
-    } else {                                                             \
-        int comp;                                                        \
-        name##_SPLAY(head, elm);                                         \
-        comp = cmp(elm, TREE_ROOT(head));                                \
-        if (comp < 0) {                                                  \
-            TREE_LEFT(elm, field) = TREE_LEFT(TREE_ROOT(head), field);   \
-            TREE_RIGHT(elm, field) = TREE_ROOT(head);                    \
-            TREE_LEFT(TREE_ROOT(head), field) = NULL;                    \
-        } else if (comp > 0) {                                           \
-            TREE_RIGHT(elm, field) = TREE_RIGHT(TREE_ROOT(head), field); \
-            TREE_LEFT(elm, field) = TREE_ROOT(head);                     \
-            TREE_RIGHT(TREE_ROOT(head), field) = NULL;                   \
-        } else                                                           \
-            return (TREE_ROOT(head));                                    \
-    }                                                                    \
-    TREE_ROOT(head) = (elm);                                             \
-    return NULL;                                                         \
-}                                                                        \
-                                                                         \
-struct type*                                                             \
-name##_SPLAY_DEL(struct name *head, struct type *elm)                    \
-{                                                                        \
-    struct type *tmp;                                                    \
-    if (TREE_EMPTY(head))                                                \
-        return NULL;                                                     \
-    name##_SPLAY(head, elm);                                             \
-    if (cmp(elm, TREE_ROOT(head)) == 0) {                                \
-        if (TREE_LEFT(TREE_ROOT(head), field) == NULL) {                 \
-            TREE_ROOT(head) = TREE_RIGHT(TREE_ROOT(head), field);        \
-        } else {                                                         \
-            tmp = TREE_RIGHT(TREE_ROOT(head), field);                    \
-            TREE_ROOT(head) = TREE_LEFT(TREE_ROOT(head), field);         \
-            name##_SPLAY(head, elm);                                     \
-            TREE_RIGHT(TREE_ROOT(head), field) = tmp;                    \
-        }                                                                \
-        return (elm);                                                    \
-    }                                                                    \
-    return NULL;                                                         \
-}                                                                        \
-                                                                         \
-void                                                                     \
-name##_SPLAY(struct name *head, struct type *elm)                        \
-{                                                                        \
-    struct type node, *left, *right, *tmp;                               \
-    int comp;                                                            \
-                                                                         \
-    TREE_LEFT(&node, field) = TREE_RIGHT(&node, field) = NULL;           \
-    left = right = &node;                                                \
-                                                                         \
-    while ((comp = cmp(elm, TREE_ROOT(head))) != 0) {                    \
-        if (comp < 0) {                                                  \
-            tmp = TREE_LEFT(TREE_ROOT(head), field);                     \
-            if (tmp == NULL)                                             \
-                break;                                                   \
-            if (cmp(elm, tmp) < 0){                                      \
-                SPLAY_ROTATE_RIGHT(head, tmp, field);                    \
-                if (TREE_LEFT(TREE_ROOT(head), field) == NULL)           \
-                    break;                                               \
-            }                                                            \
-            SPLAY_LINK_LEFT(head, right, field);                         \
-        } else if (comp > 0) {                                           \
-            tmp = TREE_RIGHT(TREE_ROOT(head), field);                    \
-            if (tmp == NULL)                                             \
-                break;                                                   \
-            if (cmp(elm, tmp) > 0){                                      \
-                SPLAY_ROTATE_LEFT(head, tmp, field);                     \
-                if (TREE_RIGHT(TREE_ROOT(head), field) == NULL)          \
-                    break;                                               \
-            }                                                            \
-            SPLAY_LINK_RIGHT(head, left, field);                         \
-        }                                                                \
-    }                                                                    \
-    SPLAY_ASSEMBLE(head, &node, left, right, field);                     \
-}                                                                        \
-                                                                         \
-/* Suppress unused function warnings */                                  \
-void (*name##_SPLAY_DUMMY[])(void) = {                                   \
-    (void(*)(void))(name##_SPLAY_MAX),                                   \
-    (void(*)(void))(name##_SPLAY_MIN) };
 
 #endif

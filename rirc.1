@@ -3,76 +3,59 @@
 .SH NAME
 rirc \- a minimalistic irc client written in C
 .SH SYNOPSIS
-.B rirc
-.RB [ -hv ]
-.RB [ -s
-.I server
-.RB [ -p
-.IR port ]
-.RB [ -w
-.IR pass ]
-.RB [ -u
-.IR username ]
-.RB [ -r
-.IR realname ]
-.RB [ -n
-.IR nicks ]
-.RB [ -c
-.IR chans "]], ...]"
+\fBrirc\fR [ \fB-hv\fR ] [ \fB-s\fR \fIserver\fR [ \fB...\fR ]]
 .SH DESCRIPTION
-.P
+.PP
 rirc is a lightweight Internet Relay Chat client.
-.P
-Customization of rirc can be accomplished by editing the
-.I config.h
-file and (re)compiling the source code.
+.PP
+Connections are TLS enabled over port 6697 by default.
 .SH OPTIONS
+.TP 5
+.B "-h, --help"
+Print help message and exit
 .TP
-.B -h, --help
-Print this message and exit
-.TP
-.B -v, --version
+.B "-v, --version"
 Print rirc version and exit
-.TP
+.SS Server options
+.TP 5
 .BI "-s, --server=" server
-Connect to
-.I server
+Connect to \fIserver\fP
 .TP
 .BI "-p, --port=" port
-Connect to
-.I server
-using
-.I port
+Connect to \fIserver\fP using \fIport\fP
 .TP
 .BI "-w, --pass=" pass
-Connect to
-.I server
-using
-.I pass
+Connect to \fIserver\fP using \fIpass\fP
 .TP
 .BI "-u, --username=" username
-Connect to
-.I server
-using
-.I username
+Connect to \fIserver\fP using \fIusername\fP
 .TP
 .BI "-r, --realname=" realname
-Connect to
-.I server
-using
-.I realname
+Connect to \fIserver\fP using \fIrealname\fP
 .TP
 .BI "-n, --nicks=" nicks
-Comma separated list of
-.I nicks
-to use for
-.I server
+Comma separated list of \fInicks\fP to use for \fIserver\fP
 .TP
 .BI "-c, --chans=" chans
-Comma separated list of
-.I chans
-to join on
-.I server
+Comma separated list of \fIchannels\fP to join for \fIserver\fP
+.SS Server connection options
+.TP 5
+.B --ipv4
+Connect to \fIserver\fP using only ipv4 addresses
+.TP
+.B --ipv6
+Connect to \fIserver\fP using only ipv6 addresses
+.TP
+.B --tls-disable
+Set \fIserver\fP TLS disabled, default port to 6667
+.TP
+.BI --tls-verify= mode
+Set \fIserver\fP TLS peer certificate verification \fImode\fP:
+.EX
+\(bu \fIdisabled\fP - cert is not verified
+\(bu \fIoptional\fP - cert is verified, handshake continues on error
+\(bu \fIrequired\fP - cert is verified, handshake is aborted on error (default)
+.EE
 .SH USAGE
 .TS
 l .
@@ -93,10 +76,10 @@ Keys:
   ^X;close current channel
   ^U;scroll current buffer up
   ^D;scroll current buffer down
-   >;input cursor back
-   <;input cursor forward
-   ^;input history back
-   v;input history forward
+  <left>;input cursor back
+  <right>;input cursor forward
+  <up>;input history back
+  <down>;input history forward
 .TE
 
 .TS
@@ -112,6 +95,7 @@ Commands:
   :clear;
   :close;
   :connect;[host [port] [pass] [user] [real]]
+  :disconnect;
   :quit;
 .TE
 
@@ -133,21 +117,11 @@ IRC commands:
   /quit;[quit message]
   /raw;<message>
 .TE
-
 .SH AUTHORS
 .MT mail@rcr.io
 Richard 'rcr' Robbins
-.ME
-.SH LICENSE
-See the
-.I LICENSE
-file in the source directory for the terms of redistribution.
+.ME .
 .SH SEE ALSO
-See
 .UR http://rcr.io/rirc/
-.UE
-for additional documentation.
-.SH BUGS
-See the
-.I TODO
-file in the source directory for current known issues.
+Additional documentation
+.UE .

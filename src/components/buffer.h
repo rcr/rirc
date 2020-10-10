@@ -76,4 +76,12 @@ void buffer_newline(
 	size_t,
 	char);
 
+void
+buffer_line_split(
+	struct buffer_line *line,
+	unsigned *head_w,
+	unsigned *text_w,
+	unsigned cols,
+	unsigned pad);
+
 #endif

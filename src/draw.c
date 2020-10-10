@@ -11,8 +11,9 @@
 #include <string.h>
 
 #include "config.h"
-#include "src/components/input.h"
 #include "src/components/channel.h"
+#include "src/components/input.h"
+#include "src/draw.h"
 #include "src/io.h"
 #include "src/state.h"
 #include "src/utils/utils.h"
@@ -48,10 +49,9 @@
 #error "BUFFER_PADDING options are 0 (no pad), 1 (padded)"
 #endif
 
-static int actv_colours[ACTIVITY_T_SIZE] = ACTIVITY_COLOURS
-static int nick_colours[] = NICK_COLOURS
-
-/* Terminal coordinate row/column boundaries (inclusive) for objects being drawn
+/* Terminal coordinate row/column boundaries (inclusive)
+ * for objects being drawn. The origin for terminal
+ * coordinates is in the top left, indexed from 1
  *
  *   \ c0     cN
  *    +---------+
@@ -60,86 +60,83 @@ static int nick_colours[] = NICK_COLOURS
  *    |         |
  *  rN|         |
  *    +---------+
- *
- * The origin for terminal coordinates is in the top left, indexed from 1
- *
  */
+
 struct coords
 {
-	unsigned int c1;
-	unsigned int cN;
-	unsigned int r1;
-	unsigned int rN;
+	unsigned c0;
+	unsigned cN;
+	unsigned r0;
+	unsigned rN;
 };
 
-static int _draw_fmt(char**, size_t*, size_t*, int, const char*, ...);
+struct draw_state
+{
+	union {
+		struct {
+			unsigned buffer : 1;
+			unsigned input  : 1;
+			unsigned nav    : 1;
+			unsigned status : 1;
+		};
+		unsigned all;
+	} bits;
+	unsigned bell : 1;
+};
 
-static void _draw_buffer_line(struct buffer_line*, struct coords, unsigned int, unsigned int, unsigned int, unsigned int);
-static void _draw_buffer(struct buffer*, struct coords);
-static void _draw_input(struct input*, struct coords);
-static void _draw_nav(struct channel*);
-static void _draw_status(struct channel*);
+static void draw_bits(void);
+static void draw_buffer(struct buffer*, struct coords);
+static void draw_buffer_line(struct buffer_line*, struct coords, unsigned, unsigned, unsigned, unsigned);
+static void draw_input(struct input*, struct coords);
+static void draw_nav(struct channel*);
+static void draw_status(struct channel*);
 
-static inline unsigned int nick_col(char*);
-static inline void check_coords(struct coords);
+static char* draw_colour(int, int);
+static int draw_fmt(char**, size_t*, size_t*, int, const char*, ...);
+static unsigned nick_col(char*);
+static void check_coords(struct coords);
 
-static char* _colour(int, int);
+static int actv_colours[ACTIVITY_T_SIZE] = ACTIVITY_COLOURS
+static int nick_colours[] = NICK_COLOURS
+static struct draw_state draw_state;
 
 void
-draw(union draw draw)
+draw(enum draw_bit bit)
 {
-	if (!draw.all_bits)
-		return;
-
-	struct channel *c = current_channel();
-
-	if (io_tty_cols() < COLS_MIN || io_tty_rows() < ROWS_MIN) {
-		printf(CLEAR_FULL MOVE(1, 1) "rirc");
-		goto no_draw;
+	switch (bit) {
+		case DRAW_FLUSH:
+			draw_bits();
+			draw_state.bits.all = 0;
+			draw_state.bell = 0;
+			break;
+		case DRAW_BELL:
+			draw_state.bell = 1;
+			break;
+		case DRAW_BUFFER:
+			draw_state.bits.buffer = 1;
+			break;
+		case DRAW_INPUT:
+			draw_state.bits.input = 1;
+			break;
+		case DRAW_NAV:
+			draw_state.bits.nav = 1;
+			break;
+		case DRAW_STATUS:
+			draw_state.bits.status = 1;
+			break;
+		case DRAW_ALL:
+			draw_state.bits.all = -1;
+			break;
+		default:
+			fatal("unknown draw bit");
 	}
-
-	printf(CURSOR_SAVE);
-
-	if (draw.bits.buffer) _draw_buffer(&c->buffer,
-		(struct coords) {
-			.c1 = 1,
-			.cN = io_tty_cols(),
-			.r1 = 3,
-			.rN = io_tty_rows() - 2
-		});
-
-	if (draw.bits.nav)    _draw_nav(c);
-
-	if (draw.bits.input)  _draw_input(&c->input,
-		(struct coords) {
-			.c1 = 1,
-			.cN = io_tty_cols(),
-			.r1 = io_tty_rows(),
-			.rN = io_tty_rows()
-		});
-
-	if (draw.bits.status) _draw_status(c);
-
-	printf(RESET_ATTRIBUTES);
-	printf(CURSOR_RESTORE);
-
-no_draw:
-
-	fflush(stdout);
-}
-
-void
-draw_bell(void)
-{
-	if (BELL_ON_PINGED)
-		putchar('\a');
 }
 
 void
 draw_init(void)
 {
-	draw_all();
-	redraw();
+	draw(DRAW_ALL);
+	draw(DRAW_FLUSH);
 }
 
 void
@@ -149,17 +146,188 @@ draw_term(void)
 	printf(CLEAR_FULL);
 }
 
+static void
+draw_bits(void)
+{
+	if (draw_state.bell && BELL_ON_PINGED)
+		putchar('\a');
+
+	if (!draw_state.bits.all)
+		return;
+
+	struct coords coords;
+	struct channel *c = current_channel();
+
+	if (io_tty_cols() < COLS_MIN || io_tty_rows() < ROWS_MIN) {
+		printf(CLEAR_FULL MOVE(1, 1) "rirc");
+		fflush(stdout);
+		return;
+	}
+
+	printf(CURSOR_SAVE);
+
+	if (draw_state.bits.buffer) {
+		coords.c0 = 1;
+		coords.cN = io_tty_cols();
+		coords.r0 = 3;
+		coords.rN = io_tty_rows() - 2;
+		draw_buffer(&c->buffer, coords);
+	}
+
+	if (draw_state.bits.input) {
+		coords.c0 = 1;
+		coords.cN = io_tty_cols();
+		coords.r0 = io_tty_rows();
+		coords.rN = io_tty_rows();
+		draw_input(&c->input, coords);
+	}
+
+	if (draw_state.bits.nav)
+		draw_nav(c);
+
+	if (draw_state.bits.status)
+		draw_status(c);
+
+	printf(RESET_ATTRIBUTES);
+	printf(CURSOR_RESTORE);
+
+	fflush(stdout);
+}
+
+static void
+draw_buffer(struct buffer *b, struct coords coords)
+{
+	/* Dynamically draw the current channel's buffer such that:
+	 *
+	 * - The scrollback line should always be drawn in full when possible
+	 * - Lines wrap on whitespace when possible
+	 * - The top-most lines draws partially when required
+	 * - Buffers requiring fewer rows than available draw from the top down
+	 *
+	 * Rows are numbered from the top down, 1 to term_rows, so for term_rows = N,
+	 * the drawable area for the buffer is bounded [r3, rN-2]:
+	 *      __________________________
+	 * r0   |         (nav)          |
+	 * r2   |------------------------|
+	 * r3   |    ::buffer start::    |
+	 *      |                        |
+	 * ...  |                        |
+	 *      |                        |
+	 * rN-2 |     ::buffer end::     |
+	 * rN-1 |------------------------|
+	 * rN   |________(input)_________|
+	 *
+	 *
+	 * So the general steps for drawing are:
+	 *
+	 * 1. Starting from line L = scrollback, traverse backwards through the
+	 *    buffer summing the rows required to draw lines, until the sum
+	 *    exceeds the number of rows available
+	 *
+	 * 2. L now points to the top-most line to be drawn. L might not be able
+	 *    to draw in full, so discard the excessive word-wrapped segments and
+	 *    draw the remainder
+	 *
+	 * 3. Traverse forward through the buffer, drawing lines until buffer.head
+	 *    is encountered
+	 */
+
+	check_coords(coords);
+
+	unsigned row,
+	         row_count = 0,
+	         row_total = coords.rN - coords.r0 + 1;
+
+	unsigned col_total = coords.cN - coords.c0 + 1;
+
+	unsigned buffer_i = b->scrollback,
+	         head_w,
+	         text_w;
+
+	/* Clear the buffer area */
+	for (row = coords.r0; row <= coords.rN; row++)
+		printf(MOVE(%d, 1) CLEAR_LINE, row);
+
+	struct buffer_line *line = buffer_line(b, buffer_i);
+
+	if (line == NULL)
+		return;
+
+	struct buffer_line *tail = buffer_tail(b);
+	struct buffer_line *head = buffer_head(b);
+
+	/* Find top line */
+	for (;;) {
+
+		buffer_line_split(line, NULL, &text_w, col_total, b->pad);
+
+		row_count += buffer_line_rows(line, text_w);
+
+		if (line == tail)
+			break;
+
+		if (row_count >= row_total)
+			break;
+
+		line = buffer_line(b, --buffer_i);
+	}
+
+	/* Handle impartial top line print */
+	if (row_count > row_total) {
+
+		buffer_line_split(line, &head_w, &text_w, col_total, b->pad);
+
+		draw_buffer_line(
+			line,
+			coords,
+			head_w,
+			text_w,
+			row_count - row_total,
+			BUFFER_PADDING ? (b->pad - line->from_len) : 0
+		);
+
+		coords.r0 += buffer_line_rows(line, text_w) - (row_count - row_total);
+
+		if (line == head)
+			return;
+
+		line = buffer_line(b, ++buffer_i);
+	}
+
+	/* Draw all remaining lines */
+	while (coords.r0 <= coords.rN) {
+
+		buffer_line_split(line, &head_w, &text_w, col_total, b->pad);
+
+		draw_buffer_line(
+			line,
+			coords,
+			head_w,
+			text_w,
+			0,
+			BUFFER_PADDING ? (b->pad - line->from_len) : 0
+		);
+
+		coords.r0 += buffer_line_rows(line, text_w);
+
+		if (line == head)
+			return;
+
+		line = buffer_line(b, ++buffer_i);
+	}
+}
+
 /* FIXME: works except when it doesn't.
  *
  * Fails when line headers are very long compared to text. tests/draw.c needed */
 static void
-_draw_buffer_line(
+draw_buffer_line(
 		struct buffer_line *line,
 		struct coords coords,
-		unsigned int head_w,
-		unsigned int text_w,
-		unsigned int skip,
-		unsigned int pad)
+		unsigned head_w,
+		unsigned text_w,
+		unsigned skip,
+		unsigned pad)
 {
 	check_coords(coords);
 
@@ -189,19 +357,19 @@ _draw_buffer_line(
 
 		struct tm *line_tm = localtime(&line->time);
 
-		if (!_draw_fmt(&header_ptr, &buff_n, &text_n, 0,
-				_colour(BUFFER_LINE_HEADER_FG_NEUTRAL, -1)))
+		if (!draw_fmt(&header_ptr, &buff_n, &text_n, 0,
+				draw_colour(BUFFER_LINE_HEADER_FG_NEUTRAL, -1)))
 			goto print_header;
 
-		if (!_draw_fmt(&header_ptr, &buff_n, &text_n, 1,
+		if (!draw_fmt(&header_ptr, &buff_n, &text_n, 1,
 				" %02d:%02d ", line_tm->tm_hour, line_tm->tm_min))
 			goto print_header;
 
-		if (!_draw_fmt(&header_ptr, &buff_n, &text_n, 1,
+		if (!draw_fmt(&header_ptr, &buff_n, &text_n, 1,
 				"%*s", pad, ""))
 			goto print_header;
 
-		if (!_draw_fmt(&header_ptr, &buff_n, &text_n, 0, RESET_ATTRIBUTES))
+		if (!draw_fmt(&header_ptr, &buff_n, &text_n, 0, RESET_ATTRIBUTES))
 			goto print_header;
 
 		switch (line->type) {
@@ -212,20 +380,20 @@ _draw_buffer_line(
 			case BUFFER_LINE_NICK:
 			case BUFFER_LINE_PART:
 			case BUFFER_LINE_QUIT:
-				if (!_draw_fmt(&header_ptr, &buff_n, &text_n, 0,
-						_colour(BUFFER_LINE_HEADER_FG_NEUTRAL, -1)))
+				if (!draw_fmt(&header_ptr, &buff_n, &text_n, 0,
+						draw_colour(BUFFER_LINE_HEADER_FG_NEUTRAL, -1)))
 					goto print_header;
 				break;
 
 			case BUFFER_LINE_CHAT:
-				if (!_draw_fmt(&header_ptr, &buff_n, &text_n, 0,
-						_colour(line->cached.colour, -1)))
+				if (!draw_fmt(&header_ptr, &buff_n, &text_n, 0,
+						draw_colour(line->cached.colour, -1)))
 					goto print_header;
 				break;
 
 			case BUFFER_LINE_PINGED:
-				if (!_draw_fmt(&header_ptr, &buff_n, &text_n, 0,
-						_colour(BUFFER_LINE_HEADER_FG_PINGED, BUFFER_LINE_HEADER_BG_PINGED)))
+				if (!draw_fmt(&header_ptr, &buff_n, &text_n, 0,
+						draw_colour(BUFFER_LINE_HEADER_FG_PINGED, BUFFER_LINE_HEADER_BG_PINGED)))
 					goto print_header;
 				break;
 
@@ -233,13 +401,13 @@ _draw_buffer_line(
 				fatal("Invalid line type");
 		}
 
-		if (!_draw_fmt(&header_ptr, &buff_n, &text_n, 1,
+		if (!draw_fmt(&header_ptr, &buff_n, &text_n, 1,
 				"%s", line->from))
 			goto print_header;
 
 print_header:
 		/* Print the line header */
-		printf(MOVE(%d, 1) "%s " RESET_ATTRIBUTES, coords.r1, header);
+		printf(MOVE(%d, 1) "%s " RESET_ATTRIBUTES, coords.r0, header);
 	}
 
 	while (skip--)
@@ -248,19 +416,19 @@ print_header:
 	do {
 		char *sep = " "VERTICAL_SEPARATOR" ";
 
-		if ((coords.cN - coords.c1) >= sizeof(*sep) + text_w) {
-			printf(MOVE(%d, %d), coords.r1, (int)(coords.cN - (sizeof(*sep) + text_w + 1)));
-			fputs(_colour(BUFFER_LINE_HEADER_FG_NEUTRAL, -1), stdout);
+		if ((coords.cN - coords.c0) >= sizeof(*sep) + text_w) {
+			printf(MOVE(%d, %d), coords.r0, (int)(coords.cN - (sizeof(*sep) + text_w + 1)));
+			fputs(draw_colour(BUFFER_LINE_HEADER_FG_NEUTRAL, -1), stdout);
 			fputs(sep, stdout);
 		}
 
 		if (*p1) {
-			printf(MOVE(%d, %d), coords.r1, head_w);
+			printf(MOVE(%d, %d), coords.r0, head_w);
 
 			print_p1 = p1;
 			print_p2 = word_wrap(text_w, &p1, p2);
 
-			fputs(_colour(line->text[0] == QUOTE_CHAR
+			fputs(draw_colour(line->text[0] == QUOTE_CHAR
 					? BUFFER_LINE_TEXT_FG_GREEN
 					: BUFFER_LINE_TEXT_FG_NEUTRAL,
 					-1),
@@ -269,132 +437,71 @@ print_header:
 			printf("%.*s", (int)(print_p2 - print_p1), print_p1);
 		}
 
-		coords.r1++;
+		coords.r0++;
 
-	} while (*p1 && coords.r1 <= coords.rN);
+	} while (*p1 && coords.r0 <= coords.rN);
 }
 
 static void
-_draw_buffer(struct buffer *b, struct coords coords)
+draw_input(struct input *inp, struct coords coords)
 {
-	/* Dynamically draw the current channel's buffer such that:
-	 *
-	 * - The scrollback line should always be drawn in full when possible
-	 * - Lines wrap on whitespace when possible
-	 * - The top-most lines draws partially when required
-	 * - Buffers requiring fewer rows than available draw from the top down
-	 *
-	 * Rows are numbered from the top down, 1 to term_rows, so for term_rows = N,
-	 * the drawable area for the buffer is bounded [r3, rN-2]:
-	 *      __________________________
-	 * r1   |         (nav)          |
-	 * r2   |------------------------|
-	 * r3   |    ::buffer start::    |
-	 *      |                        |
-	 * ...  |                        |
-	 *      |                        |
-	 * rN-2 |     ::buffer end::     |
-	 * rN-1 |------------------------|
-	 * rN   |________(input)_________|
-	 *
-	 *
-	 * So the general steps for drawing are:
-	 *
-	 * 1. Starting from line L = scrollback, traverse backwards through the
-	 *    buffer summing the rows required to draw lines, until the sum
-	 *    exceeds the number of rows available
-	 *
-	 * 2. L now points to the top-most line to be drawn. L might not be able
-	 *    to draw in full, so discard the excessive word-wrapped segments and
-	 *    draw the remainder
-	 *
-	 * 3. Traverse forward through the buffer, drawing lines until buffer.head
-	 *    is encountered
-	 */
+	/* Draw the input line, or the current action message */
 
 	check_coords(coords);
 
-	unsigned int row,
-	             row_count = 0,
-	             row_total = coords.rN - coords.r1 + 1;
+	unsigned cols_t = coords.cN - coords.c0 + 1,
+	         cursor = coords.c0;
 
-	unsigned int col_total = coords.cN - coords.c1 + 1;
+	printf(RESET_ATTRIBUTES);
+	printf(MOVE(%d, 1) CLEAR_LINE, coords.rN);
+	printf(CURSOR_SAVE);
 
-	unsigned int buffer_i = b->scrollback,
-	             head_w,
-	             text_w;
-
-	/* Clear the buffer area */
-	for (row = coords.r1; row <= coords.rN; row++)
-		printf(MOVE(%d, 1) CLEAR_LINE, row);
-
-	struct buffer_line *line = buffer_line(b, buffer_i);
-
-	if (line == NULL)
+	/* Insufficient columns for meaningful input drawing */
+	if (cols_t < 3)
 		return;
 
-	struct buffer_line *tail = buffer_tail(b);
-	struct buffer_line *head = buffer_head(b);
+	char input[cols_t + COLOUR_SIZE * 2 + 1];
+	char *input_ptr = input;
 
-	/* Find top line */
-	for (;;) {
+	size_t buff_n = sizeof(input) - 1,
+	       text_n = cols_t;
 
-		split_buffer_cols(line, NULL, &text_w, col_total, b->pad);
+	if (sizeof(INPUT_PREFIX)) {
 
-		row_count += buffer_line_rows(line, text_w);
+		if (!draw_fmt(&input_ptr, &buff_n, &text_n, 0,
+				"%s", draw_colour(INPUT_PREFIX_FG, INPUT_PREFIX_BG)))
+			goto print_input;
 
-		if (line == tail)
-			break;
+		cursor = coords.c0 + sizeof(INPUT_PREFIX) - 1;
 
-		if (row_count >= row_total)
-			break;
-
-		line = buffer_line(b, --buffer_i);
+		if (!draw_fmt(&input_ptr, &buff_n, &text_n, 1,
+				INPUT_PREFIX))
+			goto print_input;
 	}
 
-	/* Handle impartial top line print */
-	if (row_count > row_total) {
+	if (!draw_fmt(&input_ptr, &buff_n, &text_n, 0,
+			"%s", draw_colour(INPUT_FG, INPUT_BG)))
+		goto print_input;
 
-		split_buffer_cols(line, &head_w, &text_w, col_total, b->pad);
+	if (action_message) {
 
-		_draw_buffer_line(
-			line,
-			coords,
-			head_w,
-			text_w,
-			row_count - row_total,
-			BUFFER_PADDING ? (b->pad - line->from_len) : 0
-		);
+		cursor = coords.cN;
 
-		coords.r1 += buffer_line_rows(line, text_w) - (row_count - row_total);
+		if (!draw_fmt(&input_ptr, &buff_n, &text_n, 1,
+				"%s", action_message))
+			goto print_input;
 
-		if (line == head)
-			return;
+		cursor = cols_t - text_n + 1;
 
-		line = buffer_line(b, ++buffer_i);
+	} else {
+		cursor += input_frame(inp, input_ptr, text_n);
 	}
 
-	/* Draw all remaining lines */
-	while (coords.r1 <= coords.rN) {
+print_input:
 
-		split_buffer_cols(line, &head_w, &text_w, col_total, b->pad);
-
-		_draw_buffer_line(
-			line,
-			coords,
-			head_w,
-			text_w,
-			0,
-			BUFFER_PADDING ? (b->pad - line->from_len) : 0
-		);
-
-		coords.r1 += buffer_line_rows(line, text_w);
-
-		if (line == head)
-			return;
-
-		line = buffer_line(b, ++buffer_i);
-	}
+	fputs(input, stdout);
+	printf(MOVE(%d, %d), coords.rN, (cursor >= coords.c0 && cursor <= coords.cN) ? cursor : coords.cN);
+	printf(CURSOR_SAVE);
 }
 
 /* TODO
@@ -408,7 +515,7 @@ _draw_buffer(struct buffer *b, struct coords coords)
  *           | #chan1 #chan2 #ch... |   Left printing
  * */
 static void
-_draw_nav(struct channel *c)
+draw_nav(struct channel *c)
 {
 	/* Dynamically draw the nav such that:
 	 *
@@ -505,7 +612,7 @@ _draw_nav(struct channel *c)
 
 		colour = (tmp == c) ? NAV_CURRENT_CHAN : actv_colours[tmp->activity];
 
-		if (fputs(_colour(colour, -1), stdout) < 0)
+		if (fputs(draw_colour(colour, -1), stdout) < 0)
 			break;
 
 		if (printf(" %s ", tmp->name) < 0)
@@ -517,69 +624,7 @@ _draw_nav(struct channel *c)
 }
 
 static void
-_draw_input(struct input *inp, struct coords coords)
-{
-	/* Draw the input line, or the current action message */
-
-	check_coords(coords);
-
-	unsigned int cols_t = coords.cN - coords.c1 + 1,
-	             cursor = coords.c1;
-
-	printf(RESET_ATTRIBUTES);
-	printf(MOVE(%d, 1) CLEAR_LINE, coords.rN);
-	printf(CURSOR_SAVE);
-
-	/* Insufficient columns for meaningful input drawing */
-	if (cols_t < 3)
-		return;
-
-	char input[cols_t + COLOUR_SIZE * 2 + 1];
-	char *input_ptr = input;
-
-	size_t buff_n = sizeof(input) - 1,
-	       text_n = cols_t;
-
-	if (sizeof(INPUT_PREFIX)) {
-
-		if (!_draw_fmt(&input_ptr, &buff_n, &text_n, 0,
-				"%s", _colour(INPUT_PREFIX_FG, INPUT_PREFIX_BG)))
-			goto print_input;
-
-		cursor = coords.c1 + sizeof(INPUT_PREFIX) - 1;
-
-		if (!_draw_fmt(&input_ptr, &buff_n, &text_n, 1,
-				INPUT_PREFIX))
-			goto print_input;
-	}
-
-	if (!_draw_fmt(&input_ptr, &buff_n, &text_n, 0,
-			"%s", _colour(INPUT_FG, INPUT_BG)))
-		goto print_input;
-
-	if (action_message) {
-
-		cursor = coords.cN;
-
-		if (!_draw_fmt(&input_ptr, &buff_n, &text_n, 1,
-				"%s", action_message))
-			goto print_input;
-
-		cursor = cols_t - text_n + 1;
-
-	} else {
-		cursor += input_frame(inp, input_ptr, text_n);
-	}
-
-print_input:
-
-	fputs(input, stdout);
-	printf(MOVE(%d, %d), coords.rN, (cursor >= coords.c1 && cursor <= coords.cN) ? cursor : coords.cN);
-	printf(CURSOR_SAVE);
-}
-
-static void
-_draw_status(struct channel *c)
+draw_status(struct channel *c)
 {
 	/* TODO: channel modes, channel type_flag, servermodes */
 
@@ -592,9 +637,9 @@ _draw_status(struct channel *c)
 
 	float sb;
 	int ret;
-	unsigned int col = 0;
-	unsigned int cols = io_tty_cols();
-	unsigned int rows = io_tty_rows();
+	unsigned col = 0;
+	unsigned cols = io_tty_cols();
+	unsigned rows = io_tty_rows();
 
 	/* Insufficient columns for meaningful status */
 	if (cols < 3)
@@ -686,22 +731,22 @@ print_status:
 		printf(HORIZONTAL_SEPARATOR);
 }
 
-static inline void
+static void
 check_coords(struct coords coords)
 {
 	/* Check coordinate validity before drawing, ensure at least one row, column */
 
-	if (coords.r1 > coords.rN)
-		fatal("row coordinates invalid (%u > %u)", coords.r1, coords.rN);
+	if (coords.r0 > coords.rN)
+		fatal("row coordinates invalid (%u > %u)", coords.r0, coords.rN);
 
-	if (coords.c1 > coords.cN)
-		fatal("col coordinates invalid (%u > %u)", coords.c1, coords.cN);
+	if (coords.c0 > coords.cN)
+		fatal("col coordinates invalid (%u > %u)", coords.c0, coords.cN);
 }
 
-static inline unsigned int
+static unsigned
 nick_col(char *nick)
 {
-	unsigned int colour = 0;
+	unsigned colour = 0;
 
 	while (*nick)
 		colour += *nick++;
@@ -710,7 +755,7 @@ nick_col(char *nick)
 }
 
 static char*
-_colour(int fg, int bg)
+draw_colour(int fg, int bg)
 {
 	/* Set terminal foreground and background colours to a value [0, 255],
 	 * or reset colour if given anything else
@@ -739,7 +784,7 @@ _colour(int fg, int bg)
 }
 
 static int
-_draw_fmt(char **ptr, size_t *buff_n, size_t *text_n, int txt, const char *fmt, ...)
+draw_fmt(char **ptr, size_t *buff_n, size_t *text_n, int txt, const char *fmt, ...)
 {
 	/* Write formatted text to a buffer for purposes of preparing an object to be drawn
 	 * to the terminal.
@@ -783,31 +828,4 @@ _draw_fmt(char **ptr, size_t *buff_n, size_t *text_n, int txt, const char *fmt, 
 	*ptr += _ret;
 
 	return 1;
-}
-
-void
-split_buffer_cols(
-	struct buffer_line *line,
-	unsigned int *head_w,
-	unsigned int *text_w,
-	unsigned int cols,
-	unsigned int pad)
-{
-	unsigned int _head_w = sizeof(" HH:MM   "VERTICAL_SEPARATOR" ");
-
-	if (BUFFER_PADDING)
-		_head_w += pad;
-	else
-		_head_w += line->from_len;
-
-	/* If header won't fit, split in half */
-	if (_head_w >= cols)
-		_head_w = cols / 2;
-
-	_head_w -= 1;
-
-	if (head_w)
-		*head_w = _head_w;
-	if (text_w)
-		*text_w = cols - _head_w + 1;
 }

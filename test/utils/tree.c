@@ -1,58 +1,62 @@
 #include "test/test.h"
 #include "src/utils/tree.h"
 
-struct test_avl
+struct test_node
 {
-	AVL_NODE(test_avl) node;
+	TREE_NODE(test_node) node;
 	int val;
 };
 
-struct test_avl_list
+struct test_tree
 {
-	AVL_HEAD(test_avl);
+	TREE_HEAD(test_node);
 };
 
 static inline int
-test_avl_cmp(struct test_avl *t1, struct test_avl *t2)
+test_cmp(struct test_node *t1, struct test_node *t2, void *unused)
 {
+	(void)unused;
+
 	return (t1->val == t2->val) ? 0 : ((t1->val > t2->val) ? 1 : -1);
 }
 
 static inline int
-test_avl_cmp_n(struct test_avl *t1, struct test_avl *t2, size_t n)
+test_ncmp(struct test_node *t1, struct test_node *t2, void *unused, size_t n)
 {
+	(void)unused;
+
 	int tmp = t1->val * n;
 
 	return (tmp == t2->val) ? 0 : ((tmp > t2->val) ? 1 : -1);
 }
 
 static void
-foreach_f(struct test_avl *t)
+foreach_f(struct test_node *t)
 {
 	t->val = 0;
 	t->node.tree_left = NULL;
 	t->node.tree_right = NULL;
 }
 
-AVL_GENERATE(test_avl_list, test_avl, node, test_avl_cmp, test_avl_cmp_n)
+AVL_GENERATE(test_tree, test_node, node, test_cmp, test_ncmp)
 
 static void
 test_avl_get_height(void)
 {
-	struct test_avl t0 = { .node = { .height = 1 }};
+	struct test_node t0 = { .node = { .height = 1 }};
 
-	assert_eq(test_avl_list_AVL_GET_HEIGHT(&t0),  1);
-	assert_eq(test_avl_list_AVL_GET_HEIGHT(NULL), 0);
+	assert_eq(test_tree_AVL_GET_HEIGHT(&t0),  1);
+	assert_eq(test_tree_AVL_GET_HEIGHT(NULL), 0);
 }
 
 static void
 test_avl_set_height(void)
 {
-	struct test_avl
+	struct test_node
 		t0 = { .node = { .height = 1 }},
 		t1 = { .node = { .tree_left = &t0 }};
 
-	assert_eq(test_avl_list_AVL_SET_HEIGHT(&t1), 2);
+	assert_eq(test_tree_AVL_SET_HEIGHT(&t1), 2);
 }
 
 static void
@@ -67,7 +71,7 @@ test_avl_balance(void)
 	 *         t00     t01  balance : 0, 0
 	 */
 
-	struct test_avl
+	struct test_node
 		t00 = { .node = { .height = 1 }},
 		t01 = { .node = { .height = 1 }},
 		t10 = { .node = { .height = 1 }},
@@ -79,13 +83,13 @@ test_avl_balance(void)
 		t30 = { .node = { .tree_left  = &t20,
 		                  .tree_right = &t21 }};
 
-	assert_eq(test_avl_list_AVL_BALANCE(&t00), 0);
-	assert_eq(test_avl_list_AVL_BALANCE(&t01), 0);
-	assert_eq(test_avl_list_AVL_BALANCE(&t10), 0);
-	assert_eq(test_avl_list_AVL_BALANCE(&t11), 0);
-	assert_eq(test_avl_list_AVL_BALANCE(&t20), 0);
-	assert_eq(test_avl_list_AVL_BALANCE(&t21), 1);
-	assert_eq(test_avl_list_AVL_BALANCE(&t30), 2);
+	assert_eq(test_tree_AVL_BALANCE(&t00), 0);
+	assert_eq(test_tree_AVL_BALANCE(&t01), 0);
+	assert_eq(test_tree_AVL_BALANCE(&t10), 0);
+	assert_eq(test_tree_AVL_BALANCE(&t11), 0);
+	assert_eq(test_tree_AVL_BALANCE(&t20), 0);
+	assert_eq(test_tree_AVL_BALANCE(&t21), 1);
+	assert_eq(test_tree_AVL_BALANCE(&t30), 2);
 
 	/*         t70      balance : -2
 	 *        /   \
@@ -96,7 +100,7 @@ test_avl_balance(void)
 	 *     t40     t41  balance : 0, 0
 	 */
 
-	struct test_avl
+	struct test_node
 		t40 = { .node = { .height = 1 }},
 		t41 = { .node = { .height = 1 }},
 		t50 = { .node = { .height = 1 }},
@@ -108,13 +112,13 @@ test_avl_balance(void)
 		t70 = { .node = { .tree_left  = &t60,
 		                  .tree_right = &t61 }};
 
-	assert_eq(test_avl_list_AVL_BALANCE(&t40),  0);
-	assert_eq(test_avl_list_AVL_BALANCE(&t41),  0);
-	assert_eq(test_avl_list_AVL_BALANCE(&t50),  0);
-	assert_eq(test_avl_list_AVL_BALANCE(&t51),  0);
-	assert_eq(test_avl_list_AVL_BALANCE(&t60),  1);
-	assert_eq(test_avl_list_AVL_BALANCE(&t61),  0);
-	assert_eq(test_avl_list_AVL_BALANCE(&t70), -2);
+	assert_eq(test_tree_AVL_BALANCE(&t40),  0);
+	assert_eq(test_tree_AVL_BALANCE(&t41),  0);
+	assert_eq(test_tree_AVL_BALANCE(&t50),  0);
+	assert_eq(test_tree_AVL_BALANCE(&t51),  0);
+	assert_eq(test_tree_AVL_BALANCE(&t60),  1);
+	assert_eq(test_tree_AVL_BALANCE(&t61),  0);
+	assert_eq(test_tree_AVL_BALANCE(&t70), -2);
 }
 
 static void
@@ -131,9 +135,9 @@ test_avl_add(void)
 	 * 50     150 250     350
 	 */
 
-	struct test_avl_list tl = {0};
+	struct test_tree tl = {0};
 
-	struct test_avl
+	struct test_node
 		t0 = { .val = 200 },
 		t1 = { .val = 100 },
 		t2 = { .val = 300 },
@@ -142,16 +146,16 @@ test_avl_add(void)
 		t5 = { .val = 250 },
 		t6 = { .val = 350 };
 
-	assert_ptr_eq(test_avl_list_AVL_ADD(&tl, &t0), &t0);
-	assert_ptr_eq(test_avl_list_AVL_ADD(&tl, &t1), &t1);
-	assert_ptr_eq(test_avl_list_AVL_ADD(&tl, &t2), &t2);
-	assert_ptr_eq(test_avl_list_AVL_ADD(&tl, &t3), &t3);
-	assert_ptr_eq(test_avl_list_AVL_ADD(&tl, &t4), &t4);
-	assert_ptr_eq(test_avl_list_AVL_ADD(&tl, &t5), &t5);
-	assert_ptr_eq(test_avl_list_AVL_ADD(&tl, &t6), &t6);
+	assert_ptr_eq(test_tree_AVL_ADD(&tl, &t0, 0), &t0);
+	assert_ptr_eq(test_tree_AVL_ADD(&tl, &t1, 0), &t1);
+	assert_ptr_eq(test_tree_AVL_ADD(&tl, &t2, 0), &t2);
+	assert_ptr_eq(test_tree_AVL_ADD(&tl, &t3, 0), &t3);
+	assert_ptr_eq(test_tree_AVL_ADD(&tl, &t4, 0), &t4);
+	assert_ptr_eq(test_tree_AVL_ADD(&tl, &t5, 0), &t5);
+	assert_ptr_eq(test_tree_AVL_ADD(&tl, &t6, 0), &t6);
 
 	/* Duplicate */
-	assert_ptr_null(test_avl_list_AVL_ADD(&tl, &t6));
+	assert_ptr_null(test_tree_AVL_ADD(&tl, &t6, 0));
 
 	/* Check tree structure */
 	assert_ptr_eq(TREE_ROOT(&tl), &t0);
@@ -178,17 +182,17 @@ test_avl_add(void)
 	assert_ptr_null(t6.node.tree_right);
 
 	/* Retrieve the nodes */
-	assert_ptr_eq(test_avl_list_AVL_GET(&tl, &t0), &t0);
-	assert_ptr_eq(test_avl_list_AVL_GET(&tl, &t1), &t1);
-	assert_ptr_eq(test_avl_list_AVL_GET(&tl, &t2), &t2);
-	assert_ptr_eq(test_avl_list_AVL_GET(&tl, &t3), &t3);
-	assert_ptr_eq(test_avl_list_AVL_GET(&tl, &t4), &t4);
-	assert_ptr_eq(test_avl_list_AVL_GET(&tl, &t5), &t5);
-	assert_ptr_eq(test_avl_list_AVL_GET(&tl, &t6), &t6);
+	assert_ptr_eq(test_tree_AVL_GET(&tl, &t0, 0), &t0);
+	assert_ptr_eq(test_tree_AVL_GET(&tl, &t1, 0), &t1);
+	assert_ptr_eq(test_tree_AVL_GET(&tl, &t2, 0), &t2);
+	assert_ptr_eq(test_tree_AVL_GET(&tl, &t3, 0), &t3);
+	assert_ptr_eq(test_tree_AVL_GET(&tl, &t4, 0), &t4);
+	assert_ptr_eq(test_tree_AVL_GET(&tl, &t5, 0), &t5);
+	assert_ptr_eq(test_tree_AVL_GET(&tl, &t6, 0), &t6);
 
-	struct test_avl t7 = { .val = -1 };
+	struct test_node t7 = { .val = -1 };
 
-	assert_ptr_null(test_avl_list_AVL_GET(&tl, &t7));
+	assert_ptr_null(test_tree_AVL_GET(&tl, &t7, 0));
 }
 
 static void
@@ -205,9 +209,9 @@ test_avl_del(void)
 	 * 50     150 250     350
 	 */
 
-	struct test_avl_list tl = {0};
+	struct test_tree tl = {0};
 
-	struct test_avl
+	struct test_node
 		t200 = { .val = 200 },
 		t100 = { .val = 100 },
 		t300 = { .val = 300 },
@@ -217,16 +221,16 @@ test_avl_del(void)
 		t350 = { .val = 350 },
 		t0 = { .val = 0 };
 
-	assert_ptr_eq(test_avl_list_AVL_ADD(&tl, &t200), &t200);
-	assert_ptr_eq(test_avl_list_AVL_ADD(&tl, &t100), &t100);
-	assert_ptr_eq(test_avl_list_AVL_ADD(&tl, &t300), &t300);
-	assert_ptr_eq(test_avl_list_AVL_ADD(&tl, &t050), &t050);
-	assert_ptr_eq(test_avl_list_AVL_ADD(&tl, &t150), &t150);
-	assert_ptr_eq(test_avl_list_AVL_ADD(&tl, &t250), &t250);
-	assert_ptr_eq(test_avl_list_AVL_ADD(&tl, &t350), &t350);
+	assert_ptr_eq(test_tree_AVL_ADD(&tl, &t200, 0), &t200);
+	assert_ptr_eq(test_tree_AVL_ADD(&tl, &t100, 0), &t100);
+	assert_ptr_eq(test_tree_AVL_ADD(&tl, &t300, 0), &t300);
+	assert_ptr_eq(test_tree_AVL_ADD(&tl, &t050, 0), &t050);
+	assert_ptr_eq(test_tree_AVL_ADD(&tl, &t150, 0), &t150);
+	assert_ptr_eq(test_tree_AVL_ADD(&tl, &t250, 0), &t250);
+	assert_ptr_eq(test_tree_AVL_ADD(&tl, &t350, 0), &t350);
 
 	/* Test deleting node not found in tree */
-	assert_ptr_eq(test_avl_list_AVL_DEL(&tl, &t0), NULL);
+	assert_ptr_eq(test_tree_AVL_DEL(&tl, &t0, 0), NULL);
 
 	/* Delete 200; In-order successor is substituted from leaf
 	 *
@@ -237,7 +241,7 @@ test_avl_del(void)
 	 * 50     150        350
 	 */
 
-	assert_ptr_eq(test_avl_list_AVL_DEL(&tl, &t200), &t200);
+	assert_ptr_eq(test_tree_AVL_DEL(&tl, &t200, 0), &t200);
 
 	/* Check tree structure */
 	assert_ptr_eq(TREE_ROOT(&tl), &t250);
@@ -270,7 +274,7 @@ test_avl_del(void)
 	 *
 	 */
 
-	assert_ptr_eq(test_avl_list_AVL_DEL(&tl, &t250), &t250);
+	assert_ptr_eq(test_tree_AVL_DEL(&tl, &t250, 0), &t250);
 
 	/* Check tree structure */
 	assert_ptr_eq(TREE_ROOT(&tl), &t300);
@@ -306,7 +310,7 @@ test_avl_del(void)
 	 *        150
 	 */
 
-	assert_ptr_eq(test_avl_list_AVL_DEL(&tl, &t300), &t300);
+	assert_ptr_eq(test_tree_AVL_DEL(&tl, &t300, 0), &t300);
 
 	/* Check tree structure */
 	assert_ptr_eq(TREE_ROOT(&tl), &t100);
@@ -338,7 +342,7 @@ test_avl_del(void)
 	 * 100     350
 	 */
 
-	assert_ptr_eq(test_avl_list_AVL_DEL(&tl, &t050), &t050);
+	assert_ptr_eq(test_tree_AVL_DEL(&tl, &t050, 0), &t050);
 
 	/* Check tree structure */
 	assert_ptr_eq(TREE_ROOT(&tl), &t150);
@@ -354,13 +358,13 @@ test_avl_del(void)
 
 	/* Test same-key based delete returns pointer to the deleted object */
 
-	struct test_avl key_test = { .val = t100.val };
+	struct test_node key_test = { .val = t100.val };
 
-	assert_ptr_eq(test_avl_list_AVL_DEL(&tl, &key_test), &t100);
+	assert_ptr_eq(test_tree_AVL_DEL(&tl, &key_test, 0), &t100);
 
 	/* Delete remaining nodes */
-	assert_ptr_eq(test_avl_list_AVL_DEL(&tl, &t150), &t150);
-	assert_ptr_eq(test_avl_list_AVL_DEL(&tl, &t350), &t350);
+	assert_ptr_eq(test_tree_AVL_DEL(&tl, &t150, 0), &t150);
+	assert_ptr_eq(test_tree_AVL_DEL(&tl, &t350, 0), &t350);
 
 	assert_ptr_null(TREE_ROOT(&tl));
 }
@@ -370,20 +374,20 @@ test_avl_get_n(void)
 {
 	/* Test parameterized matching */
 
-	struct test_avl_list tl = {0};
+	struct test_tree tl = {0};
 
-	struct test_avl
+	struct test_node
 		t0 = { .val =   0, },
 		t1 = { .val =  10, },
 		t2 = { .val = -15, },
 		t3 = { .val =   5, };
 
-	assert_ptr_eq(test_avl_list_AVL_ADD(&tl, &t0), &t0);
-	assert_ptr_eq(test_avl_list_AVL_ADD(&tl, &t1), &t1);
-	assert_ptr_eq(test_avl_list_AVL_ADD(&tl, &t2), &t2);
+	assert_ptr_eq(test_tree_AVL_ADD(&tl, &t0, 0), &t0);
+	assert_ptr_eq(test_tree_AVL_ADD(&tl, &t1, 0), &t1);
+	assert_ptr_eq(test_tree_AVL_ADD(&tl, &t2, 0), &t2);
 
-	assert_ptr_eq(test_avl_list_AVL_NGET(&tl, &t3,  2), &t1);
-	assert_ptr_eq(test_avl_list_AVL_NGET(&tl, &t3, -3), &t2);
+	assert_ptr_eq(test_tree_AVL_NGET(&tl, &t3, 0,  2), &t1);
+	assert_ptr_eq(test_tree_AVL_NGET(&tl, &t3, 0, -3), &t2);
 }
 
 static void
@@ -391,7 +395,7 @@ test_avl_rotations(void)
 {
 	/* Exercise all 4 rotation types */
 
-	struct test_avl_list tl = {0};
+	struct test_tree tl = {0};
 
 	/* Add 100, 200, 300:
 	 *
@@ -408,14 +412,14 @@ test_avl_rotations(void)
 	 *   100     300
 	 */
 
-	struct test_avl
+	struct test_node
 		t0 = { .val = 100 },
 		t1 = { .val = 200 },
 		t2 = { .val = 300 };
 
-	assert_ptr_eq(test_avl_list_AVL_ADD(&tl, &t0), &t0);
-	assert_ptr_eq(test_avl_list_AVL_ADD(&tl, &t1), &t1);
-	assert_ptr_eq(test_avl_list_AVL_ADD(&tl, &t2), &t2);
+	assert_ptr_eq(test_tree_AVL_ADD(&tl, &t0, 0), &t0);
+	assert_ptr_eq(test_tree_AVL_ADD(&tl, &t1, 0), &t1);
+	assert_ptr_eq(test_tree_AVL_ADD(&tl, &t2, 0), &t2);
 
 	assert_ptr_eq(TREE_ROOT(&tl), &t1);
 
@@ -452,12 +456,12 @@ test_avl_rotations(void)
 	 *   225
 	 */
 
-	struct test_avl
+	struct test_node
 		t3 = { .val = 225 },
 		t4 = { .val = 275 };
 
-	assert_ptr_eq(test_avl_list_AVL_ADD(&tl, &t3), &t3);
-	assert_ptr_eq(test_avl_list_AVL_ADD(&tl, &t4), &t4);
+	assert_ptr_eq(test_tree_AVL_ADD(&tl, &t3, 0), &t3);
+	assert_ptr_eq(test_tree_AVL_ADD(&tl, &t4, 0), &t4);
 
 	assert_ptr_eq(TREE_ROOT(&tl), &t1);
 
@@ -500,12 +504,12 @@ test_avl_rotations(void)
 	 *   40    100 225     300
 	 */
 
-	struct test_avl
+	struct test_node
 		t5 = { .val = 50 },
 		t6 = { .val = 40 };
 
-	assert_ptr_eq(test_avl_list_AVL_ADD(&tl, &t5), &t5);
-	assert_ptr_eq(test_avl_list_AVL_ADD(&tl, &t6), &t6);
+	assert_ptr_eq(test_tree_AVL_ADD(&tl, &t5, 0), &t5);
+	assert_ptr_eq(test_tree_AVL_ADD(&tl, &t6, 0), &t6);
 
 	assert_ptr_eq(TREE_ROOT(&tl), &t1);
 
@@ -564,12 +568,12 @@ test_avl_rotations(void)
 	 *
 	 */
 
-	struct test_avl
+	struct test_node
 		t7 = { .val = 45 },
 		t8 = { .val = 42 };
 
-	assert_ptr_eq(test_avl_list_AVL_ADD(&tl, &t7), &t7);
-	assert_ptr_eq(test_avl_list_AVL_ADD(&tl, &t8), &t8);
+	assert_ptr_eq(test_tree_AVL_ADD(&tl, &t7, 0), &t7);
+	assert_ptr_eq(test_tree_AVL_ADD(&tl, &t8, 0), &t8);
 
 	assert_ptr_eq(TREE_ROOT(&tl), &t1);
 
@@ -615,9 +619,9 @@ test_avl_foreach(void)
 {
 	/* Test that each node can be reached and altered safely (e.g. freed) */
 
-	struct test_avl_list tl = {0};
+	struct test_tree tl = {0};
 
-	struct test_avl
+	struct test_node
 		t200 = { .val = 200 },
 		t100 = { .val = 100 },
 		t300 = { .val = 300 },
@@ -626,15 +630,15 @@ test_avl_foreach(void)
 		t250 = { .val = 250 },
 		t350 = { .val = 350 };
 
-	assert_ptr_eq(test_avl_list_AVL_ADD(&tl, &t200), &t200);
-	assert_ptr_eq(test_avl_list_AVL_ADD(&tl, &t100), &t100);
-	assert_ptr_eq(test_avl_list_AVL_ADD(&tl, &t300), &t300);
-	assert_ptr_eq(test_avl_list_AVL_ADD(&tl, &t050), &t050);
-	assert_ptr_eq(test_avl_list_AVL_ADD(&tl, &t150), &t150);
-	assert_ptr_eq(test_avl_list_AVL_ADD(&tl, &t250), &t250);
-	assert_ptr_eq(test_avl_list_AVL_ADD(&tl, &t350), &t350);
+	assert_ptr_eq(test_tree_AVL_ADD(&tl, &t200, 0), &t200);
+	assert_ptr_eq(test_tree_AVL_ADD(&tl, &t100, 0), &t100);
+	assert_ptr_eq(test_tree_AVL_ADD(&tl, &t300, 0), &t300);
+	assert_ptr_eq(test_tree_AVL_ADD(&tl, &t050, 0), &t050);
+	assert_ptr_eq(test_tree_AVL_ADD(&tl, &t150, 0), &t150);
+	assert_ptr_eq(test_tree_AVL_ADD(&tl, &t250, 0), &t250);
+	assert_ptr_eq(test_tree_AVL_ADD(&tl, &t350, 0), &t350);
 
-	test_avl_list_AVL_FOREACH(&tl, foreach_f);
+	test_tree_AVL_FOREACH(&tl, foreach_f);
 
 	assert_eq(t200.val, 0);
 	assert_ptr_null(t200.node.tree_left);

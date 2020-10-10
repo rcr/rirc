@@ -2,8 +2,29 @@
 Summary of notable changes and features
 
 ## Unreleased (dev)
+
+## [0.1.3]
 ### Features
+ - add command :disconnect
+ - add cli option `--ipv4`
+ - add cli option `--ipv6`
+ - add cli option `--tls-disable`
+ - add cli option `--tls-verify`
+ - add TLS support
+    - add mbedtls git submodule
+    - add CA_CERT_PATH define to config.h
+    - changed default connection type to TLS
+    - changed default port to 6697
+ - add IRCv3 CAP support
+    - add command /cap-ls
+    - add command /cap-list
+    - add IRCv3 CAP multi-prefix
+ - changed standard versions
+    - c99          -> c11
+    - POSIX.1-2001 -> POSIX.1-2008
 ### Fixes
+ - fix segfault in CTCP extended format handling
+ - fix default username/realname not being set
 
 ## [0.1.2]
 ### Features

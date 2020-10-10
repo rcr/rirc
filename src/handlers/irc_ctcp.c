@@ -25,7 +25,6 @@
 static int
 parse_ctcp(struct server *s, const char *from, char **args, const char **cmd)
 {
-	char *saveptr;
 	char *message = *args;
 	char *command;
 	char *p;
@@ -41,14 +40,14 @@ parse_ctcp(struct server *s, const char *from, char **args, const char **cmd)
 
 	*message++ = 0;
 
-	if (!(command = strtok_r(message, " ", &saveptr)))
+	if (!(command = strsep(&message)))
 		failf(s, "Received empty CTCP from %s", from);
 
 	for (p = command; *p; p++)
 		*p = toupper(*p);
 
 	*cmd = command;
-	*args = saveptr;
+	*args = strtrim(&message);
 
 	return 0;
 }
@@ -63,10 +62,10 @@ ctcp_request(struct server *s, const char *from, const char *targ, char *message
 	if ((ret = parse_ctcp(s, from, &message, &command)) != 0)
 		return ret;
 
-	if ((ctcp = ctcp_handler_lookup(command, strlen(command))))
-		return ctcp->f_request(s, from, targ, message);
+	if (!(ctcp = ctcp_handler_lookup(command, strlen(command))))
+		failf(s, "Received unsupported CTCP request '%s' from %s", command, from);
 
-	failf(s, "Received unsupported CTCP request '%s' from %s", command, from);
+	return ctcp->f_request(s, from, targ, message);
 }
 
 int
@@ -79,15 +78,24 @@ ctcp_response(struct server *s, const char *from, const char *targ, char *messag
 	if ((ret = parse_ctcp(s, from, &message, &command)) != 0)
 		return ret;
 
-	if ((ctcp = ctcp_handler_lookup(command, strlen(command))))
-		return ctcp->f_response(s, from, targ, message);
+	if (!(ctcp = ctcp_handler_lookup(command, strlen(command))) || !ctcp->f_response)
+		failf(s, "Received unsupported CTCP response '%s' from %s", command, from);
 
-	failf(s, "Received unsupported CTCP response '%s' from %s", command, from);
+	return ctcp->f_response(s, from, targ, message);
 }
 
 static int
 ctcp_request_action(struct server *s, const char *from, const char *targ, char *m)
 {
+	/* Type:     Extended Formatting
+	 * Request:  ACTION <text>
+	 * Response: -- no response --
+	 *
+	 * This extended formatting message shows that <text> should be displayed as
+	 * a third-person action or emote. If <text> is empty, clients SHOULD still
+	 * include a single space after
+	 */
+
 	struct channel *c;
 
 	if (!targ)
@@ -104,7 +112,7 @@ ctcp_request_action(struct server *s, const char *from, const char *targ, char *
 		failf(s, "CTCP ACTION: target '%s' not found", targ);
 	}
 
-	if (str_trim(&m))
+	if (strtrim(&m))
 		newlinef(c, 0, "*", "%s %s", from, m);
 	else
 		newlinef(c, 0, "*", "%s", from);
@@ -115,9 +123,17 @@ ctcp_request_action(struct server *s, const char *from, const char *targ, char *
 static int
 ctcp_request_clientinfo(struct server *s, const char *from, const char *targ, char *m)
 {
+	/* Type:     Extended Query
+	 * Request:  CLIENTINFO
+	 * Response: CLIENTINFO <args>
+	 *
+	 * This extended query returns a list of the CTCP messages that this client
+	 * supports and implements, delimited by a single ASCII space.
+	 */
+
 	UNUSED(targ);
 
-	if (str_trim(&m))
+	if (strtrim(&m))
 		server_info(s, "CTCP CLIENTINFO from %s (%s)", from, m);
 	else
 		server_info(s, "CTCP CLIENTINFO from %s", from);
@@ -130,9 +146,18 @@ ctcp_request_clientinfo(struct server *s, const char *from, const char *targ, ch
 static int
 ctcp_request_finger(struct server *s, const char *from, const char *targ, char *m)
 {
+	/* Type:     Metadata Query
+	 * Request:  FINGER
+	 * Response: FINGER <info>
+	 *
+	 * This metadata query returns miscellaneous info about the user, typically
+	 * the same information that’s held in their realname field. However, some
+	 * implementations return the client name and version instead.
+	 */
+
 	UNUSED(targ);
 
-	if (str_trim(&m))
+	if (strtrim(&m))
 		server_info(s, "CTCP FINGER from %s (%s)", from, m);
 	else
 		server_info(s, "CTCP FINGER from %s", from);
@@ -145,11 +170,26 @@ ctcp_request_finger(struct server *s, const char *from, const char *targ, char *
 static int
 ctcp_request_ping(struct server *s, const char *from, const char *targ, char *m)
 {
+	/* Type:     Extended Query
+	 * Request:  PING <info>
+	 * Response: PING <info>
+	 *
+	 * This extended query confirms reachability and latency to the target
+	 * client. When receiving a CTCP PING, the reply MUST contain exactly
+	 * the same parameters as the original query.
+	 */
+
 	UNUSED(targ);
 
-	server_info(s, "CTCP PING from %s", from);
+	if (strtrim(&m))
+		server_info(s, "CTCP PING from %s (%s)", from, m);
+	else
+		server_info(s, "CTCP PING from %s", from);
 
-	sendf(s, "NOTICE %s :\001PING %s\001", from, m);
+	if (m)
+		sendf(s, "NOTICE %s :\001PING %s\001", from, m);
+	else
+		sendf(s, "NOTICE %s :\001PING\001", from);
 
 	return 0;
 }
@@ -157,9 +197,16 @@ ctcp_request_ping(struct server *s, const char *from, const char *targ, char *m)
 static int
 ctcp_request_source(struct server *s, const char *from, const char *targ, char *m)
 {
+	/* Type:     Metadata Query
+	 * Request:  SOURCE
+	 * Response: SOURCE <info>
+	 *
+	 * This metadata query returns the location of the source code for the client.
+	 */
+
 	UNUSED(targ);
 
-	if (str_trim(&m))
+	if (strtrim(&m))
 		server_info(s, "CTCP SOURCE from %s (%s)", from, m);
 	else
 		server_info(s, "CTCP SOURCE from %s", from);
@@ -172,6 +219,17 @@ ctcp_request_source(struct server *s, const char *from, const char *targ, char *
 static int
 ctcp_request_time(struct server *s, const char *from, const char *targ, char *m)
 {
+	/* Type:     Extended Query
+	 * Request:  TIME
+	 * Response: TIME <timestring>
+	 *
+	 * This extended query returns the client’s local time in an unspecified
+	 * human-readable format. In practice, both the format output by ctime()
+	 * and the format described in Section 3.3 of RFC5322 are common. Earlier
+	 * specifications recommended prefixing the time string with a colon,
+	 * but this is no longer recommended.
+	 */
+
 	/* ISO 8601 */
 	char buf[sizeof("1970-01-01T00:00:00")];
 	struct tm tm;
@@ -179,7 +237,7 @@ ctcp_request_time(struct server *s, const char *from, const char *targ, char *m)
 
 	UNUSED(targ);
 
-	if (str_trim(&m))
+	if (strtrim(&m))
 		server_info(s, "CTCP TIME from %s (%s)", from, m);
 	else
 		server_info(s, "CTCP TIME from %s", from);
@@ -205,9 +263,18 @@ ctcp_request_time(struct server *s, const char *from, const char *targ, char *m)
 static int
 ctcp_request_userinfo(struct server *s, const char *from, const char *targ, char *m)
 {
+	/* Type:     Metadata Query
+	 * Request:  USERINFO
+	 * Response: USERINFO <info>
+	 *
+	 * This metadata query returns miscellaneous info about the user, typically
+	 * the same information that’s held in their realname field. However, some
+	 * implementations return <nickname> (<realname>) instead.
+	 */
+
 	UNUSED(targ);
 
-	if (str_trim(&m))
+	if (strtrim(&m))
 		server_info(s, "CTCP USERINFO from %s (%s)", from, m);
 	else
 		server_info(s, "CTCP USERINFO from %s", from);
@@ -220,9 +287,17 @@ ctcp_request_userinfo(struct server *s, const char *from, const char *targ, char
 static int
 ctcp_request_version(struct server *s, const char *from, const char *targ, char *m)
 {
+	/* Type:     Metadata Query
+	 * Request:  VERSION
+	 * Response: VERSION <verstring>
+	 *
+	 * This metadata query returns the name and version of the client software in
+	 * use. There is no specified format for the version string.
+	 */
+
 	UNUSED(targ);
 
-	if (str_trim(&m))
+	if (strtrim(&m))
 		server_info(s, "CTCP VERSION from %s (%s)", from, m);
 	else
 		server_info(s, "CTCP VERSION from %s", from);
@@ -235,9 +310,17 @@ ctcp_request_version(struct server *s, const char *from, const char *targ, char 
 static int
 ctcp_response_clientinfo(struct server *s, const char *from, const char *targ, char *m)
 {
+	/* Type:     Extended Query
+	 * Request:  CLIENTINFO
+	 * Response: CLIENTINFO <args>
+	 *
+	 * This extended query returns a list of the CTCP messages that this client
+	 * supports and implements, delimited by a single ASCII space.
+	 */
+
 	UNUSED(targ);
 
-	if (!str_trim(&m))
+	if (!strtrim(&m))
 		failf(s, "CTCP CLIENTINFO response from %s: empty message", from);
 
 	server_info(s, "CTCP CLIENTINFO response from %s: %s", from, m);
@@ -248,9 +331,18 @@ ctcp_response_clientinfo(struct server *s, const char *from, const char *targ, c
 static int
 ctcp_response_finger(struct server *s, const char *from, const char *targ, char *m)
 {
+	/* Type:     Metadata Query
+	 * Request:  FINGER
+	 * Response: FINGER <info>
+	 *
+	 * This metadata query returns miscellaneous info about the user, typically
+	 * the same information that’s held in their realname field. However, some
+	 * implementations return the client name and version instead.
+	 */
+
 	UNUSED(targ);
 
-	if (!str_trim(&m))
+	if (!strtrim(&m))
 		failf(s, "CTCP FINGER response from %s: empty message", from);
 
 	server_info(s, "CTCP FINGER response from %s: %s", from, m);
@@ -261,7 +353,15 @@ ctcp_response_finger(struct server *s, const char *from, const char *targ, char 
 static int
 ctcp_response_ping(struct server *s, const char *from, const char *targ, char *m)
 {
-	char *saveptr;
+	/* Type:     Extended Query
+	 * Request:  PING <info>
+	 * Response: PING <info>
+	 *
+	 * This extended query confirms reachability and latency to the target
+	 * client. When receiving a CTCP PING, the reply MUST contain exactly
+	 * the same parameters as the original query.
+	 */
+
 	const char *sec;
 	const char *usec;
 	long long unsigned res;
@@ -274,10 +374,10 @@ ctcp_response_ping(struct server *s, const char *from, const char *targ, char *m
 
 	UNUSED(targ);
 
-	if (!(sec = strtok_r(m, " ", &saveptr)))
+	if (!(sec = strsep(&m)))
 		failf(s, "CTCP PING response from %s: sec is NULL", from);
 
-	if (!(usec = strtok_r(NULL, " ", &saveptr)))
+	if (!(usec = strsep(&m)))
 		failf(s, "CTCP PING response from %s: usec is NULL", from);
 
 	for (const char *p = sec; *p; p++) {
@@ -325,9 +425,16 @@ ctcp_response_ping(struct server *s, const char *from, const char *targ, char *m
 static int
 ctcp_response_source(struct server *s, const char *from, const char *targ, char *m)
 {
+	/* Type:     Metadata Query
+	 * Request:  SOURCE
+	 * Response: SOURCE <info>
+	 *
+	 * This metadata query returns the location of the source code for the client.
+	 */
+
 	UNUSED(targ);
 
-	if (!str_trim(&m))
+	if (!strtrim(&m))
 		failf(s, "CTCP SOURCE response from %s: empty message", from);
 
 	server_info(s, "CTCP SOURCE response from %s: %s", from, m);
@@ -338,9 +445,20 @@ ctcp_response_source(struct server *s, const char *from, const char *targ, char 
 static int
 ctcp_response_time(struct server *s, const char *from, const char *targ, char *m)
 {
+	/* Type:     Extended Query
+	 * Request:  TIME
+	 * Response: TIME <timestring>
+	 *
+	 * This extended query returns the client’s local time in an unspecified
+	 * human-readable format. In practice, both the format output by ctime()
+	 * and the format described in Section 3.3 of RFC5322 are common. Earlier
+	 * specifications recommended prefixing the time string with a colon,
+	 * but this is no longer recommended.
+	 */
+
 	UNUSED(targ);
 
-	if (!str_trim(&m))
+	if (!strtrim(&m))
 		failf(s, "CTCP TIME response from %s: empty message", from);
 
 	server_info(s, "CTCP TIME response from %s: %s", from, m);
@@ -351,9 +469,18 @@ ctcp_response_time(struct server *s, const char *from, const char *targ, char *m
 static int
 ctcp_response_userinfo(struct server *s, const char *from, const char *targ, char *m)
 {
+	/* Type:     Metadata Query
+	 * Request:  USERINFO
+	 * Response: USERINFO <info>
+	 *
+	 * This metadata query returns miscellaneous info about the user, typically
+	 * the same information that’s held in their realname field. However, some
+	 * implementations return <nickname> (<realname>) instead.
+	 */
+
 	UNUSED(targ);
 
-	if (!str_trim(&m))
+	if (!strtrim(&m))
 		failf(s, "CTCP USERINFO response from %s: empty message", from);
 
 	server_info(s, "CTCP USERINFO response from %s: %s", from, m);
@@ -364,9 +491,17 @@ ctcp_response_userinfo(struct server *s, const char *from, const char *targ, cha
 static int
 ctcp_response_version(struct server *s, const char *from, const char *targ, char *m)
 {
+	/* Type:     Metadata Query
+	 * Request:  VERSION
+	 * Response: VERSION <verstring>
+	 *
+	 * This metadata query returns the name and version of the client software in
+	 * use. There is no specified format for the version string.
+	 */
+
 	UNUSED(targ);
 
-	if (!str_trim(&m))
+	if (!strtrim(&m))
 		failf(s, "CTCP VERSION response from %s: empty message", from);
 
 	server_info(s, "CTCP VERSION response from %s: %s", from, m);

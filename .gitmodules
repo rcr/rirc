@@ -1,0 +1,4 @@
+[submodule "mbedtls"]
+	path = lib/mbedtls
+	url = https://github.com/ARMmbed/mbedtls.git
+	ignore = dirty

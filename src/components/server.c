@@ -19,7 +19,7 @@ struct opt
 	char *val;
 };
 
-static int parse_opt(struct opt*, char**);
+static int parse_005(struct opt*, char**);
 static int server_cmp(const struct server*, const char*, const char*);
 
 #define X(cmd) static int server_set_##cmd(struct server*, char*);
@@ -42,6 +42,7 @@ server(const char *host, const char *port, const char *pass, const char *user, c
 	s->channel = channel(host, CHANNEL_T_SERVER);
 	s->casemapping = CASEMAPPING_RFC1459;
 	s->mode_str.type = MODE_STR_USERMODE;
+	ircv3_caps(&(s->ircv3_caps));
 	mode_cfg(&(s->mode_cfg), NULL, MODE_CFG_DEFAULTS);
 	/* FIXME: remove server pointer from channel, remove
 	 * server's channel from clist */
@@ -130,9 +131,11 @@ server_list_del(struct server_list *sl, struct server *s)
 void
 server_reset(struct server *s)
 {
+	ircv3_caps_reset(&(s->ircv3_caps));
 	mode_reset(&(s->usermodes), &(s->mode_str));
 	s->ping = 0;
 	s->quitting = 0;
+	s->registered = 0;
 	s->nicks.next = 0;
 }
 
@@ -163,40 +166,35 @@ server_set_004(struct server *s, char *str)
 {
 	/* <server_name> <version> <user_modes> <chan_modes> */
 
-	struct channel *c = s->channel;
+	const char *server_name; /* Not used */
+	const char *version;     /* Not used */
+	const char *user_modes;  /* Configure server usermodes */
+	const char *chan_modes;  /* Configure server chanmodes */
 
-	char *saveptr;
-	char *server_name, /* Not used */
-	     *version,     /* Not used */
-	     *user_modes,  /* Configure server usermodes */
-	     *chan_modes;  /* Configure server chanmodes */
+	if (!(server_name = strsep(&str)))
+		server_error(s, "invalid numeric 004: server_name is null");
 
-	if (!(server_name = strtok_r(str, " ", &saveptr)))
-		newline(c, 0, "-!!-", "invalid numeric 004: server_name is null");
+	if (!(version = strsep(&str)))
+		server_error(s, "invalid numeric 004: version is null");
 
-	if (!(version = strtok_r(NULL, " ", &saveptr)))
-		newline(c, 0, "-!!-", "invalid numeric 004: version is null");
+	if (!(user_modes = strsep(&str)))
+		server_error(s, "invalid numeric 004: user_modes is null");
 
-	if (!(user_modes = strtok_r(NULL, " ", &saveptr)))
-		newline(c, 0, "-!!-", "invalid numeric 004: user_modes is null");
-
-	if (!(chan_modes = strtok_r(NULL, " ", &saveptr)))
-		newline(c, 0, "-!!-", "invalid numeric 004: chan_modes is null");
+	if (!(chan_modes = strsep(&str)))
+		server_error(s, "invalid numeric 004: chan_modes is null");
 
 	if (user_modes) {
-
-		debug("Setting numeric 004 user_modes: %s", user_modes);
-
-		if (mode_cfg(&(s->mode_cfg), user_modes, MODE_CFG_USERMODES) != MODE_ERR_NONE)
-			newlinef(c, 0, "-!!-", "invalid numeric 004 user_modes: %s", user_modes);
+		if (mode_cfg(&(s->mode_cfg), user_modes, MODE_CFG_USERMODES) == MODE_ERR_NONE)
+			debug("Setting numeric 004 user_modes: %s", user_modes);
+		else
+			server_error(s, "invalid numeric 004 user_modes: %s", user_modes);
 	}
 
 	if (chan_modes) {
-
-		debug("Setting numeric 004 chan_modes: %s", chan_modes);
-
-		if (mode_cfg(&(s->mode_cfg), chan_modes, MODE_CFG_CHANMODES) != MODE_ERR_NONE)
-			newlinef(c, 0, "-!!-", "invalid numeric 004 chan_modes: %s", chan_modes);
+		if (mode_cfg(&(s->mode_cfg), chan_modes, MODE_CFG_CHANMODES) == MODE_ERR_NONE)
+			debug("Setting numeric 004 chan_modes: %s", chan_modes);
+		else
+			server_error(s, "invalid numeric 004 chan_modes: %s", chan_modes);
 	}
 }
 
@@ -207,12 +205,25 @@ server_set_005(struct server *s, char *str)
 
 	struct opt opt;
 
-	while (parse_opt(&opt, &str)) {
+	while (parse_005(&opt, &str)) {
+
+		int (*server_set)(struct server*, char*) = NULL;
+
 		#define X(cmd) \
-		if (!strcmp(opt.arg, #cmd) && server_set_##cmd(s, opt.val)) \
-			newlinef(s->channel, 0, "-!!-", "invalid %s: %s", #cmd, opt.val);
+		if (!strcmp(opt.arg, #cmd)) \
+			server_set = server_set_##cmd;
 		HANDLED_005
 		#undef X
+
+		if (server_set) {
+			if (opt.val == NULL) {
+				server_error(s, "invalid numeric 005 %s: value is NULL", opt.arg);
+			} else if ((*server_set)(s, opt.val)) {
+				server_error(s, "invalid numeric 005 %s: %s", opt.arg, opt.val);
+			} else {
+				debug("Setting numeric 005 %s: %s", opt.arg, opt.val);
+			}
+		}
 	}
 }
 
@@ -272,7 +283,7 @@ server_cmp(const struct server *s, const char *host, const char *port)
 }
 
 static int
-parse_opt(struct opt *opt, char **str)
+parse_005(struct opt *opt, char **str)
 {
 	/* Parse a single argument from numeric 005 (ISUPPORT)
 	 *
@@ -316,7 +327,7 @@ parse_opt(struct opt *opt, char **str)
 	opt->arg = NULL;
 	opt->val = NULL;
 
-	if (!str_trim(&p))
+	if (!strtrim(&p))
 		return 0;
 
 	if (!isalnum(*p))
@@ -344,18 +355,20 @@ parse_opt(struct opt *opt, char **str)
 static int
 server_set_CASEMAPPING(struct server *s, char *val)
 {
-	if (val == NULL)
-		return 0;
-	else if (!strcmp(val, "ascii"))
+	if (!strcmp(val, "ascii")) {
 		s->casemapping = CASEMAPPING_ASCII;
-	else if (!strcmp(val, "rfc1459"))
-		s->casemapping = CASEMAPPING_RFC1459;
-	else if (!strcmp(val, "strict-rfc1459"))
-		s->casemapping = CASEMAPPING_STRICT_RFC1459;
-	else
 		return 0;
+	}
 
-	debug("Setting numeric 005 CASEMAPPING: %s", val);
+	if (!strcmp(val, "rfc1459")) {
+		s->casemapping = CASEMAPPING_RFC1459;
+		return 0;
+	}
+
+	if (!strcmp(val, "strict-rfc1459")) {
+		s->casemapping = CASEMAPPING_STRICT_RFC1459;
+		return 0;
+	}
 
 	return 1;
 }
@@ -363,25 +376,19 @@ server_set_CASEMAPPING(struct server *s, char *val)
 static int
 server_set_CHANMODES(struct server *s, char *val)
 {
-	debug("Setting numeric 005 CHANMODES: %s", val);
-
-	return (mode_cfg(&(s->mode_cfg), val, MODE_CFG_SUBTYPES) != MODE_ERR_NONE);
+	return mode_cfg(&(s->mode_cfg), val, MODE_CFG_SUBTYPES) != MODE_ERR_NONE;
 }
 
 static int
 server_set_MODES(struct server *s, char *val)
 {
-	debug("Setting numeric 005 MODES: %s", val);
-
-	return (mode_cfg(&(s->mode_cfg), val, MODE_CFG_MODES) != MODE_ERR_NONE);
+	return mode_cfg(&(s->mode_cfg), val, MODE_CFG_MODES) != MODE_ERR_NONE;
 }
 
 static int
 server_set_PREFIX(struct server *s, char *val)
 {
-	debug("Setting numeric 005 PREFIX: %s", val);
-
-	return (mode_cfg(&(s->mode_cfg), val, MODE_CFG_PREFIX) != MODE_ERR_NONE);
+	return mode_cfg(&(s->mode_cfg), val, MODE_CFG_PREFIX) != MODE_ERR_NONE;
 }
 
 void

@@ -1,0 +1,18 @@
+image: alpine/edge
+
+packages:
+  - cmake
+  - gperf
+  - perl
+
+sources:
+  - https://git.sr.ht/~rcr/rirc
+
+tasks:
+  - setup: |
+      cd rirc
+      git submodule init
+      git submodule update --recursive
+  - build: |
+      cd rirc
+      make rirc rirc.debug test

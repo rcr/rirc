@@ -12,33 +12,33 @@
  *  - cxed: connected    ~ Socket connected
  *  - ping: timing out   ~ Socket connected, network state in question
  *
- *                            +--------+
- *                 +----(B)-- |  rxng  |
- *                 |          +--------+
- *                 |           |      ^
- *   INIT          |         (A,C)    |
- *    v            |           |     (E)
- *    |            v           v      |
- *    |    +--------+ --(A)-> +--------+
- *    +--> |  dxed  |         |  cxng  | <--+
- *         +--------+ <-(B)-- +--------+    |
- *          ^      ^           |      ^    (F)
- *          |      |          (D)     |     |
- *          |      |           |     (F)    |
- *          |      |           v      |     |
- *          |      |          +--------+    |
- *          |      +----(B)-- |  cxed  |    |
- *          |                 +--------+    |
- *          |                  |      ^     |
- *          |                 (G)     |     |
- *          |                  |     (I)    |
- *          |                  v      |     |
- *          |                 +--------+    |
- *          +-----------(B)-- |  ping  | ---+
- *                            +--------+
- *                             v      ^
- *                             |      |
- *                             +--(H)-+
+ *                             +--------+
+ *                 +----(B1)-- |  rxng  |
+ *                 |           +--------+
+ *                 |            |      ^
+ *   INIT          |         (A2,C)    |
+ *    v            |            |     (E)
+ *    |            v            v      |
+ *    |    +--------+ --(A1)-> +--------+
+ *    +--> |  dxed  |          |  cxng  | <--+
+ *         +--------+ <-(B2)-- +--------+    |
+ *          ^      ^            |      ^   (F2)
+ *          |      |           (D)     |     |
+ *          |      |            |    (F1)    |
+ *          |      |            v      |     |
+ *          |      |           +--------+    |
+ *          |      +----(B3)-- |  cxed  |    |
+ *          |                  +--------+    |
+ *          |                   |      ^     |
+ *          |                  (G)     |     |
+ *          |                   |     (I)    |
+ *          |                   v      |     |
+ *          |                  +--------+    |
+ *          +-----------(B4)-- |  ping  | ---+
+ *                             +--------+
+ *                              v      ^
+ *                              |      |
+ *                              +--(H)-+
  *
  * This module exposes functions for explicitly directing network
  * state as well declaring callback functions for state transitions
@@ -69,25 +69,21 @@
  *   t(n) = t(n - 1) * factor
  *   t(0) = base
  *
- * Calling io_init starts the io context and doesn't return until io_term
+ * Calling io_start starts the io context and doesn't return until after
+ * a call to io_stop
  */
 
-#define IO_MAX_CONNECTIONS 8
+#include <stdarg.h>
+#include <stddef.h>
+#include <stdint.h>
 
 struct connection;
-
-enum io_sig_t
-{
-	IO_SIG_INVALID,
-	IO_SIGWINCH,
-	IO_SIG_SIZE
-};
 
 enum io_cb_t
 {
 	IO_CB_INVALID,
-	IO_CB_CXED,   /* <const char *fmt>, [args, ...] */
-	IO_CB_DXED,   /* <const char *fmt>, [args, ...] */
+	IO_CB_CXED,   /* no args */
+	IO_CB_DXED,   /* no args */
 	IO_CB_ERR,    /* <const char *fmt>, [args, ...] */
 	IO_CB_INFO,   /* <const char *fmt>, [args, ...] */
 	IO_CB_PING_0, /* <unsigned ping> */
@@ -97,13 +93,38 @@ enum io_cb_t
 	IO_CB_SIZE
 };
 
+enum io_log_level
+{
+	IO_LOG_ERROR,
+	IO_LOG_WARN,
+	IO_LOG_INFO,
+	IO_LOG_DEBUG,
+};
+
+enum io_sig_t
+{
+	IO_SIG_INVALID,
+	IO_SIGWINCH,
+	IO_SIG_SIZE
+};
+
+#define IO_IPV_UNSPEC        (1 << 1)
+#define IO_IPV_4             (1 << 2)
+#define IO_IPV_6             (1 << 3)
+#define IO_TLS_ENABLED       (1 << 4)
+#define IO_TLS_DISABLED      (1 << 5)
+#define IO_TLS_VRFY_DISABLED (1 << 6)
+#define IO_TLS_VRFY_OPTIONAL (1 << 7)
+#define IO_TLS_VRFY_REQUIRED (1 << 8)
+
 /* Returns a connection, or NULL if limit is reached */
 struct connection* connection(
-	const void*,  /* callback object */
-	const char*,  /* host */
-	const char*); /* port */
+	const void*, /* callback object */
+	const char*, /* host */
+	const char*, /* port */
+	uint32_t);   /* flags */
 
-void io_free(struct connection*);
+void connection_free(struct connection*);
 
 /* Explicit direction of net state */
 int io_cx(struct connection*);
@@ -112,16 +133,10 @@ int io_dx(struct connection*);
 /* Formatted write to connection */
 int io_sendf(struct connection*, const char*, ...);
 
-/* IO state callback */
-void io_cb(enum io_cb_t, const void*, ...);
-
-/* IO data callback */
-void io_cb_read_inp(char*, size_t);
-void io_cb_read_soc(char*, size_t, const void*);
-
-/* Start/stop IO context */
+/* Init/start/stop IO context */
 void io_init(void);
-void io_term(void);
+void io_start(void);
+void io_stop(void);
 
 /* Get tty dimensions */
 unsigned io_tty_cols(void);
@@ -129,5 +144,15 @@ unsigned io_tty_rows(void);
 
 /* IO error string */
 const char* io_err(int);
+
+/* IO state callback */
+void io_cb(enum io_cb_t, const void*, ...);
+
+/* IO data callback */
+void io_cb_read_inp(char*, size_t);
+void io_cb_read_soc(char*, size_t, const void*);
+
+/* Log message callback */
+void io_cb_log(const void*, enum io_log_level, const char*, ...);
 
 #endif

@@ -1,10 +1,11 @@
 #include "test/test.h"
-#include "src/components/server.c"
-#include "src/components/channel.c"
-#include "src/components/user.c"
-#include "src/components/mode.c"
-#include "src/components/input.c"
 #include "src/components/buffer.c"
+#include "src/components/channel.c"
+#include "src/components/input.c"
+#include "src/components/ircv3.c"
+#include "src/components/mode.c"
+#include "src/components/server.c"
+#include "src/components/user.c"
 #include "src/utils/utils.c"
 
 void
@@ -164,7 +165,7 @@ test_server_set_nicks(void)
 }
 
 static void
-test_parse_opt(void)
+test_parse_005(void)
 {
 	/* Test numeric 005 parsing  */
 
@@ -174,26 +175,26 @@ test_parse_opt(void)
 
 	char opts0[] = "";
 	ptr = opts0;
-	assert_eq(parse_opt(&opt, &ptr), 0);
+	assert_eq(parse_005(&opt, &ptr), 0);
 
 	char opts1[] = "=";
 	ptr = opts1;
-	assert_eq(parse_opt(&opt, &ptr), 0);
+	assert_eq(parse_005(&opt, &ptr), 0);
 
 	char opts2[] = " ";
 	ptr = opts2;
-	assert_eq(parse_opt(&opt, &ptr), 0);
+	assert_eq(parse_005(&opt, &ptr), 0);
 
 	char opts3[] = "=TESTING";
 	ptr = opts3;
-	assert_eq(parse_opt(&opt, &ptr), 0);
+	assert_eq(parse_005(&opt, &ptr), 0);
 
 	char opts4[] = ":test,trailing";
 	ptr = opts4;
-	assert_eq(parse_opt(&opt, &ptr), 0);
+	assert_eq(parse_005(&opt, &ptr), 0);
 
 #define CHECK(R, A, V) \
-	assert_eq(parse_opt(&opt, &ptr), (R)); \
+	assert_eq(parse_005(&opt, &ptr), (R)); \
 	assert_strcmp(opt.arg, (A)); \
 	assert_strcmp(opt.val, (V));
 
@@ -251,7 +252,7 @@ main(void)
 	struct testcase tests[] = {
 		TESTCASE(test_server_list),
 		TESTCASE(test_server_set_nicks),
-		TESTCASE(test_parse_opt)
+		TESTCASE(test_parse_005)
 	};
 
 	return run_tests(tests);

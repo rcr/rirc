@@ -5,9 +5,14 @@
 *.o
 *.t
 *.td
+.clangd
 bld
+compile_commands.json
+config.h
 coverage
 rirc
 rirc.debug
+rirc.debug.address
+rirc.debug.thread
 rirc.out
 tags

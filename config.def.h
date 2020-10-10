@@ -85,6 +85,8 @@
 
 /* [NETWORK] */
 
+#define CA_CERT_PATH "/etc/ssl/certs/"
+
 /* Seconds before displaying ping
  *   Integer, [0, 150, 86400]
  *   (0: no ping handling) */
