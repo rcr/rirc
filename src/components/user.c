@@ -15,13 +15,13 @@ AVL_GENERATE(user_list, user, ul, user_cmp, user_ncmp)
 static inline int
 user_cmp(struct user *u1, struct user *u2, void *arg)
 {
-	return irc_strcmp((enum casemapping_t)arg, u1->nick, u2->nick);
+	return irc_strcmp(*(enum casemapping_t*)arg, u1->nick, u2->nick);
 }
 
 static inline int
 user_ncmp(struct user *u1, struct user *u2, void *arg, size_t n)
 {
-	return irc_strncmp((enum casemapping_t)arg, u1->nick, u2->nick, n);
+	return irc_strncmp(*(enum casemapping_t*)arg, u1->nick, u2->nick, n);
 }
 
 static inline void
@@ -54,7 +54,7 @@ user_list_add(struct user_list *ul, enum casemapping_t cm, const char *nick, str
 	if (user_list_get(ul, cm, nick, 0) != NULL)
 		return USER_ERR_DUPLICATE;
 
-	AVL_ADD(user_list, ul, user(nick, prfxmodes), (void*)cm);
+	AVL_ADD(user_list, ul, user(nick, prfxmodes), &cm);
 	ul->count++;
 
 	return USER_ERR_NONE;
@@ -70,7 +70,7 @@ user_list_del(struct user_list *ul, enum casemapping_t cm, const char *nick)
 	if ((u = user_list_get(ul, cm, nick, 0)) == NULL)
 		return USER_ERR_NOT_FOUND;
 
-	AVL_DEL(user_list, ul, u, (void*)cm);
+	AVL_DEL(user_list, ul, u, &cm);
 	ul->count--;
 
 	user_free(u);
@@ -93,8 +93,8 @@ user_list_rpl(struct user_list *ul, enum casemapping_t cm, const char *nick_old,
 
 	new = user(nick_new, old->prfxmodes);
 
-	AVL_ADD(user_list, ul, new, (void*)cm);
-	AVL_DEL(user_list, ul, old, (void*)cm);
+	AVL_ADD(user_list, ul, new, &cm);
+	AVL_DEL(user_list, ul, old, &cm);
 
 	user_free(old);
 
@@ -107,9 +107,9 @@ user_list_get(struct user_list *ul, enum casemapping_t cm, const char *nick, siz
 	struct user u2 = { .nick = nick };
 
 	if (prefix_len == 0)
-		return AVL_GET(user_list, ul, &u2, (void*)cm);
+		return AVL_GET(user_list, ul, &u2, &cm);
 	else
-		return AVL_NGET(user_list, ul, &u2, (void*)cm, prefix_len);
+		return AVL_NGET(user_list, ul, &u2, &cm, prefix_len);
 }
 
 void

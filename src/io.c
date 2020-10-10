@@ -693,7 +693,7 @@ io_net_connect(struct connection *cx)
 	char buf[MAX(INET6_ADDRSTRLEN, 512)];
 	const void *addr;
 	int ret;
-	int soc;
+	int soc = -1;
 	struct addrinfo *p, *res;
 	struct addrinfo hints = {
 		.ai_family   = AF_UNSPEC,
