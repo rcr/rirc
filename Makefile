@@ -1,4 +1,4 @@
-VERSION := 0.1.2
+VERSION := 0.1.3
 
 # Release and debug build executable names
 BIN_R := rirc
