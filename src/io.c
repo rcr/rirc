@@ -742,7 +742,7 @@ io_net_connect(struct connection *cx)
 			goto err;
 	}
 
-	if (!p && soc == -1) {
+	if (!p && soc < -1) {
 		io_cb_err(cx, " .. Failed to obtain socket: %s", io_strerror(buf, sizeof(buf)));
 		goto err;
 	}
