@@ -6,6 +6,8 @@ Summary of notable changes and features
  - add command :disconnect
  - add cli option `--ipv4`
  - add cli option `--ipv6`
+ - add cli option `--tls-disable`
+ - add cli option `--tls-verify`
  - add SSL support
     - add mbedtls git submodule
     - add CA_CERT_PATH define to config.h

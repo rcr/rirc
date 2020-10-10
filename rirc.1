@@ -5,13 +5,10 @@ rirc \- a minimalistic irc client written in C
 .SH SYNOPSIS
 \fBrirc\fR [ \fB-hv\fR ] [ \fB-s\fR \fIserver\fR [ \fB...\fR ]]
 .SH DESCRIPTION
-.P
+.PP
 rirc is a lightweight Internet Relay Chat client.
-.P
-rirc only supports TLS connections, the default port is 6697
-.P
-Customization of rirc can be accomplished by editing the \fIconfig.h\fP file
-and (re)compiling the source code.
+.PP
+Connections are TLS enabled over port 6697 by default.
 .SH OPTIONS
 .TP 5
 .B "-h, --help"
@@ -49,14 +46,16 @@ Connect to \fIserver\fP using only ipv4 addresses
 .B --ipv6
 Connect to \fIserver\fP using only ipv6 addresses
 .TP
+.B --tls-disable
+Set \fIserver\fP TLS disabled, default port to 6667
+.TP
 .BI --tls-verify= mode
-Set \fIserver\fP TLS peer certificate verify \fImode\fP (default: \fIrequired\fP)
-.TQ
-     \(bu \fIdisabled\fP - peer certificate is not verified
-.TQ
-     \(bu \fIoptional\fP - peer certificate is verified
-.TQ
-     \(bu \fIrequired\fP - peer certificate is verified, handshake is aborted on error
+Set \fIserver\fP TLS peer certificate verification \fImode\fP:
+.EX
+\(bu \fIdisabled\fP - cert is not verified
+\(bu \fIoptional\fP - cert is verified, handshake continues on error
+\(bu \fIrequired\fP - cert is verified, handshake is aborted on error (default)
+.EE
 .SH USAGE
 .TS
 l .
@@ -96,7 +95,7 @@ Commands:
   :clear;
   :close;
   :connect;[host [port] [pass] [user] [real]]
-  :disconnect
+  :disconnect;
   :quit;
 .TE
 

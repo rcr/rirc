@@ -108,18 +108,21 @@ enum io_sig_t
 	IO_SIG_SIZE
 };
 
-#define IO_IPV_4             (1 << 1)
-#define IO_IPV_6             (1 << 2)
-#define IO_TLS_VRFY_DISABLED (1 << 3)
-#define IO_TLS_VRFY_OPTIONAL (1 << 4)
-#define IO_TLS_VRFY_REQUIRED (1 << 5)
+#define IO_IPV_UNSPEC        (1 << 1)
+#define IO_IPV_4             (1 << 2)
+#define IO_IPV_6             (1 << 3)
+#define IO_TLS_ENABLED       (1 << 4)
+#define IO_TLS_DISABLED      (1 << 5)
+#define IO_TLS_VRFY_DISABLED (1 << 6)
+#define IO_TLS_VRFY_OPTIONAL (1 << 7)
+#define IO_TLS_VRFY_REQUIRED (1 << 8)
 
 /* Returns a connection, or NULL if limit is reached */
 struct connection* connection(
 	const void*, /* callback object */
 	const char*, /* host */
 	const char*, /* port */
-	uint8_t);    /* flags */
+	uint32_t);   /* flags */
 
 void connection_free(struct connection*);
 

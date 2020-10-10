@@ -17,7 +17,7 @@
 	do { fprintf(stderr, "%s ", runtime_name); \
 	     fprintf(stderr, __VA_ARGS__); \
 	     fprintf(stderr, "\n%s --help for usage\n", runtime_name); \
-	     return 1; \
+	     return -1; \
 	} while (0)
 
 static const char* opt_arg_str(char);
@@ -76,7 +76,8 @@ static const char *const rirc_help =
 "\nServer connection options:"
 "\n   --ipv4                   Connect to server using only ipv4 addresses"
 "\n   --ipv6                   Connect to server using only ipv6 addresses"
-"\n   --tls-verify=<mode>      Set server TLS peer certificate verify mode"
+"\n   --tls-disable            Set server TLS disabled"
+"\n   --tls-verify=<mode>      Set server TLS peer certificate verification mode"
 "\n";
 
 static const char *const rirc_version =
@@ -99,6 +100,7 @@ opt_arg_str(char c)
 		case 'r': return "-r/--realname";
 		case '4': return "--ipv4";
 		case '6': return "--ipv6";
+		case 'x': return "--tls-disable";
 		case 'y': return "--tls-verify";
 		default:
 			fatal("unknown option flag '%c'", c);
@@ -127,26 +129,22 @@ parse_args(int argc, char **argv)
 
 	size_t n_servers = 0;
 
-	if (argc > 0)
-		runtime_name = argv[0];
-
-	srand(time(NULL));
-
 	opterr = 0;
 
 	struct option long_opts[] = {
-		{"server",     required_argument, 0, 's'},
-		{"port",       required_argument, 0, 'p'},
-		{"pass",       required_argument, 0, 'w'},
-		{"nicks",      required_argument, 0, 'n'},
-		{"chans",      required_argument, 0, 'c'},
-		{"username",   required_argument, 0, 'u'},
-		{"realname",   required_argument, 0, 'r'},
-		{"help",       no_argument,       0, 'h'},
-		{"version",    no_argument,       0, 'v'},
-		{"ipv4",       no_argument,       0, '4'},
-		{"ipv6",       no_argument,       0, '6'},
-		{"tls-verify", required_argument, 0, 'y'},
+		{"server",      required_argument, 0, 's'},
+		{"port",        required_argument, 0, 'p'},
+		{"pass",        required_argument, 0, 'w'},
+		{"nicks",       required_argument, 0, 'n'},
+		{"chans",       required_argument, 0, 'c'},
+		{"username",    required_argument, 0, 'u'},
+		{"realname",    required_argument, 0, 'r'},
+		{"help",        no_argument,       0, 'h'},
+		{"version",     no_argument,       0, 'v'},
+		{"ipv4",        no_argument,       0, '4'},
+		{"ipv6",        no_argument,       0, '6'},
+		{"tls-disable", no_argument,       0, 'x'},
+		{"tls-verify",  required_argument, 0, 'y'},
 		{0, 0, 0, 0}
 	};
 
@@ -159,11 +157,11 @@ parse_args(int argc, char **argv)
 		const char *username;
 		const char *realname;
 		int ipv;
+		int tls;
 		int tls_vrfy;
 		struct server *s;
 	} cli_servers[MAX_CLI_SERVERS];
 
-	/* FIXME: getopt_long is a GNU extension */
 	while (0 < (opt_c = getopt_long(argc, argv, ":s:p:w:n:c:r:u:hv", long_opts, &opt_i))) {
 
 		switch (opt_c) {
@@ -176,14 +174,15 @@ parse_args(int argc, char **argv)
 				if (++n_servers == MAX_CLI_SERVERS)
 					arg_error("exceeded maximum number of servers (%d)", MAX_CLI_SERVERS);
 
-				cli_servers[n_servers - 1].host = optarg;
-				cli_servers[n_servers - 1].port = "6697";
-				cli_servers[n_servers - 1].pass = NULL;
-				cli_servers[n_servers - 1].nicks = NULL;
-				cli_servers[n_servers - 1].chans = NULL;
+				cli_servers[n_servers - 1].host     = optarg;
+				cli_servers[n_servers - 1].port     = NULL;
+				cli_servers[n_servers - 1].pass     = NULL;
+				cli_servers[n_servers - 1].nicks    = NULL;
+				cli_servers[n_servers - 1].chans    = NULL;
 				cli_servers[n_servers - 1].username = NULL;
 				cli_servers[n_servers - 1].realname = NULL;
-				cli_servers[n_servers - 1].ipv = 0;
+				cli_servers[n_servers - 1].ipv      = IO_IPV_UNSPEC;
+				cli_servers[n_servers - 1].tls      = IO_TLS_ENABLED;
 				cli_servers[n_servers - 1].tls_vrfy = IO_TLS_VRFY_REQUIRED;
 				break;
 
@@ -233,7 +232,12 @@ parse_args(int argc, char **argv)
 				cli_servers[n_servers -1].ipv = IO_IPV_6;
 				break;
 
-			case 'y': /* Set TLS peer certificate verification mode */
+			case 'x': /* Set server TLS disabled */
+				CHECK_SERVER_OPTARG(opt_c, 0);
+				cli_servers[n_servers -1].tls = IO_TLS_DISABLED;
+				break;
+
+			case 'y': /* Set server TLS peer certificate verification mode */
 				CHECK_SERVER_OPTARG(opt_c, 1);
 				if (!strcmp(optarg, "0") || !strcmp(optarg, "disabled")) {
 					cli_servers[n_servers -1].tls_vrfy = IO_TLS_VRFY_DISABLED;
@@ -287,9 +291,13 @@ parse_args(int argc, char **argv)
 
 	for (size_t i = 0; i < n_servers; i++) {
 
-		uint8_t flags =
+		uint32_t flags =
 			cli_servers[i].ipv |
+			cli_servers[i].tls |
 			cli_servers[i].tls_vrfy;
+
+		if (cli_servers[i].port == NULL)
+			cli_servers[i].port = (cli_servers[i].tls == IO_TLS_ENABLED) ? "6697" : "6667";
 
 		struct server *s = server(
 			cli_servers[i].host,
@@ -328,6 +336,11 @@ int
 main(int argc, char **argv)
 {
 	int ret;
+
+	if (argc > 0)
+		runtime_name = argv[0];
+
+	srand(time(NULL));
 
 	if ((ret = parse_args(argc, argv)) == 0) {
 		io_start();

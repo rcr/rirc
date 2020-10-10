@@ -28,7 +28,7 @@
 
 A minimalistic irc client written in C.
 
-rirc supports only TLS connections, the default port is 6697
+Connections are TLS enabled over port 6697 by default.
 
 ### Configuring:
 
@@ -84,7 +84,8 @@ Server options:
 Server connection options:
    --ipv4                   Connect to server using only ipv4 addresses
    --ipv6                   Connect to server using only ipv6 addresses
-   --tls-verify=<mode>      Set server TLS peer certificate verify mode
+   --tls-disable            Set server TLS disabled
+   --tls-verify=<mode>      Set server TLS peer certificate verification mode
 ```
 
 Commands:
