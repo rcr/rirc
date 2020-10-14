@@ -2,7 +2,6 @@
 #include <string.h>
 
 #define RECV_HANDLERS \
-	X(cap) \
 	X(error) \
 	X(invite) \
 	X(join) \
@@ -15,7 +14,9 @@
 	X(pong) \
 	X(privmsg) \
 	X(quit) \
-	X(topic)
+	X(topic) \
+	X(ircv3_cap) \
+	X(ircv3_account)
 
 #define X(cmd) static int recv_##cmd(struct server*, struct irc_message*);
 RECV_HANDLERS
@@ -41,7 +42,6 @@ struct recv_handler
 %define initializer-suffix ,(irc_recv_f)0
 struct recv_handler;
 %%
-CAP,     recv_cap
 ERROR,   recv_error
 INVITE,  recv_invite
 JOIN,    recv_join
@@ -55,4 +55,6 @@ PONG,    recv_pong
 PRIVMSG, recv_privmsg
 QUIT,    recv_quit
 TOPIC,   recv_topic
+CAP,     recv_ircv3_cap
+ACCOUNT, recv_ircv3_account
 %%

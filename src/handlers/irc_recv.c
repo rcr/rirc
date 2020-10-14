@@ -24,6 +24,10 @@
 #define QUIT_THRESHOLD 0
 #endif
 
+#ifndef ACCOUNT_THRESHOLD
+#define ACCOUNT_THRESHOLD 0
+#endif
+
 #define failf(S, ...) \
 	do { server_error((S), __VA_ARGS__); \
 	     return 1; \
@@ -63,6 +67,7 @@ static int recv_mode_usermodes(struct irc_message*, const struct mode_cfg*, stru
 static const unsigned quit_threshold = QUIT_THRESHOLD;
 static const unsigned join_threshold = JOIN_THRESHOLD;
 static const unsigned part_threshold = PART_THRESHOLD;
+static const unsigned account_threshold = ACCOUNT_THRESHOLD;
 
 static const irc_recv_f irc_numerics[] = {
 	  [1] = irc_001,    /* RPL_WELCOME */
@@ -601,12 +606,6 @@ irc_recv_numeric(struct server *s, struct irc_message *m)
 		failf(s, "Numeric type '%u' unknown: %s", code, m->params);
 	else
 		failf(s, "Numeric type '%u' unknown", code);
-}
-
-static int
-recv_cap(struct server *s, struct irc_message *m)
-{
-	return ircv3_recv_CAP(s, m);
 }
 
 static int
@@ -1255,6 +1254,43 @@ recv_quit(struct server *s, struct irc_message *m)
 	} while ((c = c->next) != s->channel);
 
 	draw(DRAW_STATUS);
+
+	return 0;
+}
+
+static int
+recv_ircv3_cap(struct server *s, struct irc_message *m)
+{
+	return ircv3_recv_CAP(s, m);
+}
+
+static int
+recv_ircv3_account(struct server *s, struct irc_message *m)
+{
+	/* :nick!user@host ACCOUNT <account> */
+
+	char *account;
+	struct channel *c = s->channel;
+
+	if (!m->from)
+		failf(s, "ACCOUNT: sender's nick is null");
+
+	if (!irc_message_param(m, &account))
+		failf(s, "ACCOUNT: account is null");
+
+	do {
+		if (!user_list_get(&(c->users), s->casemapping, m->from, 0))
+			continue;
+
+		if (account_threshold && account_threshold < c->users.count)
+			continue;
+
+		if (!strcmp(account, "*"))
+			newlinef(c, 0, FROM_INFO, "%s has logged out", m->from);
+		else
+			newlinef(c, 0, FROM_INFO, "%s has logged in as %s", m->from, account);
+
+	} while ((c = c->next) != s->channel);
 
 	return 0;
 }

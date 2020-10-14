@@ -16,12 +16,13 @@
 #define DEFAULT_USERNAME ""
 #define DEFAULT_REALNAME ""
 
-/* User count in channel before filtering JOIN/PART/QUIT messages
+/* User count in channel before filtering message types
  *   Integer
  *   (0: no filtering) */
 #define JOIN_THRESHOLD 0
 #define PART_THRESHOLD 0
 #define QUIT_THRESHOLD 0
+#define ACCOUNT_THRESHOLD 0
 
 /* Message sent for PART and QUIT by default */
 #define DEFAULT_QUIT_MESG "rirc v" VERSION
