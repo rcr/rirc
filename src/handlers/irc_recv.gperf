@@ -16,7 +16,8 @@
 	X(quit) \
 	X(topic) \
 	X(ircv3_cap) \
-	X(ircv3_account)
+	X(ircv3_account) \
+	X(ircv3_away)
 
 #define X(cmd) static int recv_##cmd(struct server*, struct irc_message*);
 RECV_HANDLERS
@@ -57,4 +58,5 @@ QUIT,    recv_quit
 TOPIC,   recv_topic
 CAP,     recv_ircv3_cap
 ACCOUNT, recv_ircv3_account
+AWAY,    recv_ircv3_away
 %%

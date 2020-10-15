@@ -28,6 +28,10 @@
 #define ACCOUNT_THRESHOLD 0
 #endif
 
+#ifndef AWAY_THRESHOLD
+#define AWAY_THRESHOLD 0
+#endif
+
 #define failf(S, ...) \
 	do { server_error((S), __VA_ARGS__); \
 	     return 1; \
@@ -68,6 +72,7 @@ static const unsigned quit_threshold = QUIT_THRESHOLD;
 static const unsigned join_threshold = JOIN_THRESHOLD;
 static const unsigned part_threshold = PART_THRESHOLD;
 static const unsigned account_threshold = ACCOUNT_THRESHOLD;
+static const unsigned away_threshold = AWAY_THRESHOLD;
 
 static const irc_recv_f irc_numerics[] = {
 	  [1] = irc_001,    /* RPL_WELCOME */
@@ -1289,6 +1294,34 @@ recv_ircv3_account(struct server *s, struct irc_message *m)
 			newlinef(c, 0, FROM_INFO, "%s has logged out", m->from);
 		else
 			newlinef(c, 0, FROM_INFO, "%s has logged in as %s", m->from, account);
+
+	} while ((c = c->next) != s->channel);
+
+	return 0;
+}
+
+static int
+recv_ircv3_away(struct server *s, struct irc_message *m)
+{
+	/* :nick!user@host AWAY [:message] */
+
+	char *message;
+	struct channel *c = s->channel;
+
+	if (!m->from)
+		failf(s, "AWAY: sender's nick is null");
+
+	do {
+		if (!user_list_get(&(c->users), s->casemapping, m->from, 0))
+			continue;
+
+		if (away_threshold && away_threshold < c->users.count)
+			continue;
+
+		if (irc_message_param(m, &message))
+			newlinef(c, 0, FROM_INFO, "%s is now away: %s", m->from, message);
+		else
+			newlinef(c, 0, FROM_INFO, "%s is no longer away", m->from);
 
 	} while ((c = c->next) != s->channel);
 

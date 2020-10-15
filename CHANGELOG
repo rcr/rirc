@@ -4,6 +4,7 @@ Summary of notable changes and features
 ## Unreleased (dev)
 ### Features
  - add IRCv3 CAP account-notify
+ - add IRCv3 CAP away-notify
 
 ## [0.1.3]
 ### Features
