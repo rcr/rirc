@@ -635,20 +635,27 @@ recv_invite(struct server *s, struct irc_message *m)
 
 	char *chan;
 	char *nick;
+	struct channel *c;
 
 	if (!m->from)
 		failf(s, "INVITE: sender's nick is null");
 
-	if (!irc_message_param(m, &chan))
-		failf(s, "INVITE: target channel is null");
-
 	if (!irc_message_param(m, &nick))
 		failf(s, "INVITE: target nick is null");
 
-	if (!strcmp(nick, s->nick))
-		newlinef(s->channel, 0, FROM_INFO, "You invited %s to %s", nick, chan);
-	else
-		newlinef(s->channel, 0, FROM_INFO, "You've been invited to %s by %s", chan, m->from);
+	if (!irc_message_param(m, &chan))
+		failf(s, "INVITE: target channel is null");
+
+	if (!strcmp(nick, s->nick)) {
+		newlinef(s->channel, 0, FROM_INFO, "%s invited you to %s", m->from, chan);
+		return 0;
+	}
+
+	/* IRCv3 CAP invite-notify, sent to all users on the target channel */
+	if ((c = channel_list_get(&s->clist, chan, s->casemapping)) == NULL)
+		failf(s, "INVITE: channel '%s' not found", chan);
+
+	newlinef(c, 0, FROM_INFO, "%s invited %s to %s", m->from, nick, chan);
 
 	return 0;
 }
@@ -1136,7 +1143,7 @@ recv_ping(struct server *s, struct irc_message *m)
 static int
 recv_pong(struct server *s, struct irc_message *m)
 {
-	/*  PONG <server> [<server2>] */
+	/* PONG <server> [<server2>] */
 
 	UNUSED(s);
 	UNUSED(m);

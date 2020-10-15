@@ -4,7 +4,12 @@ Summary of notable changes and features
 ## Unreleased (dev)
 ### Features
  - add IRCv3 CAP account-notify
+    - add ACCOUNT_THRESHOLD define to config.h
  - add IRCv3 CAP away-notify
+    - add AWAY_THRESHOLD define to config.h
+ - add IRCv3 CAP invite-notify
+### Fixes
+ - fix incorrect INVITE message handling
 
 ## [0.1.3]
 ### Features
