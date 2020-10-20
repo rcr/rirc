@@ -8,6 +8,7 @@ Summary of notable changes and features
  - add IRCv3 CAP away-notify
     - add AWAY_THRESHOLD define to config.h
  - add IRCv3 CAP invite-notify
+ - add IRCv3 CAP extended-join
 ### Fixes
  - fix incorrect INVITE message handling
 

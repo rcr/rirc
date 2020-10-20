@@ -663,7 +663,10 @@ recv_invite(struct server *s, struct irc_message *m)
 static int
 recv_join(struct server *s, struct irc_message *m)
 {
-	/* :nick!user@host JOIN <channel> */
+	/* :nick!user@host JOIN <channel>
+	 *
+	 * IRCv3 CAP extended-join
+	 * :nick!user@host JOIN <channel> <account> :<realname> */
 
 	char *chan;
 	struct channel *c;
@@ -695,8 +698,25 @@ recv_join(struct server *s, struct irc_message *m)
 	if (user_list_add(&(c->users), s->casemapping, m->from, MODE_EMPTY) == USER_ERR_DUPLICATE)
 		failf(s, "JOIN: user '%s' alread on channel '%s'", m->from, chan);
 
-	if (!join_threshold || c->users.count <= join_threshold)
-		newlinef(c, BUFFER_LINE_JOIN, FROM_JOIN, "%s!%s has joined", m->from, m->host);
+	if (!join_threshold || c->users.count <= join_threshold) {
+
+		if (s->ircv3_caps.extended_join.set) {
+
+			char *account;
+			char *realname;
+
+			if (!irc_message_param(m, &account))
+				failf(s, "JOIN: account is null");
+
+			if (!irc_message_param(m, &realname))
+				failf(s, "JOIN: realname is null");
+
+			newlinef(c, BUFFER_LINE_JOIN, FROM_JOIN, "%s!%s has joined [%s - %s]",
+				m->from, m->host, account, realname);
+		} else {
+			newlinef(c, BUFFER_LINE_JOIN, FROM_JOIN, "%s!%s has joined", m->from, m->host);
+		}
+	}
 
 	draw(DRAW_STATUS);
 
