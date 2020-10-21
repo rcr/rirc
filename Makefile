@@ -28,6 +28,8 @@ DIR_B := bld
 DIR_S := src
 DIR_T := test
 
+PWD := $(shell pwd)
+
 SRC     := $(shell find $(DIR_S) -name '*.c')
 SUBDIRS += $(shell find $(DIR_S) -name '*.c' -exec dirname {} \; | sort -u)
 
