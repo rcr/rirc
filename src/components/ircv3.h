@@ -10,6 +10,7 @@
 #define IRCV3_CAPS_DEF \
 	X("account-notify", account_notify, IRCV3_CAP_AUTO) \
 	X("away-notify",    away_notify,    IRCV3_CAP_AUTO) \
+	X("chghost",        chghost,        IRCV3_CAP_AUTO) \
 	X("extended-join",  extended_join,  IRCV3_CAP_AUTO) \
 	X("invite-notify",  invite_notify,  IRCV3_CAP_AUTO) \
 	X("multi-prefix",   multi_prefix,   IRCV3_CAP_AUTO)

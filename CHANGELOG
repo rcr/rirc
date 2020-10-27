@@ -4,9 +4,11 @@ Summary of notable changes and features
 ## Unreleased (dev)
 ### Features
  - add IRCv3 CAP account-notify
-    - add ACCOUNT_THRESHOLD define to config.h
+    - add ACCOUNT_THRESHOLD define to config.def.h
  - add IRCv3 CAP away-notify
-    - add AWAY_THRESHOLD define to config.h
+    - add AWAY_THRESHOLD define to config.def.h
+ - add IRCv3 CAP chghost
+    - add CHGHOST_THRESHOLD define to config.def.h
  - add IRCv3 CAP invite-notify
  - add IRCv3 CAP extended-join
 ### Fixes

@@ -24,6 +24,7 @@
 #define QUIT_THRESHOLD 0
 #define ACCOUNT_THRESHOLD 0
 #define AWAY_THRESHOLD 0
+#define CHGHOST_THRESHOLD 0
 
 /* Message sent for PART and QUIT by default */
 #define DEFAULT_QUIT_MESG "rirc v" VERSION

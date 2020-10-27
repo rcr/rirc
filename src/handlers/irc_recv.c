@@ -32,6 +32,10 @@
 #define AWAY_THRESHOLD 0
 #endif
 
+#ifndef CHGHOST_THRESHOLD
+#define CHGHOST_THRESHOLD 0
+#endif
+
 #define failf(S, ...) \
 	do { server_error((S), __VA_ARGS__); \
 	     return 1; \
@@ -73,6 +77,7 @@ static const unsigned join_threshold = JOIN_THRESHOLD;
 static const unsigned part_threshold = PART_THRESHOLD;
 static const unsigned account_threshold = ACCOUNT_THRESHOLD;
 static const unsigned away_threshold = AWAY_THRESHOLD;
+static const unsigned chghost_threshold = CHGHOST_THRESHOLD;
 
 static const irc_recv_f irc_numerics[] = {
 	  [1] = irc_001,    /* RPL_WELCOME */
@@ -1349,6 +1354,38 @@ recv_ircv3_away(struct server *s, struct irc_message *m)
 			newlinef(c, 0, FROM_INFO, "%s is now away: %s", m->from, message);
 		else
 			newlinef(c, 0, FROM_INFO, "%s is no longer away", m->from);
+
+	} while ((c = c->next) != s->channel);
+
+	return 0;
+}
+
+static int
+recv_ircv3_chghost(struct server *s, struct irc_message *m)
+{
+	/* :nick!user@host CHGHOST new_user new_host */
+
+	char *user;
+	char *host;
+	struct channel *c = s->channel;
+
+	if (!m->from)
+		failf(s, "CHGHOST: sender's nick is null");
+
+	if (!irc_message_param(m, &user))
+		failf(s, "CHGHOST: user is null");
+
+	if (!irc_message_param(m, &host))
+		failf(s, "CHGHOST: host is null");
+
+	do {
+		if (!user_list_get(&(c->users), s->casemapping, m->from, 0))
+			continue;
+
+		if (chghost_threshold && chghost_threshold < c->users.count)
+			continue;
+
+		newlinef(c, 0, FROM_INFO, "%s has changed user/host: %s/%s", user, host);
 
 	} while ((c = c->next) != s->channel);
 
