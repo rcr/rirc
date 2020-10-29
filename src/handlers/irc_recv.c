@@ -646,10 +646,10 @@ recv_invite(struct server *s, struct irc_message *m)
 		failf(s, "INVITE: sender's nick is null");
 
 	if (!irc_message_param(m, &nick))
-		failf(s, "INVITE: target nick is null");
+		failf(s, "INVITE: nick is null");
 
 	if (!irc_message_param(m, &chan))
-		failf(s, "INVITE: target channel is null");
+		failf(s, "INVITE: channel is null");
 
 	if (!strcmp(nick, s->nick)) {
 		newlinef(s->channel, 0, FROM_INFO, "%s invited you to %s", m->from, chan);
@@ -669,8 +669,6 @@ static int
 recv_join(struct server *s, struct irc_message *m)
 {
 	/* :nick!user@host JOIN <channel>
-	 *
-	 * IRCv3 CAP extended-join
 	 * :nick!user@host JOIN <channel> <account> :<realname> */
 
 	char *chan;
@@ -680,7 +678,7 @@ recv_join(struct server *s, struct irc_message *m)
 		failf(s, "JOIN: sender's nick is null");
 
 	if (!irc_message_param(m, &chan))
-		failf(s, "JOIN: target channel is null");
+		failf(s, "JOIN: channel is null");
 
 	if (!strcmp(m->from, s->nick)) {
 		if ((c = channel_list_get(&s->clist, chan, s->casemapping)) == NULL) {
@@ -701,9 +699,9 @@ recv_join(struct server *s, struct irc_message *m)
 		failf(s, "JOIN: channel '%s' not found", chan);
 
 	if (user_list_add(&(c->users), s->casemapping, m->from, MODE_EMPTY) == USER_ERR_DUPLICATE)
-		failf(s, "JOIN: user '%s' alread on channel '%s'", m->from, chan);
+		failf(s, "JOIN: user '%s' already on channel '%s'", m->from, chan);
 
-	if (join_threshold && join_threshold <= c->users.count) {
+	if (!join_threshold || join_threshold > c->users.count) {
 
 		if (s->ircv3_caps.extended_join.set) {
 
@@ -1034,7 +1032,7 @@ recv_nick(struct server *s, struct irc_message *m)
 			newlinef(c, BUFFER_LINE_NICK, FROM_NICK, "%s  >>  %s", m->from, nick);
 
 		else if (ret == USER_ERR_DUPLICATE)
-			server_error(s, "NICK: user '%s' alread on channel '%s'", m->from, c->name);
+			server_error(s, "NICK: user '%s' already on channel '%s'", nick, c->name);
 
 	} while ((c = c->next) != s->channel);
 
@@ -1115,7 +1113,7 @@ recv_part(struct server *s, struct irc_message *m)
 		failf(s, "PART: sender's nick is null");
 
 	if (!irc_message_param(m, &chan))
-		failf(s, "PART: target channel is null");
+		failf(s, "PART: channel is null");
 
 	if (!strcmp(m->from, s->nick)) {
 
@@ -1137,7 +1135,7 @@ recv_part(struct server *s, struct irc_message *m)
 		if (user_list_del(&(c->users), s->casemapping, m->from) == USER_ERR_NOT_FOUND)
 			failf(s, "PART: nick '%s' not found in '%s'", m->from, chan);
 
-		if (part_threshold && part_threshold <= c->users.count) {
+		if (!part_threshold || part_threshold > c->users.count) {
 			if (irc_message_param(m, &message))
 				newlinef(c, 0, FROM_PART, "%s!%s has parted (%s)", m->from, m->host, message);
 			else
@@ -1248,16 +1246,16 @@ recv_topic(struct server *s, struct irc_message *m)
 		failf(s, "TOPIC: sender's nick is null");
 
 	if (!irc_message_param(m, &chan))
-		failf(s, "TOPIC: target channel is null");
+		failf(s, "TOPIC: channel is null");
 
 	if (!irc_message_param(m, &topic))
 		failf(s, "TOPIC: topic is null");
 
 	if ((c = channel_list_get(&s->clist, chan, s->casemapping)) == NULL)
-		failf(s, "TOPIC: target channel '%s' not found", chan);
+		failf(s, "TOPIC: channel '%s' not found", chan);
 
 	if (*topic) {
-		newlinef(c, 0, FROM_INFO, "%s has changed the topic:", m->from);
+		newlinef(c, 0, FROM_INFO, "%s has set the topic:", m->from);
 		newlinef(c, 0, FROM_INFO, "\"%s\"", topic);
 	} else {
 		newlinef(c, 0, FROM_INFO, "%s has unset the topic", m->from);
@@ -1281,12 +1279,16 @@ recv_quit(struct server *s, struct irc_message *m)
 
 	do {
 		if (user_list_del(&(c->users), s->casemapping, m->from) == USER_ERR_NONE) {
-			if (quit_threshold && quit_threshold <= c->users.count) {
-				if (message)
-					newlinef(c, BUFFER_LINE_QUIT, FROM_QUIT, "%s!%s has quit (%s)", m->from, m->host, message);
-				else
-					newlinef(c, BUFFER_LINE_QUIT, FROM_QUIT, "%s!%s has quit", m->from, m->host);
-			}
+
+			if (quit_threshold && quit_threshold <= c->users.count)
+				continue;
+
+			if (message)
+				newlinef(c, BUFFER_LINE_QUIT, FROM_QUIT, "%s!%s has quit (%s)",
+					m->from, m->host, message);
+			else
+				newlinef(c, BUFFER_LINE_QUIT, FROM_QUIT, "%s!%s has quit",
+					m->from, m->host);
 		}
 	} while ((c = c->next) != s->channel);
 
