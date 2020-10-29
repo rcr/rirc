@@ -190,7 +190,7 @@ test_recv_ctcp_request_action(void)
 		assert_eq(ctcp_request(s, (F), (T), (M)), (R)); \
 		assert_eq(mock_line_n, 1); \
 		assert_eq(mock_send_n, 0); \
-		assert_strcmp(mock_chan, (C)); \
+		assert_strcmp(mock_chan[0], (C)); \
 		assert_strcmp(mock_line[0], (L)); \
 	} while (0)
 
