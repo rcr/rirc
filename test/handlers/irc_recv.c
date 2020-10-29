@@ -39,7 +39,7 @@ static struct channel *c3;
 static struct server *s;
 
 static void
-test_353(void)
+test_irc_353(void)
 {
 	/* 353 <nick> <type> <channel> 1*(<modes><nick>) */
 
@@ -458,44 +458,6 @@ test_recv_privmsg(void)
 }
 
 static void
-test_recv_topic(void)
-{
-	/* :nick!user@host TOPIC <channel> [topic] */
-
-	channel_reset(c1);
-	server_reset(s);
-
-	CHECK_RECV("TOPIC #c1 message", 1, 1, 0);
-	assert_strcmp(mock_chan[0], "host");
-	assert_strcmp(mock_line[0], "TOPIC: sender's nick is null");
-
-	CHECK_RECV(":nick1!user@host TOPIC", 1, 1, 0);
-	assert_strcmp(mock_line[0], "TOPIC: channel is null");
-
-	CHECK_RECV(":nick1!user@host TOPIC #c1", 1, 1, 0);
-	assert_strcmp(mock_line[0], "TOPIC: topic is null");
-
-	CHECK_RECV(":nick1!user@host TOPIC #notfound message", 1, 1, 0);
-	assert_strcmp(mock_line[0], "TOPIC: channel '#notfound' not found");
-
-	CHECK_RECV(":nick1!user@host TOPIC #c1 message", 0, 2, 0);
-	assert_strcmp(mock_chan[0], "#c1");
-	assert_strcmp(mock_chan[1], "#c1");
-	assert_strcmp(mock_line[0], "nick1 has set the topic:");
-	assert_strcmp(mock_line[1], "\"message\"");
-
-	CHECK_RECV(":nick1!user@host TOPIC #c1 :topic message", 0, 2, 0);
-	assert_strcmp(mock_chan[0], "#c1");
-	assert_strcmp(mock_chan[1], "#c1");
-	assert_strcmp(mock_line[0], "nick1 has set the topic:");
-	assert_strcmp(mock_line[1], "\"topic message\"");
-
-	CHECK_RECV(":nick1!user@host TOPIC #c1 :", 0, 1, 0);
-	assert_strcmp(mock_chan[0], "#c1");
-	assert_strcmp(mock_line[0], "nick1 has unset the topic");
-}
-
-static void
 test_recv_quit(void)
 {
 	/* :nick!user@host QUIT [message] */
@@ -542,6 +504,44 @@ test_recv_quit(void)
 	assert_strcmp(mock_line[0], "nick1!user@host has quit");
 	assert_ptr_null(user_list_get(&(c1->users), s->casemapping, "nick1", 0));
 	assert_ptr_null(user_list_get(&(c3->users), s->casemapping, "nick1", 0));
+}
+
+static void
+test_recv_topic(void)
+{
+	/* :nick!user@host TOPIC <channel> [topic] */
+
+	channel_reset(c1);
+	server_reset(s);
+
+	CHECK_RECV("TOPIC #c1 message", 1, 1, 0);
+	assert_strcmp(mock_chan[0], "host");
+	assert_strcmp(mock_line[0], "TOPIC: sender's nick is null");
+
+	CHECK_RECV(":nick1!user@host TOPIC", 1, 1, 0);
+	assert_strcmp(mock_line[0], "TOPIC: channel is null");
+
+	CHECK_RECV(":nick1!user@host TOPIC #c1", 1, 1, 0);
+	assert_strcmp(mock_line[0], "TOPIC: topic is null");
+
+	CHECK_RECV(":nick1!user@host TOPIC #notfound message", 1, 1, 0);
+	assert_strcmp(mock_line[0], "TOPIC: channel '#notfound' not found");
+
+	CHECK_RECV(":nick1!user@host TOPIC #c1 message", 0, 2, 0);
+	assert_strcmp(mock_chan[0], "#c1");
+	assert_strcmp(mock_chan[1], "#c1");
+	assert_strcmp(mock_line[0], "nick1 has set the topic:");
+	assert_strcmp(mock_line[1], "\"message\"");
+
+	CHECK_RECV(":nick1!user@host TOPIC #c1 :topic message", 0, 2, 0);
+	assert_strcmp(mock_chan[0], "#c1");
+	assert_strcmp(mock_chan[1], "#c1");
+	assert_strcmp(mock_line[0], "nick1 has set the topic:");
+	assert_strcmp(mock_line[1], "\"topic message\"");
+
+	CHECK_RECV(":nick1!user@host TOPIC #c1 :", 0, 1, 0);
+	assert_strcmp(mock_chan[0], "#c1");
+	assert_strcmp(mock_line[0], "nick1 has unset the topic");
 }
 
 static void
@@ -707,7 +707,7 @@ main(void)
 	server_nick_set(s, "me");
 
 	struct testcase tests[] = {
-		TESTCASE(test_353),
+		TESTCASE(test_irc_353),
 		TESTCASE(test_recv_error),
 		TESTCASE(test_recv_invite),
 		TESTCASE(test_recv_join),
@@ -721,8 +721,8 @@ main(void)
 		TESTCASE(test_recv_ping),
 		TESTCASE(test_recv_pong),
 		TESTCASE(test_recv_privmsg),
-		TESTCASE(test_recv_topic),
 		TESTCASE(test_recv_quit),
+		TESTCASE(test_recv_topic),
 		TESTCASE(test_recv_ircv3_cap),
 		TESTCASE(test_recv_ircv3_account),
 		TESTCASE(test_recv_ircv3_away),

@@ -85,10 +85,13 @@ user_list_rpl(struct user_list *ul, enum casemapping_t cm, const char *nick_old,
 
 	struct user *old, *new;
 
-	if ((old = user_list_get(ul, cm, nick_old, 0)) == NULL)
+	old = user_list_get(ul, cm, nick_old, 0);
+	new = user_list_get(ul, cm, nick_new, 0);
+
+	if (old == NULL)
 		return USER_ERR_NOT_FOUND;
 
-	if ((new = user_list_get(ul, cm, nick_new, 0)) != NULL)
+	if (new != NULL)
 		return USER_ERR_DUPLICATE;
 
 	new = user(nick_new, old->prfxmodes);

@@ -776,7 +776,7 @@ draw_colour(int fg, int bg)
 	}
 
 	if (bg >= 0 && bg <= 255) {
-		if ((ret = snprintf(buf + len, sizeof(buf) - len, ESC"[48;5;%dm", bg)) < 0)
+		if ((snprintf(buf + len, sizeof(buf) - len, ESC"[48;5;%dm", bg)) < 0)
 			buf[len] = 0;
 	}
 

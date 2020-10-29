@@ -197,13 +197,12 @@ int
 io_cx(struct connection *cx)
 {
 	enum io_err_t err = IO_ERR_NONE;
-	enum io_state_t st;
 	sigset_t sigset;
 	sigset_t sigset_old;
 
 	PT_LK(&(cx->mtx));
 
-	switch ((st = cx->st_cur)) {
+	switch (cx->st_cur) {
 		case IO_ST_DXED:
 			PT_CF(sigfillset(&sigset));
 			PT_CF(pthread_sigmask(SIG_BLOCK, &sigset, &sigset_old));
@@ -742,7 +741,7 @@ io_net_connect(struct connection *cx)
 			goto err;
 	}
 
-	if (!p && soc < -1) {
+	if (!p && soc < 0) {
 		io_cb_err(cx, " .. Failed to obtain socket: %s", io_strerror(buf, sizeof(buf)));
 		goto err;
 	}

@@ -75,9 +75,7 @@ server_list_get(struct server_list *sl, const char *host, const char *port)
 struct server*
 server_list_add(struct server_list *sl, struct server *s)
 {
-	struct server *tmp;
-
-	if ((tmp = server_list_get(sl, s->host, s->port)) != NULL)
+	if (server_list_get(sl, s->host, s->port) != NULL)
 		return s;
 
 	if (sl->head == NULL) {
@@ -166,15 +164,15 @@ server_set_004(struct server *s, char *str)
 {
 	/* <server_name> <version> <user_modes> <chan_modes> */
 
-	const char *server_name; /* Not used */
-	const char *version;     /* Not used */
-	const char *user_modes;  /* Configure server usermodes */
-	const char *chan_modes;  /* Configure server chanmodes */
+	const char *user_modes;
+	const char *chan_modes;
 
-	if (!(server_name = strsep(&str)))
+	/* Not used */
+	if (!strsep(&str))
 		server_error(s, "invalid numeric 004: server_name is null");
 
-	if (!(version = strsep(&str)))
+	/* Not used */
+	if (!strsep(&str))
 		server_error(s, "invalid numeric 004: version is null");
 
 	if (!(user_modes = strsep(&str)))

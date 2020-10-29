@@ -1234,37 +1234,6 @@ recv_privmsg(struct server *s, struct irc_message *m)
 }
 
 static int
-recv_topic(struct server *s, struct irc_message *m)
-{
-	/* :nick!user@host TOPIC <channel> [topic] */
-
-	char *chan;
-	char *topic;
-	struct channel *c;
-
-	if (!m->from)
-		failf(s, "TOPIC: sender's nick is null");
-
-	if (!irc_message_param(m, &chan))
-		failf(s, "TOPIC: channel is null");
-
-	if (!irc_message_param(m, &topic))
-		failf(s, "TOPIC: topic is null");
-
-	if ((c = channel_list_get(&s->clist, chan, s->casemapping)) == NULL)
-		failf(s, "TOPIC: channel '%s' not found", chan);
-
-	if (*topic) {
-		newlinef(c, 0, FROM_INFO, "%s has set the topic:", m->from);
-		newlinef(c, 0, FROM_INFO, "\"%s\"", topic);
-	} else {
-		newlinef(c, 0, FROM_INFO, "%s has unset the topic", m->from);
-	}
-
-	return 0;
-}
-
-static int
 recv_quit(struct server *s, struct irc_message *m)
 {
 	/* :nick!user@host QUIT [message] */
@@ -1293,6 +1262,37 @@ recv_quit(struct server *s, struct irc_message *m)
 	} while ((c = c->next) != s->channel);
 
 	draw(DRAW_STATUS);
+
+	return 0;
+}
+
+static int
+recv_topic(struct server *s, struct irc_message *m)
+{
+	/* :nick!user@host TOPIC <channel> [topic] */
+
+	char *chan;
+	char *topic;
+	struct channel *c;
+
+	if (!m->from)
+		failf(s, "TOPIC: sender's nick is null");
+
+	if (!irc_message_param(m, &chan))
+		failf(s, "TOPIC: channel is null");
+
+	if (!irc_message_param(m, &topic))
+		failf(s, "TOPIC: topic is null");
+
+	if ((c = channel_list_get(&s->clist, chan, s->casemapping)) == NULL)
+		failf(s, "TOPIC: channel '%s' not found", chan);
+
+	if (*topic) {
+		newlinef(c, 0, FROM_INFO, "%s has set the topic:", m->from);
+		newlinef(c, 0, FROM_INFO, "\"%s\"", topic);
+	} else {
+		newlinef(c, 0, FROM_INFO, "%s has unset the topic", m->from);
+	}
 
 	return 0;
 }
