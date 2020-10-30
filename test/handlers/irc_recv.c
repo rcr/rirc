@@ -354,6 +354,13 @@ test_recv_nick(void)
 	assert_strcmp(mock_chan[0], "host");
 	assert_strcmp(mock_line[0], "Your nick is now 'new_me'");
 
+	/* user can change own nick case */
+	assert_eq(user_list_add(&(c1->users), CASEMAPPING_RFC1459, "abc{}|^", MODE_EMPTY), USER_ERR_NONE);
+
+	CHECK_RECV(":abc{}|^!user@host NICK AbC{]|~", 0, 1, 0);
+	assert_strcmp(mock_chan[0], "#c1");
+	assert_strcmp(mock_line[0], "abc{}|^  >>  AbC{]|~");
+
 	server_nick_set(s, "me");
 }
 
