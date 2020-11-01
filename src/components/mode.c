@@ -380,14 +380,13 @@ mode_prfxmode_prefix(struct mode *m, const struct mode_cfg *cfg, int flag)
 	const char *f = cfg->PREFIX.F,
 	           *t = cfg->PREFIX.T;
 
-	while (*t != flag) {
-
-		if (*t == 0)
-			return MODE_ERR_INVALID_PREFIX;
-
+	while (*t && *t != flag) {
 		f++;
 		t++;
 	}
+
+	if (*t == 0)
+		return MODE_ERR_INVALID_PREFIX;
 
 	bit = flag_bit(*f);
 
@@ -399,11 +398,7 @@ mode_prfxmode_prefix(struct mode *m, const struct mode_cfg *cfg, int flag)
 	f = cfg->PREFIX.F,
 	t = cfg->PREFIX.T;
 
-	while (*f) {
-
-		if (mode_isset(m, *f))
-			break;
-
+	while (!mode_isset(m, *f)) {
 		f++;
 		t++;
 	}

@@ -69,14 +69,8 @@ test_irc_353(void)
 	CHECK_RECV("353 me x #c1 :n1", 1, 1, 0);
 	assert_strcmp(mock_line[0], "RPL_NAMEREPLY: invalid channel flag: 'x'");
 
-	CHECK_RECV("353 me = #c1 :!n1", 1, 1, 0);
-	assert_strcmp(mock_line[0], "RPL_NAMEREPLY: invalid user prefix: '!'");
-
-	CHECK_RECV("353 me = #c1 :+@n1", 1, 1, 0);
-	assert_strcmp(mock_line[0], "RPL_NAMEREPLY: invalid nick: '@n1'");
-
-	CHECK_RECV("353 me = #c1 :n1 n2 n1", 1, 1, 0);
-	assert_strcmp(mock_line[0], "RPL_NAMEREPLY: duplicate nick: 'n1'");
+	CHECK_RECV("353 me = #c1 :+@", 1, 1, 0);
+	assert_strcmp(mock_line[0], "RPL_NAMEREPLY: invalid nick: '+@'");
 
 	/* test single nick */
 	channel_reset(c1);

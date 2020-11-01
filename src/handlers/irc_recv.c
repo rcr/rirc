@@ -504,6 +504,7 @@ irc_353(struct server *s, struct irc_message *m)
 	char *chan;
 	char *nick;
 	char *nicks;
+	char *prfx;
 	char *type;
 	struct channel *c;
 
@@ -522,29 +523,18 @@ irc_353(struct server *s, struct irc_message *m)
 	if (mode_chanmode_prefix(&(c->chanmodes), &(s->mode_cfg), *type) != MODE_ERR_NONE)
 		failf(s, "RPL_NAMEREPLY: invalid channel flag: '%c'", *type);
 
-	if ((nick = strsep(&nicks))) {
-		do {
-			char prefix = 0;
-			struct mode m = MODE_EMPTY;
+	while ((prfx = nick = strsep(&nicks))) {
 
-			do {
-				if (irc_isnickchar(*nick, 1))
-					break;
+		struct mode m = MODE_EMPTY;
 
-				prefix = *nick++;
+		while (mode_prfxmode_prefix(&m, &(s->mode_cfg), *nick) == MODE_ERR_NONE)
+			nick++;
 
-				if (mode_prfxmode_prefix(&m, &(s->mode_cfg), prefix) != MODE_ERR_NONE)
-					failf(s, "RPL_NAMEREPLY: invalid user prefix: '%c'", prefix);
+		if (*nick == 0)
+			failf(s, "RPL_NAMEREPLY: invalid nick: '%s'", prfx);
 
-			} while (s->ircv3_caps.multi_prefix.set);
-
-			if (!irc_isnick(nick))
-				failf(s, "RPL_NAMEREPLY: invalid nick: '%s'", nick);
-
-			if (user_list_add(&(c->users), s->casemapping, nick, m) == USER_ERR_DUPLICATE)
-				failf(s, "RPL_NAMEREPLY: duplicate nick: '%s'", nick);
-
-		} while ((nick = strsep(&nicks)));
+		if (user_list_add(&(c->users), s->casemapping, nick, m) == USER_ERR_DUPLICATE)
+			failf(s, "RPL_NAMEREPLY: duplicate nick: '%s'", nick);
 	}
 
 	draw(DRAW_STATUS);
