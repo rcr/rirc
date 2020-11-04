@@ -7,41 +7,9 @@
 
 #include "src/utils/utils.h"
 
+static inline int irc_ischanchar(char, int);
+static inline int irc_isnickchar(char, int);
 static inline int irc_toupper(enum casemapping_t, int);
-
-int
-irc_isnickchar(char c, int first)
-{
-	/* RFC 2812, section 2.3.1
-	 *
-	 * nickname   =  ( letter / special ) *8( letter / digit / special / "-" )
-	 * letter     =  %x41-5A / %x61-7A       ; A-Z / a-z
-	 * digit      =  %x30-39                 ; 0-9
-	 * special    =  %x5B-60 / %x7B-7D       ; "[", "]", "\", "`", "_", "^", "{", "|", "}"
-	 */
-
-	return ((c >= 0x41 && c <= 0x7D) || (!first && ((c >= 0x30 && c <= 0x39) || c == '-')));
-}
-
-int
-irc_ischanchar(char c, int first)
-{
-	/* RFC 2812, section 2.3.1
-	 *
-	 * channel    =  ( "#" / "+" / ( "!" channelid ) / "&" ) chanstring
-	 *               [ ":" chanstring ]
-	 * chanstring =  %x01-07 / %x08-09 / %x0B-0C / %x0E-1F / %x21-2B
-	 * chanstring =/ %x2D-39 / %x3B-FF
-	 *                 ; any octet except NUL, BELL, CR, LF, " ", "," and ":"
-	 * channelid  = 5( %x41-5A / digit )   ; 5( A-Z / 0-9 )
-	 */
-
-	/* TODO: CHANTYPES */
-	(void)c;
-	(void)first;
-
-	return 1;
-}
 
 int
 irc_isnick(const char *str)
@@ -72,21 +40,18 @@ irc_ischan(const char *str)
 }
 
 int
-irc_pinged(enum casemapping_t casemapping, const char *mesg, const char *nick)
+irc_pinged(enum casemapping_t cm, const char *mesg, const char *nick)
 {
 	size_t len = strlen(nick);
 
 	while (*mesg) {
 
-		/* skip any prefixing characters that wouldn't match a valid nick */
-		while (!(*mesg >= 0x41 && *mesg <= 0x7D))
+		while (*mesg && *mesg != *nick && !irc_isnickchar(*mesg, 1))
 			mesg++;
 
-		/* nick prefixes the word, following character is space or symbol */
-		if (!irc_strncmp(casemapping, mesg, nick, len) && !irc_isnickchar(*(mesg + len), 0))
+		if (!irc_strncmp(cm, mesg, nick, len) && !irc_isnickchar(*(mesg + len), 0))
 			return 1;
 
-		/* skip to end of word */
 		while (*mesg && *mesg != ' ')
 			mesg++;
 	}
@@ -95,7 +60,7 @@ irc_pinged(enum casemapping_t casemapping, const char *mesg, const char *nick)
 }
 
 int
-irc_strcmp(enum casemapping_t casemapping, const char *s1, const char *s2)
+irc_strcmp(enum casemapping_t cm, const char *s1, const char *s2)
 {
 	/* Case insensitive comparison of strings s1, s2 in accordance
 	 * with RFC 2812, section 2.2 */
@@ -104,8 +69,8 @@ irc_strcmp(enum casemapping_t casemapping, const char *s1, const char *s2)
 
 	for (;;) {
 
-		c1 = irc_toupper(casemapping, *s1++);
-		c2 = irc_toupper(casemapping, *s2++);
+		c1 = irc_toupper(cm, *s1++);
+		c2 = irc_toupper(cm, *s2++);
 
 		if ((c1 -= c2))
 			return -c1;
@@ -118,7 +83,7 @@ irc_strcmp(enum casemapping_t casemapping, const char *s1, const char *s2)
 }
 
 int
-irc_strncmp(enum casemapping_t casemapping, const char *s1, const char *s2, size_t n)
+irc_strncmp(enum casemapping_t cm, const char *s1, const char *s2, size_t n)
 {
 	/* Case insensitive comparison of strings s1, s2 in accordance
 	 * with RFC 2812, section 2.2, up to n characters */
@@ -127,8 +92,8 @@ irc_strncmp(enum casemapping_t casemapping, const char *s1, const char *s2, size
 
 	while (n > 0) {
 
-		c1 = irc_toupper(casemapping, *s1++);
-		c2 = irc_toupper(casemapping, *s2++);
+		c1 = irc_toupper(cm, *s1++);
+		c2 = irc_toupper(cm, *s2++);
 
 		if ((c1 -= c2))
 			return -c1;
@@ -440,7 +405,41 @@ memdup(const void *mem, size_t len)
 }
 
 static inline int
-irc_toupper(enum casemapping_t casemapping, int c)
+irc_ischanchar(char c, int first)
+{
+	/* RFC 2812, section 2.3.1
+	 *
+	 * channel    =  ( "#" / "+" / ( "!" channelid ) / "&" ) chanstring
+	 *               [ ":" chanstring ]
+	 * chanstring =  %x01-07 / %x08-09 / %x0B-0C / %x0E-1F / %x21-2B
+	 * chanstring =/ %x2D-39 / %x3B-FF
+	 *                 ; any octet except NUL, BELL, CR, LF, " ", "," and ":"
+	 * channelid  = 5( %x41-5A / digit )   ; 5( A-Z / 0-9 )
+	 */
+
+	/* TODO: CHANTYPES */
+	(void)c;
+	(void)first;
+
+	return 1;
+}
+
+static inline int
+irc_isnickchar(char c, int first)
+{
+	/* RFC 2812, section 2.3.1
+	 *
+	 * nickname   =  ( letter / special ) *8( letter / digit / special / "-" )
+	 * letter     =  %x41-5A / %x61-7A       ; A-Z / a-z
+	 * digit      =  %x30-39                 ; 0-9
+	 * special    =  %x5B-60 / %x7B-7D       ; "[", "]", "\", "`", "_", "^", "{", "|", "}"
+	 */
+
+	return ((c >= 0x41 && c <= 0x7D) || (!first && ((c >= 0x30 && c <= 0x39) || c == '-')));
+}
+
+static inline int
+irc_toupper(enum casemapping_t cm, int c)
 {
 	/* RFC 2812, section 2.2
 	 *
@@ -449,7 +448,7 @@ irc_toupper(enum casemapping_t casemapping, int c)
 	 * respectively. This is a critical issue when determining the
 	 * equivalence of two nicknames or channel names. */
 
-	switch (casemapping) {
+	switch (cm) {
 		case CASEMAPPING_RFC1459:
 			if (c == '^') return '~';
 			/* FALLTHROUGH */

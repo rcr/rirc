@@ -66,9 +66,7 @@ struct irc_message
 };
 
 int irc_ischan(const char*);
-int irc_ischanchar(char, int);
 int irc_isnick(const char*);
-int irc_isnickchar(char, int);
 int irc_pinged(enum casemapping_t, const char*, const char*);
 int irc_strcmp(enum casemapping_t, const char*, const char*);
 int irc_strncmp(enum casemapping_t, const char*, const char*, size_t);

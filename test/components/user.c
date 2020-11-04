@@ -128,6 +128,8 @@ test_user_list_casemapping(void)
 
 	assert_ptr_not_null(user_list_get(&ulist, CASEMAPPING_RFC1459, "zZz", 0));
 	assert_ptr_not_null(user_list_get(&ulist, CASEMAPPING_RFC1459, "{]^", 0));
+
+	user_list_free(&ulist);
 }
 
 static void
