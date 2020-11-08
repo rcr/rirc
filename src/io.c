@@ -3,6 +3,7 @@
 #include <arpa/inet.h>
 #include <errno.h>
 #include <netdb.h>
+#include <poll.h>
 #include <pthread.h>
 #include <signal.h>
 #include <stdarg.h>
@@ -25,9 +26,7 @@
 #include "mbedtls/x509_crt.h"
 
 /* RFC 2812, section 2.3 */
-#ifndef IO_MESG_LEN
 #define IO_MESG_LEN 510
-#endif
 
 #ifndef IO_PING_MIN
 #define IO_PING_MIN 150
@@ -119,8 +118,7 @@ struct connection
 		IO_ST_PING, /* Socket connected, network state in question */
 	} st_cur, /* current thread state */
 	  st_new; /* new thread state */
-	int soc;
-	mbedtls_net_context tls_fd;
+	mbedtls_net_context net_ctx;
 	mbedtls_ssl_config  tls_conf;
 	mbedtls_ssl_context tls_ctx;
 	pthread_mutex_t mtx;
@@ -134,7 +132,7 @@ static enum io_state_t io_state_cxed(struct connection*);
 static enum io_state_t io_state_cxng(struct connection*);
 static enum io_state_t io_state_ping(struct connection*);
 static enum io_state_t io_state_rxng(struct connection*);
-static int io_cx_read(struct connection*, unsigned);
+static int io_cx_read(struct connection*, uint32_t);
 static void io_fatal(const char*, int);
 static void io_sig_handle(int);
 static void io_sig_init(void);
@@ -279,34 +277,27 @@ io_sendf(struct connection *cx, const char *fmt, ...)
 	ret = 0;
 	written = 0;
 
-	if (cx->flags & IO_TLS_ENABLED) {
-		do {
-			if ((ret = mbedtls_ssl_write(&(cx->tls_ctx), sendbuf + ret, len - ret)) < 0) {
-				switch (ret) {
-					case MBEDTLS_ERR_SSL_WANT_READ:
-					case MBEDTLS_ERR_SSL_WANT_WRITE:
-						ret = 0;
-						continue;
-					default:
-						io_dx(cx);
-						io_cx(cx);
-						return IO_ERR_SSL_WRITE;
-				}
-			}
-		} while ((written += ret) < len);
-	} else {
-		do {
-			if ((ret = send(cx->soc, sendbuf + ret, len - ret, 0)) == -1) {
-				switch (errno) {
-					case EINTR:
-						ret = 0;
-						continue;
-					default:
-						return IO_ERR_SSL_WRITE;
-				}
-			}
-		} while ((written += ret) < len);
-	}
+	do {
+		if (cx->flags & IO_TLS_ENABLED) {
+			ret = mbedtls_ssl_write(&(cx->tls_ctx), sendbuf + ret, len - ret);
+		} else {
+			ret = mbedtls_net_send(&(cx->net_ctx), sendbuf + ret, len - ret);
+		}
+
+		if (ret >= 0)
+			continue;
+
+		switch (ret) {
+			case MBEDTLS_ERR_SSL_WANT_READ:
+			case MBEDTLS_ERR_SSL_WANT_WRITE:
+				ret = 0;
+				continue;
+			default:
+				io_dx(cx);
+				io_cx(cx);
+				return IO_ERR_SSL_WRITE;
+		}
+	} while ((written += ret) < len);
 
 	return IO_ERR_NONE;
 }
@@ -423,7 +414,7 @@ io_state_rxng(struct connection *cx)
 static enum io_state_t
 io_state_cxng(struct connection *cx)
 {
-	if ((cx->soc = io_net_connect(cx)) < 0)
+	if ((io_net_connect(cx)) < 0)
 		return IO_ST_RXNG;
 
 	if ((cx->flags & IO_TLS_ENABLED) && io_tls_establish(cx) < 0)
@@ -437,7 +428,7 @@ io_state_cxed(struct connection *cx)
 {
 	int ret;
 
-	while ((ret = io_cx_read(cx, IO_PING_MIN)) > 0)
+	while ((ret = io_cx_read(cx, SEC_IN_MS(IO_PING_MIN))) > 0)
 		continue;
 
 	if (ret == MBEDTLS_ERR_SSL_TIMEOUT)
@@ -445,7 +436,6 @@ io_state_cxed(struct connection *cx)
 
 	switch (ret) {
 		case MBEDTLS_ERR_SSL_WANT_READ:
-		case MBEDTLS_ERR_SSL_WANT_WRITE:
 			break;
 		case MBEDTLS_ERR_SSL_PEER_CLOSE_NOTIFY:
 			io_cb_info(cx, "connection closed gracefully");
@@ -455,13 +445,16 @@ io_state_cxed(struct connection *cx)
 			io_cb_err(cx, "connection reset by peer");
 			break;
 		default:
-			io_cb_err(cx, "connection tls error");
+			io_cb_err(cx, "connection error");
 			break;
 	}
 
-	mbedtls_net_free(&(cx->tls_fd));
-	mbedtls_ssl_config_free(&(cx->tls_conf));
-	mbedtls_ssl_free(&(cx->tls_ctx));
+	mbedtls_net_free(&(cx->net_ctx));
+
+	if (cx->flags & IO_TLS_ENABLED) {
+		mbedtls_ssl_config_free(&(cx->tls_conf));
+		mbedtls_ssl_free(&(cx->tls_ctx));
+	}
 
 	return IO_ST_CXNG;
 }
@@ -474,7 +467,7 @@ io_state_ping(struct connection *cx)
 	if (cx->ping >= IO_PING_MAX)
 		return IO_ST_CXNG;
 
-	if ((ret = io_cx_read(cx, IO_PING_REFRESH)) > 0)
+	if ((ret = io_cx_read(cx, SEC_IN_MS(IO_PING_REFRESH))) > 0)
 		return IO_ST_CXED;
 
 	if (ret == MBEDTLS_ERR_SSL_TIMEOUT)
@@ -482,7 +475,6 @@ io_state_ping(struct connection *cx)
 
 	switch (ret) {
 		case MBEDTLS_ERR_SSL_WANT_READ:
-		case MBEDTLS_ERR_SSL_WANT_WRITE:
 			break;
 		case MBEDTLS_ERR_SSL_PEER_CLOSE_NOTIFY:
 			io_cb_info(cx, "connection closed gracefully");
@@ -492,13 +484,16 @@ io_state_ping(struct connection *cx)
 			io_cb_err(cx, "connection reset by peer");
 			break;
 		default:
-			io_cb_err(cx, "connection ssl error");
+			io_cb_err(cx, "connection error");
 			break;
 	}
 
-	mbedtls_net_free(&(cx->tls_fd));
-	mbedtls_ssl_config_free(&(cx->tls_conf));
-	mbedtls_ssl_free(&(cx->tls_ctx));
+	mbedtls_net_free(&(cx->net_ctx));
+
+	if (cx->flags & IO_TLS_ENABLED) {
+		mbedtls_ssl_config_free(&(cx->tls_conf));
+		mbedtls_ssl_free(&(cx->tls_ctx));
+	}
 
 	return IO_ST_CXNG;
 }
@@ -594,24 +589,37 @@ io_thread(void *arg)
 }
 
 static int
-io_cx_read(struct connection *cx, unsigned timeout)
+io_cx_read(struct connection *cx, uint32_t timeout)
 {
 	int ret;
+	struct pollfd fd[1];
 	unsigned char buf[1024];
 
+	fd[0].fd = cx->net_ctx.fd;
+	fd[0].events = POLLIN;
+
+	while ((ret = poll(fd, 1, timeout)) < 0 && errno == EAGAIN)
+		continue;
+
+	if (ret == 0)
+		return MBEDTLS_ERR_SSL_TIMEOUT;
+
+	if (ret < 0 && errno == EINTR)
+		return MBEDTLS_ERR_SSL_WANT_READ;
+
+	if (ret < 0)
+		fatal("poll: %s", strerror(errno));
+
 	if (cx->flags & IO_TLS_ENABLED) {
-		mbedtls_ssl_conf_read_timeout(&(cx->tls_conf), SEC_IN_MS(timeout));
-		if ((ret = mbedtls_ssl_read(&(cx->tls_ctx), buf, sizeof(buf))) > 0) {
-			PT_LK(&io_cb_mutex);
-			io_cb_read_soc((char *)buf, (size_t)ret,  cx->obj);
-			PT_UL(&io_cb_mutex);
-		}
+		ret = mbedtls_ssl_read(&(cx->tls_ctx), buf, sizeof(buf));
 	} else {
-		while ((ret = recv(cx->soc, buf, sizeof(buf), 0)) > 0) {
-			PT_LK(&io_cb_mutex);
-			io_cb_read_soc((char *)buf, (size_t)ret,  cx->obj);
-			PT_UL(&io_cb_mutex);
-		}
+		ret = mbedtls_net_recv(&(cx->net_ctx), buf, sizeof(buf));
+	}
+
+	if (ret > 0) {
+		PT_LK(&io_cb_mutex);
+		io_cb_read_soc((char *)buf, (size_t)ret,  cx->obj);
+		PT_UL(&io_cb_mutex);
 	}
 
 	return ret;
@@ -764,7 +772,7 @@ io_net_connect(struct connection *cx)
 err:
 	freeaddrinfo(res);
 
-	return ret;
+	return (cx->net_ctx.fd = ret);
 }
 
 static void
@@ -794,11 +802,8 @@ io_tls_establish(struct connection *cx)
 
 	io_cb_info(cx, " .. Establishing TLS connection");
 
-	mbedtls_net_init(&(cx->tls_fd));
 	mbedtls_ssl_init(&(cx->tls_ctx));
 	mbedtls_ssl_config_init(&(cx->tls_conf));
-
-	cx->tls_fd.fd = cx->soc;
 
 	if ((ret = mbedtls_ssl_config_defaults(
 			&(cx->tls_conf),
@@ -833,7 +838,7 @@ io_tls_establish(struct connection *cx)
 			mbedtls_ssl_conf_authmode(&(cx->tls_conf), MBEDTLS_SSL_VERIFY_REQUIRED);
 	}
 
-	if ((ret = mbedtls_net_set_block(&(cx->tls_fd)))) {
+	if ((ret = mbedtls_net_set_block(&(cx->net_ctx)))) {
 		io_cb_err(cx, " .. %s ", io_tls_err(ret));
 		goto err;
 	}
@@ -850,10 +855,10 @@ io_tls_establish(struct connection *cx)
 
 	mbedtls_ssl_set_bio(
 		&(cx->tls_ctx),
-		&(cx->tls_fd),
+		&(cx->net_ctx),
 		mbedtls_net_send,
-		NULL,
-		mbedtls_net_recv_timeout);
+		mbedtls_net_recv,
+		NULL);
 
 	while ((ret = mbedtls_ssl_handshake(&(cx->tls_ctx)))) {
 		if (ret != MBEDTLS_ERR_SSL_WANT_READ
@@ -886,7 +891,7 @@ err:
 
 	mbedtls_ssl_config_free(&(cx->tls_conf));
 	mbedtls_ssl_free(&(cx->tls_ctx));
-	mbedtls_net_free(&(cx->tls_fd));
+	mbedtls_net_free(&(cx->net_ctx));
 
 	return -1;
 }

@@ -92,7 +92,7 @@ $(TLS_LIBS): $(TLS_CONF)
 
 clean:
 	rm -rf $(DIR_B) $(BIN_R) $(BIN_D)
-	find . -name "*gperf.out" -print0 | xargs -0 -I % rm %
+	@find . -name "*gperf.out" -print0 | xargs -0 -I % rm -rfv %
 
 install: $(BIN_R)
 	@echo installing executable to $(BIN_DIR)
