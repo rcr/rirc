@@ -1,5 +1,5 @@
-#ifndef SERVER_H
-#define SERVER_H
+#ifndef RIRC_COMPONENTS_SERVER_H
+#define RIRC_COMPONENTS_SERVER_H
 
 #include "src/components/buffer.h"
 #include "src/components/channel.h"

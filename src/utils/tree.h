@@ -1,5 +1,5 @@
-#ifndef TREE_H
-#define TREE_H
+#ifndef RIRC_UTILS_TREE_H
+#define RIRC_UTILS_TREE_H
 
 #include <stddef.h>
 

@@ -1,5 +1,5 @@
-#ifndef UTILS_H
-#define UTILS_H
+#ifndef RIRC_UTILS_UTILS_H
+#define RIRC_UTILS_UTILS_H
 
 #include <stdio.h>
 #include <stdlib.h>

@@ -1,5 +1,5 @@
-#ifndef IRC_SEND_H
-#define IRC_SEND_H
+#ifndef RIRC_HANDLERS_IRC_SEND_H
+#define RIRC_HANDLERS_IRC_SEND_H
 
 #include "src/components/channel.h"
 #include "src/components/server.h"

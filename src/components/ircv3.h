@@ -1,5 +1,5 @@
-#ifndef IRCV3_CAP_H
-#define IRCV3_CAP_H
+#ifndef RIRC_COMPONENTS_IRCV3_CAP_H
+#define RIRC_COMPONENTS_IRCV3_CAP_H
 
 #define IRCV3_CAP_AUTO   (1 << 0)
 #define IRCV3_CAP_NO_DEL (1 << 1)

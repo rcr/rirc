@@ -1,5 +1,5 @@
-#ifndef IO_H
-#define IO_H
+#ifndef RIRC_IO_H
+#define RIRC_IO_H
 
 /* Handling off all network io, user input and signals
  *

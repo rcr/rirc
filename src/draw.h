@@ -1,5 +1,5 @@
-#ifndef DRAW_H
-#define DRAW_H
+#ifndef RIRC_DRAW_H
+#define RIRC_DRAW_H
 
 enum draw_bit
 {

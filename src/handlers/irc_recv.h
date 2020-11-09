@@ -1,5 +1,5 @@
-#ifndef IRC_RECV_H
-#define IRC_RECV_H
+#ifndef RIRC_HANDLERS_IRC_RECV_H
+#define RIRC_HANDLERS_IRC_RECV_H
 
 /* Summary of irc protocol implementation:
  *

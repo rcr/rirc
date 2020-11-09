@@ -1,5 +1,5 @@
-#ifndef IRC_CTCP_H
-#define IRC_CTCP_H
+#ifndef RIRC_HANDLERS_IRC_CTCP_H
+#define RIRC_HANDLERS_IRC_CTCP_H
 
 #include "src/components/server.h"
 

@@ -1,5 +1,5 @@
-#ifndef BUFFER_H
-#define BUFFER_H
+#ifndef RIRC_COMPONENTS_BUFFER_H
+#define RIRC_COMPONENTS_BUFFER_H
 
 #include <time.h>
 

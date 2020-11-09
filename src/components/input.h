@@ -1,5 +1,5 @@
-#ifndef INPUT_H
-#define INPUT_H
+#ifndef RIRC_COMPONENTS_INPUT_H
+#define RIRC_COMPONENTS_INPUT_H
 
 /* Buffer input
  *

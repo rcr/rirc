@@ -1,5 +1,5 @@
-#ifndef STATE_H
-#define STATE_H
+#ifndef RIRC_STATE_H
+#define RIRC_STATE_H
 
 #include "src/components/buffer.h"
 #include "src/components/channel.h"

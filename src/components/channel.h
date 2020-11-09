@@ -1,5 +1,5 @@
-#ifndef CHANNEL_H
-#define CHANNEL_H
+#ifndef RIRC_COMPONENTS_CHANNEL_H
+#define RIRC_COMPONENTS_CHANNEL_H
 
 #include "src/components/buffer.h"
 #include "src/components/input.h"

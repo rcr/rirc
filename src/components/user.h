@@ -1,5 +1,5 @@
-#ifndef NICKLIST_H
-#define NICKLIST_H
+#ifndef RIRC_COMPONENTS_USER_H
+#define RIRC_COMPONENTS_USER_H
 
 #include "src/components/mode.h"
 #include "src/utils/tree.h"
