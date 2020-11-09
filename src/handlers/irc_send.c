@@ -95,6 +95,17 @@ targ_or_type(struct channel *c, char *m, enum channel_t type)
 }
 
 static int
+send_away(struct server *s, struct channel *c, char *m)
+{
+	if (strtrim(&m))
+		sendf(s, c, "AWAY :%s", m);
+	else
+		sendf(s, c, "AWAY");
+
+	return 0;
+}
+
+static int
 send_notice(struct server *s, struct channel *c, char *m)
 {
 	const char *targ;

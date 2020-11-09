@@ -110,6 +110,18 @@ test_irc_send_privmsg(void)
 }
 
 static void
+test_send_away(void)
+{
+	char m1[] = "away";
+	char m2[] = "away ";
+	char m3[] = "away testing away message";
+
+	CHECK_SEND_COMMAND(c_chan, m1, 0, 0, 1, "", "AWAY");
+	CHECK_SEND_COMMAND(c_chan, m2, 0, 0, 1, "", "AWAY");
+	CHECK_SEND_COMMAND(c_chan, m3, 0, 0, 1, "", "AWAY :testing away message");
+}
+
+static void
 test_send_notice(void)
 {
 	char m1[] = "notice";
