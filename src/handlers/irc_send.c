@@ -179,6 +179,20 @@ send_topic(struct server *s, struct channel *c, char *m)
 }
 
 static int
+send_topic_unset(struct server *s, struct channel *c, char *m)
+{
+	if (c->type != CHANNEL_T_CHANNEL)
+		failf(c, "This is not a channel");
+
+	if (strtrim(&m))
+		failf(c, "Usage: /topic-unset");
+
+	sendf(s, c, "TOPIC %s :", c->name);
+
+	return 0;
+}
+
+static int
 send_ctcp_action(struct server *s, struct channel *c, char *m)
 {
 	if (!(c->type == CHANNEL_T_CHANNEL || c->type == CHANNEL_T_PRIVATE))

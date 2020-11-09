@@ -64,6 +64,8 @@ static const char *irc_list[] = {
 	"ctcp-time",
 	"ctcp-userinfo",
 	"ctcp-version",
+	"away",
+	"topic-unset",
 	"admin",   "connect", "info",     "invite", "join",
 	"kick",    "kill",    "links",    "list",   "lusers",
 	"mode",    "motd",    "names",    "nick",   "notice",

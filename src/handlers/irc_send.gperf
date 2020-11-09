@@ -7,7 +7,8 @@
 	X(part) \
 	X(privmsg) \
 	X(quit) \
-	X(topic)
+	X(topic) \
+	X(topic_unset)
 
 #define SEND_CTCP_HANDLERS \
 	X(action) \
@@ -71,4 +72,5 @@ PART,            send_part
 PRIVMSG,         send_privmsg
 QUIT,            send_quit
 TOPIC,           send_topic
+TOPIC-UNSET,     send_topic_unset
 %%

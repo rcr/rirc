@@ -196,6 +196,22 @@ test_send_topic(void)
 }
 
 static void
+test_send_topic_unset(void)
+{
+	char m1[] = "topic-unset";
+	char m2[] = "topic-unset";
+	char m3[] = "topic-unset test";
+	char m4[] = "topic-unset";
+	char m5[] = "topic-unset ";
+
+	CHECK_SEND_COMMAND(c_serv, m1, 1, 1, 0, "This is not a channel", "");
+	CHECK_SEND_COMMAND(c_priv, m2, 1, 1, 0, "This is not a channel", "");
+	CHECK_SEND_COMMAND(c_chan, m3, 1, 1, 0, "Usage: /topic-unset", "");
+	CHECK_SEND_COMMAND(c_chan, m4, 0, 0, 1, "", "TOPIC chan :");
+	CHECK_SEND_COMMAND(c_chan, m5, 0, 0, 1, "", "TOPIC chan :");
+}
+
+static void
 test_send_ctcp_action(void)
 {
 	char m1[] = "ctcp-action test action";
