@@ -71,26 +71,22 @@
 			io_fatal((#X), _ptcf); \
 		}                          \
 	} while (0)
+
 #define PT_LK(X) PT_CF(pthread_mutex_lock((X)))
 #define PT_UL(X) PT_CF(pthread_mutex_unlock((X)))
-#define PT_CB(...) \
-	do {                    \
-		PT_LK(&io_cb_mutex);   \
-		io_cb(__VA_ARGS__); \
-		PT_UL(&io_cb_mutex);   \
-	} while (0)
+
+/* IO callback */
+#define IO_CB(X) \
+	do { PT_LK(&io_cb_mutex); (X); PT_UL(&io_cb_mutex); } while (0)
+
+#define io_cxed(C)       IO_CB(io_cb_cxed((C)->obj))
+#define io_dxed(C)       IO_CB(io_cb_dxed((C)->obj))
+#define io_error(C, ...) IO_CB(io_cb_error((C)->obj,  __VA_ARGS__))
+#define io_info(C, ...)  IO_CB(io_cb_info((C)->obj, __VA_ARGS__))
+#define io_ping(C, P)    IO_CB(io_cb_ping((C)->obj, P))
 
 /* state transition */
 #define ST_X(OLD, NEW) (((OLD) << 3) | (NEW))
-
-#define io_cb_cxed(C)        PT_CB(IO_CB_CXED, (C)->obj)
-#define io_cb_dxed(C)        PT_CB(IO_CB_DXED, (C)->obj)
-#define io_cb_err(C, ...)    PT_CB(IO_CB_ERR, (C)->obj, __VA_ARGS__)
-#define io_cb_info(C, ...)   PT_CB(IO_CB_INFO, (C)->obj, __VA_ARGS__)
-#define io_cb_ping_0(C, ...) PT_CB(IO_CB_PING_0, (C)->obj, __VA_ARGS__)
-#define io_cb_ping_1(C, ...) PT_CB(IO_CB_PING_1, (C)->obj, __VA_ARGS__)
-#define io_cb_ping_n(C, ...) PT_CB(IO_CB_PING_N, (C)->obj, __VA_ARGS__)
-#define io_cb_signal(S)      PT_CB(IO_CB_SIGNAL, NULL, (S))
 
 enum io_err_t
 {
@@ -321,14 +317,12 @@ io_start(void)
 		ssize_t ret = read(STDIN_FILENO, buf, sizeof(buf));
 
 		if (ret > 0) {
-			PT_LK(&io_cb_mutex);
-			io_cb_read_inp(buf, ret);
-			PT_UL(&io_cb_mutex);
+			IO_CB(io_cb_read_inp(buf, ret));
 		} else {
 			if (errno == EINTR) {
 				if (flag_sigwinch_cb) {
 					flag_sigwinch_cb = 0;
-					io_cb_signal(IO_SIGWINCH);
+					IO_CB(io_cb_sigwinch());
 				}
 			} else {
 				fatal("read: %s", ret ? strerror(errno) : "EOF");
@@ -402,7 +396,7 @@ io_state_rxng(struct connection *cx)
 		);
 	}
 
-	io_cb_info(cx, "Attemping reconnect in %02u:%02u",
+	io_info(cx, "Attemping reconnect in %02u:%02u",
 		(cx->rx_sleep / 60),
 		(cx->rx_sleep % 60));
 
@@ -438,14 +432,14 @@ io_state_cxed(struct connection *cx)
 		case MBEDTLS_ERR_SSL_WANT_READ:
 			break;
 		case MBEDTLS_ERR_SSL_PEER_CLOSE_NOTIFY:
-			io_cb_info(cx, "connection closed gracefully");
+			io_info(cx, "connection closed gracefully");
 			break;
 		case MBEDTLS_ERR_NET_CONN_RESET:
 		case 0:
-			io_cb_err(cx, "connection reset by peer");
+			io_error(cx, "connection reset by peer");
 			break;
 		default:
-			io_cb_err(cx, "connection error");
+			io_error(cx, "connection error");
 			break;
 	}
 
@@ -477,14 +471,14 @@ io_state_ping(struct connection *cx)
 		case MBEDTLS_ERR_SSL_WANT_READ:
 			break;
 		case MBEDTLS_ERR_SSL_PEER_CLOSE_NOTIFY:
-			io_cb_info(cx, "connection closed gracefully");
+			io_info(cx, "connection closed gracefully");
 			break;
 		case MBEDTLS_ERR_NET_CONN_RESET:
 		case 0:
-			io_cb_err(cx, "connection reset by peer");
+			io_error(cx, "connection reset by peer");
 			break;
 		default:
-			io_cb_err(cx, "connection error");
+			io_error(cx, "connection error");
 			break;
 	}
 
@@ -541,43 +535,40 @@ io_thread(void *arg)
 		switch (ST_X(st_cur, st_new)) {
 			case ST_X(IO_ST_DXED, IO_ST_CXNG): /* A1 */
 			case ST_X(IO_ST_RXNG, IO_ST_CXNG): /* A2,C */
-				io_cb_info(cx, "Connecting to %s:%s", cx->host, cx->port);
+				io_info(cx, "Connecting to %s:%s", cx->host, cx->port);
 				break;
 			case ST_X(IO_ST_CXED, IO_ST_CXNG): /* F1 */
-				io_cb_dxed(cx);
+				io_dxed(cx);
 				break;
 			case ST_X(IO_ST_PING, IO_ST_CXNG): /* F2 */
-				io_cb_err(cx, "Connection timeout (%u)", cx->ping);
-				io_cb_dxed(cx);
+				io_error(cx, "Connection timeout (%u)", cx->ping);
+				io_dxed(cx);
 				break;
 			case ST_X(IO_ST_RXNG, IO_ST_DXED): /* B1 */
 			case ST_X(IO_ST_CXNG, IO_ST_DXED): /* B2 */
-				io_cb_info(cx, "Connection cancelled");
+				io_info(cx, "Connection cancelled");
 				break;
 			case ST_X(IO_ST_CXED, IO_ST_DXED): /* B3 */
 			case ST_X(IO_ST_PING, IO_ST_DXED): /* B4 */
-				io_cb_info(cx, "Connection closed");
-				io_cb_dxed(cx);
+				io_info(cx, "Connection closed");
+				io_dxed(cx);
 				break;
 			case ST_X(IO_ST_CXNG, IO_ST_CXED): /* D */
-				io_cb_info(cx, " .. Connection successful");
-				io_cb_cxed(cx);
+				io_info(cx, " .. Connection successful");
+				io_cxed(cx);
 				cx->rx_sleep = 0;
 				break;
 			case ST_X(IO_ST_CXNG, IO_ST_RXNG): /* E */
-				io_cb_err(cx, " .. Connection failed -- retrying");
+				io_error(cx, " .. Connection failed -- retrying");
 				break;
 			case ST_X(IO_ST_CXED, IO_ST_PING): /* G */
-				cx->ping = IO_PING_MIN;
-				io_cb_ping_1(cx, cx->ping);
+				io_ping(cx, (cx->ping = IO_PING_MIN));
 				break;
 			case ST_X(IO_ST_PING, IO_ST_PING): /* H */
-				cx->ping += IO_PING_REFRESH;
-				io_cb_ping_n(cx, cx->ping);
+				io_ping(cx, (cx->ping += IO_PING_REFRESH));
 				break;
 			case ST_X(IO_ST_PING, IO_ST_CXED): /* I */
-				cx->ping = 0;
-				io_cb_ping_0(cx, cx->ping);
+				io_ping(cx, (cx->ping = 0));
 				break;
 			default:
 				fatal("BAD ST_X from: %d to: %d", st_cur, st_new);
@@ -617,9 +608,7 @@ io_cx_read(struct connection *cx, uint32_t timeout)
 	}
 
 	if (ret > 0) {
-		PT_LK(&io_cb_mutex);
-		io_cb_read_soc((char *)buf, (size_t)ret,  cx->obj);
-		PT_UL(&io_cb_mutex);
+		IO_CB(io_cb_read_soc((char *)buf, (size_t)ret,  cx->obj));
 	}
 
 	return ret;
@@ -723,10 +712,10 @@ io_net_connect(struct connection *cx)
 			return -1;
 
 		if (ret == EAI_SYSTEM) {
-			io_cb_err(cx, " .. Failed to resolve host: %s",
+			io_error(cx, " .. Failed to resolve host: %s",
 				io_strerror(buf, sizeof(buf)));
 		} else {
-			io_cb_err(cx, " .. Failed to resolve host: %s",
+			io_error(cx, " .. Failed to resolve host: %s",
 				gai_strerror(ret));
 		}
 
@@ -750,12 +739,12 @@ io_net_connect(struct connection *cx)
 	}
 
 	if (!p && soc < 0) {
-		io_cb_err(cx, " .. Failed to obtain socket: %s", io_strerror(buf, sizeof(buf)));
+		io_error(cx, " .. Failed to obtain socket: %s", io_strerror(buf, sizeof(buf)));
 		goto err;
 	}
 
 	if (!p && soc >= 0) {
-		io_cb_err(cx, " .. Failed to connect: %s", io_strerror(buf, sizeof(buf)));
+		io_error(cx, " .. Failed to connect: %s", io_strerror(buf, sizeof(buf)));
 		goto err;
 	}
 
@@ -765,7 +754,7 @@ io_net_connect(struct connection *cx)
 		addr = &(((struct sockaddr_in6*)p->ai_addr)->sin6_addr);
 
 	if (inet_ntop(p->ai_family, addr, buf, sizeof(buf)))
-		io_cb_info(cx, " .. Connected [%s]", buf);
+		io_info(cx, " .. Connected [%s]", buf);
 
 	ret = soc;
 
@@ -800,7 +789,7 @@ io_tls_establish(struct connection *cx)
 {
 	int ret;
 
-	io_cb_info(cx, " .. Establishing TLS connection");
+	io_info(cx, " .. Establishing TLS connection");
 
 	mbedtls_ssl_init(&(cx->tls_ctx));
 	mbedtls_ssl_config_init(&(cx->tls_conf));
@@ -810,7 +799,7 @@ io_tls_establish(struct connection *cx)
 			MBEDTLS_SSL_IS_CLIENT,
 			MBEDTLS_SSL_TRANSPORT_STREAM,
 			MBEDTLS_SSL_PRESET_DEFAULT))) {
-		io_cb_err(cx, " .. %s ", io_tls_err(ret));
+		io_error(cx, " .. %s ", io_tls_err(ret));
 		goto err;
 	}
 
@@ -839,17 +828,17 @@ io_tls_establish(struct connection *cx)
 	}
 
 	if ((ret = mbedtls_net_set_block(&(cx->net_ctx)))) {
-		io_cb_err(cx, " .. %s ", io_tls_err(ret));
+		io_error(cx, " .. %s ", io_tls_err(ret));
 		goto err;
 	}
 
 	if ((ret = mbedtls_ssl_setup(&(cx->tls_ctx), &(cx->tls_conf)))) {
-		io_cb_err(cx, " .. %s ", io_tls_err(ret));
+		io_error(cx, " .. %s ", io_tls_err(ret));
 		goto err;
 	}
 
 	if ((ret = mbedtls_ssl_set_hostname(&(cx->tls_ctx), cx->host))) {
-		io_cb_err(cx, " .. %s ", io_tls_err(ret));
+		io_error(cx, " .. %s ", io_tls_err(ret));
 		goto err;
 	}
 
@@ -867,27 +856,27 @@ io_tls_establish(struct connection *cx)
 	}
 
 	if (ret && cx->flags & IO_TLS_VRFY_DISABLED) {
-		io_cb_err(cx, " .. %s ", io_tls_err(ret));
+		io_error(cx, " .. %s ", io_tls_err(ret));
 		goto err;
 	}
 
 	if (io_tls_x509_vrfy(cx) < 0)
-		io_cb_err(cx, " .... Unknown x509 error");
+		io_error(cx, " .... Unknown x509 error");
 
 	if (ret) {
-		io_cb_err(cx, " .. %s ", io_tls_err(ret));
+		io_error(cx, " .. %s ", io_tls_err(ret));
 		goto err;
 	}
 
-	io_cb_info(cx, " .. TLS connection established");
-	io_cb_info(cx, " ..   - version:     %s", mbedtls_ssl_get_version(&(cx->tls_ctx)));
-	io_cb_info(cx, " ..   - ciphersuite: %s", mbedtls_ssl_get_ciphersuite(&(cx->tls_ctx)));
+	io_info(cx, " .. TLS connection established");
+	io_info(cx, " ..   - version:     %s", mbedtls_ssl_get_version(&(cx->tls_ctx)));
+	io_info(cx, " ..   - ciphersuite: %s", mbedtls_ssl_get_ciphersuite(&(cx->tls_ctx)));
 
 	return 0;
 
 err:
 
-	io_cb_err(cx, " .. TLS connection failure");
+	io_error(cx, " .. TLS connection failure");
 
 	mbedtls_ssl_config_free(&(cx->tls_conf));
 	mbedtls_ssl_free(&(cx->tls_ctx));
@@ -918,7 +907,7 @@ io_tls_x509_vrfy(struct connection *cx)
 		if ((p = strchr(buf, '\n')))
 			*p++ = 0;
 
-		io_cb_err(cx, " .... %s", s);
+		io_error(cx, " .... %s", s);
 
 	} while ((s = p));
 

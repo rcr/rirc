@@ -23,10 +23,6 @@
 #define CTRL(k) ((k) & 0x1f)
 
 static void _newline(struct channel*, enum buffer_line_t, const char*, const char*, va_list);
-static void state_io_cxed(struct server*);
-static void state_io_dxed(struct server*);
-static void state_io_ping(struct server*, unsigned int);
-static void state_io_signal(enum io_sig_t);
 
 static int state_input_linef(struct channel*);
 static int state_input_ctrlch(const char*, size_t);
@@ -691,103 +687,6 @@ state_complete(char *str, uint16_t len, uint16_t max, int first)
 }
 
 static void
-state_io_cxed(struct server *s)
-{
-	int ret;
-	server_reset(s);
-	server_nicks_next(s);
-
-	if ((ret = io_sendf(s->connection, "CAP LS " IRCV3_CAP_VERSION)))
-		newlinef(s->channel, 0, "-!!-", "sendf fail: %s", io_err(ret));
-
-	if (s->pass && (ret = io_sendf(s->connection, "PASS %s", s->pass)))
-		newlinef(s->channel, 0, "-!!-", "sendf fail: %s", io_err(ret));
-
-	if ((ret = io_sendf(s->connection, "NICK %s", s->nick)))
-		newlinef(s->channel, 0, "-!!-", "sendf fail: %s", io_err(ret));
-
-	if ((ret = io_sendf(s->connection, "USER %s 8 * :%s", s->username, s->realname)))
-		newlinef(s->channel, 0, "-!!-", "sendf fail: %s", io_err(ret));
-
-	draw(DRAW_STATUS);
-}
-
-static void
-state_io_dxed(struct server *s)
-{
-	struct channel *c = s->channel;
-
-	do {
-		newline(c, 0, "-!!-", " -- disconnected --");
-		channel_reset(c);
-		c = c->next;
-	} while (c != s->channel);
-}
-
-static void
-state_io_ping(struct server *s, unsigned int ping)
-{
-	int ret;
-
-	s->ping = ping;
-
-	if (ping != IO_PING_MIN)
-		draw(DRAW_STATUS);
-	else if ((ret = io_sendf(s->connection, "PING :%s", s->host)))
-		newlinef(s->channel, 0, "-!!-", "sendf fail: %s", io_err(ret));
-}
-
-static void
-state_io_signal(enum io_sig_t sig)
-{
-	switch (sig) {
-		case IO_SIGWINCH:
-			draw(DRAW_ALL);
-			break;
-		default:
-			newlinef(state.default_channel, 0, "-!!-", "unhandled signal %d", sig);
-	}
-}
-
-void
-io_cb(enum io_cb_t type, const void *cb_obj, ...)
-{
-	struct server *s = (struct server *)cb_obj;
-	va_list ap;
-
-	va_start(ap, cb_obj);
-
-	switch (type) {
-		case IO_CB_CXED:
-			state_io_cxed(s);
-			break;
-		case IO_CB_DXED:
-			state_io_dxed(s);
-			break;
-		case IO_CB_PING_0:
-		case IO_CB_PING_1:
-		case IO_CB_PING_N:
-			state_io_ping(s, va_arg(ap, unsigned int));
-			break;
-		case IO_CB_ERR:
-			_newline(s->channel, 0, "-!!-", va_arg(ap, const char *), ap);
-			break;
-		case IO_CB_INFO:
-			_newline(s->channel, 0, "--", va_arg(ap, const char *), ap);
-			break;
-		case IO_CB_SIGNAL:
-			state_io_signal(va_arg(ap, enum io_sig_t));
-			break;
-		default:
-			fatal("unhandled io_cb_t: %d", type);
-	}
-
-	va_end(ap);
-
-	draw(DRAW_FLUSH);
-}
-
-static void
 command(struct channel *c, char *buf)
 {
 	const char *cmnd;
@@ -1061,25 +960,90 @@ io_cb_read_soc(char *buf, size_t len, const void *cb_obj)
 }
 
 void
-io_cb_log(const void *cb_obj, enum io_log_level lvl, const char *fmt, ...)
+io_cb_cxed(const void *cb_obj)
 {
 	struct server *s = (struct server *)cb_obj;
 
+	int ret;
+	server_reset(s);
+	server_nicks_next(s);
+
+	if ((ret = io_sendf(s->connection, "CAP LS " IRCV3_CAP_VERSION)))
+		newlinef(s->channel, 0, "-!!-", "sendf fail: %s", io_err(ret));
+
+	if (s->pass && (ret = io_sendf(s->connection, "PASS %s", s->pass)))
+		newlinef(s->channel, 0, "-!!-", "sendf fail: %s", io_err(ret));
+
+	if ((ret = io_sendf(s->connection, "NICK %s", s->nick)))
+		newlinef(s->channel, 0, "-!!-", "sendf fail: %s", io_err(ret));
+
+	if ((ret = io_sendf(s->connection, "USER %s 8 * :%s", s->username, s->realname)))
+		newlinef(s->channel, 0, "-!!-", "sendf fail: %s", io_err(ret));
+
+	draw(DRAW_STATUS);
+	draw(DRAW_FLUSH);
+}
+
+void
+io_cb_dxed(const void *cb_obj)
+{
+	struct server *s = (struct server *)cb_obj;
+	struct channel *c = s->channel;
+
+	do {
+		newline(c, 0, "-!!-", " -- disconnected --");
+		channel_reset(c);
+		c = c->next;
+	} while (c != s->channel);
+
+	draw(DRAW_FLUSH);
+}
+
+void
+io_cb_ping(const void *cb_obj, unsigned ping)
+{
+	int ret;
+	struct server *s = (struct server *)cb_obj;
+
+	s->ping = ping;
+
+	if (ping != IO_PING_MIN)
+		draw(DRAW_STATUS);
+	else if ((ret = io_sendf(s->connection, "PING :%s", s->host)))
+		newlinef(s->channel, 0, "-!!-", "sendf fail: %s", io_err(ret));
+
+	draw(DRAW_FLUSH);
+}
+
+void
+io_cb_sigwinch(void)
+{
+	draw(DRAW_ALL);
+	draw(DRAW_FLUSH);
+}
+
+void
+io_cb_info(const void *cb_obj, const char *fmt, ...)
+{
 	va_list ap;
 	va_start(ap, fmt);
 
-	switch (lvl) {
-		case IO_LOG_ERROR:
-			_newline(s->channel, 0, "-!!-", fmt, ap);
-			break;
-		case IO_LOG_WARN:
-		case IO_LOG_INFO:
-		case IO_LOG_DEBUG:
-			_newline(s->channel, 0, "--", fmt, ap);
-			break;
-		default:
-			fatal("invalid log level");
-	}
+	_newline(((struct server *)cb_obj)->channel, 0, "--", fmt, ap);
 
 	va_end(ap);
+
+	draw(DRAW_FLUSH);
+}
+
+void
+io_cb_error(const void *cb_obj, const char *fmt, ...)
+{
+	va_list ap;
+	va_start(ap, fmt);
+
+	_newline(((struct server *)cb_obj)->channel, 0, "-!!-", fmt, ap);
+
+	va_end(ap);
+
+	draw(DRAW_FLUSH);
 }
