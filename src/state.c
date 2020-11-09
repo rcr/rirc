@@ -37,6 +37,9 @@ static struct
 	struct server_list servers;
 } state;
 
+static unsigned state_tty_cols;
+static unsigned state_tty_rows;
+
 struct server_list*
 state_server_list(void)
 {
@@ -110,6 +113,18 @@ state_term(void)
 		connection_free(s2->connection);
 		server_free(s2);
 	} while (s1 != state_server_list()->head);
+}
+
+unsigned
+state_cols(void)
+{
+	return state_tty_cols;
+}
+
+unsigned
+state_rows(void)
+{
+	return state_tty_rows;
 }
 
 void
@@ -474,8 +489,8 @@ buffer_scrollback_back(struct channel *c)
 	unsigned int buffer_i = b->scrollback,
 	             count = 0,
 	             text_w = 0,
-	             cols = io_tty_cols(),
-	             rows = io_tty_rows() - 4;
+	             cols = state_tty_cols,
+	             rows = state_tty_rows - 4;
 
 	struct buffer_line *line = buffer_line(b, buffer_i);
 
@@ -516,8 +531,8 @@ buffer_scrollback_forw(struct channel *c)
 
 	unsigned int count = 0,
 	             text_w = 0,
-	             cols = io_tty_cols(),
-	             rows = io_tty_rows() - 4;
+	             cols = state_tty_cols,
+	             rows = state_tty_rows - 4;
 
 	struct buffer *b = &c->buffer;
 
@@ -1012,8 +1027,11 @@ io_cb_ping(const void *cb_obj, unsigned ping)
 }
 
 void
-io_cb_sigwinch(void)
+io_cb_sigwinch(unsigned cols, unsigned rows)
 {
+	state_tty_cols = cols;
+	state_tty_rows = rows;
+
 	draw(DRAW_ALL);
 	draw(DRAW_FLUSH);
 }

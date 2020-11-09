@@ -122,23 +122,13 @@ draw(enum draw_bit bit)
 		case DRAW_ALL:
 			draw_state.bits.all = -1;
 			break;
+		case DRAW_CLEAR:
+			printf(RESET_ATTRIBUTES);
+			printf(CLEAR_FULL);
+			break;
 		default:
 			fatal("unknown draw bit");
 	}
-}
-
-void
-draw_init(void)
-{
-	draw(DRAW_ALL);
-	draw(DRAW_FLUSH);
-}
-
-void
-draw_term(void)
-{
-	printf(RESET_ATTRIBUTES);
-	printf(CLEAR_FULL);
 }
 
 static void
@@ -153,7 +143,7 @@ draw_bits(void)
 	struct coords coords;
 	struct channel *c = current_channel();
 
-	if (io_tty_cols() < COLS_MIN || io_tty_rows() < ROWS_MIN) {
+	if (state_cols() < COLS_MIN || state_rows() < ROWS_MIN) {
 		printf(CLEAR_FULL MOVE(1, 1) "rirc");
 		fflush(stdout);
 		return;
@@ -163,17 +153,17 @@ draw_bits(void)
 
 	if (draw_state.bits.buffer) {
 		coords.c0 = 1;
-		coords.cN = io_tty_cols();
+		coords.cN = state_cols();
 		coords.r0 = 3;
-		coords.rN = io_tty_rows() - 2;
+		coords.rN = state_rows() - 2;
 		draw_buffer(&c->buffer, coords);
 	}
 
 	if (draw_state.bits.input) {
 		coords.c0 = 1;
-		coords.cN = io_tty_cols();
-		coords.r0 = io_tty_rows();
-		coords.rN = io_tty_rows();
+		coords.cN = state_cols();
+		coords.r0 = state_rows();
+		coords.rN = state_rows();
 		draw_input(&c->input, coords);
 	}
 
@@ -536,7 +526,7 @@ draw_nav(struct channel *c)
 	size_t len, total_len = 0;
 
 	/* Bump the channel frames, if applicable */
-	if ((total_len = (c->name_len + 2)) >= io_tty_cols())
+	if ((total_len = (c->name_len + 2)) >= state_cols())
 		return;
 	else if (c == frame_prev && frame_prev != c_first)
 		frame_prev = channel_get_prev(frame_prev);
@@ -555,7 +545,7 @@ draw_nav(struct channel *c)
 			tmp = channel_get_next(tmp_next);
 			len = tmp->name_len;
 
-			while ((total_len += (len + 2)) < io_tty_cols() && tmp != c_first) {
+			while ((total_len += (len + 2)) < state_cols() && tmp != c_first) {
 
 				tmp_next = tmp;
 
@@ -573,7 +563,7 @@ draw_nav(struct channel *c)
 			tmp = channel_get_prev(tmp_prev);
 			len = tmp->name_len;
 
-			while ((total_len += (len + 2)) < io_tty_cols() && tmp != c_last) {
+			while ((total_len += (len + 2)) < state_cols() && tmp != c_last) {
 
 				tmp_prev = tmp;
 
@@ -588,7 +578,7 @@ draw_nav(struct channel *c)
 		len = tmp->name_len;
 
 		/* Next channel doesn't fit */
-		if ((total_len += (len + 2)) >= io_tty_cols())
+		if ((total_len += (len + 2)) >= state_cols())
 			break;
 
 		if (nextward)
@@ -633,8 +623,8 @@ draw_status(struct channel *c)
 	float sb;
 	int ret;
 	unsigned col = 0;
-	unsigned cols = io_tty_cols();
-	unsigned rows = io_tty_rows();
+	unsigned cols = state_cols();
+	unsigned rows = state_rows();
 
 	/* Insufficient columns for meaningful status */
 	if (cols < 3)

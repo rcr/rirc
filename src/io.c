@@ -143,10 +143,7 @@ static mbedtls_entropy_context  tls_entropy;
 static mbedtls_x509_crt         tls_x509_crt;
 static pthread_mutex_t io_cb_mutex = PTHREAD_MUTEX_INITIALIZER;
 static struct termios term;
-static unsigned io_cols;
-static unsigned io_rows;
 static volatile sig_atomic_t flag_sigwinch_cb; /* sigwinch callback */
-static volatile sig_atomic_t flag_tty_resized; /* sigwinch ws resize */
 
 static const char* io_strerror(char*, size_t);
 static int io_net_connect(struct connection*);
@@ -322,7 +319,7 @@ io_start(void)
 			if (errno == EINTR) {
 				if (flag_sigwinch_cb) {
 					flag_sigwinch_cb = 0;
-					IO_CB(io_cb_sigwinch());
+					io_tty_winsize();
 				}
 			} else {
 				fatal("read: %s", ret ? strerror(errno) : "EOF");
@@ -340,31 +337,12 @@ io_stop(void)
 static void
 io_tty_winsize(void)
 {
-	static struct winsize tty_ws;
+	struct winsize tty_ws;
 
-	if (flag_tty_resized == 0) {
-		flag_tty_resized = 1;
+	if (ioctl(0, TIOCGWINSZ, &tty_ws) < 0)
+		fatal("ioctl: %s", strerror(errno));
 
-		if (ioctl(0, TIOCGWINSZ, &tty_ws) < 0)
-			fatal("ioctl: %s", strerror(errno));
-
-		io_rows = tty_ws.ws_row;
-		io_cols = tty_ws.ws_col;
-	}
-}
-
-unsigned
-io_tty_cols(void)
-{
-	io_tty_winsize();
-	return io_cols;
-}
-
-unsigned
-io_tty_rows(void)
-{
-	io_tty_winsize();
-	return io_rows;
+	IO_CB(io_cb_sigwinch(tty_ws.ws_col, tty_ws.ws_row));
 }
 
 const char*
@@ -629,10 +607,8 @@ io_fatal(const char *f, int errnum)
 static void
 io_sig_handle(int sig)
 {
-	if (sig == SIGWINCH) {
+	if (sig == SIGWINCH)
 		flag_sigwinch_cb = 1;
-		flag_tty_resized = 0;
-	}
 }
 
 static void
@@ -672,6 +648,8 @@ io_tty_init(void)
 
 	if (atexit(io_tty_term))
 		fatal("atexit");
+
+	io_tty_winsize();
 }
 
 static void

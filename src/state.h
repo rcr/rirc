@@ -31,6 +31,10 @@ struct server_list* state_server_list(void);
 void state_init(void);
 void state_term(void);
 
+/* Get tty dimensions */
+unsigned state_cols(void);
+unsigned state_rows(void);
+
 // TODO: most of this stuff can be static
 //TODO: move to channel.c, function of server's channel list
 /* Useful state retrieval abstractions */

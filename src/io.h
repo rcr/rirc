@@ -100,10 +100,6 @@ int io_dx(struct connection*);
 /* Formatted write to connection */
 int io_sendf(struct connection*, const char*, ...);
 
-/* Get tty dimensions */
-unsigned io_tty_cols(void);
-unsigned io_tty_rows(void);
-
 /* IO error string */
 const char* io_err(int);
 
@@ -115,7 +111,7 @@ void io_cb_read_soc(char*, size_t, const void*);
 void io_cb_cxed(const void*);
 void io_cb_dxed(const void*);
 void io_cb_ping(const void*, unsigned);
-void io_cb_sigwinch(void);
+void io_cb_sigwinch(unsigned, unsigned);
 
 /* IO informational callbacks */
 void io_cb_error(const void*, const char*, ...);
