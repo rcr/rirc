@@ -1,12 +1,12 @@
+#include "src/handlers/irc_ctcp.h"
+
 #include <ctype.h>
 #include <errno.h>
 #include <string.h>
 #include <sys/time.h>
 
 #include "src/components/channel.h"
-#include "src/components/server.h"
 #include "src/handlers/irc_ctcp.gperf.out"
-#include "src/handlers/irc_ctcp.h"
 #include "src/io.h"
 #include "src/state.h"
 #include "src/utils/utils.h"

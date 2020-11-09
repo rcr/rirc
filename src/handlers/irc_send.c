@@ -1,13 +1,12 @@
+#include "src/handlers/irc_send.h"
+
 #include <ctype.h>
 #include <sys/time.h>
 
 #include "config.h"
 #include "src/components/buffer.h"
-#include "src/components/channel.h"
 #include "src/components/ircv3.h"
-#include "src/components/server.h"
 #include "src/handlers/irc_send.gperf.out"
-#include "src/handlers/irc_send.h"
 #include "src/io.h"
 #include "src/state.h"
 #include "src/utils/utils.h"

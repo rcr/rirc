@@ -1,6 +1,9 @@
+#include "src/components/buffer.h"
+
 #include <string.h>
 
-#include "src/components/buffer.h"
+#include "config.h"
+#include "src/utils/utils.h"
 
 #define BUFFER_MASK(X) ((X) & (BUFFER_LINES_MAX - 1))
 

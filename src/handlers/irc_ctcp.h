@@ -1,6 +1,8 @@
 #ifndef IRC_CTCP_H
 #define IRC_CTCP_H
 
+#include "src/components/server.h"
+
 /* Summary of CTCP implementation:
  *
  *  NOTICE <targ> :\x01ACTION <text>\x01

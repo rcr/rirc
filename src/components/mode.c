@@ -1,9 +1,8 @@
-/* TODO: safe channels ('!' prefix) (see RFC2811) */
+#include "src/components/mode.h"
 
 #include <ctype.h>
 #include <string.h>
 
-#include "src/components/mode.h"
 #include "src/utils/utils.h"
 
 #define MODE_ISLOWER(X) ((X) >= 'a' && (X) <= 'z')
@@ -33,6 +32,7 @@ static enum mode_err_t mode_cfg_modes(struct mode_cfg*, const char*);
 /* TODO: static inline void mode_bit_set(struct mode*, uint32_t); */
 /* TODO: static inline void mode_bit_isset(struct mode*, uint32_t); */
 /* TODO: aggregate errors with logging callback */
+/* TODO: safe channels ('!' prefix) (see RFC2811) */
 
 static inline int
 mode_isset(const struct mode *m, int flag)

@@ -1,8 +1,9 @@
+#include "src/components/channel.h"
+
 #include <errno.h>
 #include <stdlib.h>
 #include <string.h>
 
-#include "src/components/channel.h"
 #include "src/utils/utils.h"
 
 struct channel*

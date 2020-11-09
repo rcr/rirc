@@ -1,11 +1,11 @@
+#include "src/utils/utils.h"
+
 #include <errno.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <strings.h>
-
-#include "src/utils/utils.h"
 
 static inline int irc_ischanchar(char, int);
 static inline int irc_isnickchar(char, int);

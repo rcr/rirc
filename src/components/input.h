@@ -13,6 +13,7 @@
  * copied into the working area when scrolling
  */
 
+#include <stddef.h>
 #include <stdint.h>
 
 /* 410 max characters for input should be sufficient given

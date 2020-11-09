@@ -1,8 +1,4 @@
-/**
- * state.c
- *
- * All manipulation of global program state
- */
+#include "src/state.h"
 
 #include <ctype.h>
 #include <stdlib.h>
@@ -11,12 +7,12 @@
 #include <stdarg.h>
 #include <stdio.h>
 
+#include "config.h"
 #include "src/draw.h"
 #include "src/handlers/irc_recv.h"
 #include "src/handlers/irc_send.h"
 #include "src/io.h"
 #include "src/rirc.h"
-#include "src/state.h"
 #include "src/utils/utils.h"
 
 /* See: https://vt100.net/docs/vt100-ug/chapter3.html */

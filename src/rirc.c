@@ -1,3 +1,5 @@
+#include "src/rirc.h"
+
 #include <errno.h>
 #include <getopt.h>
 #include <pwd.h>

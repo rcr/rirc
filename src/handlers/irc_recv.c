@@ -1,3 +1,5 @@
+#include "src/handlers/irc_recv.h"
+
 #include <ctype.h>
 #include <errno.h>
 #include <stdlib.h>
@@ -5,7 +7,6 @@
 #include "src/components/server.h"
 #include "src/handlers/irc_ctcp.h"
 #include "src/handlers/irc_recv.gperf.out"
-#include "src/handlers/irc_recv.h"
 #include "src/handlers/ircv3.h"
 #include "src/draw.h"
 #include "src/io.h"

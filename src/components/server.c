@@ -1,9 +1,10 @@
+#include "src/components/server.h"
+
 #include <ctype.h>
 #include <errno.h>
 #include <stdlib.h>
 #include <string.h>
 
-#include "src/components/server.h"
 #include "src/state.h"
 #include "src/utils/utils.h"
 

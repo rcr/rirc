@@ -15,8 +15,8 @@
 #include <unistd.h>
 
 #include "config.h"
-#include "rirc.h"
-#include "utils/utils.h"
+#include "src/rirc.h"
+#include "src/utils/utils.h"
 
 #include "mbedtls/ctr_drbg.h"
 #include "mbedtls/entropy.h"

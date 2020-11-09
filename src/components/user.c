@@ -1,9 +1,8 @@
+#include "src/components/user.h"
+
 #include <errno.h>
 #include <stdlib.h>
 #include <string.h>
-
-#include "src/components/user.h"
-#include "src/utils/utils.h"
 
 static struct user* user(const char*, struct mode);
 static inline int user_cmp(struct user*, struct user*, void *arg);

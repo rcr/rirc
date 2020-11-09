@@ -1,8 +1,4 @@
-/* draw.c
- *
- * Draw the elements in state.c to the terminal.
- *
- * Assumes vt-100 compatible escape codes, as such YMMV */
+#include "src/draw.h"
 
 #include <alloca.h>
 #include <stdarg.h>
@@ -13,7 +9,6 @@
 #include "config.h"
 #include "src/components/channel.h"
 #include "src/components/input.h"
-#include "src/draw.h"
 #include "src/io.h"
 #include "src/state.h"
 #include "src/utils/utils.h"
