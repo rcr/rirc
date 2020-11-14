@@ -246,13 +246,6 @@ channel_clear(struct channel *c)
 	draw(DRAW_BUFFER);
 }
 
-/* WIP:
- *
- * removed action subsystem from input.c
- *
- * eventually should go in action.{h,c}
- *
- */
 /* Max length of user action message */
 #define MAX_ACTION_MESG 256
 char *action_message;
@@ -260,36 +253,7 @@ static int action_close_server(char);
 /* Action handling */
 static int (*action_handler)(char);
 static char action_buff[MAX_ACTION_MESG];
-/* Incremental channel search */
-static int action_find_channel(char);
-/* TODO: This is a first draft for simple channel searching functionality.
- *
- * It can be cleaned up, and input.c is probably not the most ideal place for this */
-#define MAX_SEARCH 128
-struct channel *search_cptr; /* Used for iterative searching, before setting the current channel */
-static char search_buf[MAX_SEARCH];
-static size_t search_i;
 
-static struct channel* search_channels(struct channel*, char*);
-static struct channel*
-search_channels(struct channel *start, char *search)
-{
-	if (start == NULL || *search == '\0')
-		return NULL;
-
-	/* Start the search one past the input */
-	struct channel *c = channel_get_next(start);
-
-	while (c != start) {
-
-		if (strstr(c->name, search))
-			return c;
-
-		c = channel_get_next(c);
-	}
-
-	return NULL;
-}
 static int
 state_input_action(const char *input, size_t len)
 {
@@ -306,6 +270,7 @@ state_input_action(const char *input, size_t len)
 
 	return 0;
 }
+
 static int
 action_close_server(char c)
 {
@@ -339,6 +304,7 @@ action_close_server(char c)
 
 	return 0;
 }
+
 void
 action(int (*a_handler)(char), const char *fmt, ...)
 {
@@ -362,75 +328,6 @@ action(int (*a_handler)(char), const char *fmt, ...)
 		action_message = action_buff;
 		draw(DRAW_INPUT);
 	}
-}
-/* Action line should be:
- *
- *
- * Find: [current result]/[(server if not current server[socket if not 6697])] : <search input> */
-static int
-action_find_channel(char c)
-{
-	/* Incremental channel search */
-
-	/* \n, Esc, ^C cancels a search if no results are found */
-	if (c == '\n' || c == 0x1b || c == CTRL('c')) {
-
-		/* Confirm non-empty match */
-		if (c == '\n' && search_cptr)
-			channel_set_current(search_cptr);
-
-		search_buf[0] = 0;
-		search_i = 0;
-		search_cptr = NULL;
-		return 1;
-	}
-
-	/* ^F repeats the search forward from the current result,
-	 * or resets search criteria if no match */
-	if (c == CTRL('f')) {
-		if (search_cptr == NULL) {
-			search_buf[0] = 0;
-			search_i = 0;
-			action(action_find_channel, "Find: ");
-			return 0;
-		}
-
-		search_cptr = search_channels(search_cptr, search_buf);
-	} else if (c == 0x7f && search_i) {
-		/* Backspace */
-		search_buf[--search_i] = 0;
-		search_cptr = search_channels(current_channel(), search_buf);
-
-	} else if (isprint(c) && search_i < (sizeof(search_buf) - 1)) {
-		/* All other input */
-		search_buf[search_i++] = c;
-		search_buf[search_i] = 0;
-		search_cptr = search_channels(current_channel(), search_buf);
-	}
-
-	/* Reprint the action message */
-	if (search_cptr == NULL) {
-		if (*search_buf)
-			action(action_find_channel, "Find: NO MATCH -- %s", search_buf);
-		else
-			action(action_find_channel, "Find: ");
-	} else {
-		/* Found a channel */
-		if (search_cptr->server == current_channel()->server) {
-			action(action_find_channel, "Find: %s -- %s",
-					search_cptr->name, search_buf);
-		} else {
-			if (!strcmp(search_cptr->server->port, "6697"))
-				action(action_find_channel, "Find: %s/%s -- %s",
-						search_cptr->server->host, search_cptr->name, search_buf);
-			else
-				action(action_find_channel, "Find: %s:%s/%s -- %s",
-						search_cptr->server->host, search_cptr->server->port,
-						search_cptr->name, search_buf);
-		}
-	}
-
-	return 0;
 }
 
 void
@@ -710,51 +607,6 @@ command(struct channel *c, char *buf)
 		return;
 	}
 
-	if (!strcasecmp(cmnd, "quit")) {
-		io_stop();
-	}
-
-	if (!strcasecmp(cmnd, "connect")) {
-		// TODO: parse --args
-		const char *host = strsep(&buf);
-		const char *port = strsep(&buf);
-		const char *pass = strsep(&buf);
-		const char *user = strsep(&buf);
-		const char *real = strsep(&buf);
-		const char *help = ":connect [host [port] [pass] [user] [real]]";
-		struct server *s;
-
-		if (host == NULL) {
-			if (c->server == NULL) {
-				newlinef(c, 0, "-!!-", "%s", help);
-			} else if ((err = io_cx(c->server->connection))) {
-				newlinef(c, 0, "-!!-", "%s", io_err(err));
-			}
-		} else {
-			port = (port ? port : "6697");
-			user = (user ? user : default_username);
-			real = (real ? real : default_realname);
-
-			if ((s = server_list_get(&state.servers, host, port)) != NULL) {
-				channel_set_current(s->channel);
-				newlinef(s->channel, 0, "-!!-", "already connected to %s:%s", host, port);
-			} else {
-				s = server(host, port, pass, user, real);
-				s->connection = connection(s, host, port, 0);
-				server_list_add(state_server_list(), s);
-				channel_set_current(s->channel);
-				io_cx(s->connection);
-				draw(DRAW_ALL);
-			}
-		}
-		return;
-	}
-
-	if (!strcasecmp(cmnd, "disconnect")) {
-		io_dx(c->server->connection);
-		return;
-	}
-
 	if (!strcasecmp(cmnd, "clear")) {
 		channel_clear(c);
 		return;
@@ -765,21 +617,22 @@ command(struct channel *c, char *buf)
 		return;
 	}
 
-	if (!strcasecmp(cmnd, "set")) {
-		/* TODO user, real, nicks, pass, key */
+	if (!strcasecmp(cmnd, "connect")) {
+		if ((err = io_cx(c->server->connection)))
+			newlinef(c, 0, "-!!-", "%s", io_err(err));
 		return;
 	}
 
-	/* TODO:
-	 * help
-	 * ignore
-	 * unignore
-	 * version
-	 * find
-	 * buffers
-	 * b#
-	 * b<num>
-	 */
+	if (!strcasecmp(cmnd, "disconnect")) {
+		if ((err = io_dx(c->server->connection)))
+			newlinef(c, 0, "-!!-", "%s", io_err(err));
+		return;
+	}
+
+	if (!strcasecmp(cmnd, "quit")) {
+		io_stop();
+		return;
+	}
 }
 
 static int
@@ -841,15 +694,8 @@ state_input_ctrlch(const char *c, size_t len)
 			/* Cancel current input */
 			return input_reset(&(current_channel()->input));
 
-		case CTRL('f'):
-			/* Find channel */
-			if (current_channel()->server)
-				 action(action_find_channel, "Find: ");
-			break;
-
 		case CTRL('l'):
 			/* Clear current channel */
-			/* TODO: as action with confirmation */
 			channel_clear(current_channel());
 			break;
 
