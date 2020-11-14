@@ -8,6 +8,7 @@
 #include <stdio.h>
 
 #include "config.h"
+#include "src/components/channel.h"
 #include "src/draw.h"
 #include "src/handlers/irc_recv.h"
 #include "src/handlers/irc_send.h"
@@ -28,6 +29,7 @@ static uint16_t state_complete(char*, uint16_t, uint16_t, int);
 static uint16_t state_complete_list(char*, uint16_t, uint16_t, const char**);
 static uint16_t state_complete_user(char*, uint16_t, uint16_t, int);
 
+static int action_clear(char);
 static int action_close_server(char);
 static int action_error(char);
 static int (*action_handler)(char);
@@ -259,6 +261,20 @@ state_input_action(const char *input, size_t len)
 	/* ^c canceled the action, or the action was resolved */
 	if (len == 1 && (*input == CTRL('c') || action_handler(*input))) {
 		action_handler = NULL;
+		return 1;
+	}
+
+	return 0;
+}
+
+static int
+action_clear(char c)
+{
+	if (toupper(c) == 'N')
+		return 1;
+
+	if (toupper(c) == 'Y') {
+		channel_clear(current_channel());
 		return 1;
 	}
 
@@ -703,7 +719,7 @@ state_input_ctrlch(const char *c, size_t len)
 
 		case CTRL('l'):
 			/* Clear current channel */
-			channel_clear(current_channel());
+			action(action_clear, "Clear buffer '%s'?   [y/n]", current_channel()->name);
 			break;
 
 		case CTRL('p'):

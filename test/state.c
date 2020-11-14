@@ -60,6 +60,8 @@ test_state(void)
 	assert_strcmp(CURRENT_LINE, "Type :quit to exit rirc");
 
 	INP_C(CTRL('l'));
+	assert_strcmp(action_message(), "Clear buffer 'rirc'?   [y/n]");
+	INP_C('y');
 	assert_ptr_null(buffer_head(&current_channel()->buffer));
 
 	/* Test adding servers */

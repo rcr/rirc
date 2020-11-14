@@ -152,6 +152,7 @@ draw_bits(void)
 	printf(CURSOR_SAVE);
 
 	if (draw_state.bits.buffer) {
+		printf(RESET_ATTRIBUTES);
 		coords.c0 = 1;
 		coords.cN = state_cols();
 		coords.r0 = 3;
@@ -160,6 +161,7 @@ draw_bits(void)
 	}
 
 	if (draw_state.bits.input) {
+		printf(RESET_ATTRIBUTES);
 		coords.c0 = 1;
 		coords.cN = state_cols();
 		coords.r0 = state_rows();
@@ -167,11 +169,15 @@ draw_bits(void)
 		draw_input(&c->input, coords);
 	}
 
-	if (draw_state.bits.nav)
+	if (draw_state.bits.nav) {
+		printf(RESET_ATTRIBUTES);
 		draw_nav(c);
+	}
 
-	if (draw_state.bits.status)
+	if (draw_state.bits.status) {
+		printf(RESET_ATTRIBUTES);
 		draw_status(c);
+	}
 
 	printf(RESET_ATTRIBUTES);
 	printf(CURSOR_RESTORE);
@@ -437,7 +443,6 @@ draw_input(struct input *inp, struct coords coords)
 	unsigned cols_t = coords.cN - coords.c0 + 1,
 	         cursor = coords.c0;
 
-	printf(RESET_ATTRIBUTES);
 	printf(MOVE(%d, 1) CLEAR_LINE, coords.rN);
 	printf(CURSOR_SAVE);
 
@@ -632,8 +637,6 @@ draw_status(struct channel *c)
 	/* Insufficient columns for meaningful status */
 	if (cols < 3)
 		return;
-
-	printf(RESET_ATTRIBUTES);
 
 	printf(MOVE(2, 1));
 	printf("%.*s", cols, (char *)(memset(alloca(cols), *HORIZONTAL_SEPARATOR, cols)));
