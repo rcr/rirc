@@ -56,6 +56,6 @@ void channel_set_current(struct channel*);
 void newlinef(struct channel*, enum buffer_line_t, const char*, const char*, ...);
 void newline(struct channel*, enum buffer_line_t, const char*, const char*);
 
-extern char *action_message;
+const char *action_message(void);
 
 #endif

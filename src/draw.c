@@ -464,21 +464,24 @@ draw_input(struct input *inp, struct coords coords)
 			goto print_input;
 	}
 
-	if (!draw_fmt(&input_ptr, &buff_n, &text_n, 0,
-			"%s", draw_colour(INPUT_FG, INPUT_BG)))
-		goto print_input;
+	if (action_message()) {
 
-	if (action_message) {
+		if (!draw_fmt(&input_ptr, &buff_n, &text_n, 0,
+				"%s", draw_colour(ACTION_FG, ACTION_BG)))
+			goto print_input;
 
 		cursor = coords.cN;
 
-		if (!draw_fmt(&input_ptr, &buff_n, &text_n, 1,
-				"%s", action_message))
+		if (!draw_fmt(&input_ptr, &buff_n, &text_n, 1, "-- %s --", action_message()))
 			goto print_input;
 
 		cursor = cols_t - text_n + 1;
 
 	} else {
+		if (!draw_fmt(&input_ptr, &buff_n, &text_n, 0,
+				"%s", draw_colour(INPUT_FG, INPUT_BG)))
+			goto print_input;
+
 		cursor += input_frame(inp, input_ptr, text_n);
 	}
 

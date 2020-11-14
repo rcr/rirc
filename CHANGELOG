@@ -11,6 +11,9 @@ Summary of notable changes and features
     - add CHGHOST_THRESHOLD define to config.def.h
  - add IRCv3 CAP invite-notify
  - add IRCv3 CAP extended-join
+ - add action message colouring config
+    - add ACTION_FG define to config.def.h
+    - add ACTION_BG define to config.def.h
 ### Fixes
  - fix incorrect INVITE message handling
 

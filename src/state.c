@@ -28,6 +28,11 @@ static uint16_t state_complete(char*, uint16_t, uint16_t, int);
 static uint16_t state_complete_list(char*, uint16_t, uint16_t, const char**);
 static uint16_t state_complete_user(char*, uint16_t, uint16_t, int);
 
+static int action_close_server(char);
+static int action_error(char);
+static int (*action_handler)(char);
+static char action_buff[256];
+
 static void command(struct channel*, char*);
 
 static struct
@@ -246,25 +251,14 @@ channel_clear(struct channel *c)
 	draw(DRAW_BUFFER);
 }
 
-/* Max length of user action message */
-#define MAX_ACTION_MESG 256
-char *action_message;
-static int action_close_server(char);
-/* Action handling */
-static int (*action_handler)(char);
-static char action_buff[MAX_ACTION_MESG];
-
 static int
 state_input_action(const char *input, size_t len)
 {
 	/* Waiting for user confirmation */
 
+	/* ^c canceled the action, or the action was resolved */
 	if (len == 1 && (*input == CTRL('c') || action_handler(*input))) {
-		/* ^c canceled the action, or the action was resolved */
-
-		action_message = NULL;
 		action_handler = NULL;
-
 		return 1;
 	}
 
@@ -276,10 +270,10 @@ action_close_server(char c)
 {
 	/* Confirm closing a server */
 
-	if (c == 'n' || c == 'N')
+	if (toupper(c) == 'N')
 		return 1;
 
-	if (c == 'y' || c == 'Y') {
+	if (toupper(c) == 'Y') {
 
 		int ret;
 		struct channel *c = current_channel();
@@ -305,6 +299,14 @@ action_close_server(char c)
 	return 0;
 }
 
+static int
+action_error(char c)
+{
+	UNUSED(c);
+
+	return 1;
+}
+
 void
 action(int (*a_handler)(char), const char *fmt, ...)
 {
@@ -318,16 +320,21 @@ action(int (*a_handler)(char), const char *fmt, ...)
 	va_list ap;
 
 	va_start(ap, fmt);
-	len = vsnprintf(action_buff, MAX_ACTION_MESG, fmt, ap);
+	len = vsnprintf(action_buff, sizeof(action_buff), fmt, ap);
 	va_end(ap);
 
 	if (len < 0) {
 		debug("vsnprintf failed");
 	} else {
 		action_handler = a_handler;
-		action_message = action_buff;
 		draw(DRAW_INPUT);
 	}
+}
+
+const char*
+action_message(void)
+{
+	return (action_handler ? action_buff : NULL);
 }
 
 void
@@ -619,13 +626,13 @@ command(struct channel *c, char *buf)
 
 	if (!strcasecmp(cmnd, "connect")) {
 		if ((err = io_cx(c->server->connection)))
-			newlinef(c, 0, "-!!-", "%s", io_err(err));
+			action(action_error, "Error: %s", io_err(err));
 		return;
 	}
 
 	if (!strcasecmp(cmnd, "disconnect")) {
 		if ((err = io_dx(c->server->connection)))
-			newlinef(c, 0, "-!!-", "%s", io_err(err));
+			action(action_error, "Error: %s", io_err(err));
 		return;
 	}
 
@@ -768,7 +775,7 @@ io_cb_read_inp(char *buf, size_t len)
 
 	if (len == 0)
 		fatal("zero length message");
-	else if (action_message)
+	else if (action_handler)
 		redraw_input = state_input_action(buf, len);
 	else if (iscntrl(*buf))
 		redraw_input = state_input_ctrlch(buf, len);
