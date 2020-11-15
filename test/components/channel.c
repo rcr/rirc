@@ -19,9 +19,9 @@ test_channel_list(void)
 
 	memset(&clist, 0, sizeof(clist));
 
-	c1 = channel("aaa", CHANNEL_T_OTHER);
-	c2 = channel("bbb", CHANNEL_T_OTHER);
-	c3 = channel("ccc", CHANNEL_T_OTHER);
+	c1 = channel("aaa", CHANNEL_T_RIRC);
+	c2 = channel("bbb", CHANNEL_T_RIRC);
+	c3 = channel("ccc", CHANNEL_T_RIRC);
 
 	channel_list_add(&clist, c1);
 	channel_list_add(&clist, c2);

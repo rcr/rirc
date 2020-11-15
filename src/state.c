@@ -29,8 +29,11 @@ static uint16_t state_complete(char*, uint16_t, uint16_t, int);
 static uint16_t state_complete_list(char*, uint16_t, uint16_t, const char**);
 static uint16_t state_complete_user(char*, uint16_t, uint16_t, int);
 
+static void state_channel_clear(int);
+static void state_channel_close(int);
+
 static int action_clear(char);
-static int action_close_server(char);
+static int action_close(char);
 static int action_error(char);
 static int (*action_handler)(char);
 static char action_buff[256];
@@ -89,7 +92,7 @@ static const char *cmd_list[] = {
 void
 state_init(void)
 {
-	state.default_channel = state.current_channel = channel("rirc", CHANNEL_T_OTHER);
+	state.default_channel = state.current_channel = channel("rirc", CHANNEL_T_RIRC);
 
 	newline(state.default_channel, 0, "--", "      _");
 	newline(state.default_channel, 0, "--", " _ __(_)_ __ ___");
@@ -246,13 +249,6 @@ state_server_set_chans(struct server *s, const char *chans)
 	return 0;
 }
 
-void
-channel_clear(struct channel *c)
-{
-	memset(&(c->buffer), 0, sizeof(c->buffer));
-	draw(DRAW_BUFFER);
-}
-
 static int
 state_input_action(const char *input, size_t len)
 {
@@ -268,13 +264,21 @@ state_input_action(const char *input, size_t len)
 }
 
 static int
+action_error(char c)
+{
+	UNUSED(c);
+
+	return 1;
+}
+
+static int
 action_clear(char c)
 {
 	if (toupper(c) == 'N')
 		return 1;
 
 	if (toupper(c) == 'Y') {
-		channel_clear(current_channel());
+		state_channel_clear(0);
 		return 1;
 	}
 
@@ -282,45 +286,17 @@ action_clear(char c)
 }
 
 static int
-action_close_server(char c)
+action_close(char c)
 {
-	/* Confirm closing a server */
-
 	if (toupper(c) == 'N')
 		return 1;
 
 	if (toupper(c) == 'Y') {
-
-		int ret;
-		struct channel *c = current_channel();
-		struct server *s = c->server;
-
-		/* If closing the last server */
-		if ((state.current_channel = c->server->next->channel) == c->server->channel)
-			state.current_channel = state.default_channel;
-
-		if ((ret = io_sendf(s->connection, "QUIT :%s", DEFAULT_QUIT_MESG)))
-			newlinef(s->channel, 0, "-!!-", "sendf fail: %s", io_err(ret));
-
-		io_dx(s->connection);
-		connection_free(s->connection);
-		server_list_del(state_server_list(), s);
-		server_free(s);
-
-		draw(DRAW_ALL);
-
+		state_channel_close(0);
 		return 1;
 	}
 
 	return 0;
-}
-
-static int
-action_error(char c)
-{
-	UNUSED(c);
-
-	return 1;
 }
 
 void
@@ -353,49 +329,67 @@ action_message(void)
 	return (action_handler ? action_buff : NULL);
 }
 
-void
-channel_close(struct channel *c)
+static void
+state_channel_clear(int action_confirm)
 {
-	/* Close a channel. If the current channel is being
-	 * closed, update state appropriately */
+	struct channel *c = current_channel();
 
-	if (c == state.default_channel) {
-		newline(c, 0, "--", "Type :quit to exit rirc");
+	if (action_confirm) {
+		action(action_clear, "Clear buffer '%s'?   [y/n]", c->name);
+	} else {
+		memset(&(c->buffer), 0, sizeof(c->buffer));
+		draw(DRAW_BUFFER);
+	}
+}
+
+static void
+state_channel_close(int action_confirm)
+{
+	/* Close the current channel */
+
+	struct channel *c = current_channel();
+	struct server *s = c->server;
+
+	if (c->type == CHANNEL_T_RIRC) {
+		action(action_error, "Type :quit to exit rirc");
+		return;
+	}
+
+	if (action_confirm) {
+
+		if (c->type == CHANNEL_T_CHANNEL || c->type == CHANNEL_T_PRIVATE)
+			action(action_close, "Close '%s'?   [y/n]", c->name);
+
+		if (c->type == CHANNEL_T_SERVER)
+			action(action_close, "Close server '%s'? [%d channels]   [y/n])",
+				c->name, (s->clist.count - 1));
+
+		return;
+	}
+
+	if (c->type == CHANNEL_T_CHANNEL || c->type == CHANNEL_T_PRIVATE) {
+
+		if (s->connected && c->type == CHANNEL_T_CHANNEL && !c->parted)
+			io_sendf(s->connection, "PART %s :%s", c->name, DEFAULT_PART_MESG);
+
+		channel_set_current(c->next);
+		channel_list_del(&(s->clist), c);
+		channel_free(c);
 		return;
 	}
 
 	if (c->type == CHANNEL_T_SERVER) {
-		/* Closing a server, confirm the number of channels being closed */
 
-		int num_chans = 0;
-
-		while ((c = c->next)->type != CHANNEL_T_SERVER)
-			num_chans++;
-
-		if (num_chans)
-			action(action_close_server, "Close server '%s'? Channels: %d   [y/n]",
-					c->server->host, num_chans);
-		else
-			action(action_close_server, "Close server '%s'?   [y/n]", c->server->host);
-	} else {
-		/* Closing a channel */
-		if (c->type == CHANNEL_T_CHANNEL && !c->parted) {
-			int ret;
-			if (0 != (ret = io_sendf(c->server->connection, "PART %s", c->name))) {
-				// FIXME: closing a parted channel when server is disconnected isnt an error
-				newlinef(c->server->channel, 0, "sendf fail", "%s", io_err(ret));
-			}
+		if (s->connected) {
+			io_sendf(s->connection, "QUIT :%s", DEFAULT_QUIT_MESG);
+			io_dx(s->connection);
 		}
 
-		/* If closing the current channel, update state to a new channel */
-		if (c == current_channel()) {
-			channel_set_current(c->next);
-		} else {
-			draw(DRAW_NAV);
-		}
-
-		channel_list_del(&c->server->clist, c);
-		channel_free(c);
+		channel_set_current((s->next != s ? s->next->channel : state.default_channel));
+		connection_free(s->connection);
+		server_list_del(state_server_list(), s);
+		server_free(s);
+		return;
 	}
 }
 
@@ -631,12 +625,12 @@ command(struct channel *c, char *buf)
 	}
 
 	if (!strcasecmp(cmnd, "clear")) {
-		channel_clear(c);
+		state_channel_clear(0);
 		return;
 	}
 
 	if (!strcasecmp(cmnd, "close")) {
-		channel_close(c);
+		state_channel_close(0);
 		return;
 	}
 
@@ -719,7 +713,7 @@ state_input_ctrlch(const char *c, size_t len)
 
 		case CTRL('l'):
 			/* Clear current channel */
-			action(action_clear, "Clear buffer '%s'?   [y/n]", current_channel()->name);
+			state_channel_clear(1);
 			break;
 
 		case CTRL('p'):
@@ -733,8 +727,7 @@ state_input_ctrlch(const char *c, size_t len)
 			break;
 
 		case CTRL('x'):
-			/* Close current channel */
-			channel_close(current_channel());
+			state_channel_close(1);
 			break;
 
 		case CTRL('u'):
@@ -850,6 +843,8 @@ io_cb_cxed(const void *cb_obj)
 	server_reset(s);
 	server_nicks_next(s);
 
+	s->connected = 1;
+
 	if ((ret = io_sendf(s->connection, "CAP LS " IRCV3_CAP_VERSION)))
 		newlinef(s->channel, 0, "-!!-", "sendf fail: %s", io_err(ret));
 
@@ -871,6 +866,8 @@ io_cb_dxed(const void *cb_obj)
 {
 	struct server *s = (struct server *)cb_obj;
 	struct channel *c = s->channel;
+
+	s->connected = 0;
 
 	do {
 		newline(c, 0, "-!!-", " -- disconnected --");

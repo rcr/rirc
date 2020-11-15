@@ -57,7 +57,8 @@ test_state(void)
 	INP_C(CTRL('c'));
 	INP_C(CTRL('p'));
 	INP_C(CTRL('x'));
-	assert_strcmp(CURRENT_LINE, "Type :quit to exit rirc");
+	assert_strcmp(action_message(), "Type :quit to exit rirc");
+	INP_C('\n');
 
 	INP_C(CTRL('l'));
 	assert_strcmp(action_message(), "Clear buffer 'rirc'?   [y/n]");

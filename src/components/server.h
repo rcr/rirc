@@ -35,7 +35,8 @@ struct server
 	struct server *prev;
 	struct user_list ignore;
 	unsigned ping;
-	unsigned quitting : 1;
+	unsigned connected  : 1;
+	unsigned quitting   : 1;
 	unsigned registered : 1;
 	void *connection;
 	// TODO: move this to utils

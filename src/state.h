@@ -46,7 +46,6 @@ struct channel* channel_get_prev(struct channel*);
 /* FIXME: */
 void buffer_scrollback_back(struct channel*);
 void buffer_scrollback_forw(struct channel*);
-void channel_clear(struct channel*);
 
 void channel_close(struct channel*);
 void channel_move_prev(void);

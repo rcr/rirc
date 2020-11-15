@@ -19,7 +19,7 @@ enum activity_t
 enum channel_t
 {
 	CHANNEL_T_INVALID,
-	CHANNEL_T_OTHER,   /* Default/all other buffers */
+	CHANNEL_T_RIRC,    /* Default buffer */
 	CHANNEL_T_CHANNEL, /* Channel message buffer */
 	CHANNEL_T_SERVER,  /* Server message buffer */
 	CHANNEL_T_PRIVATE, /* Private message buffer */
@@ -49,6 +49,7 @@ struct channel_list
 {
 	struct channel *head;
 	struct channel *tail;
+	unsigned count;
 };
 
 struct channel* channel(const char*, enum channel_t);
