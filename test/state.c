@@ -48,11 +48,6 @@ test_state(void)
 	INP_C(0x0A);
 	assert_strcmp(CURRENT_LINE, "This is not a server");
 
-	/* Test empty command */
-	INP_S(":");
-	INP_C(0x0A);
-	assert_strcmp(CURRENT_LINE, "Messages beginning with ':' require a command");
-
 	/* Test control characters */
 	INP_C(CTRL('c'));
 	INP_C(CTRL('p'));
@@ -63,6 +58,11 @@ test_state(void)
 	INP_C(CTRL('l'));
 	assert_strcmp(action_message(), "Clear buffer 'rirc'?   [y/n]");
 	INP_C('y');
+	assert_ptr_null(buffer_head(&current_channel()->buffer));
+
+	/* Test empty command */
+	INP_S(":");
+	INP_C(0x0A);
 	assert_ptr_null(buffer_head(&current_channel()->buffer));
 
 	/* Test adding servers */

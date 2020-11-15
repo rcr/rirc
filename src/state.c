@@ -84,10 +84,9 @@ static const char *irc_list[] = {
 	"time",    "topic",   "trace",    "user",   "version",
 	"who",     "whois",   "whowas",   NULL };
 
-// TODO: from command handler list
 /* List of rirc commands for tab completeion */
 static const char *cmd_list[] = {
-	"clear", "close", "connect", "disconnect", "quit", "set", NULL};
+	"clear", "close", "connect", "disconnect", "quit", NULL};
 
 void
 state_init(void)
@@ -619,10 +618,8 @@ command(struct channel *c, char *buf)
 	const char *cmnd;
 	int err;
 
-	if (!(cmnd = strsep(&buf))) {
-		newline(c, 0, "-!!-", "Messages beginning with ':' require a command");
+	if (!(cmnd = strsep(&buf)))
 		return;
-	}
 
 	if (!strcasecmp(cmnd, "clear")) {
 		state_channel_clear(0);
@@ -650,6 +647,8 @@ command(struct channel *c, char *buf)
 		io_stop();
 		return;
 	}
+
+	action(action_error, "Unknown command '%s'", cmnd);
 }
 
 static int
