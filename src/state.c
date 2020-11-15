@@ -754,6 +754,8 @@ state_input_linef(struct channel *c)
 	if ((len = input_write(&(c->input), buf, sizeof(buf), 0)) == 0)
 		return 0;
 
+	input_hist_push(&(c->input));
+
 	switch (buf[0]) {
 		case ':':
 			if (len > 1 && buf[1] == ':')
@@ -770,8 +772,6 @@ state_input_linef(struct channel *c)
 		default:
 			irc_send_privmsg(current_channel()->server, current_channel(), buf);
 	}
-
-	input_hist_push(&(c->input));
 
 	return 1;
 }
