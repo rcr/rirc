@@ -211,7 +211,7 @@ ctcp_request_source(struct server *s, const char *from, const char *targ, char *
 	else
 		server_info(s, "CTCP SOURCE from %s", from);
 
-	sendf(s, "NOTICE %s :\001SOURCE rcr.io/rirc\001", from);
+	sendf(s, "NOTICE %s :\001SOURCE https://rcr.io/rirc\001", from);
 
 	return 0;
 }

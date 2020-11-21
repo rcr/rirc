@@ -55,3 +55,8 @@ tasks:
       echo >> sonar-project.properties "sonar.tests=test"
       ./build-wrapper-linux-x86/build-wrapper-linux-x86-64 --out-dir bw-output make clean rirc.debug test
       ./sonar-scanner-$SONAR_VER-linux/bin/sonar-scanner
+
+triggers:
+  - action: email
+    condition: failure
+    to: mail+sourcehut+builds@rcr.io

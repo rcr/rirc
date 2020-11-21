@@ -16,3 +16,8 @@ tasks:
   - build: |
       cd rirc
       make rirc rirc.debug test
+
+triggers:
+  - action: email
+    condition: failure
+    to: mail+sourcehut+builds@rcr.io

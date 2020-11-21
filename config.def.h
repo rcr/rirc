@@ -64,6 +64,10 @@
 #define INPUT_PREFIX_FG 239
 #define INPUT_PREFIX_BG -1
 
+/* Action message */
+#define ACTION_FG -1
+#define ACTION_BG 239
+
 /* Input line text colours */
 #define INPUT_FG 250
 #define INPUT_BG -1

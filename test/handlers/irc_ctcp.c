@@ -270,15 +270,15 @@ test_recv_ctcp_request_source(void)
 {
 	CHECK_REQUEST(":nick!user@host PRIVMSG me :\001SOURCE", 0, 1, 1,
 		"CTCP SOURCE from nick",
-		"NOTICE nick :\001SOURCE rcr.io/rirc\001");
+		"NOTICE nick :\001SOURCE https://rcr.io/rirc\001");
 
 	CHECK_REQUEST(":nick!user@host PRIVMSG me :\001SOURCE\001", 0, 1, 1,
 		"CTCP SOURCE from nick",
-		"NOTICE nick :\001SOURCE rcr.io/rirc\001");
+		"NOTICE nick :\001SOURCE https://rcr.io/rirc\001");
 
 	CHECK_REQUEST(":nick!user@host PRIVMSG me :\001SOURCE unused args\001", 0, 1, 1,
 		"CTCP SOURCE from nick (unused args)",
-		"NOTICE nick :\001SOURCE rcr.io/rirc\001");
+		"NOTICE nick :\001SOURCE https://rcr.io/rirc\001");
 }
 
 static void
