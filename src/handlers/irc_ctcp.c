@@ -22,11 +22,21 @@
 	         failf((S), "Send fail: %s", io_err(ret)); \
 	} while (0)
 
+#define CTCP_CLIENTINFO \
+	"ACTION "     \
+	"CLIENTINFO " \
+	"FINGER "     \
+	"PING "       \
+	"SOURCE "     \
+	"TIME "       \
+	"USERINFO "   \
+	"VERSION"
+
 static int
 parse_ctcp(struct server *s, const char *from, char **args, const char **cmd)
 {
-	char *message = *args;
 	char *command;
+	char *message = *args;
 	char *p;
 
 	if (!from)
@@ -138,7 +148,7 @@ ctcp_request_clientinfo(struct server *s, const char *from, const char *targ, ch
 	else
 		server_info(s, "CTCP CLIENTINFO from %s", from);
 
-	sendf(s, "NOTICE %s :\001CLIENTINFO ACTION CLIENTINFO PING SOURCE TIME VERSION\001", from);
+	sendf(s, "NOTICE %s :\001CLIENTINFO " CTCP_CLIENTINFO "\001", from);
 
 	return 0;
 }
