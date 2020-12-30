@@ -13,29 +13,7 @@
 #include "src/state.h"
 #include "src/utils/utils.h"
 
-#ifndef JOIN_THRESHOLD
-#define JOIN_THRESHOLD 0
-#endif
-
-#ifndef PART_THRESHOLD
-#define PART_THRESHOLD 0
-#endif
-
-#ifndef QUIT_THRESHOLD
-#define QUIT_THRESHOLD 0
-#endif
-
-#ifndef ACCOUNT_THRESHOLD
-#define ACCOUNT_THRESHOLD 0
-#endif
-
-#ifndef AWAY_THRESHOLD
-#define AWAY_THRESHOLD 0
-#endif
-
-#ifndef CHGHOST_THRESHOLD
-#define CHGHOST_THRESHOLD 0
-#endif
+#include "config.h"
 
 #define failf(S, ...) \
 	do { server_error((S), __VA_ARGS__); \
@@ -73,12 +51,12 @@ static int irc_recv_numeric(struct server*, struct irc_message*);
 static int recv_mode_chanmodes(struct irc_message*, const struct mode_cfg*, struct server*, struct channel*);
 static int recv_mode_usermodes(struct irc_message*, const struct mode_cfg*, struct server*);
 
-static unsigned quit_threshold = QUIT_THRESHOLD;
-static unsigned join_threshold = JOIN_THRESHOLD;
-static unsigned part_threshold = PART_THRESHOLD;
-static unsigned account_threshold = ACCOUNT_THRESHOLD;
-static unsigned away_threshold = AWAY_THRESHOLD;
-static unsigned chghost_threshold = CHGHOST_THRESHOLD;
+static unsigned quit_threshold    = FILTER_THRESHOLD_QUIT;
+static unsigned join_threshold    = FILTER_THRESHOLD_JOIN;
+static unsigned part_threshold    = FILTER_THRESHOLD_PART;
+static unsigned account_threshold = FILTER_THRESHOLD_ACCOUNT;
+static unsigned away_threshold    = FILTER_THRESHOLD_AWAY;
+static unsigned chghost_threshold = FILTER_THRESHOLD_CHGHOST;
 
 static const irc_recv_f irc_numerics[] = {
 	  [1] = irc_001,    /* RPL_WELCOME */
