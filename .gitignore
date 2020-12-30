@@ -6,6 +6,7 @@
 *.t
 *.td
 .clangd
+.cache
 bld
 compile_commands.json
 config.h

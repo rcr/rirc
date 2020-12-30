@@ -109,11 +109,16 @@ state_init(void)
 void
 state_term(void)
 {
-	/* Exit handler; must return normally */
-
-	struct server *s1, *s2;
+	struct server *s1;
+	struct server *s2;
 
 	channel_free(state.default_channel);
+
+	state.current_channel = NULL;
+	state.default_channel = NULL;
+
+	action_handler = NULL;
+	action_buff[0] = 0;
 
 	if ((s1 = state_server_list()->head) == NULL)
 		return;
@@ -124,6 +129,9 @@ state_term(void)
 		connection_free(s2->connection);
 		server_free(s2);
 	} while (s1 != state_server_list()->head);
+
+	state.servers.head = NULL;
+	state.servers.tail = NULL;
 }
 
 unsigned
@@ -615,40 +623,78 @@ state_complete(char *str, uint16_t len, uint16_t max, int first)
 static void
 command(struct channel *c, char *buf)
 {
-	const char *cmnd;
+	const char *arg;
+	const char *cmd;
 	int err;
 
-	if (!(cmnd = strsep(&buf)))
+	if (!(cmd = strsep(&buf)))
 		return;
 
-	if (!strcasecmp(cmnd, "clear")) {
+	if (!strcasecmp(cmd, "clear")) {
+		if ((arg = strsep(&buf))) {
+			action(action_error, "clear: Unknown arg '%s'", arg);
+			return;
+		}
+
 		state_channel_clear(0);
 		return;
 	}
 
-	if (!strcasecmp(cmnd, "close")) {
+	if (!strcasecmp(cmd, "close")) {
+		if ((arg = strsep(&buf))) {
+			action(action_error, "close: Unknown arg '%s'", arg);
+			return;
+		}
+
 		state_channel_close(0);
 		return;
 	}
 
-	if (!strcasecmp(cmnd, "connect")) {
+	if (!strcasecmp(cmd, "connect")) {
+		if (!c->server) {
+			action(action_error, "connect: This is not a server");
+			return;
+		}
+
+		if ((arg = strsep(&buf))) {
+			action(action_error, "connect: Unknown arg '%s'", arg);
+			return;
+		}
+
 		if ((err = io_cx(c->server->connection)))
-			action(action_error, "Error: %s", io_err(err));
+			action(action_error, "connect: %s", io_err(err));
+
 		return;
 	}
 
-	if (!strcasecmp(cmnd, "disconnect")) {
+	if (!strcasecmp(cmd, "disconnect")) {
+		if (!c->server) {
+			action(action_error, "disconnect: This is not a server");
+			return;
+		}
+
+		if ((arg = strsep(&buf))) {
+			action(action_error, "disconnect: Unknown arg '%s'", arg);
+			return;
+		}
+
 		if ((err = io_dx(c->server->connection)))
-			action(action_error, "Error: %s", io_err(err));
+			action(action_error, "disconnect: %s", io_err(err));
+
 		return;
 	}
 
-	if (!strcasecmp(cmnd, "quit")) {
+	if (!strcasecmp(cmd, "quit")) {
+		if ((arg = strsep(&buf))) {
+			action(action_error, "quit: Unknown arg '%s'", arg);
+			return;
+		}
+
 		io_stop();
 		return;
 	}
 
-	action(action_error, "Unknown command '%s'", cmnd);
+	action(action_error, "Unknown command '%s'", cmd);
 }
 
 static int
