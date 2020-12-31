@@ -15,7 +15,8 @@ tasks:
       git submodule update --recursive
   - build: |
       cd rirc
-      make rirc rirc.debug test
+      make clean
+      make -j2 rirc rirc.debug test
 
 triggers:
   - action: email

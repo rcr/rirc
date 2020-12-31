@@ -67,6 +67,12 @@ $(DIR_B)/%.db.o: $(DIR_S)/%.c config.h
 	@$(PP) $(CFLAGS_D) -MM -MP -MT $@ -MF $(@:.o=.d) $<
 	@$(CC) $(CFLAGS_D) -c -o $@ $<
 
+# Testcases
+$(DIR_B)/%.t: $(DIR_T)/%.c
+	@$(PP) $(CFLAGS_D) -MM -MP -MT $@ -MF $(@:.t=.d) $<
+	@$(CC) $(CFLAGS_D) $(LDFLAGS) -o $@ $<
+	@$(TEST_EXT) ./$@
+
 # Default config file
 config.h:
 	cp config.def.h config.h
@@ -74,13 +80,6 @@ config.h:
 # Gperf generated source
 %.gperf.out: %.gperf
 	gperf --output-file=$@ $<
-
-# Testcase files
-$(DIR_B)/%.t: $(DIR_T)/%.c
-	@$(PP) $(CFLAGS_D) -MM -MP -MT $@ -MF $(@:.t=.d) $<
-	@$(CC) $(CFLAGS_D) $(LDFLAGS) -o $@ $<
-	-@rm -f $(@:.t=.td) && $(TEST_EXT) ./$@ || mv $@ $(@:.t=.td)
-	@[ ! -f $(@:.t=.td) ]
 
 # Build directories
 $(DIR_B):
@@ -114,3 +113,4 @@ test: $(DIR_B) $(OBJS_G) $(OBJS_T)
 -include $(OBJS_T:.t=.d)
 
 .PHONY: clean install uninstall test
+.PRECIOUS: $(OBJS_T)

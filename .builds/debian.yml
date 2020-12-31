@@ -24,7 +24,8 @@ tasks:
       git submodule update --recursive
   - build: |
       cd rirc
-      make rirc rirc.debug test
+      make clean
+      make -j2 rirc rirc.debug test
   - static-analysis: |
       cd rirc
       branch=$(git name-rev --name-only HEAD)
@@ -53,7 +54,8 @@ tasks:
       echo >> sonar-project.properties "sonar.projectKey=rirc"
       echo >> sonar-project.properties "sonar.sources=src"
       echo >> sonar-project.properties "sonar.tests=test"
-      ./build-wrapper-linux-x86/build-wrapper-linux-x86-64 --out-dir bw-output make clean rirc.debug test
+      make clean
+      ./build-wrapper-linux-x86/build-wrapper-linux-x86-64 --out-dir bw-output make -j2 rirc.debug test
       ./sonar-scanner-$SONAR_VER-linux/bin/sonar-scanner
 
 triggers:
