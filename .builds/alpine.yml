@@ -16,7 +16,7 @@ tasks:
   - build: |
       cd rirc
       make clean
-      make -j2 rirc rirc.debug test
+      make -j$(nproc) check
 
 triggers:
   - action: email

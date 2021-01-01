@@ -89,6 +89,8 @@ $(DIR_B):
 $(TLS_LIBS): $(TLS_CONF)
 	@CFLAGS="$(TLS_INCL)" $(MAKE) -C ./lib/mbedtls clean lib
 
+check: $(BIN_R) $(BIN_D) $(OBJS_T)
+
 clean:
 	rm -rf $(DIR_B) $(BIN_R) $(BIN_D)
 	@find . -name "*gperf.out" -print0 | xargs -0 -I % rm -rfv %
@@ -105,8 +107,6 @@ install: $(BIN_R)
 uninstall:
 	rm -f $(BIN_DIR)/rirc
 	rm -f $(MAN_DIR)/rirc.1
-
-test: $(DIR_B) $(OBJS_G) $(OBJS_T)
 
 -include $(OBJS_R:.o=.d)
 -include $(OBJS_D:.o=.d)

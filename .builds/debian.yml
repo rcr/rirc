@@ -25,9 +25,10 @@ tasks:
   - build: |
       cd rirc
       make clean
-      make -j2 rirc rirc.debug test
+      make -j$(nproc) check
   - static-analysis: |
       cd rirc
+      make clean
       branch=$(git name-rev --name-only HEAD)
       [ $branch = "remotes/origin/static_analysis" ] || complete-build
       set +x
@@ -54,8 +55,7 @@ tasks:
       echo >> sonar-project.properties "sonar.projectKey=rirc"
       echo >> sonar-project.properties "sonar.sources=src"
       echo >> sonar-project.properties "sonar.tests=test"
-      make clean
-      ./build-wrapper-linux-x86/build-wrapper-linux-x86-64 --out-dir bw-output make -j2 rirc.debug test
+      ./build-wrapper-linux-x86/build-wrapper-linux-x86-64 --out-dir bw-output make -j$(nproc) check
       ./sonar-scanner-$SONAR_VER-linux/bin/sonar-scanner
 
 triggers:
