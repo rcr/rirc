@@ -123,7 +123,7 @@ test_irc_353(void)
 static void
 test_recv_error(void)
 {
-	/* ERROR <message> */
+	/* ERROR :<message> */
 
 	server_reset(s);
 
@@ -240,17 +240,20 @@ test_recv_join(void)
 static void
 test_recv_kick(void)
 {
-	/* :nick!user@host KICK <channel> <user> [message] */
+	/* :nick!user@host KICK <channel> <user> [:message] */
 
 	channel_reset(c1);
 	channel_reset(c2);
+	channel_reset(c3);
 	server_reset(s);
 
 	c1->parted = 0;
 	c2->parted = 0;
+	c3->parted = 0;
 
 	assert_eq(user_list_add(&(c1->users), CASEMAPPING_RFC1459, "nick1", MODE_EMPTY), USER_ERR_NONE);
 	assert_eq(user_list_add(&(c1->users), CASEMAPPING_RFC1459, "nick2", MODE_EMPTY), USER_ERR_NONE);
+	assert_eq(user_list_add(&(c1->users), CASEMAPPING_RFC1459, "nick3", MODE_EMPTY), USER_ERR_NONE);
 
 	CHECK_RECV("KICK #c1", 1, 1, 0);
 	assert_strcmp(mock_chan[0], "host");
@@ -265,25 +268,39 @@ test_recv_kick(void)
 	CHECK_RECV(":nick!user@host KICK #notfound nick1", 1, 1, 0);
 	assert_strcmp(mock_line[0], "KICK: channel '#notfound' not found");
 
+	/* no message */
 	CHECK_RECV(":nick!user@host KICK #c1 nick1", 0, 1, 0);
 	assert_strcmp(mock_chan[0], "#c1");
 	assert_strcmp(mock_line[0], "nick has kicked nick1");
 	assert_ptr_null(user_list_get(&(c1->users), s->casemapping, "nick1", 0));
 
-	CHECK_RECV(":nick!user@host KICK #c1 nick2 :kick message", 0, 1, 0);
+	/* empty message */
+	CHECK_RECV(":nick!user@host KICK #c1 nick2 :", 0, 1, 0);
 	assert_strcmp(mock_chan[0], "#c1");
-	assert_strcmp(mock_line[0], "nick has kicked nick2 (kick message)");
+	assert_strcmp(mock_line[0], "nick has kicked nick2");
 	assert_ptr_null(user_list_get(&(c1->users), s->casemapping, "nick2", 0));
 
+	CHECK_RECV(":nick!user@host KICK #c1 nick3 :kick message", 0, 1, 0);
+	assert_strcmp(mock_chan[0], "#c1");
+	assert_strcmp(mock_line[0], "nick has kicked nick3 (kick message)");
+	assert_ptr_null(user_list_get(&(c1->users), s->casemapping, "nick3", 0));
+
+	/* no message */
 	CHECK_RECV(":nick!user@host KICK #c1 me", 0, 1, 0);
 	assert_strcmp(mock_chan[0], "#c1");
 	assert_strcmp(mock_line[0], "Kicked by nick");
 	assert_eq(c1->parted, 1);
 
-	CHECK_RECV(":nick!user@host KICK #c2 me :kick message", 0, 1, 0);
+	/* empty message */
+	CHECK_RECV(":nick!user@host KICK #c2 me :", 0, 1, 0);
 	assert_strcmp(mock_chan[0], "#c2");
-	assert_strcmp(mock_line[0], "Kicked by nick (kick message)");
+	assert_strcmp(mock_line[0], "Kicked by nick");
 	assert_eq(c2->parted, 1);
+
+	CHECK_RECV(":nick!user@host KICK #c3 me :kick message", 0, 1, 0);
+	assert_strcmp(mock_chan[0], "#c3");
+	assert_strcmp(mock_line[0], "Kicked by nick (kick message)");
+	assert_eq(c3->parted, 1);
 }
 
 static void
@@ -367,19 +384,22 @@ test_recv_notice(void)
 static void
 test_recv_part(void)
 {
-	/* :nick!user@host PART <channel> [message] */
+	/* :nick!user@host PART <channel> [:message] */
 
 	channel_reset(c1);
 	channel_reset(c2);
+	channel_reset(c3);
 	server_reset(s);
 
 	c1->parted = 0;
 	c2->parted = 0;
+	c3->parted = 0;
 
 	assert_eq(user_list_add(&(c1->users), CASEMAPPING_RFC1459, "nick1", MODE_EMPTY), USER_ERR_NONE);
 	assert_eq(user_list_add(&(c1->users), CASEMAPPING_RFC1459, "nick2", MODE_EMPTY), USER_ERR_NONE);
 	assert_eq(user_list_add(&(c1->users), CASEMAPPING_RFC1459, "nick3", MODE_EMPTY), USER_ERR_NONE);
 	assert_eq(user_list_add(&(c1->users), CASEMAPPING_RFC1459, "nick4", MODE_EMPTY), USER_ERR_NONE);
+	assert_eq(user_list_add(&(c1->users), CASEMAPPING_RFC1459, "nick5", MODE_EMPTY), USER_ERR_NONE);
 
 	part_threshold = 0;
 
@@ -393,36 +413,50 @@ test_recv_part(void)
 	CHECK_RECV(":nick1!user@host PART #notfound :quit message", 1, 1, 0);
 	assert_strcmp(mock_line[0], "PART: channel '#notfound' not found");
 
-	CHECK_RECV(":nick5!user@host PART #c1 :part message", 1, 1, 0);
-	assert_strcmp(mock_line[0], "PART: nick 'nick5' not found in '#c1'");
+	CHECK_RECV(":nick6!user@host PART #c1 :part message", 1, 1, 0);
+	assert_strcmp(mock_line[0], "PART: nick 'nick6' not found in '#c1'");
 
 	CHECK_RECV(":nick1!user@host PART #c1 :part message", 0, 1, 0);
 	assert_strcmp(mock_chan[0], "#c1");
 	assert_strcmp(mock_line[0], "nick1!user@host has parted (part message)");
 	assert_ptr_null(user_list_get(&(c1->users), s->casemapping, "nick1", 0));
 
+	/* no message */
 	CHECK_RECV(":nick2!user@host PART #c1", 0, 1, 0);
 	assert_strcmp(mock_chan[0], "#c1");
 	assert_strcmp(mock_line[0], "nick2!user@host has parted");
 	assert_ptr_null(user_list_get(&(c1->users), s->casemapping, "nick2", 0));
 
+	/* empty message */
+	CHECK_RECV(":nick3!user@host PART #c1 :", 0, 1, 0);
+	assert_strcmp(mock_chan[0], "#c1");
+	assert_strcmp(mock_line[0], "nick3!user@host has parted");
+	assert_ptr_null(user_list_get(&(c1->users), s->casemapping, "nick3", 0));
+
 	part_threshold = 1;
 
-	CHECK_RECV(":nick3!user@host PART #c1", 0, 0, 0);
-	assert_ptr_null(user_list_get(&(c1->users), s->casemapping, "nick3", 0));
+	CHECK_RECV(":nick4!user@host PART #c1", 0, 0, 0);
+	assert_ptr_null(user_list_get(&(c1->users), s->casemapping, "nick4", 0));
 
 	/* channel not found, assume closed */
 	CHECK_RECV(":me!user@host PART #notfound", 0, 0, 0);
 
+	/* no message */
 	CHECK_RECV(":me!user@host PART #c1", 0, 1, 0);
 	assert_strcmp(mock_chan[0], "#c1");
 	assert_strcmp(mock_line[0], "you have parted");
 	assert_eq(c1->parted, 1);
 
-	CHECK_RECV(":me!user@host PART #c2 message", 0, 1, 0);
+	/* empty message */
+	CHECK_RECV(":me!user@host PART #c2 :", 0, 1, 0);
 	assert_strcmp(mock_chan[0], "#c2");
-	assert_strcmp(mock_line[0], "you have parted (message)");
+	assert_strcmp(mock_line[0], "you have parted");
 	assert_eq(c2->parted, 1);
+
+	CHECK_RECV(":me!user@host PART #c3 message", 0, 1, 0);
+	assert_strcmp(mock_chan[0], "#c3");
+	assert_strcmp(mock_line[0], "you have parted (message)");
+	assert_eq(c3->parted, 1);
 }
 
 static void
@@ -461,7 +495,7 @@ test_recv_privmsg(void)
 static void
 test_recv_quit(void)
 {
-	/* :nick!user@host QUIT [message] */
+	/* :nick!user@host QUIT [:message] */
 
 	channel_reset(c1);
 	channel_reset(c2);
@@ -472,6 +506,8 @@ test_recv_quit(void)
 	assert_eq(user_list_add(&(c1->users), CASEMAPPING_RFC1459, "nick2", MODE_EMPTY), USER_ERR_NONE);
 	assert_eq(user_list_add(&(c1->users), CASEMAPPING_RFC1459, "nick3", MODE_EMPTY), USER_ERR_NONE);
 	assert_eq(user_list_add(&(c1->users), CASEMAPPING_RFC1459, "nick4", MODE_EMPTY), USER_ERR_NONE);
+	assert_eq(user_list_add(&(c1->users), CASEMAPPING_RFC1459, "nick5", MODE_EMPTY), USER_ERR_NONE);
+
 	assert_eq(user_list_add(&(c3->users), CASEMAPPING_RFC1459, "nick1", MODE_EMPTY), USER_ERR_NONE);
 	assert_eq(user_list_add(&(c3->users), CASEMAPPING_RFC1459, "nick2", MODE_EMPTY), USER_ERR_NONE);
 
@@ -482,7 +518,7 @@ test_recv_quit(void)
 	assert_strcmp(mock_line[0], "QUIT: sender's nick is null");
 
 	/* user not on channels */
-	CHECK_RECV(":nick5!user@host QUIT :quit message", 0, 0, 0);
+	CHECK_RECV(":nick6!user@host QUIT :quit message", 0, 0, 0);
 
 	CHECK_RECV(":nick2!user@host QUIT :quit message", 0, 2, 0);
 	assert_strcmp(mock_chan[0], "#c1");
@@ -492,14 +528,21 @@ test_recv_quit(void)
 	assert_ptr_null(user_list_get(&(c1->users), s->casemapping, "nick2", 0));
 	assert_ptr_null(user_list_get(&(c3->users), s->casemapping, "nick2", 0));
 
+	/* no message */
 	CHECK_RECV(":nick3!user@host QUIT", 0, 1, 0);
 	assert_strcmp(mock_chan[0], "#c1");
 	assert_strcmp(mock_line[0], "nick3!user@host has quit");
 	assert_ptr_null(user_list_get(&(c1->users), s->casemapping, "nick3", 0));
 
+	/* empty message */
+	CHECK_RECV(":nick4!user@host QUIT :", 0, 1, 0);
+	assert_strcmp(mock_chan[0], "#c1");
+	assert_strcmp(mock_line[0], "nick4!user@host has quit");
+	assert_ptr_null(user_list_get(&(c1->users), s->casemapping, "nick4", 0));
+
 	quit_threshold = 1;
 
-	/* c1 = {nick1, nick4}, c3 = {nick1} */
+	/* c1 = {nick1, nick5}, c3 = {nick1} */
 	CHECK_RECV(":nick1!user@host QUIT", 0, 1, 0);
 	assert_strcmp(mock_chan[0], "#c3");
 	assert_strcmp(mock_line[0], "nick1!user@host has quit");
@@ -510,7 +553,7 @@ test_recv_quit(void)
 static void
 test_recv_topic(void)
 {
-	/* :nick!user@host TOPIC <channel> [topic] */
+	/* :nick!user@host TOPIC <channel> [:topic] */
 
 	channel_reset(c1);
 	server_reset(s);

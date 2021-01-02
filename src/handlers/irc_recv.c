@@ -413,7 +413,7 @@ irc_329(struct server *s, struct irc_message *m)
 static int
 irc_332(struct server *s, struct irc_message *m)
 {
-	/* 332 <channel> <topic> */
+	/* 332 <channel> :<topic> */
 
 	char *chan;
 	char *topic;
@@ -590,7 +590,7 @@ irc_recv_numeric(struct server *s, struct irc_message *m)
 static int
 recv_error(struct server *s, struct irc_message *m)
 {
-	/* ERROR <message> */
+	/* ERROR :<message> */
 
 	char *message;
 
@@ -698,7 +698,7 @@ recv_join(struct server *s, struct irc_message *m)
 static int
 recv_kick(struct server *s, struct irc_message *m)
 {
-	/* :nick!user@host KICK <channel> <user> [message] */
+	/* :nick!user@host KICK <channel> <user> [:message] */
 
 	char *chan;
 	char *message;
@@ -730,7 +730,7 @@ recv_kick(struct server *s, struct irc_message *m)
 
 		channel_part(c);
 
-		if (message)
+		if (message && *message)
 			newlinef(c, 0, FROM_INFO, "Kicked by %s (%s)", m->from, message);
 		else
 			newlinef(c, 0, FROM_INFO, "Kicked by %s", m->from);
@@ -740,7 +740,7 @@ recv_kick(struct server *s, struct irc_message *m)
 		if (user_list_del(&(c->users), s->casemapping, user) == USER_ERR_NOT_FOUND)
 			failf(s, "KICK: nick '%s' not found in '%s'", user, chan);
 
-		if (message)
+		if (message && *message)
 			newlinef(c, 0, FROM_INFO, "%s has kicked %s (%s)", m->from, user, message);
 		else
 			newlinef(c, 0, FROM_INFO, "%s has kicked %s", m->from, user);
@@ -1011,7 +1011,7 @@ recv_nick(struct server *s, struct irc_message *m)
 static int
 recv_notice(struct server *s, struct irc_message *m)
 {
-	/* :nick!user@host NOTICE <target> <message> */
+	/* :nick!user@host NOTICE <target> :<message> */
 
 	char *message;
 	char *target;
@@ -1072,7 +1072,7 @@ recv_notice(struct server *s, struct irc_message *m)
 static int
 recv_part(struct server *s, struct irc_message *m)
 {
-	/* :nick!user@host PART <channel> [message] */
+	/* :nick!user@host PART <channel> [:message] */
 
 	char *chan;
 	char *message;
@@ -1084,12 +1084,14 @@ recv_part(struct server *s, struct irc_message *m)
 	if (!irc_message_param(m, &chan))
 		failf(s, "PART: channel is null");
 
+	irc_message_param(m, &message);
+
 	if (!strcmp(m->from, s->nick)) {
 
 		/* If not found, assume channel was closed */
 		if ((c = channel_list_get(&s->clist, chan, s->casemapping)) != NULL) {
 
-			if (irc_message_param(m, &message))
+			if (message && *message)
 				newlinef(c, BUFFER_LINE_PART, FROM_PART, "you have parted (%s)", message);
 			else
 				newlinef(c, BUFFER_LINE_PART, FROM_PART, "you have parted");
@@ -1105,7 +1107,8 @@ recv_part(struct server *s, struct irc_message *m)
 			failf(s, "PART: nick '%s' not found in '%s'", m->from, chan);
 
 		if (!part_threshold || part_threshold > c->users.count) {
-			if (irc_message_param(m, &message))
+
+			if (message && *message)
 				newlinef(c, 0, FROM_PART, "%s!%s has parted (%s)", m->from, m->host, message);
 			else
 				newlinef(c, 0, FROM_PART, "%s!%s has parted", m->from, m->host);
@@ -1146,7 +1149,7 @@ recv_pong(struct server *s, struct irc_message *m)
 static int
 recv_privmsg(struct server *s, struct irc_message *m)
 {
-	/* :nick!user@host PRIVMSG <target> <message> */
+	/* :nick!user@host PRIVMSG <target> :<message> */
 
 	char *message;
 	char *target;
@@ -1205,9 +1208,9 @@ recv_privmsg(struct server *s, struct irc_message *m)
 static int
 recv_quit(struct server *s, struct irc_message *m)
 {
-	/* :nick!user@host QUIT [message] */
+	/* :nick!user@host QUIT [:message] */
 
-	char *message = NULL;
+	char *message;
 	struct channel *c = s->channel;
 
 	if (!m->from)
@@ -1221,7 +1224,7 @@ recv_quit(struct server *s, struct irc_message *m)
 			if (quit_threshold && quit_threshold <= c->users.count)
 				continue;
 
-			if (message)
+			if (message && *message)
 				newlinef(c, BUFFER_LINE_QUIT, FROM_QUIT, "%s!%s has quit (%s)",
 					m->from, m->host, message);
 			else
@@ -1238,7 +1241,7 @@ recv_quit(struct server *s, struct irc_message *m)
 static int
 recv_topic(struct server *s, struct irc_message *m)
 {
-	/* :nick!user@host TOPIC <channel> [topic] */
+	/* :nick!user@host TOPIC <channel> [:topic] */
 
 	char *chan;
 	char *topic;
