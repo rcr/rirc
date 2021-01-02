@@ -28,7 +28,8 @@ DIR_B := bld
 DIR_S := src
 DIR_T := test
 
-PWD := $(shell pwd)
+JOBS := $(shell nproc)
+PWD  := $(shell pwd)
 
 SRC     := $(shell find $(DIR_S) -name '*.c')
 SUBDIRS += $(shell find $(DIR_S) -name '*.c' -exec dirname {} \; | sort -u)
@@ -87,7 +88,8 @@ $(DIR_B):
 
 # TLS libraries
 $(TLS_LIBS): $(TLS_CONF)
-	@CFLAGS="$(TLS_INCL)" $(MAKE) -C ./lib/mbedtls clean lib
+	@CFLAGS="$(TLS_INCL)" $(MAKE) -C ./lib/mbedtls clean
+	@CFLAGS="$(TLS_INCL)" $(MAKE) -C ./lib/mbedtls -j$(nproc) lib
 
 check: $(BIN_R) $(BIN_D) $(OBJS_T)
 
@@ -112,5 +114,6 @@ uninstall:
 -include $(OBJS_D:.o=.d)
 -include $(OBJS_T:.t=.d)
 
-.PHONY: clean install uninstall test
+.NOTPARALLEL: clean $(TLS_LIBS)
+.PHONY: clean install uninstall check
 .PRECIOUS: $(OBJS_T)
