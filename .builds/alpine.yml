@@ -15,7 +15,7 @@ tasks:
       git submodule update --recursive
   - build: |
       cd rirc
-      make -j$(nproc) clean check
+      make -j $(nproc) clean check
 
 triggers:
   - action: email

@@ -28,7 +28,6 @@ DIR_B := bld
 DIR_S := src
 DIR_T := test
 
-JOBS := $(shell nproc)
 PWD  := $(shell pwd)
 
 SRC     := $(shell find $(DIR_S) -name '*.c')
@@ -88,10 +87,18 @@ $(DIR_B):
 
 # TLS libraries
 $(TLS_LIBS): $(TLS_CONF)
-	@CFLAGS="$(TLS_INCL)" $(MAKE) -C ./lib/mbedtls clean
-	@CFLAGS="$(TLS_INCL)" $(MAKE) -C ./lib/mbedtls -j$(nproc) lib
+	@CFLAGS="$(TLS_INCL)" $(MAKE) --silent -C ./lib/mbedtls clean
+	@CFLAGS="$(TLS_INCL)" $(MAKE) --silent -C ./lib/mbedtls lib
 
-check: $(BIN_R) $(BIN_D) $(OBJS_T)
+all:
+	@$(MAKE) --silent $(TLS_LIBS)
+	@$(MAKE) --silent $(BIN_R)
+
+check:
+	@$(MAKE) --silent $(TLS_LIBS)
+	@$(MAKE) --silent $(BIN_R)
+	@$(MAKE) --silent $(BIN_D)
+	@$(MAKE) --silent $(OBJS_T)
 
 clean:
 	rm -rf $(DIR_B) $(BIN_R) $(BIN_D)
@@ -114,6 +121,7 @@ uninstall:
 -include $(OBJS_D:.o=.d)
 -include $(OBJS_T:.t=.d)
 
-.NOTPARALLEL: clean $(TLS_LIBS)
-.PHONY: clean install uninstall check
+.PHONY: all clean install uninstall check
+
+# Save tests for debugging
 .PRECIOUS: $(OBJS_T)
