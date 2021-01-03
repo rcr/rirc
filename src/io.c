@@ -485,6 +485,8 @@ io_thread(void *arg)
 
 	cx->st_cur = IO_ST_CXNG;
 
+	io_info(cx, "Connecting to %s:%s", cx->host, cx->port);
+
 	do {
 		enum io_state_t st_cur;
 		enum io_state_t st_new;
