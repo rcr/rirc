@@ -46,30 +46,30 @@ OBJS_T += $(DIR_B)/utils/tree.t # Header only file
 OBJS_G := $(patsubst %.gperf, %.gperf.out, $(SRC_G))
 
 # Release build executable
-$(BIN_R): $(TLS_LIBS) $(DIR_B) $(OBJS_G) $(OBJS_R)
+$(BIN_R): $(TLS_LIBS) $(OBJS_G) $(OBJS_R)
 	@echo cc $@
 	@$(CC) $(LDFLAGS) -o $@ $(OBJS_R) $(TLS_LIBS)
 
 # Debug build executable
-$(BIN_D): $(TLS_LIBS) $(DIR_B) $(OBJS_G) $(OBJS_D)
+$(BIN_D): $(TLS_LIBS) $(OBJS_G) $(OBJS_D)
 	@echo cc $@
 	@$(CC) $(LDFLAGS) -o $@ $(OBJS_D) $(TLS_LIBS)
 
 # Release build objects
-$(DIR_B)/%.o: $(DIR_S)/%.c config.h
+$(DIR_B)/%.o: $(DIR_S)/%.c config.h | $(DIR_B)
 	@echo "cc $<..."
-	@$(PP) $(CFLAGS_R) -MM -MP -MT $@ -MF $(@:.o=.d) $<
+	@$(PP) $(CFLAGS_R) -MM -MP -MT $@ -MF $(@:.o=.o.d) $<
 	@$(CC) $(CFLAGS_R) -c -o $@ $<
 
 # Debug build objects
-$(DIR_B)/%.db.o: $(DIR_S)/%.c config.h
+$(DIR_B)/%.db.o: $(DIR_S)/%.c config.h | $(DIR_B)
 	@echo "cc $<..."
-	@$(PP) $(CFLAGS_D) -MM -MP -MT $@ -MF $(@:.o=.d) $<
+	@$(PP) $(CFLAGS_D) -MM -MP -MT $@ -MF $(@:.o=.o.d) $<
 	@$(CC) $(CFLAGS_D) -c -o $@ $<
 
 # Testcases
-$(DIR_B)/%.t: $(DIR_T)/%.c
-	@$(PP) $(CFLAGS_D) -MM -MP -MT $@ -MF $(@:.t=.d) $<
+$(DIR_B)/%.t: $(DIR_T)/%.c $(OBJS_G) | $(DIR_B)
+	@$(PP) $(CFLAGS_D) -MM -MP -MT $@ -MF $(@:.t=.t.d) $<
 	@$(CC) $(CFLAGS_D) $(LDFLAGS) -o $@ $<
 	@$(TEST_EXT) ./$@
 
@@ -117,11 +117,11 @@ uninstall:
 	rm -f $(BIN_DIR)/rirc
 	rm -f $(MAN_DIR)/rirc.1
 
--include $(OBJS_R:.o=.d)
--include $(OBJS_D:.o=.d)
--include $(OBJS_T:.t=.d)
+-include $(OBJS_R:.o=.o.d)
+-include $(OBJS_D:.o=.o.d)
+-include $(OBJS_T:.t=.t.d)
 
-.PHONY: all clean install uninstall check
+.PHONY: all check clean install uninstall
 
 # Save tests for debugging
 .PRECIOUS: $(OBJS_T)
