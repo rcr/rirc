@@ -7,9 +7,6 @@
 #define MAX(A, B) ((A) > (B) ? (A) : (B))
 #define MIN(A, B) ((A) > (B) ? (B) : (A))
 
-#define ELEMS(X) (sizeof((X)) / sizeof((X)[0]))
-#define ARR_ELEM(A, E) ((E) >= 0 && (size_t)(E) < ELEMS((A)))
-
 #define SEC_IN_MS(X) ((X) * 1000)
 #define SEC_IN_US(X) ((X) * 1000 * 1000)
 

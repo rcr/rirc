@@ -206,6 +206,7 @@ static const irc_recv_f irc_numerics[] = {
 	[704] = irc_info,   /* RPL_HELPSTART */
 	[705] = irc_info,   /* RPL_HELP */
 	[706] = irc_ignore, /* RPL_ENDOFHELP */
+	[1000] = NULL       /* Out of range */
 };
 
 int
@@ -548,43 +549,34 @@ irc_recv_numeric(struct server *s, struct irc_message *m)
 	/* :server <code> <target> [args] */
 
 	char *targ;
-	int code = 0;
-	irc_recv_f handler = NULL;
+	unsigned code = 0;
 
-	for (const char *p = m->command; *p; p++) {
-
-		if (!isdigit(*p))
-			failf(s, "NUMERIC: invalid");
-
-		code *= 10;
-		code += *p - '0';
-
-		if (code > 999)
-			failf(s, "NUMERIC: out of range");
+	if ((m->command[0] && isdigit(m->command[0]))
+	 && (m->command[1] && isdigit(m->command[1]))
+	 && (m->command[2] && isdigit(m->command[2]))
+	 && (m->command[3] == 0))
+	{
+		code += (m->command[0] - '0') * 100;
+		code += (m->command[1] - '0') * 10;
+		code += (m->command[2] - '0');
 	}
 
-	/* Message target is only used to establish s->nick when registering with a server */
-	if (!(irc_message_param(m, &targ))) {
-		io_dx(s->connection);
+	if (!code)
+		failf(s, "NUMERIC: '%s' invalid", m->command);
+
+	if (!(irc_message_param(m, &targ)))
 		failf(s, "NUMERIC: target is null");
-	}
 
-	/* Message target should match s->nick or '*' if unregistered, otherwise out of sync */
-	if (strcmp(targ, s->nick) && strcmp(targ, "*") && code != 1) {
-		io_dx(s->connection);
-		failf(s, "NUMERIC: target mismatched, nick is '%s', received '%s'", s->nick, targ);
-	}
+	if (strcmp(targ, s->nick) && strcmp(targ, "*"))
+		failf(s, "NUMERIC: target '%s' is invalid", targ);
 
-	if (ARR_ELEM(irc_numerics, code))
-		handler = irc_numerics[code];
+	if (!irc_numerics[code] && (m->params && *m->params))
+		failf(s, "NUMERIC: %u unhandled: [%s]", code, m->params);
 
-	if (handler)
-		return (*handler)(s, m);
+	if (!irc_numerics[code])
+		failf(s, "NUMERIC: %u unhandled", code);
 
-	if (m->params)
-		failf(s, "Numeric type '%u' unknown: %s", code, m->params);
-	else
-		failf(s, "Numeric type '%u' unknown", code);
+	return (*irc_numerics[code])(s, m);
 }
 
 static int

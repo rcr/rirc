@@ -382,6 +382,48 @@ test_recv_notice(void)
 }
 
 static void
+test_recv_numeric(void)
+{
+	server_reset(s);
+
+	CHECK_RECV(":hostname 0 * arg :trailing arg", 1, 1, 0);
+	assert_strcmp(mock_line[0], "NUMERIC: '0' invalid");
+
+	CHECK_RECV(":hostname 00 * arg :trailing arg", 1, 1, 0);
+	assert_strcmp(mock_line[0], "NUMERIC: '00' invalid");
+
+	CHECK_RECV(":hostname 0a * arg :trailing arg", 1, 1, 0);
+	assert_strcmp(mock_line[0], "NUMERIC: '0a' invalid");
+
+	CHECK_RECV(":hostname 000 * arg :trailing arg", 1, 1, 0);
+	assert_strcmp(mock_line[0], "NUMERIC: '000' invalid");
+
+	CHECK_RECV(":hostname 00a * arg :trailing arg", 1, 1, 0);
+	assert_strcmp(mock_line[0], "NUMERIC: '00a' invalid");
+
+	CHECK_RECV(":hostname 0000 * arg :trailing arg", 1, 1, 0);
+	assert_strcmp(mock_line[0], "NUMERIC: '0000' invalid");
+
+	CHECK_RECV(":hostname 1000 * arg :trailing arg", 1, 1, 0);
+	assert_strcmp(mock_line[0], "NUMERIC: '1000' invalid");
+
+	CHECK_RECV(":hostname 001", 1, 1, 0);
+	assert_strcmp(mock_line[0], "NUMERIC: target is null");
+
+	CHECK_RECV(":hostname 001 test", 1, 1, 0);
+	assert_strcmp(mock_line[0], "NUMERIC: target 'test' is invalid");
+
+	CHECK_RECV(":hostname 666 me arg1 arg2 :trailing arg", 1, 1, 0);
+	assert_strcmp(mock_line[0], "NUMERIC: 666 unhandled: [arg1 arg2 :trailing arg]");
+
+	CHECK_RECV(":hostname 666 me", 1, 1, 0);
+	assert_strcmp(mock_line[0], "NUMERIC: 666 unhandled");
+
+	/* Numeric 375 (RPL_MOTDSTART) is ignored */
+	CHECK_RECV(":hostname 375 me :trailing arg", 0, 0, 0);
+}
+
+static void
 test_recv_part(void)
 {
 	/* :nick!user@host PART <channel> [:message] */
@@ -761,6 +803,7 @@ main(void)
 		TESTCASE(test_recv_mode_usermodes),
 		TESTCASE(test_recv_nick),
 		TESTCASE(test_recv_notice),
+		TESTCASE(test_recv_numeric),
 		TESTCASE(test_recv_part),
 		TESTCASE(test_recv_ping),
 		TESTCASE(test_recv_pong),
