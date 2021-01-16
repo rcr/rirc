@@ -1,5 +1,5 @@
-#ifndef DRAW_H
-#define DRAW_H
+#ifndef RIRC_DRAW_H
+#define RIRC_DRAW_H
 
 enum draw_bit
 {
@@ -11,10 +11,9 @@ enum draw_bit
 	DRAW_NAV,    /* set bit to draw nav */
 	DRAW_STATUS, /* set bit to draw status */
 	DRAW_ALL,    /* set all draw bits aside from bell */
+	DRAW_CLEAR,  /* clear the terminal */
 };
 
 void draw(enum draw_bit);
-void draw_init(void);
-void draw_term(void);
 
 #endif

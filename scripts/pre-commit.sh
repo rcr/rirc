@@ -5,7 +5,7 @@
 
 echo "Running pre-commit hook..."
 
-RESULTS=$(make test)
+RESULTS=$(make check)
 
 if [[ "$RESULTS" == *"failure"* ]];
 then

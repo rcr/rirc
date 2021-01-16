@@ -1,3 +1,5 @@
+#include "src/rirc.h"
+
 #include <errno.h>
 #include <getopt.h>
 #include <pwd.h>
@@ -287,7 +289,6 @@ parse_args(int argc, char **argv)
 		default_realname = getpwuid_pw_name();
 
 	state_init();
-	draw_init();
 
 	for (size_t i = 0; i < n_servers; i++) {
 
@@ -344,8 +345,8 @@ main(int argc, char **argv)
 
 	if ((ret = parse_args(argc, argv)) == 0) {
 		io_start();
-		draw_term();
 		state_term();
+		draw(DRAW_CLEAR);
 	}
 
 	return ret;

@@ -1,5 +1,5 @@
-#ifndef SERVER_H
-#define SERVER_H
+#ifndef RIRC_COMPONENTS_SERVER_H
+#define RIRC_COMPONENTS_SERVER_H
 
 #include "src/components/buffer.h"
 #include "src/components/channel.h"
@@ -35,7 +35,8 @@ struct server
 	struct server *prev;
 	struct user_list ignore;
 	unsigned ping;
-	unsigned quitting : 1;
+	unsigned connected  : 1;
+	unsigned quitting   : 1;
 	unsigned registered : 1;
 	void *connection;
 	// TODO: move this to utils

@@ -1,12 +1,12 @@
+#include "src/handlers/irc_ctcp.h"
+
 #include <ctype.h>
 #include <errno.h>
 #include <string.h>
 #include <sys/time.h>
 
 #include "src/components/channel.h"
-#include "src/components/server.h"
 #include "src/handlers/irc_ctcp.gperf.out"
-#include "src/handlers/irc_ctcp.h"
 #include "src/io.h"
 #include "src/state.h"
 #include "src/utils/utils.h"
@@ -22,11 +22,21 @@
 	         failf((S), "Send fail: %s", io_err(ret)); \
 	} while (0)
 
+#define CTCP_CLIENTINFO \
+	"ACTION "     \
+	"CLIENTINFO " \
+	"FINGER "     \
+	"PING "       \
+	"SOURCE "     \
+	"TIME "       \
+	"USERINFO "   \
+	"VERSION"
+
 static int
 parse_ctcp(struct server *s, const char *from, char **args, const char **cmd)
 {
-	char *message = *args;
 	char *command;
+	char *message = *args;
 	char *p;
 
 	if (!from)
@@ -138,7 +148,7 @@ ctcp_request_clientinfo(struct server *s, const char *from, const char *targ, ch
 	else
 		server_info(s, "CTCP CLIENTINFO from %s", from);
 
-	sendf(s, "NOTICE %s :\001CLIENTINFO ACTION CLIENTINFO PING SOURCE TIME VERSION\001", from);
+	sendf(s, "NOTICE %s :\001CLIENTINFO " CTCP_CLIENTINFO "\001", from);
 
 	return 0;
 }
@@ -211,7 +221,7 @@ ctcp_request_source(struct server *s, const char *from, const char *targ, char *
 	else
 		server_info(s, "CTCP SOURCE from %s", from);
 
-	sendf(s, "NOTICE %s :\001SOURCE rcr.io/rirc\001", from);
+	sendf(s, "NOTICE %s :\001SOURCE https://rcr.io/rirc\001", from);
 
 	return 0;
 }

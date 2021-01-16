@@ -1,10 +1,7 @@
-#ifndef BUFFER_H
-#define BUFFER_H
+#ifndef RIRC_COMPONENTS_BUFFER_H
+#define RIRC_COMPONENTS_BUFFER_H
 
 #include <time.h>
-
-#include "src/utils/utils.h"
-#include "config.h"
 
 #define TEXT_LENGTH_MAX 510 /* FIXME: remove max lengths in favour of growable buffer */
 #define FROM_LENGTH_MAX 100

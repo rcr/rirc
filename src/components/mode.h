@@ -1,5 +1,5 @@
-#ifndef MODE_H
-#define MODE_H
+#ifndef RIRC_COMPONENTS_MODE_H
+#define RIRC_COMPONENTS_MODE_H
 
 /* usermodes, chanmodes and prfxmode configuration
  *

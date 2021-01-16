@@ -1,9 +1,8 @@
-/* TODO: safe channels ('!' prefix) (see RFC2811) */
+#include "src/components/mode.h"
 
 #include <ctype.h>
 #include <string.h>
 
-#include "src/components/mode.h"
 #include "src/utils/utils.h"
 
 #define MODE_ISLOWER(X) ((X) >= 'a' && (X) <= 'z')
@@ -33,6 +32,7 @@ static enum mode_err_t mode_cfg_modes(struct mode_cfg*, const char*);
 /* TODO: static inline void mode_bit_set(struct mode*, uint32_t); */
 /* TODO: static inline void mode_bit_isset(struct mode*, uint32_t); */
 /* TODO: aggregate errors with logging callback */
+/* TODO: safe channels ('!' prefix) (see RFC2811) */
 
 static inline int
 mode_isset(const struct mode *m, int flag)
@@ -380,14 +380,13 @@ mode_prfxmode_prefix(struct mode *m, const struct mode_cfg *cfg, int flag)
 	const char *f = cfg->PREFIX.F,
 	           *t = cfg->PREFIX.T;
 
-	while (*t != flag) {
-
-		if (*t == 0)
-			return MODE_ERR_INVALID_PREFIX;
-
+	while (*t && *t != flag) {
 		f++;
 		t++;
 	}
+
+	if (*t == 0)
+		return MODE_ERR_INVALID_PREFIX;
 
 	bit = flag_bit(*f);
 
@@ -399,11 +398,7 @@ mode_prfxmode_prefix(struct mode *m, const struct mode_cfg *cfg, int flag)
 	f = cfg->PREFIX.F,
 	t = cfg->PREFIX.T;
 
-	while (*f) {
-
-		if (mode_isset(m, *f))
-			break;
-
+	while (!mode_isset(m, *f)) {
 		f++;
 		t++;
 	}

@@ -1,8 +1,4 @@
-/**
- * state.c
- *
- * All manipulation of global program state
- */
+#include "src/state.h"
 
 #include <ctype.h>
 #include <stdlib.h>
@@ -11,22 +7,19 @@
 #include <stdarg.h>
 #include <stdio.h>
 
+#include "config.h"
+#include "src/components/channel.h"
 #include "src/draw.h"
 #include "src/handlers/irc_recv.h"
 #include "src/handlers/irc_send.h"
 #include "src/io.h"
 #include "src/rirc.h"
-#include "src/state.h"
 #include "src/utils/utils.h"
 
 /* See: https://vt100.net/docs/vt100-ug/chapter3.html */
 #define CTRL(k) ((k) & 0x1f)
 
 static void _newline(struct channel*, enum buffer_line_t, const char*, const char*, va_list);
-static void state_io_cxed(struct server*);
-static void state_io_dxed(struct server*);
-static void state_io_ping(struct server*, unsigned int);
-static void state_io_signal(enum io_sig_t);
 
 static int state_input_linef(struct channel*);
 static int state_input_ctrlch(const char*, size_t);
@@ -36,6 +29,15 @@ static uint16_t state_complete(char*, uint16_t, uint16_t, int);
 static uint16_t state_complete_list(char*, uint16_t, uint16_t, const char**);
 static uint16_t state_complete_user(char*, uint16_t, uint16_t, int);
 
+static void state_channel_clear(int);
+static void state_channel_close(int);
+
+static int action_clear(char);
+static int action_close(char);
+static int action_error(char);
+static int (*action_handler)(char);
+static char action_buff[256];
+
 static void command(struct channel*, char*);
 
 static struct
@@ -44,6 +46,9 @@ static struct
 	struct channel *default_channel; /* the default rirc channel at startup */
 	struct server_list servers;
 } state;
+
+static unsigned state_tty_cols;
+static unsigned state_tty_rows;
 
 struct server_list*
 state_server_list(void)
@@ -69,6 +74,8 @@ static const char *irc_list[] = {
 	"ctcp-time",
 	"ctcp-userinfo",
 	"ctcp-version",
+	"away",
+	"topic-unset",
 	"admin",   "connect", "info",     "invite", "join",
 	"kick",    "kill",    "links",    "list",   "lusers",
 	"mode",    "motd",    "names",    "nick",   "notice",
@@ -77,15 +84,14 @@ static const char *irc_list[] = {
 	"time",    "topic",   "trace",    "user",   "version",
 	"who",     "whois",   "whowas",   NULL };
 
-// TODO: from command handler list
 /* List of rirc commands for tab completeion */
 static const char *cmd_list[] = {
-	"clear", "close", "connect", "disconnect", "quit", "set", NULL};
+	"clear", "close", "connect", "disconnect", "quit", NULL};
 
 void
 state_init(void)
 {
-	state.default_channel = state.current_channel = channel("rirc", CHANNEL_T_OTHER);
+	state.default_channel = state.current_channel = channel("rirc", CHANNEL_T_RIRC);
 
 	newline(state.default_channel, 0, "--", "      _");
 	newline(state.default_channel, 0, "--", " _ __(_)_ __ ___");
@@ -103,11 +109,16 @@ state_init(void)
 void
 state_term(void)
 {
-	/* Exit handler; must return normally */
-
-	struct server *s1, *s2;
+	struct server *s1;
+	struct server *s2;
 
 	channel_free(state.default_channel);
+
+	state.current_channel = NULL;
+	state.default_channel = NULL;
+
+	action_handler = NULL;
+	action_buff[0] = 0;
 
 	if ((s1 = state_server_list()->head) == NULL)
 		return;
@@ -118,6 +129,21 @@ state_term(void)
 		connection_free(s2->connection);
 		server_free(s2);
 	} while (s1 != state_server_list()->head);
+
+	state.servers.head = NULL;
+	state.servers.tail = NULL;
+}
+
+unsigned
+state_cols(void)
+{
+	return state_tty_cols;
+}
+
+unsigned
+state_rows(void)
+{
+	return state_tty_rows;
 }
 
 void
@@ -230,106 +256,56 @@ state_server_set_chans(struct server *s, const char *chans)
 	return 0;
 }
 
-void
-channel_clear(struct channel *c)
-{
-	memset(&(c->buffer), 0, sizeof(c->buffer));
-	draw(DRAW_BUFFER);
-}
-
-/* WIP:
- *
- * removed action subsystem from input.c
- *
- * eventually should go in action.{h,c}
- *
- */
-/* Max length of user action message */
-#define MAX_ACTION_MESG 256
-char *action_message;
-static int action_close_server(char);
-/* Action handling */
-static int (*action_handler)(char);
-static char action_buff[MAX_ACTION_MESG];
-/* Incremental channel search */
-static int action_find_channel(char);
-/* TODO: This is a first draft for simple channel searching functionality.
- *
- * It can be cleaned up, and input.c is probably not the most ideal place for this */
-#define MAX_SEARCH 128
-struct channel *search_cptr; /* Used for iterative searching, before setting the current channel */
-static char search_buf[MAX_SEARCH];
-static size_t search_i;
-
-static struct channel* search_channels(struct channel*, char*);
-static struct channel*
-search_channels(struct channel *start, char *search)
-{
-	if (start == NULL || *search == '\0')
-		return NULL;
-
-	/* Start the search one past the input */
-	struct channel *c = channel_get_next(start);
-
-	while (c != start) {
-
-		if (strstr(c->name, search))
-			return c;
-
-		c = channel_get_next(c);
-	}
-
-	return NULL;
-}
 static int
 state_input_action(const char *input, size_t len)
 {
 	/* Waiting for user confirmation */
 
+	/* ^c canceled the action, or the action was resolved */
 	if (len == 1 && (*input == CTRL('c') || action_handler(*input))) {
-		/* ^c canceled the action, or the action was resolved */
-
-		action_message = NULL;
 		action_handler = NULL;
-
 		return 1;
 	}
 
 	return 0;
 }
+
 static int
-action_close_server(char c)
+action_error(char c)
 {
-	/* Confirm closing a server */
+	UNUSED(c);
 
-	if (c == 'n' || c == 'N')
+	return 1;
+}
+
+static int
+action_clear(char c)
+{
+	if (toupper(c) == 'N')
 		return 1;
 
-	if (c == 'y' || c == 'Y') {
-
-		int ret;
-		struct channel *c = current_channel();
-		struct server *s = c->server;
-
-		/* If closing the last server */
-		if ((state.current_channel = c->server->next->channel) == c->server->channel)
-			state.current_channel = state.default_channel;
-
-		if ((ret = io_sendf(s->connection, "QUIT :%s", DEFAULT_QUIT_MESG)))
-			newlinef(s->channel, 0, "-!!-", "sendf fail: %s", io_err(ret));
-
-		io_dx(s->connection);
-		connection_free(s->connection);
-		server_list_del(state_server_list(), s);
-		server_free(s);
-
-		draw(DRAW_ALL);
-
+	if (toupper(c) == 'Y') {
+		state_channel_clear(0);
 		return 1;
 	}
 
 	return 0;
 }
+
+static int
+action_close(char c)
+{
+	if (toupper(c) == 'N')
+		return 1;
+
+	if (toupper(c) == 'Y') {
+		state_channel_close(0);
+		return 1;
+	}
+
+	return 0;
+}
+
 void
 action(int (*a_handler)(char), const char *fmt, ...)
 {
@@ -343,130 +319,84 @@ action(int (*a_handler)(char), const char *fmt, ...)
 	va_list ap;
 
 	va_start(ap, fmt);
-	len = vsnprintf(action_buff, MAX_ACTION_MESG, fmt, ap);
+	len = vsnprintf(action_buff, sizeof(action_buff), fmt, ap);
 	va_end(ap);
 
 	if (len < 0) {
 		debug("vsnprintf failed");
 	} else {
 		action_handler = a_handler;
-		action_message = action_buff;
 		draw(DRAW_INPUT);
 	}
 }
-/* Action line should be:
- *
- *
- * Find: [current result]/[(server if not current server[socket if not 6697])] : <search input> */
-static int
-action_find_channel(char c)
+
+const char*
+action_message(void)
 {
-	/* Incremental channel search */
-
-	/* \n, Esc, ^C cancels a search if no results are found */
-	if (c == '\n' || c == 0x1b || c == CTRL('c')) {
-
-		/* Confirm non-empty match */
-		if (c == '\n' && search_cptr)
-			channel_set_current(search_cptr);
-
-		search_buf[0] = 0;
-		search_i = 0;
-		search_cptr = NULL;
-		return 1;
-	}
-
-	/* ^F repeats the search forward from the current result,
-	 * or resets search criteria if no match */
-	if (c == CTRL('f')) {
-		if (search_cptr == NULL) {
-			search_buf[0] = 0;
-			search_i = 0;
-			action(action_find_channel, "Find: ");
-			return 0;
-		}
-
-		search_cptr = search_channels(search_cptr, search_buf);
-	} else if (c == 0x7f && search_i) {
-		/* Backspace */
-		search_buf[--search_i] = 0;
-		search_cptr = search_channels(current_channel(), search_buf);
-
-	} else if (isprint(c) && search_i < (sizeof(search_buf) - 1)) {
-		/* All other input */
-		search_buf[search_i++] = c;
-		search_buf[search_i] = 0;
-		search_cptr = search_channels(current_channel(), search_buf);
-	}
-
-	/* Reprint the action message */
-	if (search_cptr == NULL) {
-		if (*search_buf)
-			action(action_find_channel, "Find: NO MATCH -- %s", search_buf);
-		else
-			action(action_find_channel, "Find: ");
-	} else {
-		/* Found a channel */
-		if (search_cptr->server == current_channel()->server) {
-			action(action_find_channel, "Find: %s -- %s",
-					search_cptr->name, search_buf);
-		} else {
-			if (!strcmp(search_cptr->server->port, "6697"))
-				action(action_find_channel, "Find: %s/%s -- %s",
-						search_cptr->server->host, search_cptr->name, search_buf);
-			else
-				action(action_find_channel, "Find: %s:%s/%s -- %s",
-						search_cptr->server->host, search_cptr->server->port,
-						search_cptr->name, search_buf);
-		}
-	}
-
-	return 0;
+	return (action_handler ? action_buff : NULL);
 }
 
-void
-channel_close(struct channel *c)
+static void
+state_channel_clear(int action_confirm)
 {
-	/* Close a channel. If the current channel is being
-	 * closed, update state appropriately */
+	struct channel *c = current_channel();
 
-	if (c == state.default_channel) {
-		newline(c, 0, "--", "Type :quit to exit rirc");
+	if (action_confirm) {
+		action(action_clear, "Clear buffer '%s'?   [y/n]", c->name);
+	} else {
+		memset(&(c->buffer), 0, sizeof(c->buffer));
+		draw(DRAW_BUFFER);
+	}
+}
+
+static void
+state_channel_close(int action_confirm)
+{
+	/* Close the current channel */
+
+	struct channel *c = current_channel();
+	struct server *s = c->server;
+
+	if (c->type == CHANNEL_T_RIRC) {
+		action(action_error, "Type :quit to exit rirc");
+		return;
+	}
+
+	if (action_confirm) {
+
+		if (c->type == CHANNEL_T_CHANNEL || c->type == CHANNEL_T_PRIVATE)
+			action(action_close, "Close '%s'?   [y/n]", c->name);
+
+		if (c->type == CHANNEL_T_SERVER)
+			action(action_close, "Close server '%s'? [%d channels]   [y/n])",
+				c->name, (s->clist.count - 1));
+
+		return;
+	}
+
+	if (c->type == CHANNEL_T_CHANNEL || c->type == CHANNEL_T_PRIVATE) {
+
+		if (s->connected && c->type == CHANNEL_T_CHANNEL && !c->parted)
+			io_sendf(s->connection, "PART %s :%s", c->name, DEFAULT_PART_MESG);
+
+		channel_set_current(c->next);
+		channel_list_del(&(s->clist), c);
+		channel_free(c);
 		return;
 	}
 
 	if (c->type == CHANNEL_T_SERVER) {
-		/* Closing a server, confirm the number of channels being closed */
 
-		int num_chans = 0;
-
-		while ((c = c->next)->type != CHANNEL_T_SERVER)
-			num_chans++;
-
-		if (num_chans)
-			action(action_close_server, "Close server '%s'? Channels: %d   [y/n]",
-					c->server->host, num_chans);
-		else
-			action(action_close_server, "Close server '%s'?   [y/n]", c->server->host);
-	} else {
-		/* Closing a channel */
-		if (c->type == CHANNEL_T_CHANNEL && !c->parted) {
-			int ret;
-			if (0 != (ret = io_sendf(c->server->connection, "PART %s", c->name))) {
-				// FIXME: closing a parted channel when server is disconnected isnt an error
-				newlinef(c->server->channel, 0, "sendf fail", "%s", io_err(ret));
-			}
+		if (s->connected) {
+			io_sendf(s->connection, "QUIT :%s", DEFAULT_QUIT_MESG);
+			io_dx(s->connection);
 		}
 
-		/* If closing the current channel, update state to a new channel */
-		if (c == current_channel()) {
-			channel_set_current(c->next);
-		} else {
-			draw(DRAW_NAV);
-		}
-
-		channel_list_del(&c->server->clist, c);
-		channel_free(c);
+		channel_set_current((s->next != s ? s->next->channel : state.default_channel));
+		connection_free(s->connection);
+		server_list_del(state_server_list(), s);
+		server_free(s);
+		return;
 	}
 }
 
@@ -482,8 +412,8 @@ buffer_scrollback_back(struct channel *c)
 	unsigned int buffer_i = b->scrollback,
 	             count = 0,
 	             text_w = 0,
-	             cols = io_tty_cols(),
-	             rows = io_tty_rows() - 4;
+	             cols = state_tty_cols,
+	             rows = state_tty_rows - 4;
 
 	struct buffer_line *line = buffer_line(b, buffer_i);
 
@@ -524,8 +454,8 @@ buffer_scrollback_forw(struct channel *c)
 
 	unsigned int count = 0,
 	             text_w = 0,
-	             cols = io_tty_cols(),
-	             rows = io_tty_rows() - 4;
+	             cols = state_tty_cols,
+	             rows = state_tty_rows - 4;
 
 	struct buffer *b = &c->buffer;
 
@@ -691,183 +621,80 @@ state_complete(char *str, uint16_t len, uint16_t max, int first)
 }
 
 static void
-state_io_cxed(struct server *s)
-{
-	int ret;
-	server_reset(s);
-	server_nicks_next(s);
-
-	if ((ret = io_sendf(s->connection, "CAP LS " IRCV3_CAP_VERSION)))
-		newlinef(s->channel, 0, "-!!-", "sendf fail: %s", io_err(ret));
-
-	if (s->pass && (ret = io_sendf(s->connection, "PASS %s", s->pass)))
-		newlinef(s->channel, 0, "-!!-", "sendf fail: %s", io_err(ret));
-
-	if ((ret = io_sendf(s->connection, "NICK %s", s->nick)))
-		newlinef(s->channel, 0, "-!!-", "sendf fail: %s", io_err(ret));
-
-	if ((ret = io_sendf(s->connection, "USER %s 8 * :%s", s->username, s->realname)))
-		newlinef(s->channel, 0, "-!!-", "sendf fail: %s", io_err(ret));
-
-	draw(DRAW_STATUS);
-}
-
-static void
-state_io_dxed(struct server *s)
-{
-	struct channel *c = s->channel;
-
-	do {
-		newline(c, 0, "-!!-", " -- disconnected --");
-		channel_reset(c);
-		c = c->next;
-	} while (c != s->channel);
-}
-
-static void
-state_io_ping(struct server *s, unsigned int ping)
-{
-	int ret;
-
-	s->ping = ping;
-
-	if (ping != IO_PING_MIN)
-		draw(DRAW_STATUS);
-	else if ((ret = io_sendf(s->connection, "PING :%s", s->host)))
-		newlinef(s->channel, 0, "-!!-", "sendf fail: %s", io_err(ret));
-}
-
-static void
-state_io_signal(enum io_sig_t sig)
-{
-	switch (sig) {
-		case IO_SIGWINCH:
-			draw(DRAW_ALL);
-			break;
-		default:
-			newlinef(state.default_channel, 0, "-!!-", "unhandled signal %d", sig);
-	}
-}
-
-void
-io_cb(enum io_cb_t type, const void *cb_obj, ...)
-{
-	struct server *s = (struct server *)cb_obj;
-	va_list ap;
-
-	va_start(ap, cb_obj);
-
-	switch (type) {
-		case IO_CB_CXED:
-			state_io_cxed(s);
-			break;
-		case IO_CB_DXED:
-			state_io_dxed(s);
-			break;
-		case IO_CB_PING_0:
-		case IO_CB_PING_1:
-		case IO_CB_PING_N:
-			state_io_ping(s, va_arg(ap, unsigned int));
-			break;
-		case IO_CB_ERR:
-			_newline(s->channel, 0, "-!!-", va_arg(ap, const char *), ap);
-			break;
-		case IO_CB_INFO:
-			_newline(s->channel, 0, "--", va_arg(ap, const char *), ap);
-			break;
-		case IO_CB_SIGNAL:
-			state_io_signal(va_arg(ap, enum io_sig_t));
-			break;
-		default:
-			fatal("unhandled io_cb_t: %d", type);
-	}
-
-	va_end(ap);
-
-	draw(DRAW_FLUSH);
-}
-
-static void
 command(struct channel *c, char *buf)
 {
-	const char *cmnd;
+	const char *arg;
+	const char *cmd;
 	int err;
 
-	if (!(cmnd = strsep(&buf))) {
-		newline(c, 0, "-!!-", "Messages beginning with ':' require a command");
+	if (!(cmd = strsep(&buf)))
 		return;
-	}
 
-	if (!strcasecmp(cmnd, "quit")) {
-		io_stop();
-	}
-
-	if (!strcasecmp(cmnd, "connect")) {
-		// TODO: parse --args
-		const char *host = strsep(&buf);
-		const char *port = strsep(&buf);
-		const char *pass = strsep(&buf);
-		const char *user = strsep(&buf);
-		const char *real = strsep(&buf);
-		const char *help = ":connect [host [port] [pass] [user] [real]]";
-		struct server *s;
-
-		if (host == NULL) {
-			if (c->server == NULL) {
-				newlinef(c, 0, "-!!-", "%s", help);
-			} else if ((err = io_cx(c->server->connection))) {
-				newlinef(c, 0, "-!!-", "%s", io_err(err));
-			}
-		} else {
-			port = (port ? port : "6697");
-			user = (user ? user : default_username);
-			real = (real ? real : default_realname);
-
-			if ((s = server_list_get(&state.servers, host, port)) != NULL) {
-				channel_set_current(s->channel);
-				newlinef(s->channel, 0, "-!!-", "already connected to %s:%s", host, port);
-			} else {
-				s = server(host, port, pass, user, real);
-				s->connection = connection(s, host, port, 0);
-				server_list_add(state_server_list(), s);
-				channel_set_current(s->channel);
-				io_cx(s->connection);
-				draw(DRAW_ALL);
-			}
+	if (!strcasecmp(cmd, "clear")) {
+		if ((arg = strsep(&buf))) {
+			action(action_error, "clear: Unknown arg '%s'", arg);
+			return;
 		}
+
+		state_channel_clear(0);
 		return;
 	}
 
-	if (!strcasecmp(cmnd, "disconnect")) {
-		io_dx(c->server->connection);
+	if (!strcasecmp(cmd, "close")) {
+		if ((arg = strsep(&buf))) {
+			action(action_error, "close: Unknown arg '%s'", arg);
+			return;
+		}
+
+		state_channel_close(0);
 		return;
 	}
 
-	if (!strcasecmp(cmnd, "clear")) {
-		channel_clear(c);
+	if (!strcasecmp(cmd, "connect")) {
+		if (!c->server) {
+			action(action_error, "connect: This is not a server");
+			return;
+		}
+
+		if ((arg = strsep(&buf))) {
+			action(action_error, "connect: Unknown arg '%s'", arg);
+			return;
+		}
+
+		if ((err = io_cx(c->server->connection)))
+			action(action_error, "connect: %s", io_err(err));
+
 		return;
 	}
 
-	if (!strcasecmp(cmnd, "close")) {
-		channel_close(c);
+	if (!strcasecmp(cmd, "disconnect")) {
+		if (!c->server) {
+			action(action_error, "disconnect: This is not a server");
+			return;
+		}
+
+		if ((arg = strsep(&buf))) {
+			action(action_error, "disconnect: Unknown arg '%s'", arg);
+			return;
+		}
+
+		if ((err = io_dx(c->server->connection)))
+			action(action_error, "disconnect: %s", io_err(err));
+
 		return;
 	}
 
-	if (!strcasecmp(cmnd, "set")) {
-		/* TODO user, real, nicks, pass, key */
+	if (!strcasecmp(cmd, "quit")) {
+		if ((arg = strsep(&buf))) {
+			action(action_error, "quit: Unknown arg '%s'", arg);
+			return;
+		}
+
+		io_stop();
 		return;
 	}
 
-	/* TODO:
-	 * help
-	 * ignore
-	 * unignore
-	 * version
-	 * find
-	 * buffers
-	 * b#
-	 * b<num>
-	 */
+	action(action_error, "Unknown command '%s'", cmd);
 }
 
 static int
@@ -929,16 +756,9 @@ state_input_ctrlch(const char *c, size_t len)
 			/* Cancel current input */
 			return input_reset(&(current_channel()->input));
 
-		case CTRL('f'):
-			/* Find channel */
-			if (current_channel()->server)
-				 action(action_find_channel, "Find: ");
-			break;
-
 		case CTRL('l'):
 			/* Clear current channel */
-			/* TODO: as action with confirmation */
-			channel_clear(current_channel());
+			state_channel_clear(1);
 			break;
 
 		case CTRL('p'):
@@ -952,8 +772,7 @@ state_input_ctrlch(const char *c, size_t len)
 			break;
 
 		case CTRL('x'):
-			/* Close current channel */
-			channel_close(current_channel());
+			state_channel_close(1);
 			break;
 
 		case CTRL('u'):
@@ -981,6 +800,8 @@ state_input_linef(struct channel *c)
 	if ((len = input_write(&(c->input), buf, sizeof(buf), 0)) == 0)
 		return 0;
 
+	input_hist_push(&(c->input));
+
 	switch (buf[0]) {
 		case ':':
 			if (len > 1 && buf[1] == ':')
@@ -998,8 +819,6 @@ state_input_linef(struct channel *c)
 			irc_send_privmsg(current_channel()->server, current_channel(), buf);
 	}
 
-	input_hist_push(&(c->input));
-
 	return 1;
 }
 
@@ -1010,7 +829,7 @@ io_cb_read_inp(char *buf, size_t len)
 
 	if (len == 0)
 		fatal("zero length message");
-	else if (action_message)
+	else if (action_handler)
 		redraw_input = state_input_action(buf, len);
 	else if (iscntrl(*buf))
 		redraw_input = state_input_ctrlch(buf, len);
@@ -1061,25 +880,97 @@ io_cb_read_soc(char *buf, size_t len, const void *cb_obj)
 }
 
 void
-io_cb_log(const void *cb_obj, enum io_log_level lvl, const char *fmt, ...)
+io_cb_cxed(const void *cb_obj)
 {
 	struct server *s = (struct server *)cb_obj;
 
+	int ret;
+	server_reset(s);
+	server_nicks_next(s);
+
+	s->connected = 1;
+
+	if ((ret = io_sendf(s->connection, "CAP LS " IRCV3_CAP_VERSION)))
+		newlinef(s->channel, 0, "-!!-", "sendf fail: %s", io_err(ret));
+
+	if (s->pass && (ret = io_sendf(s->connection, "PASS %s", s->pass)))
+		newlinef(s->channel, 0, "-!!-", "sendf fail: %s", io_err(ret));
+
+	if ((ret = io_sendf(s->connection, "NICK %s", s->nick)))
+		newlinef(s->channel, 0, "-!!-", "sendf fail: %s", io_err(ret));
+
+	if ((ret = io_sendf(s->connection, "USER %s 8 * :%s", s->username, s->realname)))
+		newlinef(s->channel, 0, "-!!-", "sendf fail: %s", io_err(ret));
+
+	draw(DRAW_STATUS);
+	draw(DRAW_FLUSH);
+}
+
+void
+io_cb_dxed(const void *cb_obj)
+{
+	struct server *s = (struct server *)cb_obj;
+	struct channel *c = s->channel;
+
+	s->connected = 0;
+
+	do {
+		newline(c, 0, "-!!-", " -- disconnected --");
+		channel_reset(c);
+		c = c->next;
+	} while (c != s->channel);
+
+	draw(DRAW_FLUSH);
+}
+
+void
+io_cb_ping(const void *cb_obj, unsigned ping)
+{
+	int ret;
+	struct server *s = (struct server *)cb_obj;
+
+	s->ping = ping;
+
+	if (ping != IO_PING_MIN)
+		draw(DRAW_STATUS);
+	else if ((ret = io_sendf(s->connection, "PING :%s", s->host)))
+		newlinef(s->channel, 0, "-!!-", "sendf fail: %s", io_err(ret));
+
+	draw(DRAW_FLUSH);
+}
+
+void
+io_cb_sigwinch(unsigned cols, unsigned rows)
+{
+	state_tty_cols = cols;
+	state_tty_rows = rows;
+
+	draw(DRAW_ALL);
+	draw(DRAW_FLUSH);
+}
+
+void
+io_cb_info(const void *cb_obj, const char *fmt, ...)
+{
 	va_list ap;
 	va_start(ap, fmt);
 
-	switch (lvl) {
-		case IO_LOG_ERROR:
-			_newline(s->channel, 0, "-!!-", fmt, ap);
-			break;
-		case IO_LOG_WARN:
-		case IO_LOG_INFO:
-		case IO_LOG_DEBUG:
-			_newline(s->channel, 0, "--", fmt, ap);
-			break;
-		default:
-			fatal("invalid log level");
-	}
+	_newline(((struct server *)cb_obj)->channel, 0, "--", fmt, ap);
 
 	va_end(ap);
+
+	draw(DRAW_FLUSH);
+}
+
+void
+io_cb_error(const void *cb_obj, const char *fmt, ...)
+{
+	va_list ap;
+	va_start(ap, fmt);
+
+	_newline(((struct server *)cb_obj)->channel, 0, "-!!-", fmt, ap);
+
+	va_end(ap);
+
+	draw(DRAW_FLUSH);
 }

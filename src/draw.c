@@ -1,8 +1,4 @@
-/* draw.c
- *
- * Draw the elements in state.c to the terminal.
- *
- * Assumes vt-100 compatible escape codes, as such YMMV */
+#include "src/draw.h"
 
 #include <alloca.h>
 #include <stdarg.h>
@@ -13,7 +9,6 @@
 #include "config.h"
 #include "src/components/channel.h"
 #include "src/components/input.h"
-#include "src/draw.h"
 #include "src/io.h"
 #include "src/state.h"
 #include "src/utils/utils.h"
@@ -127,23 +122,13 @@ draw(enum draw_bit bit)
 		case DRAW_ALL:
 			draw_state.bits.all = -1;
 			break;
+		case DRAW_CLEAR:
+			printf(RESET_ATTRIBUTES);
+			printf(CLEAR_FULL);
+			break;
 		default:
 			fatal("unknown draw bit");
 	}
-}
-
-void
-draw_init(void)
-{
-	draw(DRAW_ALL);
-	draw(DRAW_FLUSH);
-}
-
-void
-draw_term(void)
-{
-	printf(RESET_ATTRIBUTES);
-	printf(CLEAR_FULL);
 }
 
 static void
@@ -158,7 +143,7 @@ draw_bits(void)
 	struct coords coords;
 	struct channel *c = current_channel();
 
-	if (io_tty_cols() < COLS_MIN || io_tty_rows() < ROWS_MIN) {
+	if (state_cols() < COLS_MIN || state_rows() < ROWS_MIN) {
 		printf(CLEAR_FULL MOVE(1, 1) "rirc");
 		fflush(stdout);
 		return;
@@ -167,26 +152,32 @@ draw_bits(void)
 	printf(CURSOR_SAVE);
 
 	if (draw_state.bits.buffer) {
+		printf(RESET_ATTRIBUTES);
 		coords.c0 = 1;
-		coords.cN = io_tty_cols();
+		coords.cN = state_cols();
 		coords.r0 = 3;
-		coords.rN = io_tty_rows() - 2;
+		coords.rN = state_rows() - 2;
 		draw_buffer(&c->buffer, coords);
 	}
 
 	if (draw_state.bits.input) {
+		printf(RESET_ATTRIBUTES);
 		coords.c0 = 1;
-		coords.cN = io_tty_cols();
-		coords.r0 = io_tty_rows();
-		coords.rN = io_tty_rows();
+		coords.cN = state_cols();
+		coords.r0 = state_rows();
+		coords.rN = state_rows();
 		draw_input(&c->input, coords);
 	}
 
-	if (draw_state.bits.nav)
+	if (draw_state.bits.nav) {
+		printf(RESET_ATTRIBUTES);
 		draw_nav(c);
+	}
 
-	if (draw_state.bits.status)
+	if (draw_state.bits.status) {
+		printf(RESET_ATTRIBUTES);
 		draw_status(c);
+	}
 
 	printf(RESET_ATTRIBUTES);
 	printf(CURSOR_RESTORE);
@@ -452,7 +443,6 @@ draw_input(struct input *inp, struct coords coords)
 	unsigned cols_t = coords.cN - coords.c0 + 1,
 	         cursor = coords.c0;
 
-	printf(RESET_ATTRIBUTES);
 	printf(MOVE(%d, 1) CLEAR_LINE, coords.rN);
 	printf(CURSOR_SAVE);
 
@@ -479,21 +469,24 @@ draw_input(struct input *inp, struct coords coords)
 			goto print_input;
 	}
 
-	if (!draw_fmt(&input_ptr, &buff_n, &text_n, 0,
-			"%s", draw_colour(INPUT_FG, INPUT_BG)))
-		goto print_input;
+	if (action_message()) {
 
-	if (action_message) {
+		if (!draw_fmt(&input_ptr, &buff_n, &text_n, 0,
+				"%s", draw_colour(ACTION_FG, ACTION_BG)))
+			goto print_input;
 
 		cursor = coords.cN;
 
-		if (!draw_fmt(&input_ptr, &buff_n, &text_n, 1,
-				"%s", action_message))
+		if (!draw_fmt(&input_ptr, &buff_n, &text_n, 1, "-- %s --", action_message()))
 			goto print_input;
 
 		cursor = cols_t - text_n + 1;
 
 	} else {
+		if (!draw_fmt(&input_ptr, &buff_n, &text_n, 0,
+				"%s", draw_colour(INPUT_FG, INPUT_BG)))
+			goto print_input;
+
 		cursor += input_frame(inp, input_ptr, text_n);
 	}
 
@@ -541,7 +534,7 @@ draw_nav(struct channel *c)
 	size_t len, total_len = 0;
 
 	/* Bump the channel frames, if applicable */
-	if ((total_len = (c->name_len + 2)) >= io_tty_cols())
+	if ((total_len = (c->name_len + 2)) >= state_cols())
 		return;
 	else if (c == frame_prev && frame_prev != c_first)
 		frame_prev = channel_get_prev(frame_prev);
@@ -560,7 +553,7 @@ draw_nav(struct channel *c)
 			tmp = channel_get_next(tmp_next);
 			len = tmp->name_len;
 
-			while ((total_len += (len + 2)) < io_tty_cols() && tmp != c_first) {
+			while ((total_len += (len + 2)) < state_cols() && tmp != c_first) {
 
 				tmp_next = tmp;
 
@@ -578,7 +571,7 @@ draw_nav(struct channel *c)
 			tmp = channel_get_prev(tmp_prev);
 			len = tmp->name_len;
 
-			while ((total_len += (len + 2)) < io_tty_cols() && tmp != c_last) {
+			while ((total_len += (len + 2)) < state_cols() && tmp != c_last) {
 
 				tmp_prev = tmp;
 
@@ -593,7 +586,7 @@ draw_nav(struct channel *c)
 		len = tmp->name_len;
 
 		/* Next channel doesn't fit */
-		if ((total_len += (len + 2)) >= io_tty_cols())
+		if ((total_len += (len + 2)) >= state_cols())
 			break;
 
 		if (nextward)
@@ -638,14 +631,12 @@ draw_status(struct channel *c)
 	float sb;
 	int ret;
 	unsigned col = 0;
-	unsigned cols = io_tty_cols();
-	unsigned rows = io_tty_rows();
+	unsigned cols = state_cols();
+	unsigned rows = state_rows();
 
 	/* Insufficient columns for meaningful status */
 	if (cols < 3)
 		return;
-
-	printf(RESET_ATTRIBUTES);
 
 	printf(MOVE(2, 1));
 	printf("%.*s", cols, (char *)(memset(alloca(cols), *HORIZONTAL_SEPARATOR, cols)));
@@ -776,7 +767,7 @@ draw_colour(int fg, int bg)
 	}
 
 	if (bg >= 0 && bg <= 255) {
-		if ((ret = snprintf(buf + len, sizeof(buf) - len, ESC"[48;5;%dm", bg)) < 0)
+		if ((snprintf(buf + len, sizeof(buf) - len, ESC"[48;5;%dm", bg)) < 0)
 			buf[len] = 0;
 	}
 

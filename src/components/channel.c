@@ -1,8 +1,9 @@
+#include "src/components/channel.h"
+
 #include <errno.h>
 #include <stdlib.h>
 #include <string.h>
 
-#include "src/components/channel.h"
 #include "src/utils/utils.h"
 
 struct channel*
@@ -52,6 +53,8 @@ channel_list_free(struct channel_list *cl)
 void
 channel_list_add(struct channel_list *cl, struct channel *c)
 {
+	cl->count++;
+
 	if (cl->head == NULL) {
 		cl->head = c->next = c;
 		cl->tail = c->prev = c;
@@ -67,6 +70,8 @@ channel_list_add(struct channel_list *cl, struct channel *c)
 void
 channel_list_del(struct channel_list *cl, struct channel *c)
 {
+	cl->count--;
+
 	if (cl->head == c && cl->tail == c) {
 		cl->head = NULL;
 		cl->tail = NULL;

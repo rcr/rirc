@@ -1,5 +1,5 @@
-#ifndef RIRC_H
-#define RIRC_H
+#ifndef RIRC_RIRC_H
+#define RIRC_RIRC_H
 
 /* Default config values obtained at runtime */
 

@@ -1,13 +1,19 @@
-#ifndef IRCV3_CAP_H
-#define IRCV3_CAP_H
+#ifndef RIRC_COMPONENTS_IRCV3_CAP_H
+#define RIRC_COMPONENTS_IRCV3_CAP_H
 
 #define IRCV3_CAP_AUTO   (1 << 0)
 #define IRCV3_CAP_NO_DEL (1 << 1)
 #define IRCV3_CAP_NO_REQ (1 << 2)
+
 #define IRCV3_CAP_VERSION "302"
 
 #define IRCV3_CAPS_DEF \
-	X("multi-prefix", multi_prefix, IRCV3_CAP_AUTO)
+	X("account-notify", account_notify, IRCV3_CAP_AUTO) \
+	X("away-notify",    away_notify,    IRCV3_CAP_AUTO) \
+	X("chghost",        chghost,        IRCV3_CAP_AUTO) \
+	X("extended-join",  extended_join,  IRCV3_CAP_AUTO) \
+	X("invite-notify",  invite_notify,  IRCV3_CAP_AUTO) \
+	X("multi-prefix",   multi_prefix,   IRCV3_CAP_AUTO)
 
 /* Extended by testcases */
 #ifndef IRCV3_CAPS_TEST

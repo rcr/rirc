@@ -1,6 +1,7 @@
+#include "src/handlers/ircv3.h"
+
 #include <string.h>
 
-#include "src/handlers/ircv3.h"
 #include "src/io.h"
 #include "src/state.h"
 

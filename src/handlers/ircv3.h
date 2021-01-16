@@ -1,5 +1,5 @@
-#ifndef IRCV3_H
-#define IRCV3_H
+#ifndef RIRC_HANDLERS_IRCV3_H
+#define RIRC_HANDLERS_IRCV3_H
 
 #include "src/components/server.h"
 #include "src/utils/utils.h"

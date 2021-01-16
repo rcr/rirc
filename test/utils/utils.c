@@ -354,39 +354,56 @@ test_irc_pinged(void)
 {
 	/* Test detecting user's nick in message */
 
-	const char *nick = "testnick";
+	const char *nick;
 
-	/* Test message contains nick */
-	const char *mesg1 = "testing testnick testing";
-	assert_eq(irc_pinged(CASEMAPPING_RFC1459, mesg1, nick), 1);
+#define CHECK_IRC_PINGED(M, R) \
+	assert_eq(irc_pinged(CASEMAPPING_RFC1459, (M), nick), (R));
 
-	/* Test common way of addressing messages to nicks */
-	const char *mesg2 = "testnick: testing";
-	assert_eq(irc_pinged(CASEMAPPING_RFC1459, mesg2, nick), 1);
+	nick = "nick";
 
-	/* Test non-nick char prefix */
-	const char *mesg3 = "testing !@#testnick testing";
-	assert_eq(irc_pinged(CASEMAPPING_RFC1459, mesg3, nick), 1);
+	CHECK_IRC_PINGED("nick", 1);
+	CHECK_IRC_PINGED("nick ", 1);
+	CHECK_IRC_PINGED("nick:", 1);
+	CHECK_IRC_PINGED("nick: ", 1);
+	CHECK_IRC_PINGED(" nick", 1);
+	CHECK_IRC_PINGED(" nick ", 1);
+	CHECK_IRC_PINGED(" nick:", 1);
+	CHECK_IRC_PINGED(" nick: ", 1);
+	CHECK_IRC_PINGED("xxx 'nick'! ", 1);
+	CHECK_IRC_PINGED("xxx @nick?! xxx", 1);
+	CHECK_IRC_PINGED("xxx @NICK?! xxx", 1);
 
-	/* Test non-nick char suffix */
-	const char *mesg4 = "testing testnick!@#$ testing";
-	assert_eq(irc_pinged(CASEMAPPING_RFC1459, mesg4, nick), 1);
+	CHECK_IRC_PINGED("", 0);
+	CHECK_IRC_PINGED(" ", 0);
+	CHECK_IRC_PINGED("xxx", 0);
+	CHECK_IRC_PINGED("xnick", 0);
+	CHECK_IRC_PINGED("xnick:", 0);
+	CHECK_IRC_PINGED("xnick: ", 0);
+	CHECK_IRC_PINGED(" xnick", 0);
+	CHECK_IRC_PINGED(" xnick:", 0);
 
-	/* Test non-nick char prefix and suffix */
-	const char *mesg5 = "testing !testnick! testing";
-	assert_eq(irc_pinged(CASEMAPPING_RFC1459, mesg5, nick), 1);
+	/* Test server assigns a non standard nick */
+	nick = "000nick";
 
-	/* Test case insensitive nick detection */
-	const char *mesg6 = "testing TeStNiCk testing";
-	assert_eq(irc_pinged(CASEMAPPING_RFC1459, mesg6, nick), 1);
+	CHECK_IRC_PINGED("000nick", 1);
+	CHECK_IRC_PINGED("000nick ", 1);
+	CHECK_IRC_PINGED("000nick:", 1);
+	CHECK_IRC_PINGED("000nick: ", 1);
+	CHECK_IRC_PINGED(" 000nick", 1);
+	CHECK_IRC_PINGED(" 000nick ", 1);
+	CHECK_IRC_PINGED(" 000nick:", 1);
+	CHECK_IRC_PINGED(" 000nick: ", 1);
+	CHECK_IRC_PINGED("xxx '000nick'! ", 1);
+	CHECK_IRC_PINGED("xxx @000nick?! xxx", 1);
+	CHECK_IRC_PINGED("xxx @000NICK?! xxx", 1);
 
-	/* Error: message doesn't contain nick */
-	const char *mesg7 = "testing testing";
-	assert_eq(irc_pinged(CASEMAPPING_RFC1459, mesg7, nick), 0);
+	CHECK_IRC_PINGED("x000nick", 0);
+	CHECK_IRC_PINGED("x000nick:", 0);
+	CHECK_IRC_PINGED("x000nick: ", 0);
+	CHECK_IRC_PINGED(" x000nick", 0);
+	CHECK_IRC_PINGED(" x000nick:", 0);
 
-	/* Error: message contains nick prefix */
-	const char *mesg8 = "testing testnickshouldfail testing";
-	assert_eq(irc_pinged(CASEMAPPING_RFC1459, mesg8, nick), 0);
+#undef CHECK_IRC_PINGED
 }
 
 static void

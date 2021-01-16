@@ -1,5 +1,5 @@
-#ifndef INPUT_H
-#define INPUT_H
+#ifndef RIRC_COMPONENTS_INPUT_H
+#define RIRC_COMPONENTS_INPUT_H
 
 /* Buffer input
  *
@@ -13,6 +13,7 @@
  * copied into the working area when scrolling
  */
 
+#include <stddef.h>
 #include <stdint.h>
 
 /* 410 max characters for input should be sufficient given

@@ -1,5 +1,5 @@
-#ifndef TREE_H
-#define TREE_H
+#ifndef RIRC_UTILS_TREE_H
+#define RIRC_UTILS_TREE_H
 
 #include <stddef.h>
 
@@ -10,11 +10,10 @@
 #define TREE_RIGHT(elm, field) (elm)->field.tree_right
 #define TREE_ROOT(head)        (head)->tree_root
 
-#define AVL_ADD(name, x, y, z)     name##_AVL_ADD(x, y, z)
-#define AVL_DEL(name, x, y, z)     name##_AVL_DEL(x, y, z)
-#define AVL_GET(name, x, y, z)     name##_AVL_GET(x, y, z)
-#define AVL_NGET(name, x, y, z, n) name##_AVL_NGET(x, y, z, n)
-#define AVL_FOREACH(name, x, y)    name##_AVL_FOREACH(x, y)
+#define AVL_ADD(name, x, y, z)    name##_AVL_ADD(x, y, z)
+#define AVL_DEL(name, x, y, z)    name##_AVL_DEL(x, y, z)
+#define AVL_GET(name, x, y, z, n) name##_AVL_GET(x, y, z, n)
+#define AVL_FOREACH(name, x, y)   name##_AVL_FOREACH(x, y)
 
 #define TREE_HEAD(type) \
     struct type *tree_root
@@ -114,24 +113,13 @@ name##_AVL_FOREACH(struct name *head, void (*f)(struct type*))                  
 }                                                                                 \
                                                                                   \
 static struct type*                                                               \
-name##_AVL_GET(struct name *head, struct type *elm, void *arg)                    \
+name##_AVL_GET(struct name *head, struct type *elm, void *arg, size_t n)          \
 {                                                                                 \
     int comp;                                                                     \
     struct type *tmp = TREE_ROOT(head);                                           \
                                                                                   \
-    while (tmp && (comp = cmp(elm, tmp, arg)))                                    \
-        tmp = (comp > 0) ? TREE_RIGHT(tmp, field) : TREE_LEFT(tmp, field);        \
-                                                                                  \
-    return tmp;                                                                   \
-}                                                                                 \
-                                                                                  \
-static struct type*                                                               \
-name##_AVL_NGET(struct name *head, struct type *elm, void *arg, size_t n)         \
-{                                                                                 \
-    int comp;                                                                     \
-    struct type *tmp = TREE_ROOT(head);                                           \
-                                                                                  \
-    while (tmp && (comp = ncmp(elm, tmp, arg, n)))                                \
+    /* TODO: this can all be one func, with a1, a2, a3 as arguments   */          \
+    while (tmp && (comp = (n ? ncmp(elm, tmp, arg, n) : cmp(elm, tmp, arg))))     \
         tmp = (comp > 0) ? TREE_RIGHT(tmp, field) : TREE_LEFT(tmp, field);        \
                                                                                   \
     return tmp;                                                                   \
