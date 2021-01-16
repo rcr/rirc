@@ -10,9 +10,6 @@ packages:
 sources:
   - https://git.sr.ht/~rcr/rirc
 
-environment:
-  SONAR_VER: 4.4.0.2170
-
 secrets:
   - 8c2439c9-5f91-4b19-b3c3-33d82f1b861f
   - a58d0951-f57f-44ef-8ef2-25f2f84f0e89
@@ -22,39 +19,23 @@ tasks:
       cd rirc
       git submodule init
       git submodule update --recursive
+      export MAKEFLAGS='-j $(nproc)'
   - build: |
       cd rirc
-      make -j $(nproc) clean check
+      make clean
+      make all
+      make check
   - static-analysis: |
       cd rirc
-      branch=$(git name-rev --name-only HEAD)
-      [ $branch = "remotes/origin/static_analysis" ] || complete-build
+      [ $(git name-rev --name-only HEAD) = "remotes/origin/static_analysis" ] || complete-build
       set +x
       source ~/export_coverity
       source ~/export_sonarscan
       set -x
-      # Coverity
-      ./scripts/coverity_get.sh coverity
-      ./scripts/coverity_run.sh coverity
-      # Sonarcloud
-      curl -o build-wrapper.zip https://sonarcloud.io/static/cpp/build-wrapper-linux-x86.zip
-      curl -o sonar-scanner.zip https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-$SONAR_VER-linux.zip
-      unzip build-wrapper.zip
-      unzip sonar-scanner.zip
-      ./scripts/coverage.sh
-      echo >> sonar-project.properties "sonar.branch.name=$branch"
-      echo >> sonar-project.properties "sonar.cfamily.build-wrapper-output=bw-output"
-      echo >> sonar-project.properties "sonar.cfamily.cache.enabled=false"
-      echo >> sonar-project.properties "sonar.cfamily.gcov.reportsPath=."
-      echo >> sonar-project.properties "sonar.cfamily.threads=1"
-      echo >> sonar-project.properties "sonar.coverage.exclusions=test"
-      echo >> sonar-project.properties "sonar.host.url=https://sonarcloud.io"
-      echo >> sonar-project.properties "sonar.organization=rirc"
-      echo >> sonar-project.properties "sonar.projectKey=rirc"
-      echo >> sonar-project.properties "sonar.sources=src"
-      echo >> sonar-project.properties "sonar.tests=test"
-      ./build-wrapper-linux-x86/build-wrapper-linux-x86-64 --out-dir bw-output make -j $(nproc) clean check
-      ./sonar-scanner-$SONAR_VER-linux/bin/sonar-scanner
+      ./scripts/sa_coverity_get.sh coverity
+      ./scripts/sa_coverity_run.sh coverity
+      ./scripts/sa_sonarcloud_get.sh sonarcloud
+      ./scripts/sa_sonarcloud_run.sh sonarcloud
 
 triggers:
   - action: email

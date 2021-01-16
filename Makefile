@@ -70,7 +70,8 @@ $(DIR_B)/%.db.o: $(DIR_S)/%.c config.h | $(DIR_B)
 # Testcases
 $(DIR_B)/%.t: $(DIR_T)/%.c $(OBJS_G) | $(DIR_B)
 	@$(PP) $(CFLAGS_D) -MM -MP -MT $@ -MF $(@:.t=.t.d) $<
-	@$(CC) $(CFLAGS_D) $(LDFLAGS) -o $@ $<
+	@$(CC) $(CFLAGS_D) -c -o $(@:.t=.t.o) $<
+	@$(CC) $(CFLAGS_D) -o $@ $(@:.t=.t.o)
 	@$(TEST_EXT) ./$@
 
 # Default config file
@@ -93,11 +94,9 @@ $(TLS_LIBS): $(TLS_CONF)
 all:
 	@$(MAKE) --silent $(TLS_LIBS)
 	@$(MAKE) --silent $(BIN_R)
+	@$(MAKE) --silent $(BIN_D)
 
 check:
-	@$(MAKE) --silent $(TLS_LIBS)
-	@$(MAKE) --silent $(BIN_R)
-	@$(MAKE) --silent $(BIN_D)
 	@$(MAKE) --silent $(OBJS_T)
 
 clean:
@@ -123,5 +122,4 @@ uninstall:
 
 .PHONY: all check clean install uninstall
 
-# Save tests for debugging
 .PRECIOUS: $(OBJS_T)

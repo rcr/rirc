@@ -2,9 +2,9 @@
 
 set -e
 
-rm -f compile_commands.json
-
 export CC=clang
 export CC_EXT="-Wno-empty-translation-unit"
+
+rm -f compile_commands.json
 
 bear make clean rirc.debug
