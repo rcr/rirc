@@ -46,24 +46,24 @@ OBJS_T += $(DIR_B)/utils/tree.t # Header only file
 OBJS_G := $(patsubst %.gperf, %.gperf.out, $(SRC_G))
 
 # Release build executable
-$(BIN_R): $(TLS_LIBS) $(OBJS_G) $(OBJS_R)
-	@echo cc $@
+$(BIN_R): libs $(OBJS_G) $(OBJS_R)
+	@echo " CC  $@"
 	@$(CC) $(LDFLAGS) -o $@ $(OBJS_R) $(TLS_LIBS)
 
 # Debug build executable
-$(BIN_D): $(TLS_LIBS) $(OBJS_G) $(OBJS_D)
-	@echo cc $@
+$(BIN_D): libs $(OBJS_G) $(OBJS_D)
+	@echo " CC  $@"
 	@$(CC) $(LDFLAGS) -o $@ $(OBJS_D) $(TLS_LIBS)
 
 # Release build objects
 $(DIR_B)/%.o: $(DIR_S)/%.c config.h | $(DIR_B)
-	@echo "cc $<..."
+	@echo " CC  $<"
 	@$(PP) $(CFLAGS_R) -MM -MP -MT $@ -MF $(@:.o=.o.d) $<
 	@$(CC) $(CFLAGS_R) -c -o $@ $<
 
 # Debug build objects
 $(DIR_B)/%.db.o: $(DIR_S)/%.c config.h | $(DIR_B)
-	@echo "cc $<..."
+	@echo " CC  $<"
 	@$(PP) $(CFLAGS_D) -MM -MP -MT $@ -MF $(@:.o=.o.d) $<
 	@$(CC) $(CFLAGS_D) -c -o $@ $<
 
@@ -74,11 +74,9 @@ $(DIR_B)/%.t: $(DIR_T)/%.c $(OBJS_G) | $(DIR_B)
 	@$(CC) $(CFLAGS_D) -o $@ $(@:.t=.t.o)
 	@$(TEST_EXT) ./$@
 
-# Default config file
 config.h:
 	cp config.def.h config.h
 
-# Gperf generated source
 %.gperf.out: %.gperf
 	gperf --output-file=$@ $<
 
@@ -91,8 +89,7 @@ $(TLS_LIBS): $(TLS_CONF)
 	@CFLAGS="$(TLS_INCL)" $(MAKE) --silent -C ./lib/mbedtls clean
 	@CFLAGS="$(TLS_INCL)" $(MAKE) --silent -C ./lib/mbedtls lib
 
-all:
-	@$(MAKE) --silent $(TLS_LIBS)
+all: libs
 	@$(MAKE) --silent $(BIN_R)
 	@$(MAKE) --silent $(BIN_D)
 
@@ -100,8 +97,11 @@ check:
 	@$(MAKE) --silent $(OBJS_T)
 
 clean:
-	rm -rf $(DIR_B) $(BIN_R) $(BIN_D)
-	@find . -name "*gperf.out" -print0 | xargs -0 -I % rm -rfv %
+	@rm -rf $(DIR_B)
+	@rm -vf $(BIN_R) $(BIN_D) $(OBJS_G)
+
+libs:
+	@$(MAKE) --silent $(TLS_LIBS)
 
 install: $(BIN_R)
 	@echo installing executable to $(BIN_DIR)
@@ -120,6 +120,6 @@ uninstall:
 -include $(OBJS_D:.o=.o.d)
 -include $(OBJS_T:.t=.t.d)
 
-.PHONY: all check clean install uninstall
+.PHONY: all check clean libs install uninstall
 
 .PRECIOUS: $(OBJS_T)
