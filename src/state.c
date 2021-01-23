@@ -354,6 +354,7 @@ state_channel_close(int action_confirm)
 {
 	/* Close the current channel */
 
+	int ret;
 	struct channel *c = current_channel();
 	struct server *s = c->server;
 
@@ -376,8 +377,10 @@ state_channel_close(int action_confirm)
 
 	if (c->type == CHANNEL_T_CHANNEL || c->type == CHANNEL_T_PRIVATE) {
 
-		if (s->connected && c->type == CHANNEL_T_CHANNEL && !c->parted)
-			io_sendf(s->connection, "PART %s :%s", c->name, DEFAULT_PART_MESG);
+		if (s->connected && c->type == CHANNEL_T_CHANNEL && !c->parted) {
+			if ((ret = io_sendf(s->connection, "PART %s :%s", c->name, DEFAULT_PART_MESG)))
+				newlinef(s->channel, 0, "-!!-", "sendf fail: %s", io_err(ret));
+		}
 
 		channel_set_current(c->next);
 		channel_list_del(&(s->clist), c);
@@ -388,7 +391,8 @@ state_channel_close(int action_confirm)
 	if (c->type == CHANNEL_T_SERVER) {
 
 		if (s->connected) {
-			io_sendf(s->connection, "QUIT :%s", DEFAULT_QUIT_MESG);
+			if ((ret = io_sendf(s->connection, "QUIT :%s", DEFAULT_QUIT_MESG)))
+				newlinef(s->channel, 0, "-!!-", "sendf fail: %s", io_err(ret));
 			io_dx(s->connection);
 		}
 
