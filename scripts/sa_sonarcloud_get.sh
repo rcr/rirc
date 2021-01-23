@@ -18,7 +18,9 @@ BUILD_ZIP_URL="https://sonarcloud.io/static/cpp/build-wrapper-linux-x86.zip"
 SONAR_ZIP_URL="https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-$SONAR_VER-linux.zip"
 SONAR_MD5_URL="https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-$SONAR_VER-linux.zip.md5"
 
-mkdir "$1"
+mkdir -p "$1"
+
+echo "*" > "$1/.gitignore"
 
 curl -fs --show-error "$BUILD_ZIP_URL" -o "$BUILD_ZIP"
 curl -fs --show-error "$SONAR_ZIP_URL" -o "$SONAR_ZIP"

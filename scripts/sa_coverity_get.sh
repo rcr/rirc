@@ -12,14 +12,18 @@ if [[ -z "${COVERITY_TOKEN}" ]]; then
 	fail "missing env COVERITY_TOKEN"
 fi
 
-COVERITY_MD5="$1/coverity_tool.md5"
-COVERITY_TGZ="$1/coverity_tool.tgz"
+DIR="$1"
 
-mkdir "$1"
+COVERITY_MD5="$DIR/coverity_tool.md5"
+COVERITY_TGZ="$DIR/coverity_tool.tgz"
+
+mkdir -p "$DIR"
+
+echo "*" > "$DIR/.gitignore"
 
 curl -fs --show-error https://scan.coverity.com/download/linux64 -o "$COVERITY_MD5" --data "token=$COVERITY_TOKEN&project=rcr%2Frirc&md5=1"
 curl -fs --show-error https://scan.coverity.com/download/linux64 -o "$COVERITY_TGZ" --data "token=$COVERITY_TOKEN&project=rcr%2Frirc"
 
 printf "%s\t$COVERITY_TGZ" "$(cat "$COVERITY_MD5")" | md5sum --quiet -c -
 
-tar xzf "$COVERITY_TGZ" -C "$1" --strip-components 1
+tar xzf "$COVERITY_TGZ" -C "$DIR" --strip-components 1

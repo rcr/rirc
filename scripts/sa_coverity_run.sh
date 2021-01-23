@@ -16,18 +16,25 @@ if [[ -z "${COVERITY_TOKEN}" ]]; then
 	fail "missing env COVERITY_TOKEN"
 fi
 
-COVERITY_OUT="cov-int"
-COVERITY_TAR="cov-int.tgz"
+DIR="$1"
+
+COVERITY_OUT="$DIR/cov-int"
+COVERITY_TAR="$DIR/cov-int.tgz"
 
 VERSION=$(git rev-parse --short HEAD)
 
-PATH=$(pwd)/$1/bin:$PATH cov-build --dir "$COVERITY_OUT" make clean all check
+export PATH="$PWD/$DIR/bin:$PATH"
+
+make clean
+make libs
+
+cov-build --dir "$COVERITY_OUT" make all check
 
 tar czf "$COVERITY_TAR" "$COVERITY_OUT"
 
-curl \
-	--form file=@"$COVERITY_TAR" \
+curl https://scan.coverity.com/builds?project=rcr%2Frirc \
+	--form description="$VERSION" \
 	--form email="$COVERITY_EMAIL" \
+	--form file=@"$COVERITY_TAR" \
 	--form token="$COVERITY_TOKEN" \
-	--form version="$VERSION" \
-	https://scan.coverity.com/builds?project=rcr%2Frirc
+	--form version="$VERSION"
