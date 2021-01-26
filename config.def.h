@@ -73,7 +73,7 @@
 #define INPUT_BG -1
 
 /* BUFFER_PADDING:
- * How the buffer line headers will be padded, options are 0, 1
+ * How the buffer line headers will be padded [0, 1]
  *
  * 0 (Unpadded):
  *   12:34 alice ~ hello
