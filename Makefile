@@ -45,13 +45,15 @@ OBJS_T += $(DIR_B)/utils/tree.t # Header only file
 # Gperf generated source files
 OBJS_G := $(patsubst %.gperf, %.gperf.out, $(SRC_G))
 
+# TODO: making this depend on libs means that it always rebuilds because its phony :(
 # Release build executable
-$(BIN_R): libs $(OBJS_G) $(OBJS_R)
+$(BIN_R): $(TLS_LIBS) $(OBJS_G) $(OBJS_R)
 	@echo " CC  $@"
 	@$(CC) $(LDFLAGS) -o $@ $(OBJS_R) $(TLS_LIBS)
 
+# TODO: making this depend on libs means that it always rebuilds because its phony :(
 # Debug build executable
-$(BIN_D): libs $(OBJS_G) $(OBJS_D)
+$(BIN_D): $(TLS_LIBS) $(OBJS_G) $(OBJS_D)
 	@echo " CC  $@"
 	@$(CC) $(LDFLAGS) -o $@ $(OBJS_D) $(TLS_LIBS)
 
@@ -89,7 +91,7 @@ $(TLS_LIBS): $(TLS_CONF)
 	@CFLAGS="$(TLS_INCL)" $(MAKE) --silent -C ./lib/mbedtls clean
 	@CFLAGS="$(TLS_INCL)" $(MAKE) --silent -C ./lib/mbedtls lib
 
-all: libs
+all:
 	@$(MAKE) --silent $(BIN_R)
 	@$(MAKE) --silent $(BIN_D)
 
@@ -100,8 +102,7 @@ clean:
 	@rm -rf $(DIR_B)
 	@rm -vf $(BIN_R) $(BIN_D) $(OBJS_G)
 
-libs:
-	@$(MAKE) --silent $(TLS_LIBS)
+libs: $(TLS_LIBS)
 
 install: $(BIN_R)
 	@echo installing executable to $(BIN_DIR)
