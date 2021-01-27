@@ -70,7 +70,7 @@ int irc_strncmp(enum casemapping_t, const char*, const char*, size_t);
 
 int irc_message_param(struct irc_message*, char**);
 int irc_message_parse(struct irc_message*, char*);
-int irc_message_split(struct irc_message*, char**);
+int irc_message_split(struct irc_message*, const char**, const char**);
 
 char* strdup(const char*);
 char* strsep(char**);

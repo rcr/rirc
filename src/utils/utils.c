@@ -224,10 +224,11 @@ irc_message_parse(struct irc_message *m, char *buf)
 }
 
 int
-irc_message_split(struct irc_message *m, char **trailing)
+irc_message_split(struct irc_message *m, const char **params, const char **trailing)
 {
 	/* Split the message params and trailing arg for use in generic handling */
 
+	*params = m->params;
 	*trailing = NULL;
 
 	if (!m->params)
@@ -247,13 +248,13 @@ irc_message_split(struct irc_message *m, char **trailing)
 
 		if (m->n_params >= 15) {
 			if (m->params == p) {
-				m->params = NULL;
+				*params = m->params = NULL;
 				*trailing = p;
 			} else {
 				*trailing = (*p) ? p : NULL;
 				do {
 					if (p == m->params) {
-						m->params = NULL;
+						*params = m->params = NULL;
 						return 1;
 					}
 					p--;
@@ -268,7 +269,7 @@ irc_message_split(struct irc_message *m, char **trailing)
 			*trailing = (*(p + 1)) ? (p + 1) : NULL;
 			do {
 				if (p == m->params) {
-					m->params = NULL;
+					*params = m->params = NULL;
 					return 1;
 				}
 				p--;

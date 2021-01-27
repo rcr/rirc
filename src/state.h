@@ -5,22 +5,19 @@
 #include "src/components/channel.h"
 #include "src/components/server.h"
 
-#define FROM_INFO "--"
-#define FROM_ERROR "-!!-"
+#define FROM_INFO    "--"
+#define FROM_ERROR   "-!!-"
 #define FROM_UNKNOWN "-\?\?-"
-#define FROM_JOIN ">>"
-#define FROM_NICK "--"
-#define FROM_PART "<<"
-#define FROM_QUIT "<<"
+#define FROM_JOIN    ">>"
+#define FROM_NICK    "--"
+#define FROM_PART    "<<"
+#define FROM_QUIT    "<<"
 
 #define server_info(S, ...) \
 	do { newlinef((S)->channel, BUFFER_LINE_SERVER_INFO, FROM_INFO, __VA_ARGS__); } while (0)
 
 #define server_error(S, ...) \
 	do { newlinef((S)->channel, BUFFER_LINE_SERVER_ERROR, FROM_ERROR, __VA_ARGS__); } while (0)
-
-#define server_unknown(S, ...) \
-	do { newlinef((S)->channel, BUFFER_LINE_SERVER_ERROR, FROM_UNKNOWN, __VA_ARGS__); } while (0)
 
 int state_server_set_chans(struct server*, const char*);
 

@@ -179,7 +179,8 @@ static void
 test_irc_message_split(void)
 {
 	char *param;
-	char *trailing;
+	const char *params;
+	const char *trailing;
 	struct irc_message m;
 
 #define CHECK_IRC_MESSAGE_PARAM(R, S) \
@@ -190,8 +191,8 @@ test_irc_message_split(void)
 	assert_eq(irc_message_parse(&m, (M)), (R));
 
 #define CHECK_IRC_MESSAGE_SPLIT(R, P, T) \
-	assert_eq(irc_message_split(&m, &trailing), (R)); \
-	assert_strcmp(m.params, (P)); \
+	assert_eq(irc_message_split(&m, &params, &trailing), (R)); \
+	assert_strcmp(params,   (P)); \
 	assert_strcmp(trailing, (T));
 
 	/* Test empty params */
