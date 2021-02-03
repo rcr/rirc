@@ -327,7 +327,7 @@ irc_strtrim(char **str)
 }
 
 char*
-irc_strwrap(int n, char **str, char *end)
+irc_strwrap(unsigned n, char **str, char *end)
 {
 	/* Greedy word wrap algorithm.
 	 *

@@ -45,13 +45,11 @@ OBJS_T += $(DIR_B)/utils/tree.t # Header only file
 # Gperf generated source files
 OBJS_G := $(patsubst %.gperf, %.gperf.out, $(SRC_G))
 
-# TODO: making this depend on libs means that it always rebuilds because its phony :(
 # Release build executable
 $(BIN_R): $(TLS_LIBS) $(OBJS_G) $(OBJS_R)
 	@echo " CC  $@"
 	@$(CC) $(LDFLAGS) -o $@ $(OBJS_R) $(TLS_LIBS)
 
-# TODO: making this depend on libs means that it always rebuilds because its phony :(
 # Debug build executable
 $(BIN_D): $(TLS_LIBS) $(OBJS_G) $(OBJS_D)
 	@echo " CC  $@"
@@ -74,7 +72,8 @@ $(DIR_B)/%.t: $(DIR_T)/%.c $(OBJS_G) | $(DIR_B)
 	@$(PP) $(CFLAGS_D) -MM -MP -MT $@ -MF $(@:.t=.t.d) $<
 	@$(CC) $(CFLAGS_D) -c -o $(@:.t=.t.o) $<
 	@$(CC) $(CFLAGS_D) -o $@ $(@:.t=.t.o)
-	@$(TEST_EXT) ./$@
+	@$(TEST_EXT) ./$@ || mv $@ $(@:.t=.td)
+	@[ -f $@ ]
 
 config.h:
 	cp config.def.h config.h
@@ -122,5 +121,3 @@ uninstall:
 -include $(OBJS_T:.t=.t.d)
 
 .PHONY: all check clean libs install uninstall
-
-.PRECIOUS: $(OBJS_T)
