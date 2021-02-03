@@ -1,12 +1,12 @@
 #include "src/components/server.h"
 
+#include "src/state.h"
+#include "src/utils/utils.h"
+
 #include <ctype.h>
 #include <errno.h>
 #include <stdlib.h>
 #include <string.h>
-
-#include "src/state.h"
-#include "src/utils/utils.h"
 
 #define HANDLED_005 \
 	X(CASEMAPPING)  \
@@ -169,17 +169,17 @@ server_set_004(struct server *s, char *str)
 	const char *chan_modes;
 
 	/* Not used */
-	if (!strsep(&str))
+	if (!irc_strsep(&str))
 		server_error(s, "invalid numeric 004: server_name is null");
 
 	/* Not used */
-	if (!strsep(&str))
+	if (!irc_strsep(&str))
 		server_error(s, "invalid numeric 004: version is null");
 
-	if (!(user_modes = strsep(&str)))
+	if (!(user_modes = irc_strsep(&str)))
 		server_error(s, "invalid numeric 004: user_modes is null");
 
-	if (!(chan_modes = strsep(&str)))
+	if (!(chan_modes = irc_strsep(&str)))
 		server_error(s, "invalid numeric 004: chan_modes is null");
 
 	if (user_modes) {
@@ -326,7 +326,7 @@ parse_005(struct opt *opt, char **str)
 	opt->arg = NULL;
 	opt->val = NULL;
 
-	if (!strtrim(&p))
+	if (!irc_strtrim(&p))
 		return 0;
 
 	if (!isalnum(*p))

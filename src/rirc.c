@@ -1,5 +1,10 @@
 #include "src/rirc.h"
 
+#include "config.h"
+#include "src/draw.h"
+#include "src/io.h"
+#include "src/state.h"
+
 #include <errno.h>
 #include <getopt.h>
 #include <pwd.h>
@@ -7,11 +12,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-
-#include "config.h"
-#include "src/draw.h"
-#include "src/io.h"
-#include "src/state.h"
 
 #define MAX_CLI_SERVERS 16
 

@@ -9,7 +9,7 @@
 
 static inline int irc_ischanchar(char, int);
 static inline int irc_isnickchar(char, int);
-static inline int irc_toupper(enum casemapping_t, int);
+static inline int irc_toupper(enum casemapping, int);
 
 int
 irc_isnick(const char *str)
@@ -40,7 +40,7 @@ irc_ischan(const char *str)
 }
 
 int
-irc_pinged(enum casemapping_t cm, const char *mesg, const char *nick)
+irc_pinged(enum casemapping cm, const char *mesg, const char *nick)
 {
 	size_t len = strlen(nick);
 
@@ -60,7 +60,7 @@ irc_pinged(enum casemapping_t cm, const char *mesg, const char *nick)
 }
 
 int
-irc_strcmp(enum casemapping_t cm, const char *s1, const char *s2)
+irc_strcmp(enum casemapping cm, const char *s1, const char *s2)
 {
 	/* Case insensitive comparison of strings s1, s2 in accordance
 	 * with RFC 2812, section 2.2 */
@@ -83,7 +83,7 @@ irc_strcmp(enum casemapping_t cm, const char *s1, const char *s2)
 }
 
 int
-irc_strncmp(enum casemapping_t cm, const char *s1, const char *s2, size_t n)
+irc_strncmp(enum casemapping cm, const char *s1, const char *s2, size_t n)
 {
 	/* Case insensitive comparison of strings s1, s2 in accordance
 	 * with RFC 2812, section 2.2, up to n characters */
@@ -117,7 +117,7 @@ irc_message_param(struct irc_message *m, char **param)
 	if (m->params == NULL)
 		return 0;
 
-	if (!strtrim(&m->params))
+	if (!irc_strtrim(&m->params))
 		return 0;
 
 	if (!m->split && m->n_params >= 14) {
@@ -167,7 +167,7 @@ irc_message_parse(struct irc_message *m, char *buf)
 
 	memset(m, 0, sizeof(*m));
 
-	if (!strtrim(&buf))
+	if (!irc_strtrim(&buf))
 		return -1;
 
 	if (*buf == ':') {
@@ -204,7 +204,7 @@ irc_message_parse(struct irc_message *m, char *buf)
 			*buf++ = 0;
 	}
 
-	if (!strtrim(&buf))
+	if (!irc_strtrim(&buf))
 		return -1;
 
 	m->command = buf;
@@ -217,7 +217,7 @@ irc_message_parse(struct irc_message *m, char *buf)
 	if (*buf == ' ')
 		*buf++ = 0;
 
-	if (strtrim(&buf))
+	if (irc_strtrim(&buf))
 		m->params = buf;
 
 	return 0;
@@ -286,13 +286,7 @@ irc_message_split(struct irc_message *m, const char **params, const char **trail
 }
 
 char*
-strdup(const char *str)
-{
-	return memdup(str, strlen(str) + 1);
-}
-
-char*
-strsep(char **str)
+irc_strsep(char **str)
 {
 	char *p;
 	char *ret;
@@ -300,7 +294,7 @@ strsep(char **str)
 	if (str == NULL || (p = *str) == NULL)
 		return NULL;
 
-	if ((ret = strtrim(&p)) == NULL)
+	if ((ret = irc_strtrim(&p)) == NULL)
 		return NULL;
 
 	while (*p && *p != ' ')
@@ -317,7 +311,7 @@ strsep(char **str)
 }
 
 char*
-strtrim(char **str)
+irc_strtrim(char **str)
 {
 	char *p;
 
@@ -333,7 +327,7 @@ strtrim(char **str)
 }
 
 char*
-word_wrap(int n, char **str, char *end)
+irc_strwrap(int n, char **str, char *end)
 {
 	/* Greedy word wrap algorithm.
 	 *
@@ -392,19 +386,6 @@ word_wrap(int n, char **str, char *end)
 	return ret;
 }
 
-void*
-memdup(const void *mem, size_t len)
-{
-	void *ret;
-
-	if ((ret = malloc(len)) == NULL)
-		fatal("malloc: %s", strerror(errno));
-
-	memcpy(ret, mem, len);
-
-	return ret;
-}
-
 static inline int
 irc_ischanchar(char c, int first)
 {
@@ -440,7 +421,7 @@ irc_isnickchar(char c, int first)
 }
 
 static inline int
-irc_toupper(enum casemapping_t cm, int c)
+irc_toupper(enum casemapping cm, int c)
 {
 	/* RFC 2812, section 2.2
 	 *

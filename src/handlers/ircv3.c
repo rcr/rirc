@@ -1,9 +1,9 @@
 #include "src/handlers/ircv3.h"
 
-#include <string.h>
-
 #include "src/io.h"
 #include "src/state.h"
+
+#include <string.h>
 
 #define failf(S, ...) \
 	do { server_error((S), __VA_ARGS__); \
@@ -93,7 +93,7 @@ ircv3_recv_cap_LS(struct server *s, struct irc_message *m)
 		return 0;
 	}
 
-	while ((cap = strsep(&(caps)))) {
+	while ((cap = irc_strsep(&(caps)))) {
 
 		struct ircv3_cap *c;
 
@@ -180,7 +180,7 @@ ircv3_recv_cap_ACK(struct server *s, struct irc_message *m)
 	if (!irc_message_param(m, &caps))
 		failf(s, "CAP ACK: parameter is null");
 
-	if (!(cap = strsep(&(caps))))
+	if (!(cap = irc_strsep(&(caps))))
 		failf(s, "CAP ACK: parameter is empty");
 
 	do {
@@ -219,7 +219,7 @@ ircv3_recv_cap_ACK(struct server *s, struct irc_message *m)
 
 		server_info(s, "capability change accepted: %s%s", (unset ? "-" : ""), cap);
 
-	} while ((cap = strsep(&(caps))));
+	} while ((cap = irc_strsep(&(caps))));
 
 	if (errors)
 		failf(s, "CAP ACK: parameter errors");
@@ -245,7 +245,7 @@ ircv3_recv_cap_NAK(struct server *s, struct irc_message *m)
 	if (!irc_message_param(m, &caps))
 		failf(s, "CAP NAK: parameter is null");
 
-	if (!(cap = strsep(&(caps))))
+	if (!(cap = irc_strsep(&(caps))))
 		failf(s, "CAP NAK: parameter is empty");
 
 	do {
@@ -256,7 +256,7 @@ ircv3_recv_cap_NAK(struct server *s, struct irc_message *m)
 
 		server_info(s, "capability change rejected: %s", cap);
 
-	} while ((cap = strsep(&(caps))));
+	} while ((cap = irc_strsep(&(caps))));
 
 	if (!s->registered && !ircv3_cap_req_count(&(s->ircv3_caps)))
 		sendf(s, "CAP END");
@@ -282,7 +282,7 @@ ircv3_recv_cap_DEL(struct server *s, struct irc_message *m)
 	if (!irc_message_param(m, &caps))
 		failf(s, "CAP DEL: parameter is null");
 
-	if (!(cap = strsep(&(caps))))
+	if (!(cap = irc_strsep(&(caps))))
 		failf(s, "CAP DEL: parameter is empty");
 
 	do {
@@ -300,7 +300,7 @@ ircv3_recv_cap_DEL(struct server *s, struct irc_message *m)
 
 		server_info(s, "capability lost: %s", cap);
 
-	} while ((cap = strsep(&(caps))));
+	} while ((cap = irc_strsep(&(caps))));
 
 	return 0;
 }
@@ -321,7 +321,7 @@ ircv3_recv_cap_NEW(struct server *s, struct irc_message *m)
 	if (!irc_message_param(m, &caps))
 		failf(s, "CAP NEW: parameter is null");
 
-	if (!(cap = strsep(&(caps))))
+	if (!(cap = irc_strsep(&(caps))))
 		failf(s, "CAP NEW: parameter is empty");
 
 	do {
@@ -339,7 +339,7 @@ ircv3_recv_cap_NEW(struct server *s, struct irc_message *m)
 
 		server_info(s, "new capability: %s", cap);
 
-	} while ((cap = strsep(&(caps))));
+	} while ((cap = irc_strsep(&(caps))));
 
 	return 0;
 }

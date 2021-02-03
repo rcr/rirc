@@ -41,7 +41,7 @@
 	do { MESSAGE("FATAL", __VA_ARGS__); } while (0)
 #endif
 
-enum casemapping_t
+enum casemapping
 {
 	CASEMAPPING_INVALID,
 	CASEMAPPING_ASCII,
@@ -64,18 +64,15 @@ struct irc_message
 
 int irc_ischan(const char*);
 int irc_isnick(const char*);
-int irc_pinged(enum casemapping_t, const char*, const char*);
-int irc_strcmp(enum casemapping_t, const char*, const char*);
-int irc_strncmp(enum casemapping_t, const char*, const char*, size_t);
+int irc_pinged(enum casemapping, const char*, const char*);
+int irc_strcmp(enum casemapping, const char*, const char*);
+int irc_strncmp(enum casemapping, const char*, const char*, size_t);
+char* irc_strsep(char**);
+char* irc_strtrim(char**);
+char* irc_strwrap(int, char**, char*);
 
 int irc_message_param(struct irc_message*, char**);
 int irc_message_parse(struct irc_message*, char*);
 int irc_message_split(struct irc_message*, const char**, const char**);
-
-char* strdup(const char*);
-char* strsep(char**);
-char* strtrim(char**);
-char* word_wrap(int, char**, char*);
-void* memdup(const void*, size_t);
 
 #endif

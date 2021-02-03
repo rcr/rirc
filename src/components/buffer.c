@@ -1,9 +1,9 @@
 #include "src/components/buffer.h"
 
-#include <string.h>
-
 #include "config.h"
 #include "src/utils/utils.h"
+
+#include <string.h>
 
 #define BUFFER_MASK(X) ((X) & (BUFFER_LINES_MAX - 1))
 
@@ -117,7 +117,7 @@ buffer_line_rows(struct buffer_line *line, unsigned int w)
 		line->cached.w = w;
 
 		for (p = line->text, line->cached.rows = 0; *p; line->cached.rows++)
-			word_wrap(w, &p, line->text + line->text_len);
+			irc_strwrap(w, &p, line->text + line->text_len);
 	}
 
 	return line->cached.rows;
@@ -126,7 +126,7 @@ buffer_line_rows(struct buffer_line *line, unsigned int w)
 void
 buffer_newline(
 		struct buffer *b,
-		enum buffer_line_t type,
+		enum buffer_line_type type,
 		const char *from_str,
 		const char *text_str,
 		size_t from_len,

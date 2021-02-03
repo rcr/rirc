@@ -1,9 +1,5 @@
 #include "src/handlers/irc_recv.h"
 
-#include <ctype.h>
-#include <errno.h>
-#include <stdlib.h>
-
 #include "src/components/server.h"
 #include "src/handlers/irc_ctcp.h"
 #include "src/handlers/irc_recv.gperf.out"
@@ -14,6 +10,10 @@
 #include "src/utils/utils.h"
 
 #include "config.h"
+
+#include <ctype.h>
+#include <errno.h>
+#include <stdlib.h>
 
 #define failf(S, ...) \
 	do { server_error((S), __VA_ARGS__); \
@@ -237,7 +237,7 @@ irc_generic(struct server *s, struct irc_message *m, const char *command, const 
 	const char *trailing     = NULL;
 	const char *trailing_sep = NULL;
 
-	if (!command && !strtrim(&m->params))
+	if (!command && !irc_strtrim(&m->params))
 		return 1;
 
 	irc_message_split(m, &params, &trailing);
@@ -535,7 +535,7 @@ irc_numeric_353(struct server *s, struct irc_message *m)
 	if (mode_chanmode_prefix(&(c->chanmodes), &(s->mode_cfg), *type) != MODE_ERR_NONE)
 		failf(s, "RPL_NAMEREPLY: invalid channel flag: '%c'", *type);
 
-	while ((prfx = nick = strsep(&nicks))) {
+	while ((prfx = nick = irc_strsep(&nicks))) {
 
 		struct mode m = MODE_EMPTY;
 
@@ -818,8 +818,8 @@ recv_mode_chanmodes(struct irc_message *m, const struct mode_cfg *cfg, struct se
 	char flag;
 	char *modestring;
 	char *modearg;
-	enum mode_err_t mode_err;
-	enum mode_set_t mode_set;
+	enum mode_err mode_err;
+	enum mode_set mode_set;
 	struct mode *chanmodes = &(c->chanmodes);
 	struct user *user;
 
@@ -951,8 +951,8 @@ recv_mode_usermodes(struct irc_message *m, const struct mode_cfg *cfg, struct se
 {
 	char flag;
 	char *modestring;
-	enum mode_err_t mode_err;
-	enum mode_set_t mode_set;
+	enum mode_err mode_err;
+	enum mode_set mode_set;
 	struct mode *usermodes = &(s->usermodes);
 
 	if (!irc_message_param(m, &modestring))

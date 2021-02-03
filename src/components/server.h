@@ -17,7 +17,7 @@ struct server
 	const char *username;
 	const char *realname;
 	const char *nick;
-	enum casemapping_t casemapping;
+	enum casemapping casemapping;
 	struct {
 		size_t next;
 		size_t size;

@@ -1,12 +1,5 @@
 #include "src/state.h"
 
-#include <ctype.h>
-#include <stdlib.h>
-#include <string.h>
-#include <strings.h>
-#include <stdarg.h>
-#include <stdio.h>
-
 #include "config.h"
 #include "src/components/channel.h"
 #include "src/draw.h"
@@ -16,10 +9,17 @@
 #include "src/rirc.h"
 #include "src/utils/utils.h"
 
+#include <ctype.h>
+#include <stdlib.h>
+#include <string.h>
+#include <strings.h>
+#include <stdarg.h>
+#include <stdio.h>
+
 /* See: https://vt100.net/docs/vt100-ug/chapter3.html */
 #define CTRL(k) ((k) & 0x1f)
 
-static void _newline(struct channel*, enum buffer_line_t, const char*, const char*, va_list);
+static void _newline(struct channel*, enum buffer_line_type, const char*, const char*, va_list);
 
 static int state_input_linef(struct channel*);
 static int state_input_ctrlch(const char*, size_t);
@@ -147,7 +147,7 @@ state_rows(void)
 }
 
 void
-newline(struct channel *c, enum buffer_line_t type, const char *from, const char *mesg)
+newline(struct channel *c, enum buffer_line_type type, const char *from, const char *mesg)
 {
 	/* Default wrapper for _newline */
 
@@ -155,7 +155,7 @@ newline(struct channel *c, enum buffer_line_t type, const char *from, const char
 }
 
 void
-newlinef(struct channel *c, enum buffer_line_t type, const char *from, const char *fmt, ...)
+newlinef(struct channel *c, enum buffer_line_type type, const char *from, const char *fmt, ...)
 {
 	/* Formating wrapper for _newline */
 
@@ -167,7 +167,7 @@ newlinef(struct channel *c, enum buffer_line_t type, const char *from, const cha
 }
 
 static void
-_newline(struct channel *c, enum buffer_line_t type, const char *from, const char *fmt, va_list ap)
+_newline(struct channel *c, enum buffer_line_type type, const char *from, const char *fmt, va_list ap)
 {
 	char buf[TEXT_LENGTH_MAX];
 	char prefix = 0;
@@ -631,11 +631,11 @@ command(struct channel *c, char *buf)
 	const char *cmd;
 	int err;
 
-	if (!(cmd = strsep(&buf)))
+	if (!(cmd = irc_strsep(&buf)))
 		return;
 
 	if (!strcasecmp(cmd, "clear")) {
-		if ((arg = strsep(&buf))) {
+		if ((arg = irc_strsep(&buf))) {
 			action(action_error, "clear: Unknown arg '%s'", arg);
 			return;
 		}
@@ -645,7 +645,7 @@ command(struct channel *c, char *buf)
 	}
 
 	if (!strcasecmp(cmd, "close")) {
-		if ((arg = strsep(&buf))) {
+		if ((arg = irc_strsep(&buf))) {
 			action(action_error, "close: Unknown arg '%s'", arg);
 			return;
 		}
@@ -660,7 +660,7 @@ command(struct channel *c, char *buf)
 			return;
 		}
 
-		if ((arg = strsep(&buf))) {
+		if ((arg = irc_strsep(&buf))) {
 			action(action_error, "connect: Unknown arg '%s'", arg);
 			return;
 		}
@@ -677,7 +677,7 @@ command(struct channel *c, char *buf)
 			return;
 		}
 
-		if ((arg = strsep(&buf))) {
+		if ((arg = irc_strsep(&buf))) {
 			action(action_error, "disconnect: Unknown arg '%s'", arg);
 			return;
 		}
@@ -689,7 +689,7 @@ command(struct channel *c, char *buf)
 	}
 
 	if (!strcasecmp(cmd, "quit")) {
-		if ((arg = strsep(&buf))) {
+		if ((arg = irc_strsep(&buf))) {
 			action(action_error, "quit: Unknown arg '%s'", arg);
 			return;
 		}

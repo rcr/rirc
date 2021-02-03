@@ -290,9 +290,9 @@ test_send_ctcp_ping(void)
 	/* truncated by ctcp delimeter */
 	assert_strcmp(mock_send[0], "PRIVMSG priv :");
 
-	assert_ptr_not_null((arg1 = strsep(&p1)));
-	assert_ptr_not_null((arg2 = strsep(&p1)));
-	assert_ptr_not_null((arg3 = strsep(&p1)));
+	assert_ptr_not_null((arg1 = irc_strsep(&p1)));
+	assert_ptr_not_null((arg2 = irc_strsep(&p1)));
+	assert_ptr_not_null((arg3 = irc_strsep(&p1)));
 
 	assert_strcmp(arg1, "PING");
 	assert_gt(strtoul(arg2, NULL, 10), 0); /* sec */
@@ -319,9 +319,9 @@ test_send_ctcp_ping(void)
 	/* truncated by ctcp delimeter */
 	assert_strcmp(mock_send[0], "PRIVMSG targ :");
 
-	assert_ptr_not_null((arg1 = strsep(&p1)));
-	assert_ptr_not_null((arg2 = strsep(&p1)));
-	assert_ptr_not_null((arg3 = strsep(&p1)));
+	assert_ptr_not_null((arg1 = irc_strsep(&p1)));
+	assert_ptr_not_null((arg2 = irc_strsep(&p1)));
+	assert_ptr_not_null((arg3 = irc_strsep(&p1)));
 
 	assert_strcmp(arg1, "PING");
 	assert_gt(strtoul(arg2, NULL, 10), 0); /* sec */

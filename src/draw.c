@@ -1,17 +1,17 @@
 #include "src/draw.h"
 
-#include <alloca.h>
-#include <stdarg.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-
 #include "config.h"
 #include "src/components/channel.h"
 #include "src/components/input.h"
 #include "src/io.h"
 #include "src/state.h"
 #include "src/utils/utils.h"
+
+#include <alloca.h>
+#include <stdarg.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 /* Control sequence initiator */
 #define CSI "\x1b["
@@ -396,7 +396,7 @@ print_header:
 	}
 
 	while (skip--)
-		word_wrap(text_w, &p1, p2);
+		irc_strwrap(text_w, &p1, p2);
 
 	do {
 		char *sep = " "VERTICAL_SEPARATOR" ";
@@ -411,7 +411,7 @@ print_header:
 			printf(C_MOVE(%d, %d), coords.r0, head_w);
 
 			print_p1 = p1;
-			print_p2 = word_wrap(text_w, &p1, p2);
+			print_p2 = irc_strwrap(text_w, &p1, p2);
 
 			fputs(draw_colour(line->text[0] == QUOTE_CHAR
 					? BUFFER_LINE_TEXT_FG_GREEN
