@@ -18,9 +18,9 @@ void
 ircv3_caps(struct ircv3_caps *caps)
 {
 	#define X(CAP, VAR, ATTRS) \
-	caps->VAR.req = 0;                                    \
-	caps->VAR.set = 0;                                    \
-	caps->VAR.supported = 0;                              \
+	caps->VAR.req = 0; \
+	caps->VAR.set = 0; \
+	caps->VAR.supported = 0; \
 	caps->VAR.supports_del = !(ATTRS & IRCV3_CAP_NO_DEL); \
 	caps->VAR.supports_req = !(ATTRS & IRCV3_CAP_NO_REQ); \
 	caps->VAR.req_auto = (ATTRS & IRCV3_CAP_AUTO);
