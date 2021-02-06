@@ -153,6 +153,7 @@ static const irc_recv_f irc_numerics[] = {
 	[376] = irc_generic_ignore, /* RPL_ENDOFMOTD */
 	[381] = irc_generic_info,   /* RPL_YOUREOPER */
 	[391] = irc_generic_info,   /* RPL_TIME */
+	[396] = irc_generic_info,   /* RPL_VISIBLEHOST */
 	[401] = irc_generic_error,  /* ERR_NOSUCHNICK */
 	[402] = irc_generic_error,  /* ERR_NOSUCHSERVER */
 	[403] = irc_generic_error,  /* ERR_NOSUCHCHANNEL */
