@@ -32,6 +32,9 @@ static uint16_t state_complete_user(char*, uint16_t, uint16_t, int);
 static void state_channel_clear(int);
 static void state_channel_close(int);
 
+static void channel_move_prev(void);
+static void channel_move_next(void);
+
 static int action_clear(char);
 static int action_close(char);
 static int action_error(char);
@@ -93,16 +96,16 @@ state_init(void)
 {
 	state.default_channel = state.current_channel = channel("rirc", CHANNEL_T_RIRC);
 
-	newline(state.default_channel, 0, "--", "      _");
-	newline(state.default_channel, 0, "--", " _ __(_)_ __ ___");
-	newline(state.default_channel, 0, "--", "| '__| | '__/ __|");
-	newline(state.default_channel, 0, "--", "| |  | | | | (__");
-	newline(state.default_channel, 0, "--", "|_|  |_|_|  \\___|");
-	newline(state.default_channel, 0, "--", "");
-	newline(state.default_channel, 0, "--", " - version " VERSION);
-	newline(state.default_channel, 0, "--", " - compiled " __DATE__ ", " __TIME__);
+	newlinef(state.default_channel, 0, FROM_INFO, "      _");
+	newlinef(state.default_channel, 0, FROM_INFO, " _ __(_)_ __ ___");
+	newlinef(state.default_channel, 0, FROM_INFO, "| '__| | '__/ __|");
+	newlinef(state.default_channel, 0, FROM_INFO, "| |  | | | | (__");
+	newlinef(state.default_channel, 0, FROM_INFO, "|_|  |_|_|  \\___|");
+	newlinef(state.default_channel, 0, FROM_INFO, "");
+	newlinef(state.default_channel, 0, FROM_INFO, " - version %s", VERSION);
+	newlinef(state.default_channel, 0, FROM_INFO, " - compiled %s, %s", __DATE__, __TIME__);
 #ifndef NDEBUG
-	newline(state.default_channel, 0, "--", " - compiled with DEBUG flags");
+	newlinef(state.default_channel, 0, FROM_INFO, " - compiled with DEBUG flags");
 #endif
 }
 
@@ -147,14 +150,6 @@ state_rows(void)
 }
 
 void
-newline(struct channel *c, enum buffer_line_type type, const char *from, const char *mesg)
-{
-	/* Default wrapper for _newline */
-
-	newlinef(c, type, from, "%s", mesg);
-}
-
-void
 newlinef(struct channel *c, enum buffer_line_type type, const char *from, const char *fmt, ...)
 {
 	/* Formating wrapper for _newline */
@@ -180,7 +175,7 @@ _newline(struct channel *c, enum buffer_line_type type, const char *from, const 
 	if ((len = vsnprintf(buf, sizeof(buf), fmt, ap)) < 0) {
 		text_str = "newlinef error: vsprintf failure";
 		text_len = strlen(text_str);
-		from_str = "-!!-";
+		from_str = FROM_ERROR;
 		from_len = strlen(from_str);
 	} else {
 		text_str = buf;
@@ -379,7 +374,7 @@ state_channel_close(int action_confirm)
 
 		if (s->connected && c->type == CHANNEL_T_CHANNEL && !c->parted) {
 			if ((ret = io_sendf(s->connection, "PART %s :%s", c->name, DEFAULT_PART_MESG)))
-				newlinef(s->channel, 0, "-!!-", "sendf fail: %s", io_err(ret));
+				newlinef(s->channel, 0, FROM_ERROR, "sendf fail: %s", io_err(ret));
 		}
 
 		channel_set_current(c->next);
@@ -392,7 +387,7 @@ state_channel_close(int action_confirm)
 
 		if (s->connected) {
 			if ((ret = io_sendf(s->connection, "QUIT :%s", DEFAULT_QUIT_MESG)))
-				newlinef(s->channel, 0, "-!!-", "sendf fail: %s", io_err(ret));
+				newlinef(s->channel, 0, FROM_ERROR, "sendf fail: %s", io_err(ret));
 			io_dx(s->connection);
 		}
 
@@ -493,12 +488,6 @@ buffer_scrollback_forw(struct channel *c)
 	draw(DRAW_STATUS);
 }
 
-/* FIXME:
- *  - These abstractions should take into account the new component hierarchy
- *    and have the backwards pointer from channel to server removed, in favour
- *    of passing a current_server() to handlers
- *  - The server's channel should not be part of the server's channel_list
- */
 struct channel*
 channel_get_first(void)
 {
@@ -518,30 +507,23 @@ channel_get_last(void)
 struct channel*
 channel_get_next(struct channel *c)
 {
+	/* Return the next channel, accounting for server wrap around */
+
 	if (c == state.default_channel)
 		return c;
-	else {
-		/* Return the next channel, accounting for server wrap around */
-		return !(c->next == c->server->channel) ? c->next : c->server->next->channel;
-	}
+
+	return !(c->next == c->server->channel) ? c->next : c->server->next->channel;
 }
 
 struct channel*
 channel_get_prev(struct channel *c)
 {
+	/* Return the previous channel, accounting for server wrap around */
+
 	if (c == state.default_channel)
 		return c;
-	else
-		/* Return the previous channel, accounting for server wrap around */
-		return !(c == c->server->channel) ? c->prev : c->server->prev->channel->prev;
-}
 
-void
-channel_set_current(struct channel *c)
-{
-	/* Set the state to an arbitrary channel */
-	state.current_channel = c;
-	draw(DRAW_ALL);
+	return !(c == c->server->channel) ? c->prev : c->server->prev->channel->prev;
 }
 
 void
@@ -549,12 +531,12 @@ channel_move_prev(void)
 {
 	/* Set the current channel to the previous channel */
 
-	struct channel *c = channel_get_prev(state.current_channel);
+	struct channel *c;
 
-	if (c != state.current_channel) {
-		state.current_channel = c;
-		draw(DRAW_ALL);
-	}
+	if ((c = channel_get_prev(current_channel())) == current_channel())
+		return;
+
+	channel_set_current(c);
 }
 
 void
@@ -562,12 +544,22 @@ channel_move_next(void)
 {
 	/* Set the current channel to the next channel */
 
-	struct channel *c = channel_get_next(state.current_channel);
+	struct channel *c;
 
-	if (c != state.current_channel) {
-		state.current_channel = c;
-		draw(DRAW_ALL);
-	}
+	if ((c = channel_get_next(current_channel())) == current_channel())
+		return;
+
+	channel_set_current(c);
+}
+
+void
+channel_set_current(struct channel *c)
+{
+	/* Set the state to an arbitrary channel */
+
+	state.current_channel = c;
+
+	draw(DRAW_ALL);
 }
 
 static uint16_t
@@ -867,7 +859,7 @@ io_cb_read_soc(char *buf, size_t len, const void *cb_obj)
 			struct irc_message m;
 
 			if (irc_message_parse(&m, s->read.buf) != 0)
-				newlinef(c, 0, "-!!-", "failed to parse message");
+				newlinef(c, 0, FROM_ERROR, "failed to parse message");
 			else
 				irc_recv(s, &m);
 
@@ -895,16 +887,16 @@ io_cb_cxed(const void *cb_obj)
 	s->connected = 1;
 
 	if ((ret = io_sendf(s->connection, "CAP LS " IRCV3_CAP_VERSION)))
-		newlinef(s->channel, 0, "-!!-", "sendf fail: %s", io_err(ret));
+		newlinef(s->channel, 0, FROM_ERROR, "sendf fail: %s", io_err(ret));
 
 	if (s->pass && (ret = io_sendf(s->connection, "PASS %s", s->pass)))
-		newlinef(s->channel, 0, "-!!-", "sendf fail: %s", io_err(ret));
+		newlinef(s->channel, 0, FROM_ERROR, "sendf fail: %s", io_err(ret));
 
 	if ((ret = io_sendf(s->connection, "NICK %s", s->nick)))
-		newlinef(s->channel, 0, "-!!-", "sendf fail: %s", io_err(ret));
+		newlinef(s->channel, 0, FROM_ERROR, "sendf fail: %s", io_err(ret));
 
 	if ((ret = io_sendf(s->connection, "USER %s 8 * :%s", s->username, s->realname)))
-		newlinef(s->channel, 0, "-!!-", "sendf fail: %s", io_err(ret));
+		newlinef(s->channel, 0, FROM_ERROR, "sendf fail: %s", io_err(ret));
 
 	draw(DRAW_STATUS);
 	draw(DRAW_FLUSH);
@@ -919,7 +911,7 @@ io_cb_dxed(const void *cb_obj)
 	s->connected = 0;
 
 	do {
-		newline(c, 0, "-!!-", " -- disconnected --");
+		newlinef(c, 0, FROM_ERROR, " -- disconnected --");
 		channel_reset(c);
 		c = c->next;
 	} while (c != s->channel);
@@ -938,7 +930,7 @@ io_cb_ping(const void *cb_obj, unsigned ping)
 	if (ping != IO_PING_MIN)
 		draw(DRAW_STATUS);
 	else if ((ret = io_sendf(s->connection, "PING :%s", s->host)))
-		newlinef(s->channel, 0, "-!!-", "sendf fail: %s", io_err(ret));
+		newlinef(s->channel, 0, FROM_ERROR, "sendf fail: %s", io_err(ret));
 
 	draw(DRAW_FLUSH);
 }
@@ -959,7 +951,7 @@ io_cb_info(const void *cb_obj, const char *fmt, ...)
 	va_list ap;
 	va_start(ap, fmt);
 
-	_newline(((struct server *)cb_obj)->channel, 0, "--", fmt, ap);
+	_newline(((struct server *)cb_obj)->channel, 0, FROM_INFO, fmt, ap);
 
 	va_end(ap);
 
@@ -972,7 +964,7 @@ io_cb_error(const void *cb_obj, const char *fmt, ...)
 	va_list ap;
 	va_start(ap, fmt);
 
-	_newline(((struct server *)cb_obj)->channel, 0, "-!!-", fmt, ap);
+	_newline(((struct server *)cb_obj)->channel, 0, FROM_ERROR, fmt, ap);
 
 	va_end(ap);
 

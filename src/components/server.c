@@ -40,13 +40,12 @@ server(const char *host, const char *port, const char *pass, const char *user, c
 	s->pass = pass ? strdup(pass) : NULL;
 	s->username = strdup(user);
 	s->realname = strdup(real);
-	s->channel = channel(host, CHANNEL_T_SERVER);
 	s->casemapping = CASEMAPPING_RFC1459;
 	s->mode_str.type = MODE_STR_USERMODE;
 	ircv3_caps(&(s->ircv3_caps));
 	mode_cfg(&(s->mode_cfg), NULL, MODE_CFG_DEFAULTS);
-	/* FIXME: remove server pointer from channel, remove
-	 * server's channel from clist */
+
+	s->channel = channel(host, CHANNEL_T_SERVER);
 	s->channel->server = s;
 	channel_list_add(&(s->clist), s->channel);
 
@@ -141,12 +140,8 @@ server_reset(struct server *s)
 void
 server_free(struct server *s)
 {
-	// FIXME: add this back when removing it from
-	// server's channel_list
-	// channel_free(s->channel);
-
 	channel_list_free(&(s->clist));
-	channel_list_free(&(s->ulist));
+
 	user_list_free(&(s->ignore));
 
 	free((void *)s->host);

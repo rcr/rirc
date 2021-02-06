@@ -316,7 +316,7 @@ irc_numeric_001(struct server *s, struct irc_message *m)
 	} while ((c = c->next) != s->channel);
 
 	if (irc_message_split(m, &params, &trailing))
-		newline(s->channel, 0, FROM_INFO, trailing);
+		newlinef(s->channel, 0, FROM_INFO, "%s", trailing);
 
 	server_info(s, "You are known as %s", s->nick);
 
@@ -1012,14 +1012,14 @@ recv_nick(struct server *s, struct irc_message *m)
 
 	if (!strcmp(m->from, s->nick)) {
 		server_nick_set(s, nick);
-		newlinef(s->channel, BUFFER_LINE_NICK, FROM_NICK, "Your nick is now '%s'", nick);
+		newlinef(s->channel, BUFFER_LINE_NICK, FROM_INFO, "Your nick is now '%s'", nick);
 	}
 
 	do {
 		enum user_err ret;
 
 		if ((ret = user_list_rpl(&(c->users), s->casemapping, m->from, nick)) == USER_ERR_NONE)
-			newlinef(c, BUFFER_LINE_NICK, FROM_NICK, "%s  >>  %s", m->from, nick);
+			newlinef(c, BUFFER_LINE_NICK, FROM_INFO, "%s  >>  %s", m->from, nick);
 
 		else if (ret == USER_ERR_DUPLICATE)
 			server_error(s, "NICK: user '%s' already on channel '%s'", nick, c->name);
@@ -1076,9 +1076,9 @@ recv_notice(struct server *s, struct irc_message *m)
 		if (c != current_channel())
 			urgent = 1;
 
-		newline(c, BUFFER_LINE_PINGED, m->from, message);
+		newlinef(c, BUFFER_LINE_PINGED, m->from, "%s", message);
 	} else {
-		newline(c, BUFFER_LINE_CHAT, m->from, message);
+		newlinef(c, BUFFER_LINE_CHAT, m->from, "%s", message);
 	}
 
 	if (urgent) {
@@ -1212,9 +1212,9 @@ recv_privmsg(struct server *s, struct irc_message *m)
 		if (c != current_channel())
 			urgent = 1;
 
-		newline(c, BUFFER_LINE_PINGED, m->from, message);
+		newlinef(c, BUFFER_LINE_PINGED, m->from, "%s", message);
 	} else {
-		newline(c, BUFFER_LINE_CHAT, m->from, message);
+		newlinef(c, BUFFER_LINE_CHAT, m->from, "%s", message);
 	}
 
 	if (urgent) {

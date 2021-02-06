@@ -26,7 +26,6 @@ struct server
 	} nicks;
 	struct channel *channel;
 	struct channel_list clist;
-	struct channel_list ulist; // TODO: seperate privmsg
 	struct ircv3_caps ircv3_caps;
 	struct mode usermodes;
 	struct mode_str mode_str;

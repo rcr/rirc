@@ -77,7 +77,7 @@ irc_send_privmsg(struct server *s, struct channel *c, char *m)
 
 	sendf(s, c, "PRIVMSG %s :%s", c->name, m);
 
-	newline(c, BUFFER_LINE_CHAT, s->nick, m);
+	newlinef(c, BUFFER_LINE_CHAT, s->nick, "%s", m);
 
 	return 0;
 }
