@@ -10,7 +10,8 @@ fi
 
 DIR="$1"
 
-SONAR_VERSION="4.5.0.2216"
+SONAR_VER="4.6.0.2311"
+
 SONAR_CONFIG="$DIR/sonar-project.properties"
 
 SONAR_SCANNER_BIN="$DIR/sonar-scanner-$SONAR_VERSION-linux/bin/sonar-scanner"
