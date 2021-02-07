@@ -1,5 +1,5 @@
-#ifndef CHANNEL_H
-#define CHANNEL_H
+#ifndef RIRC_COMPONENTS_CHANNEL_H
+#define RIRC_COMPONENTS_CHANNEL_H
 
 #include "src/components/buffer.h"
 #include "src/components/input.h"
@@ -7,7 +7,7 @@
 #include "src/components/user.h"
 
 /* Channel activity types, in order of precedence */
-enum activity_t
+enum activity
 {
 	ACTIVITY_DEFAULT, /* Default activity */
 	ACTIVITY_JPQ,     /* Join/Part/Quit activity */
@@ -16,10 +16,10 @@ enum activity_t
 	ACTIVITY_T_SIZE
 };
 
-enum channel_t
+enum channel_type
 {
 	CHANNEL_T_INVALID,
-	CHANNEL_T_OTHER,   /* Default/all other buffers */
+	CHANNEL_T_RIRC,    /* Default buffer */
 	CHANNEL_T_CHANNEL, /* Channel message buffer */
 	CHANNEL_T_SERVER,  /* Server message buffer */
 	CHANNEL_T_PRIVATE, /* Private message buffer */
@@ -29,8 +29,8 @@ enum channel_t
 struct channel
 {
 	const char *name;
-	enum activity_t activity;
-	enum channel_t type;
+	enum activity activity;
+	enum channel_type type;
 	size_t name_len;
 	struct buffer buffer;
 	struct channel *next;
@@ -49,10 +49,11 @@ struct channel_list
 {
 	struct channel *head;
 	struct channel *tail;
+	unsigned count;
 };
 
-struct channel* channel(const char*, enum channel_t);
-struct channel* channel_list_get(struct channel_list*, const char*, enum casemapping_t);
+struct channel* channel(const char*, enum channel_type);
+struct channel* channel_list_get(struct channel_list*, const char*, enum casemapping);
 void channel_free(struct channel*);
 void channel_list_add(struct channel_list*, struct channel*);
 void channel_list_del(struct channel_list*, struct channel*);

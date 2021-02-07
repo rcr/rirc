@@ -1,8 +1,11 @@
-/* draw.c
- *
- * Draw the elements in state.c to the terminal.
- *
- * Assumes vt-100 compatible escape codes, as such YMMV */
+#include "src/draw.h"
+
+#include "config.h"
+#include "src/components/channel.h"
+#include "src/components/input.h"
+#include "src/io.h"
+#include "src/state.h"
+#include "src/utils/utils.h"
 
 #include <alloca.h>
 #include <stdarg.h>
@@ -10,43 +13,29 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "config.h"
-#include "src/components/channel.h"
-#include "src/components/input.h"
-#include "src/draw.h"
-#include "src/io.h"
-#include "src/state.h"
-#include "src/utils/utils.h"
+/* Control sequence initiator */
+#define CSI "\x1b["
 
-#define ESC "\x1b"
+#define ATTR_FG(X)   CSI "38;5;"#X"m"
+#define ATTR_BG(X)   CSI "48;5;"#X"m"
+#define ATTR_RESET   CSI "0m"
 
-#define RESET_ATTRIBUTES ESC"[0m"
+#define CLEAR_FULL   CSI "2J"
+#define CLEAR_LINE   CSI "2K"
 
-#define FG(X) ESC"[38;5;"#X"m"
-#define BG(X) ESC"[48;5;"#X"m"
-
-#define MOVE(X, Y) ESC"["#X";"#Y"H"
-
-#define CLEAR_FULL  ESC"[2J"
-#define CLEAR_RIGHT ESC"[0K"
-#define CLEAR_LEFT  ESC"[1K"
-#define CLEAR_LINE  ESC"[2K"
-
-/* Save and restore the cursor's location */
-#define CURSOR_SAVE    ESC"[s"
-#define CURSOR_RESTORE ESC"[u"
+#define C_MOVE(X, Y) CSI ""#X";"#Y"H"
+#define C_SAVE       CSI "s"
+#define C_RESTORE    CSI "u"
 
 /* Minimum rows or columns to safely draw */
 #define COLS_MIN 5
 #define ROWS_MIN 5
 
 /* Size of a full colour string for purposes of pre-formating text to print */
-#define COLOUR_SIZE sizeof(RESET_ATTRIBUTES FG(255) BG(255))
+#define COLOUR_SIZE sizeof(ATTR_RESET ATTR_FG(255) ATTR_BG(255))
 
 #ifndef BUFFER_PADDING
 #define BUFFER_PADDING 1
-#elif BUFFER_PADDING != 0 && BUFFER_PADDING != 1
-#error "BUFFER_PADDING options are 0 (no pad), 1 (padded)"
 #endif
 
 /* Terminal coordinate row/column boundaries (inclusive)
@@ -127,23 +116,13 @@ draw(enum draw_bit bit)
 		case DRAW_ALL:
 			draw_state.bits.all = -1;
 			break;
+		case DRAW_CLEAR:
+			printf(ATTR_RESET);
+			printf(CLEAR_FULL);
+			break;
 		default:
 			fatal("unknown draw bit");
 	}
-}
-
-void
-draw_init(void)
-{
-	draw(DRAW_ALL);
-	draw(DRAW_FLUSH);
-}
-
-void
-draw_term(void)
-{
-	printf(RESET_ATTRIBUTES);
-	printf(CLEAR_FULL);
 }
 
 static void
@@ -158,38 +137,44 @@ draw_bits(void)
 	struct coords coords;
 	struct channel *c = current_channel();
 
-	if (io_tty_cols() < COLS_MIN || io_tty_rows() < ROWS_MIN) {
-		printf(CLEAR_FULL MOVE(1, 1) "rirc");
+	if (state_cols() < COLS_MIN || state_rows() < ROWS_MIN) {
+		printf(CLEAR_FULL C_MOVE(1, 1) "rirc");
 		fflush(stdout);
 		return;
 	}
 
-	printf(CURSOR_SAVE);
+	printf(C_SAVE);
 
 	if (draw_state.bits.buffer) {
+		printf(ATTR_RESET);
 		coords.c0 = 1;
-		coords.cN = io_tty_cols();
+		coords.cN = state_cols();
 		coords.r0 = 3;
-		coords.rN = io_tty_rows() - 2;
+		coords.rN = state_rows() - 2;
 		draw_buffer(&c->buffer, coords);
 	}
 
 	if (draw_state.bits.input) {
+		printf(ATTR_RESET);
 		coords.c0 = 1;
-		coords.cN = io_tty_cols();
-		coords.r0 = io_tty_rows();
-		coords.rN = io_tty_rows();
+		coords.cN = state_cols();
+		coords.r0 = state_rows();
+		coords.rN = state_rows();
 		draw_input(&c->input, coords);
 	}
 
-	if (draw_state.bits.nav)
+	if (draw_state.bits.nav) {
+		printf(ATTR_RESET);
 		draw_nav(c);
+	}
 
-	if (draw_state.bits.status)
+	if (draw_state.bits.status) {
+		printf(ATTR_RESET);
 		draw_status(c);
+	}
 
-	printf(RESET_ATTRIBUTES);
-	printf(CURSOR_RESTORE);
+	printf(ATTR_RESET);
+	printf(C_RESTORE);
 
 	fflush(stdout);
 }
@@ -246,7 +231,7 @@ draw_buffer(struct buffer *b, struct coords coords)
 
 	/* Clear the buffer area */
 	for (row = coords.r0; row <= coords.rN; row++)
-		printf(MOVE(%d, 1) CLEAR_LINE, row);
+		printf(C_MOVE(%d, 1) CLEAR_LINE, row);
 
 	struct buffer_line *line = buffer_line(b, buffer_i);
 
@@ -369,7 +354,7 @@ draw_buffer_line(
 				"%*s", pad, ""))
 			goto print_header;
 
-		if (!draw_fmt(&header_ptr, &buff_n, &text_n, 0, RESET_ATTRIBUTES))
+		if (!draw_fmt(&header_ptr, &buff_n, &text_n, 0, ATTR_RESET))
 			goto print_header;
 
 		switch (line->type) {
@@ -407,26 +392,26 @@ draw_buffer_line(
 
 print_header:
 		/* Print the line header */
-		printf(MOVE(%d, 1) "%s " RESET_ATTRIBUTES, coords.r0, header);
+		printf(C_MOVE(%d, 1) "%s " ATTR_RESET, coords.r0, header);
 	}
 
 	while (skip--)
-		word_wrap(text_w, &p1, p2);
+		irc_strwrap(text_w, &p1, p2);
 
 	do {
 		char *sep = " "VERTICAL_SEPARATOR" ";
 
 		if ((coords.cN - coords.c0) >= sizeof(*sep) + text_w) {
-			printf(MOVE(%d, %d), coords.r0, (int)(coords.cN - (sizeof(*sep) + text_w + 1)));
+			printf(C_MOVE(%d, %d), coords.r0, (int)(coords.cN - (sizeof(*sep) + text_w + 1)));
 			fputs(draw_colour(BUFFER_LINE_HEADER_FG_NEUTRAL, -1), stdout);
 			fputs(sep, stdout);
 		}
 
 		if (*p1) {
-			printf(MOVE(%d, %d), coords.r0, head_w);
+			printf(C_MOVE(%d, %d), coords.r0, head_w);
 
 			print_p1 = p1;
-			print_p2 = word_wrap(text_w, &p1, p2);
+			print_p2 = irc_strwrap(text_w, &p1, p2);
 
 			fputs(draw_colour(line->text[0] == QUOTE_CHAR
 					? BUFFER_LINE_TEXT_FG_GREEN
@@ -452,9 +437,8 @@ draw_input(struct input *inp, struct coords coords)
 	unsigned cols_t = coords.cN - coords.c0 + 1,
 	         cursor = coords.c0;
 
-	printf(RESET_ATTRIBUTES);
-	printf(MOVE(%d, 1) CLEAR_LINE, coords.rN);
-	printf(CURSOR_SAVE);
+	printf(C_MOVE(%d, 1) CLEAR_LINE, coords.rN);
+	printf(C_SAVE);
 
 	/* Insufficient columns for meaningful input drawing */
 	if (cols_t < 3)
@@ -479,29 +463,32 @@ draw_input(struct input *inp, struct coords coords)
 			goto print_input;
 	}
 
-	if (!draw_fmt(&input_ptr, &buff_n, &text_n, 0,
-			"%s", draw_colour(INPUT_FG, INPUT_BG)))
-		goto print_input;
+	if (action_message()) {
 
-	if (action_message) {
+		if (!draw_fmt(&input_ptr, &buff_n, &text_n, 0,
+				"%s", draw_colour(ACTION_FG, ACTION_BG)))
+			goto print_input;
 
 		cursor = coords.cN;
 
-		if (!draw_fmt(&input_ptr, &buff_n, &text_n, 1,
-				"%s", action_message))
+		if (!draw_fmt(&input_ptr, &buff_n, &text_n, 1, "-- %s --", action_message()))
 			goto print_input;
 
 		cursor = cols_t - text_n + 1;
 
 	} else {
+		if (!draw_fmt(&input_ptr, &buff_n, &text_n, 0,
+				"%s", draw_colour(INPUT_FG, INPUT_BG)))
+			goto print_input;
+
 		cursor += input_frame(inp, input_ptr, text_n);
 	}
 
 print_input:
 
 	fputs(input, stdout);
-	printf(MOVE(%d, %d), coords.rN, (cursor >= coords.c0 && cursor <= coords.cN) ? cursor : coords.cN);
-	printf(CURSOR_SAVE);
+	printf(C_MOVE(%d, %d), coords.rN, (cursor >= coords.c0 && cursor <= coords.cN) ? cursor : coords.cN);
+	printf(C_SAVE);
 }
 
 /* TODO
@@ -524,7 +511,7 @@ draw_nav(struct channel *c)
 	 *  - The nav is kept framed between the first and last channels
 	 */
 
-	printf(MOVE(1, 1) CLEAR_LINE);
+	printf(C_MOVE(1, 1) CLEAR_LINE);
 
 	static struct channel *frame_prev,
 	                      *frame_next;
@@ -541,7 +528,7 @@ draw_nav(struct channel *c)
 	size_t len, total_len = 0;
 
 	/* Bump the channel frames, if applicable */
-	if ((total_len = (c->name_len + 2)) >= io_tty_cols())
+	if ((total_len = (c->name_len + 2)) >= state_cols())
 		return;
 	else if (c == frame_prev && frame_prev != c_first)
 		frame_prev = channel_get_prev(frame_prev);
@@ -560,7 +547,7 @@ draw_nav(struct channel *c)
 			tmp = channel_get_next(tmp_next);
 			len = tmp->name_len;
 
-			while ((total_len += (len + 2)) < io_tty_cols() && tmp != c_first) {
+			while ((total_len += (len + 2)) < state_cols() && tmp != c_first) {
 
 				tmp_next = tmp;
 
@@ -578,7 +565,7 @@ draw_nav(struct channel *c)
 			tmp = channel_get_prev(tmp_prev);
 			len = tmp->name_len;
 
-			while ((total_len += (len + 2)) < io_tty_cols() && tmp != c_last) {
+			while ((total_len += (len + 2)) < state_cols() && tmp != c_last) {
 
 				tmp_prev = tmp;
 
@@ -593,7 +580,7 @@ draw_nav(struct channel *c)
 		len = tmp->name_len;
 
 		/* Next channel doesn't fit */
-		if ((total_len += (len + 2)) >= io_tty_cols())
+		if ((total_len += (len + 2)) >= state_cols())
 			break;
 
 		if (nextward)
@@ -638,19 +625,17 @@ draw_status(struct channel *c)
 	float sb;
 	int ret;
 	unsigned col = 0;
-	unsigned cols = io_tty_cols();
-	unsigned rows = io_tty_rows();
+	unsigned cols = state_cols();
+	unsigned rows = state_rows();
 
 	/* Insufficient columns for meaningful status */
 	if (cols < 3)
 		return;
 
-	printf(RESET_ATTRIBUTES);
-
-	printf(MOVE(2, 1));
+	printf(C_MOVE(2, 1));
 	printf("%.*s", cols, (char *)(memset(alloca(cols), *HORIZONTAL_SEPARATOR, cols)));
 
-	printf(MOVE(%d, 1) CLEAR_LINE, rows - 1);
+	printf(C_MOVE(%d, 1) CLEAR_LINE, rows - 1);
 
 	/* Print status to temporary buffer */
 	char status_buff[cols + 1];
@@ -758,25 +743,21 @@ static char*
 draw_colour(int fg, int bg)
 {
 	/* Set terminal foreground and background colours to a value [0, 255],
-	 * or reset colour if given anything else
-	 *
-	 * Foreground(F): ESC"[38;5;Fm"
-	 * Background(B): ESC"[48;5;Bm"
-	 * */
+	 * or reset colour if given anything else */
 
-	static char buf[COLOUR_SIZE + 1] = RESET_ATTRIBUTES;
-	size_t len = sizeof(RESET_ATTRIBUTES) - 1;
+	static char buf[COLOUR_SIZE + 1] = ATTR_RESET;
+	size_t len = sizeof(ATTR_RESET) - 1;
 	int ret = 0;
 
 	if (fg >= 0 && fg <= 255) {
-		if ((ret = snprintf(buf + len, sizeof(buf) - len, ESC"[38;5;%dm", fg)) < 0)
+		if ((ret = snprintf(buf + len, sizeof(buf) - len, ATTR_FG(%d), fg)) < 0)
 			buf[len] = 0;
 		else
 			len += ret;
 	}
 
 	if (bg >= 0 && bg <= 255) {
-		if ((ret = snprintf(buf + len, sizeof(buf) - len, ESC"[48;5;%dm", bg)) < 0)
+		if ((snprintf(buf + len, sizeof(buf) - len, ATTR_BG(%d), bg)) < 0)
 			buf[len] = 0;
 	}
 

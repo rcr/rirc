@@ -1,10 +1,7 @@
-#ifndef BUFFER_H
-#define BUFFER_H
+#ifndef RIRC_COMPONENTS_BUFFER_H
+#define RIRC_COMPONENTS_BUFFER_H
 
 #include <time.h>
-
-#include "src/utils/utils.h"
-#include "config.h"
 
 #define TEXT_LENGTH_MAX 510 /* FIXME: remove max lengths in favour of growable buffer */
 #define FROM_LENGTH_MAX 100
@@ -14,7 +11,7 @@
 #endif
 
 /* Buffer line types, in order of precedence */
-enum buffer_line_t
+enum buffer_line_type
 {
 	BUFFER_LINE_OTHER,        /* Default/all other lines */
 	BUFFER_LINE_SERVER_INFO,  /* Server info message */
@@ -30,7 +27,7 @@ enum buffer_line_t
 
 struct buffer_line
 {
-	enum buffer_line_t type;
+	enum buffer_line_type type;
 	char prefix; /* TODO as part of `from` */
 	char from[FROM_LENGTH_MAX + 1]; /* TODO: from/text as struct string */
 	char text[TEXT_LENGTH_MAX + 1];
@@ -69,7 +66,7 @@ struct buffer_line* buffer_line(struct buffer*, unsigned int);
 
 void buffer_newline(
 	struct buffer*,
-	enum buffer_line_t,
+	enum buffer_line_type,
 	const char*,
 	const char*,
 	size_t,

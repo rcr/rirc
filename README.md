@@ -93,7 +93,7 @@ Commands:
 ```
   :clear
   :close
-  :connect [host [port] [pass] [user] [real]]
+  :connect
   :disconnect
   :quit
 ```
@@ -105,7 +105,6 @@ Keys:
   ^P : go to previous channel
   ^L : clear channel
   ^X : close channel
-  ^F : find channel
   ^C : cancel input/action
   ^U : scroll buffer up
   ^D : scroll buffer down
@@ -117,4 +116,4 @@ Keys:
 
 ### More info:
 
-[rcr.io/rirc/](http://rcr.io/rirc/)
+[https://rcr.io/rirc/](http://rcr.io/rirc/)

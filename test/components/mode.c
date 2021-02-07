@@ -286,12 +286,15 @@ test_prfxmode_prefix(void)
 	mode_cfg_chanmodes(&cfg, "abc");
 
 	/* Test setting invalid prfxmode prefix */
+	assert_eq(mode_prfxmode_prefix(&m, &cfg, 0),   MODE_ERR_INVALID_PREFIX);
+	assert_eq(mode_prfxmode_prefix(&m, &cfg, '0'), MODE_ERR_INVALID_PREFIX);
 	assert_eq(mode_prfxmode_prefix(&m, &cfg, '4'), MODE_ERR_INVALID_PREFIX);
 
 	/* Test setting valid prfxmode prefix */
 	assert_eq(mode_prfxmode_prefix(&m, &cfg, '2'), MODE_ERR_NONE);
+	assert_eq(mode_prfxmode_prefix(&m, &cfg, '3'), MODE_ERR_NONE);
 
-	assert_strcmp(mode_str(&m, &str), "b");
+	assert_strcmp(mode_str(&m, &str), "bc");
 	assert_eq(m.prefix, '2');
 }
 
@@ -495,7 +498,7 @@ test_chanmode_type(void)
 		test_abort("Configuration error");
 
 	/* Test invalid '+'/'-' */
-	assert_eq(chanmode_type(&cfg, MODE_SET_T_SIZE, 'a'), MODE_FLAG_INVALID_SET);
+	assert_eq(chanmode_type(&cfg, MODE_SET_INVALID, 'a'), MODE_FLAG_INVALID_SET);
 
 	/* Test invalid flag */
 	assert_eq(chanmode_type(&cfg, MODE_SET_ON, '!'), MODE_FLAG_INVALID_FLAG);

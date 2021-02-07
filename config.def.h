@@ -16,12 +16,15 @@
 #define DEFAULT_USERNAME ""
 #define DEFAULT_REALNAME ""
 
-/* User count in channel before filtering JOIN/PART/QUIT messages
+/* User count in channel before filtering message types
  *   Integer
  *   (0: no filtering) */
-#define JOIN_THRESHOLD 0
-#define PART_THRESHOLD 0
-#define QUIT_THRESHOLD 0
+#define FILTER_THRESHOLD_JOIN    0
+#define FILTER_THRESHOLD_PART    0
+#define FILTER_THRESHOLD_QUIT    0
+#define FILTER_THRESHOLD_ACCOUNT 0
+#define FILTER_THRESHOLD_AWAY    0
+#define FILTER_THRESHOLD_CHGHOST 0
 
 /* Message sent for PART and QUIT by default */
 #define DEFAULT_QUIT_MESG "rirc v" VERSION
@@ -61,12 +64,16 @@
 #define INPUT_PREFIX_FG 239
 #define INPUT_PREFIX_BG -1
 
+/* Action message */
+#define ACTION_FG -1
+#define ACTION_BG 239
+
 /* Input line text colours */
 #define INPUT_FG 250
 #define INPUT_BG -1
 
 /* BUFFER_PADDING:
- * How the buffer line headers will be padded, options are 0, 1
+ * How the buffer line headers will be padded [0, 1]
  *
  * 0 (Unpadded):
  *   12:34 alice ~ hello

@@ -1,5 +1,7 @@
 #include "test/test.h"
 
+#include <ctype.h>
+
 #include "src/components/buffer.c"
 #include "src/components/channel.c"
 #include "src/components/input.c"
@@ -60,26 +62,6 @@ static struct irc_message m;
 static struct server *s;
 
 static void
-test_case_insensitive(void)
-{
-	/* Requests */
-	CHECK_REQUEST(":nick!user@host PRIVMSG me :\001clientinfo", 0, 1, 1,
-		"CTCP CLIENTINFO from nick",
-		"NOTICE nick :\001CLIENTINFO ACTION CLIENTINFO PING SOURCE TIME VERSION\001");
-
-	CHECK_REQUEST(":nick!user@host PRIVMSG me :\001clientinfo\001", 0, 1, 1,
-		"CTCP CLIENTINFO from nick",
-		"NOTICE nick :\001CLIENTINFO ACTION CLIENTINFO PING SOURCE TIME VERSION\001");
-
-	/* Response */
-	CHECK_RESPONSE(":nick!user@host NOTICE me :\001clientinfo FOO BAR BAZ", 0,
-		"CTCP CLIENTINFO response from nick: FOO BAR BAZ");
-
-	CHECK_RESPONSE(":nick!user@host NOTICE me :\001clientinfo 123 456 789\001", 0,
-		"CTCP CLIENTINFO response from nick: 123 456 789");
-}
-
-static void
 test_recv_ctcp_request(void)
 {
 	/* test malformed */
@@ -123,6 +105,15 @@ test_recv_ctcp_request(void)
 
 	CHECK_REQUEST(":nick!user@host PRIVMSG me :\001TEST3 arg1 arg2\001", 1, 1, 0,
 		"Received unsupported CTCP request 'TEST3' from nick", "");
+
+	/* test case insensitive */
+	CHECK_REQUEST(":nick!user@host PRIVMSG me :\001clientinfo", 0, 1, 1,
+		"CTCP CLIENTINFO from nick",
+		"NOTICE nick :\001CLIENTINFO " CTCP_CLIENTINFO "\001");
+
+	CHECK_REQUEST(":nick!user@host PRIVMSG me :\001clientinfo\001", 0, 1, 1,
+		"CTCP CLIENTINFO from nick",
+		"NOTICE nick :\001CLIENTINFO " CTCP_CLIENTINFO "\001");
 }
 
 static void
@@ -169,6 +160,13 @@ test_recv_ctcp_response(void)
 
 	CHECK_RESPONSE(":nick!user@host NOTICE me :\001TEST3 arg1 arg2\001", 1,
 		"Received unsupported CTCP response 'TEST3' from nick");
+
+	/* test case insensitive */
+	CHECK_RESPONSE(":nick!user@host NOTICE me :\001clientinfo FOO BAR BAZ", 0,
+		"CTCP CLIENTINFO response from nick: FOO BAR BAZ");
+
+	CHECK_RESPONSE(":nick!user@host NOTICE me :\001clientinfo 123 456 789\001", 0,
+		"CTCP CLIENTINFO response from nick: 123 456 789");
 }
 
 static void
@@ -190,7 +188,7 @@ test_recv_ctcp_request_action(void)
 		assert_eq(ctcp_request(s, (F), (T), (M)), (R)); \
 		assert_eq(mock_line_n, 1); \
 		assert_eq(mock_send_n, 0); \
-		assert_strcmp(mock_chan, (C)); \
+		assert_strcmp(mock_chan[0], (C)); \
 		assert_strcmp(mock_line[0], (L)); \
 	} while (0)
 
@@ -222,15 +220,26 @@ test_recv_ctcp_request_clientinfo(void)
 {
 	CHECK_REQUEST(":nick!user@host PRIVMSG me :\001CLIENTINFO", 0, 1, 1,
 		"CTCP CLIENTINFO from nick",
-		"NOTICE nick :\001CLIENTINFO ACTION CLIENTINFO PING SOURCE TIME VERSION\001");
+		"NOTICE nick :\001CLIENTINFO " CTCP_CLIENTINFO "\001");
 
 	CHECK_REQUEST(":nick!user@host PRIVMSG me :\001CLIENTINFO\001", 0, 1, 1,
 		"CTCP CLIENTINFO from nick",
-		"NOTICE nick :\001CLIENTINFO ACTION CLIENTINFO PING SOURCE TIME VERSION\001");
+		"NOTICE nick :\001CLIENTINFO " CTCP_CLIENTINFO "\001");
 
 	CHECK_REQUEST(":nick!user@host PRIVMSG me :\001CLIENTINFO unused args\001", 0, 1, 1,
 		"CTCP CLIENTINFO from nick (unused args)",
-		"NOTICE nick :\001CLIENTINFO ACTION CLIENTINFO PING SOURCE TIME VERSION\001");
+		"NOTICE nick :\001CLIENTINFO " CTCP_CLIENTINFO "\001");
+
+	char *p, clientinfo[] = CTCP_CLIENTINFO;
+
+	for (p = clientinfo; *p; p++)
+		*p = tolower(*p);
+
+	#define X(cmd) assert_ptr_not_null(strstr(clientinfo, #cmd));
+		CTCP_EXTENDED_FORMATTING
+		CTCP_EXTENDED_QUERY
+		CTCP_METADATA_QUERY
+	#undef X
 }
 
 static void
@@ -270,15 +279,15 @@ test_recv_ctcp_request_source(void)
 {
 	CHECK_REQUEST(":nick!user@host PRIVMSG me :\001SOURCE", 0, 1, 1,
 		"CTCP SOURCE from nick",
-		"NOTICE nick :\001SOURCE rcr.io/rirc\001");
+		"NOTICE nick :\001SOURCE https://rcr.io/rirc\001");
 
 	CHECK_REQUEST(":nick!user@host PRIVMSG me :\001SOURCE\001", 0, 1, 1,
 		"CTCP SOURCE from nick",
-		"NOTICE nick :\001SOURCE rcr.io/rirc\001");
+		"NOTICE nick :\001SOURCE https://rcr.io/rirc\001");
 
 	CHECK_REQUEST(":nick!user@host PRIVMSG me :\001SOURCE unused args\001", 0, 1, 1,
 		"CTCP SOURCE from nick (unused args)",
-		"NOTICE nick :\001SOURCE rcr.io/rirc\001");
+		"NOTICE nick :\001SOURCE https://rcr.io/rirc\001");
 }
 
 static void
@@ -488,7 +497,6 @@ main(void)
 	server_nick_set(s, "me");
 
 	struct testcase tests[] = {
-		TESTCASE(test_case_insensitive),
 		TESTCASE(test_recv_ctcp_request),
 		TESTCASE(test_recv_ctcp_response),
 #define X(cmd) TESTCASE(test_recv_ctcp_request_##cmd),

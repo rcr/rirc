@@ -1,11 +1,12 @@
+#include "src/components/server.h"
+
+#include "src/state.h"
+#include "src/utils/utils.h"
+
 #include <ctype.h>
 #include <errno.h>
 #include <stdlib.h>
 #include <string.h>
-
-#include "src/components/server.h"
-#include "src/state.h"
-#include "src/utils/utils.h"
 
 #define HANDLED_005 \
 	X(CASEMAPPING)  \
@@ -39,13 +40,12 @@ server(const char *host, const char *port, const char *pass, const char *user, c
 	s->pass = pass ? strdup(pass) : NULL;
 	s->username = strdup(user);
 	s->realname = strdup(real);
-	s->channel = channel(host, CHANNEL_T_SERVER);
 	s->casemapping = CASEMAPPING_RFC1459;
 	s->mode_str.type = MODE_STR_USERMODE;
 	ircv3_caps(&(s->ircv3_caps));
 	mode_cfg(&(s->mode_cfg), NULL, MODE_CFG_DEFAULTS);
-	/* FIXME: remove server pointer from channel, remove
-	 * server's channel from clist */
+
+	s->channel = channel(host, CHANNEL_T_SERVER);
 	s->channel->server = s;
 	channel_list_add(&(s->clist), s->channel);
 
@@ -75,9 +75,7 @@ server_list_get(struct server_list *sl, const char *host, const char *port)
 struct server*
 server_list_add(struct server_list *sl, struct server *s)
 {
-	struct server *tmp;
-
-	if ((tmp = server_list_get(sl, s->host, s->port)) != NULL)
+	if (server_list_get(sl, s->host, s->port) != NULL)
 		return s;
 
 	if (sl->head == NULL) {
@@ -142,12 +140,8 @@ server_reset(struct server *s)
 void
 server_free(struct server *s)
 {
-	// FIXME: add this back when removing it from
-	// server's channel_list
-	// channel_free(s->channel);
-
 	channel_list_free(&(s->clist));
-	channel_list_free(&(s->ulist));
+
 	user_list_free(&(s->ignore));
 
 	free((void *)s->host);
@@ -166,21 +160,21 @@ server_set_004(struct server *s, char *str)
 {
 	/* <server_name> <version> <user_modes> <chan_modes> */
 
-	const char *server_name; /* Not used */
-	const char *version;     /* Not used */
-	const char *user_modes;  /* Configure server usermodes */
-	const char *chan_modes;  /* Configure server chanmodes */
+	const char *user_modes;
+	const char *chan_modes;
 
-	if (!(server_name = strsep(&str)))
+	/* Not used */
+	if (!irc_strsep(&str))
 		server_error(s, "invalid numeric 004: server_name is null");
 
-	if (!(version = strsep(&str)))
+	/* Not used */
+	if (!irc_strsep(&str))
 		server_error(s, "invalid numeric 004: version is null");
 
-	if (!(user_modes = strsep(&str)))
+	if (!(user_modes = irc_strsep(&str)))
 		server_error(s, "invalid numeric 004: user_modes is null");
 
-	if (!(chan_modes = strsep(&str)))
+	if (!(chan_modes = irc_strsep(&str)))
 		server_error(s, "invalid numeric 004: chan_modes is null");
 
 	if (user_modes) {
@@ -327,7 +321,7 @@ parse_005(struct opt *opt, char **str)
 	opt->arg = NULL;
 	opt->val = NULL;
 
-	if (!strtrim(&p))
+	if (!irc_strtrim(&p))
 		return 0;
 
 	if (!isalnum(*p))

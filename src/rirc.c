@@ -1,3 +1,10 @@
+#include "src/rirc.h"
+
+#include "config.h"
+#include "src/draw.h"
+#include "src/io.h"
+#include "src/state.h"
+
 #include <errno.h>
 #include <getopt.h>
 #include <pwd.h>
@@ -5,11 +12,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-
-#include "config.h"
-#include "src/draw.h"
-#include "src/io.h"
-#include "src/state.h"
 
 #define MAX_CLI_SERVERS 16
 
@@ -287,7 +289,6 @@ parse_args(int argc, char **argv)
 		default_realname = getpwuid_pw_name();
 
 	state_init();
-	draw_init();
 
 	for (size_t i = 0; i < n_servers; i++) {
 
@@ -344,8 +345,8 @@ main(int argc, char **argv)
 
 	if ((ret = parse_args(argc, argv)) == 0) {
 		io_start();
-		draw_term();
 		state_term();
+		draw(DRAW_CLEAR);
 	}
 
 	return ret;

@@ -1,5 +1,5 @@
-#ifndef IO_H
-#define IO_H
+#ifndef RIRC_IO_H
+#define RIRC_IO_H
 
 /* Handling off all network io, user input and signals
  *
@@ -49,20 +49,17 @@
  *   (B) io_dx: close network connection
  *
  * Network state implicit transitions result in informational callback types:
- *   (C) on connection attempt:  IO_CB_INFO
- *   (E) on connection failure:  IO_CB_ERROR
- *   (D) on connection success:  IO_CB_CXED
- *   (F) on connection loss:     IO_CB_DXED
- *   (G) on ping timeout start:  IO_CB_PING_1
- *   (H) on ping timeout update: IO_CB_PING_N
- *   (I) on ping normal:         IO_CB_PING_0
+ *   (D) on connection success:  io_cb_cxed
+ *   (F) on connection loss:     io_cb_dxed
+ *   (G) on ping timeout start:  io_cb_ping
+ *   (H) on ping timeout update: io_cb_ping
+ *   (I) on ping normal:         io_cb_ping
  *
  * Successful reads on stdin and connected sockets result in data callbacks:
  *   from stdin:  io_cb_read_inp
  *   from socket: io_cb_read_soc
  *
- * Signals registered to be caught result in non-signal handler context
- * callback with type IO_CB_SIGNAL
+ * SIGWINCH results in a non signal-handler context callback io_cb_singwinch
  *
  * Failed connection attempts enter a retry cycle with exponential
  * backoff time given by:
@@ -77,37 +74,6 @@
 #include <stddef.h>
 #include <stdint.h>
 
-struct connection;
-
-enum io_cb_t
-{
-	IO_CB_INVALID,
-	IO_CB_CXED,   /* no args */
-	IO_CB_DXED,   /* no args */
-	IO_CB_ERR,    /* <const char *fmt>, [args, ...] */
-	IO_CB_INFO,   /* <const char *fmt>, [args, ...] */
-	IO_CB_PING_0, /* <unsigned ping> */
-	IO_CB_PING_1, /* <unsigned ping> */
-	IO_CB_PING_N, /* <unsigned ping> */
-	IO_CB_SIGNAL, /* <io_sig_t sig> */
-	IO_CB_SIZE
-};
-
-enum io_log_level
-{
-	IO_LOG_ERROR,
-	IO_LOG_WARN,
-	IO_LOG_INFO,
-	IO_LOG_DEBUG,
-};
-
-enum io_sig_t
-{
-	IO_SIG_INVALID,
-	IO_SIGWINCH,
-	IO_SIG_SIZE
-};
-
 #define IO_IPV_UNSPEC        (1 << 1)
 #define IO_IPV_4             (1 << 2)
 #define IO_IPV_6             (1 << 3)
@@ -117,7 +83,8 @@ enum io_sig_t
 #define IO_TLS_VRFY_OPTIONAL (1 << 7)
 #define IO_TLS_VRFY_REQUIRED (1 << 8)
 
-/* Returns a connection, or NULL if limit is reached */
+struct connection;
+
 struct connection* connection(
 	const void*, /* callback object */
 	const char*, /* host */
@@ -133,26 +100,25 @@ int io_dx(struct connection*);
 /* Formatted write to connection */
 int io_sendf(struct connection*, const char*, ...);
 
-/* Init/start/stop IO context */
-void io_init(void);
-void io_start(void);
-void io_stop(void);
-
-/* Get tty dimensions */
-unsigned io_tty_cols(void);
-unsigned io_tty_rows(void);
-
 /* IO error string */
 const char* io_err(int);
-
-/* IO state callback */
-void io_cb(enum io_cb_t, const void*, ...);
 
 /* IO data callback */
 void io_cb_read_inp(char*, size_t);
 void io_cb_read_soc(char*, size_t, const void*);
 
-/* Log message callback */
-void io_cb_log(const void*, enum io_log_level, const char*, ...);
+/* IO event callbacks */
+void io_cb_cxed(const void*);
+void io_cb_dxed(const void*);
+void io_cb_ping(const void*, unsigned);
+void io_cb_sigwinch(unsigned, unsigned);
+
+/* IO informational callbacks */
+void io_cb_error(const void*, const char*, ...);
+void io_cb_info(const void*, const char*, ...);
+
+void io_init(void);
+void io_start(void);
+void io_stop(void);
 
 #endif

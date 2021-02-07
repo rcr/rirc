@@ -6,7 +6,9 @@
 	X("cap-2", cap_2, 0) \
 	X("cap-3", cap_3, IRCV3_CAP_AUTO) \
 	X("cap-4", cap_4, IRCV3_CAP_AUTO) \
-	X("cap-5", cap_5, (IRCV3_CAP_AUTO | IRCV3_CAP_NO_DEL))
+	X("cap-5", cap_5, 0) \
+	X("cap-6", cap_6, IRCV3_CAP_AUTO) \
+	X("cap-7", cap_7, (IRCV3_CAP_AUTO | IRCV3_CAP_NO_DEL))
 
 #include "src/components/buffer.c"
 #include "src/components/channel.c"
@@ -116,9 +118,8 @@ test_ircv3_CAP_LS(void)
 	ircv3_caps_reset(&(s->ircv3_caps));
 	IRC_MESSAGE_PARSE("CAP * LS :cap-1 cap-2 cap-3");
 	assert_eq(irc_recv(s, &m), 0);
-	assert_eq(mock_send_n, 2);
-	assert_strcmp(mock_send[0], "CAP REQ :cap-1");
-	assert_strcmp(mock_send[1], "CAP REQ :cap-3");
+	assert_eq(mock_send_n, 1);
+	assert_strcmp(mock_send[0], "CAP REQ :cap-1 cap-3");
 	assert_eq(s->ircv3_caps.cap_1.supported, 1);
 	assert_eq(s->ircv3_caps.cap_2.supported, 1);
 	assert_eq(s->ircv3_caps.cap_3.supported, 1);
@@ -128,9 +129,8 @@ test_ircv3_CAP_LS(void)
 	ircv3_caps_reset(&(s->ircv3_caps));
 	IRC_MESSAGE_PARSE("CAP * LS :cap-1 foo cap-2 bar cap-3");
 	assert_eq(irc_recv(s, &m), 0);
-	assert_eq(mock_send_n, 2);
-	assert_strcmp(mock_send[0], "CAP REQ :cap-1");
-	assert_strcmp(mock_send[1], "CAP REQ :cap-3");
+	assert_eq(mock_send_n, 1);
+	assert_strcmp(mock_send[0], "CAP REQ :cap-1 cap-3");
 	assert_eq(s->ircv3_caps.cap_1.supported, 1);
 	assert_eq(s->ircv3_caps.cap_2.supported, 1);
 	assert_eq(s->ircv3_caps.cap_3.supported, 1);
@@ -146,10 +146,8 @@ test_ircv3_CAP_LS(void)
 	assert_eq(mock_send_n, 0);
 	IRC_MESSAGE_PARSE("CAP * LS cap-4");
 	assert_eq(irc_recv(s, &m), 0);
-	assert_eq(mock_send_n, 3);
-	assert_strcmp(mock_send[0], "CAP REQ :cap-1");
-	assert_strcmp(mock_send[1], "CAP REQ :cap-3");
-	assert_strcmp(mock_send[2], "CAP REQ :cap-4");
+	assert_eq(mock_send_n, 1);
+	assert_strcmp(mock_send[0], "CAP REQ :cap-1 cap-3 cap-4");
 	assert_eq(s->ircv3_caps.cap_1.supported, 1);
 	assert_eq(s->ircv3_caps.cap_2.supported, 1);
 	assert_eq(s->ircv3_caps.cap_3.supported, 1);
@@ -426,13 +424,13 @@ test_ircv3_CAP_DEL(void)
 	assert_eq(mock_line_n, 1);
 	assert_strcmp(mock_line[0], "CAP DEL: parameter is empty");
 
-	/* test cap-5 doesn't support DEL */
+	/* test cap-7 doesn't support DEL */
 	mock_reset();
-	IRC_MESSAGE_PARSE("CAP * DEL :cap-5");
+	IRC_MESSAGE_PARSE("CAP * DEL :cap-7");
 	assert_eq(irc_recv(s, &m), 1);
 	assert_eq(mock_send_n, 0);
 	assert_eq(mock_line_n, 1);
-	assert_strcmp(mock_line[0], "CAP DEL: 'cap-5' doesn't support DEL");
+	assert_strcmp(mock_line[0], "CAP DEL: 'cap-7' doesn't support DEL");
 
 	/* test unsupported caps */
 	mock_reset();
@@ -491,38 +489,110 @@ test_ircv3_CAP_NEW(void)
 
 	/* test supported caps */
 	mock_reset();
-	s->ircv3_caps.cap_3.req = 0;
-	s->ircv3_caps.cap_4.req = 0;
-	s->ircv3_caps.cap_5.req = 1; /* cap req - don't send REQ */
-	s->ircv3_caps.cap_3.set = 1; /* cap set - don't send REQ */
-	s->ircv3_caps.cap_4.set = 0;
-	s->ircv3_caps.cap_5.set = 0;
-	s->ircv3_caps.cap_3.supported = 0;
-	s->ircv3_caps.cap_4.supported = 0;
-	s->ircv3_caps.cap_5.supported = 0;
-	IRC_MESSAGE_PARSE("CAP * NEW :cap-3 cap-4 cap-5");
+	IRC_MESSAGE_PARSE("CAP * NEW :cap-1 cap-2 cap-3 cap-4 cap-5 cap-6 cap-7");
 	assert_eq(irc_recv(s, &m), 0);
 	assert_eq(mock_send_n, 1);
-	assert_eq(mock_line_n, 3);
-	assert_strcmp(mock_line[0], "new capability: cap-3");
-	assert_strcmp(mock_line[1], "new capability: cap-4");
-	assert_strcmp(mock_line[2], "new capability: cap-5");
-	assert_strcmp(mock_send[0], "CAP REQ :cap-4");
+	assert_eq(mock_line_n, 7);
+	assert_strcmp(mock_line[0], "new capability: cap-1 (auto-req)");
+	assert_strcmp(mock_line[1], "new capability: cap-2"); /* no REQ (IRCV3_CAP_AUTO disasabled) */
+	assert_strcmp(mock_line[2], "new capability: cap-3 (auto-req)");
+	assert_strcmp(mock_line[3], "new capability: cap-4 (auto-req)");
+	assert_strcmp(mock_line[4], "new capability: cap-5"); /* no REQ (IRCV3_CAP_AUTO disasabled) */
+	assert_strcmp(mock_line[5], "new capability: cap-6 (auto-req)");
+	assert_strcmp(mock_line[6], "new capability: cap-7 (auto-req)");
+	assert_strcmp(mock_send[0], "CAP REQ :cap-1 cap-3 cap-4 cap-6 cap-7");
+	assert_eq(s->ircv3_caps.cap_1.supported, 1);
+	assert_eq(s->ircv3_caps.cap_2.supported, 1);
 	assert_eq(s->ircv3_caps.cap_3.supported, 1);
 	assert_eq(s->ircv3_caps.cap_4.supported, 1);
 	assert_eq(s->ircv3_caps.cap_5.supported, 1);
+	assert_eq(s->ircv3_caps.cap_6.supported, 1);
+	assert_eq(s->ircv3_caps.cap_7.supported, 1);
 
-	/* test supported caps, cap_2 is non-auto */
+	/* test supported caps with cap.req, cap.set */
 	mock_reset();
-	s->ircv3_caps.cap_2.req = 0;
-	s->ircv3_caps.cap_2.set = 1;
-	s->ircv3_caps.cap_2.supported = 0;
-	IRC_MESSAGE_PARSE("CAP * NEW :cap-2");
+	s->ircv3_caps.cap_1.req = 1; /* test cap.req */
+	s->ircv3_caps.cap_4.set = 1; /* test cap.set */
+	IRC_MESSAGE_PARSE("CAP * NEW :cap-1 cap-2 cap-3 cap-4 cap-5 cap-6 cap-7");
+	assert_eq(irc_recv(s, &m), 0);
+	assert_eq(mock_send_n, 1);
+	assert_eq(mock_line_n, 7);
+	assert_strcmp(mock_line[0], "new capability: cap-1"); /* no REQ (.req = 1) */
+	assert_strcmp(mock_line[1], "new capability: cap-2"); /* no REQ (IRCV3_CAP_AUTO disasabled) */
+	assert_strcmp(mock_line[2], "new capability: cap-3 (auto-req)");
+	assert_strcmp(mock_line[3], "new capability: cap-4"); /* no REQ (.set = 1) */
+	assert_strcmp(mock_line[4], "new capability: cap-5"); /* no REQ (IRCV3_CAP_AUTO disasabled) */
+	assert_strcmp(mock_line[5], "new capability: cap-6 (auto-req)");
+	assert_strcmp(mock_line[6], "new capability: cap-7 (auto-req)");
+	assert_strcmp(mock_send[0], "CAP REQ :cap-3 cap-6 cap-7");
+	assert_eq(s->ircv3_caps.cap_1.supported, 1);
+	assert_eq(s->ircv3_caps.cap_2.supported, 1);
+	assert_eq(s->ircv3_caps.cap_3.supported, 1);
+	assert_eq(s->ircv3_caps.cap_4.supported, 1);
+	assert_eq(s->ircv3_caps.cap_5.supported, 1);
+	assert_eq(s->ircv3_caps.cap_6.supported, 1);
+	assert_eq(s->ircv3_caps.cap_7.supported, 1);
+
+	/* test supported caps, only non-auto */
+	mock_reset();
+	IRC_MESSAGE_PARSE("CAP * NEW :cap-2 cap-5");
 	assert_eq(irc_recv(s, &m), 0);
 	assert_eq(mock_send_n, 0);
-	assert_eq(mock_line_n, 1);
-	assert_strcmp(mock_line[0], "new capability: cap-2");
+	assert_eq(mock_line_n, 2);
+	assert_strcmp(mock_line[0], "new capability: cap-2"); /* no REQ (IRCV3_CAP_AUTO disasabled) */
+	assert_strcmp(mock_line[1], "new capability: cap-5"); /* no REQ (IRCV3_CAP_AUTO disasabled) */
+	assert_eq(s->ircv3_caps.cap_1.supported, 0);
 	assert_eq(s->ircv3_caps.cap_2.supported, 1);
+	assert_eq(s->ircv3_caps.cap_3.supported, 0);
+	assert_eq(s->ircv3_caps.cap_4.supported, 0);
+	assert_eq(s->ircv3_caps.cap_5.supported, 1);
+	assert_eq(s->ircv3_caps.cap_6.supported, 0);
+	assert_eq(s->ircv3_caps.cap_7.supported, 0);
+}
+
+static void
+test_ircv3_cap_req_count(void)
+{
+	mock_reset();
+	assert_eq(ircv3_cap_req_count(&(s->ircv3_caps)), 0);
+
+	mock_reset();
+	s->ircv3_caps.cap_1.req = 1;
+	assert_eq(ircv3_cap_req_count(&(s->ircv3_caps)), 1);
+
+	mock_reset();
+	s->ircv3_caps.cap_1.req = 1;
+	s->ircv3_caps.cap_2.req = 1;
+	s->ircv3_caps.cap_3.req = 1;
+	assert_eq(ircv3_cap_req_count(&(s->ircv3_caps)), 3);
+}
+
+static void
+test_ircv3_cap_req_send(void)
+{
+	mock_reset();
+	s->ircv3_caps.cap_1.req = 1;
+	assert_eq(ircv3_cap_req_send(&(s->ircv3_caps), s), 0);
+	assert_eq(mock_send_n, 1);
+	assert_eq(mock_line_n, 0);
+	assert_strcmp(mock_send[0], "CAP REQ :cap-1");
+
+	mock_reset();
+	s->ircv3_caps.cap_1.req = 1;
+	s->ircv3_caps.cap_3.req = 1;
+	assert_eq(ircv3_cap_req_send(&(s->ircv3_caps), s), 0);
+	assert_eq(mock_send_n, 1);
+	assert_eq(mock_line_n, 0);
+	assert_strcmp(mock_send[0], "CAP REQ :cap-1 cap-3");
+
+	mock_reset();
+	s->ircv3_caps.cap_1.req = 1;
+	s->ircv3_caps.cap_3.req = 1;
+	s->ircv3_caps.cap_5.req = 1;
+	assert_eq(ircv3_cap_req_send(&(s->ircv3_caps), s), 0);
+	assert_eq(mock_send_n, 1);
+	assert_eq(mock_line_n, 0);
+	assert_strcmp(mock_send[0], "CAP REQ :cap-1 cap-3 cap-5");
 }
 
 int
@@ -541,6 +611,8 @@ main(void)
 		TESTCASE(test_ircv3_CAP_NAK),
 		TESTCASE(test_ircv3_CAP_DEL),
 		TESTCASE(test_ircv3_CAP_NEW),
+		TESTCASE(test_ircv3_cap_req_count),
+		TESTCASE(test_ircv3_cap_req_send),
 	};
 
 	int ret = run_tests(tests);

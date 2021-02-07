@@ -1,8 +1,20 @@
 #include "src/io.h"
 
+#include "config.h"
+#include "src/rirc.h"
+#include "src/utils/utils.h"
+
+#include "mbedtls/ctr_drbg.h"
+#include "mbedtls/entropy.h"
+#include "mbedtls/error.h"
+#include "mbedtls/net_sockets.h"
+#include "mbedtls/ssl.h"
+#include "mbedtls/x509_crt.h"
+
 #include <arpa/inet.h>
 #include <errno.h>
 #include <netdb.h>
+#include <poll.h>
 #include <pthread.h>
 #include <signal.h>
 #include <stdarg.h>
@@ -13,21 +25,8 @@
 #include <termios.h>
 #include <unistd.h>
 
-#include "config.h"
-#include "rirc.h"
-#include "utils/utils.h"
-
-#include "mbedtls/ctr_drbg.h"
-#include "mbedtls/entropy.h"
-#include "mbedtls/error.h"
-#include "mbedtls/net_sockets.h"
-#include "mbedtls/ssl.h"
-#include "mbedtls/x509_crt.h"
-
 /* RFC 2812, section 2.3 */
-#ifndef IO_MESG_LEN
 #define IO_MESG_LEN 510
-#endif
 
 #ifndef IO_PING_MIN
 #define IO_PING_MIN 150
@@ -72,28 +71,24 @@
 			io_fatal((#X), _ptcf); \
 		}                          \
 	} while (0)
+
 #define PT_LK(X) PT_CF(pthread_mutex_lock((X)))
 #define PT_UL(X) PT_CF(pthread_mutex_unlock((X)))
-#define PT_CB(...) \
-	do {                    \
-		PT_LK(&io_cb_mutex);   \
-		io_cb(__VA_ARGS__); \
-		PT_UL(&io_cb_mutex);   \
-	} while (0)
+
+/* IO callback */
+#define IO_CB(X) \
+	do { PT_LK(&io_cb_mutex); (X); PT_UL(&io_cb_mutex); } while (0)
+
+#define io_cxed(C)       IO_CB(io_cb_cxed((C)->obj))
+#define io_dxed(C)       IO_CB(io_cb_dxed((C)->obj))
+#define io_error(C, ...) IO_CB(io_cb_error((C)->obj,  __VA_ARGS__))
+#define io_info(C, ...)  IO_CB(io_cb_info((C)->obj, __VA_ARGS__))
+#define io_ping(C, P)    IO_CB(io_cb_ping((C)->obj, P))
 
 /* state transition */
 #define ST_X(OLD, NEW) (((OLD) << 3) | (NEW))
 
-#define io_cb_cxed(C)        PT_CB(IO_CB_CXED, (C)->obj)
-#define io_cb_dxed(C)        PT_CB(IO_CB_DXED, (C)->obj)
-#define io_cb_err(C, ...)    PT_CB(IO_CB_ERR, (C)->obj, __VA_ARGS__)
-#define io_cb_info(C, ...)   PT_CB(IO_CB_INFO, (C)->obj, __VA_ARGS__)
-#define io_cb_ping_0(C, ...) PT_CB(IO_CB_PING_0, (C)->obj, __VA_ARGS__)
-#define io_cb_ping_1(C, ...) PT_CB(IO_CB_PING_1, (C)->obj, __VA_ARGS__)
-#define io_cb_ping_n(C, ...) PT_CB(IO_CB_PING_N, (C)->obj, __VA_ARGS__)
-#define io_cb_signal(S)      PT_CB(IO_CB_SIGNAL, NULL, (S))
-
-enum io_err_t
+enum io_err
 {
 	IO_ERR_NONE,
 	IO_ERR_CXED,
@@ -110,7 +105,7 @@ struct connection
 	const void *obj;
 	const char *host;
 	const char *port;
-	enum io_state_t {
+	enum io_state {
 		IO_ST_INVALID,
 		IO_ST_DXED, /* Socket disconnected, passive */
 		IO_ST_RXNG, /* Socket disconnected, pending reconnect */
@@ -119,8 +114,7 @@ struct connection
 		IO_ST_PING, /* Socket connected, network state in question */
 	} st_cur, /* current thread state */
 	  st_new; /* new thread state */
-	int soc;
-	mbedtls_net_context tls_fd;
+	mbedtls_net_context net_ctx;
 	mbedtls_ssl_config  tls_conf;
 	mbedtls_ssl_context tls_ctx;
 	pthread_mutex_t mtx;
@@ -130,11 +124,11 @@ struct connection
 	unsigned rx_sleep;
 };
 
-static enum io_state_t io_state_cxed(struct connection*);
-static enum io_state_t io_state_cxng(struct connection*);
-static enum io_state_t io_state_ping(struct connection*);
-static enum io_state_t io_state_rxng(struct connection*);
-static int io_cx_read(struct connection*, unsigned);
+static enum io_state io_state_cxed(struct connection*);
+static enum io_state io_state_cxng(struct connection*);
+static enum io_state io_state_ping(struct connection*);
+static enum io_state io_state_rxng(struct connection*);
+static int io_cx_read(struct connection*, uint32_t);
 static void io_fatal(const char*, int);
 static void io_sig_handle(int);
 static void io_sig_init(void);
@@ -149,10 +143,7 @@ static mbedtls_entropy_context  tls_entropy;
 static mbedtls_x509_crt         tls_x509_crt;
 static pthread_mutex_t io_cb_mutex = PTHREAD_MUTEX_INITIALIZER;
 static struct termios term;
-static unsigned io_cols;
-static unsigned io_rows;
 static volatile sig_atomic_t flag_sigwinch_cb; /* sigwinch callback */
-static volatile sig_atomic_t flag_tty_resized; /* sigwinch ws resize */
 
 static const char* io_strerror(char*, size_t);
 static int io_net_connect(struct connection*);
@@ -196,14 +187,13 @@ connection_free(struct connection *cx)
 int
 io_cx(struct connection *cx)
 {
-	enum io_err_t err = IO_ERR_NONE;
-	enum io_state_t st;
+	enum io_err err = IO_ERR_NONE;
 	sigset_t sigset;
 	sigset_t sigset_old;
 
 	PT_LK(&(cx->mtx));
 
-	switch ((st = cx->st_cur)) {
+	switch (cx->st_cur) {
 		case IO_ST_DXED:
 			PT_CF(sigfillset(&sigset));
 			PT_CF(pthread_sigmask(SIG_BLOCK, &sigset, &sigset_old));
@@ -233,7 +223,7 @@ io_cx(struct connection *cx)
 int
 io_dx(struct connection *cx)
 {
-	enum io_err_t err = IO_ERR_NONE;
+	enum io_err err = IO_ERR_NONE;
 
 	if (cx->st_cur == IO_ST_DXED)
 		return IO_ERR_DXED;
@@ -280,34 +270,27 @@ io_sendf(struct connection *cx, const char *fmt, ...)
 	ret = 0;
 	written = 0;
 
-	if (cx->flags & IO_TLS_ENABLED) {
-		do {
-			if ((ret = mbedtls_ssl_write(&(cx->tls_ctx), sendbuf + ret, len - ret)) < 0) {
-				switch (ret) {
-					case MBEDTLS_ERR_SSL_WANT_READ:
-					case MBEDTLS_ERR_SSL_WANT_WRITE:
-						ret = 0;
-						continue;
-					default:
-						io_dx(cx);
-						io_cx(cx);
-						return IO_ERR_SSL_WRITE;
-				}
-			}
-		} while ((written += ret) < len);
-	} else {
-		do {
-			if ((ret = send(cx->soc, sendbuf + ret, len - ret, 0)) == -1) {
-				switch (errno) {
-					case EINTR:
-						ret = 0;
-						continue;
-					default:
-						return IO_ERR_SSL_WRITE;
-				}
-			}
-		} while ((written += ret) < len);
-	}
+	do {
+		if (cx->flags & IO_TLS_ENABLED) {
+			ret = mbedtls_ssl_write(&(cx->tls_ctx), sendbuf + ret, len - ret);
+		} else {
+			ret = mbedtls_net_send(&(cx->net_ctx), sendbuf + ret, len - ret);
+		}
+
+		if (ret >= 0)
+			continue;
+
+		switch (ret) {
+			case MBEDTLS_ERR_SSL_WANT_READ:
+			case MBEDTLS_ERR_SSL_WANT_WRITE:
+				ret = 0;
+				continue;
+			default:
+				io_dx(cx);
+				io_cx(cx);
+				return IO_ERR_SSL_WRITE;
+		}
+	} while ((written += ret) < len);
 
 	return IO_ERR_NONE;
 }
@@ -331,14 +314,12 @@ io_start(void)
 		ssize_t ret = read(STDIN_FILENO, buf, sizeof(buf));
 
 		if (ret > 0) {
-			PT_LK(&io_cb_mutex);
-			io_cb_read_inp(buf, ret);
-			PT_UL(&io_cb_mutex);
+			IO_CB(io_cb_read_inp(buf, ret));
 		} else {
 			if (errno == EINTR) {
 				if (flag_sigwinch_cb) {
 					flag_sigwinch_cb = 0;
-					io_cb_signal(IO_SIGWINCH);
+					io_tty_winsize();
 				}
 			} else {
 				fatal("read: %s", ret ? strerror(errno) : "EOF");
@@ -356,31 +337,12 @@ io_stop(void)
 static void
 io_tty_winsize(void)
 {
-	static struct winsize tty_ws;
+	struct winsize tty_ws;
 
-	if (flag_tty_resized == 0) {
-		flag_tty_resized = 1;
+	if (ioctl(0, TIOCGWINSZ, &tty_ws) < 0)
+		fatal("ioctl: %s", strerror(errno));
 
-		if (ioctl(0, TIOCGWINSZ, &tty_ws) < 0)
-			fatal("ioctl: %s", strerror(errno));
-
-		io_rows = tty_ws.ws_row;
-		io_cols = tty_ws.ws_col;
-	}
-}
-
-unsigned
-io_tty_cols(void)
-{
-	io_tty_winsize();
-	return io_cols;
-}
-
-unsigned
-io_tty_rows(void)
-{
-	io_tty_winsize();
-	return io_rows;
+	IO_CB(io_cb_sigwinch(tty_ws.ws_col, tty_ws.ws_row));
 }
 
 const char*
@@ -400,7 +362,7 @@ io_err(int err)
 	}
 }
 
-static enum io_state_t
+static enum io_state
 io_state_rxng(struct connection *cx)
 {
 	if (cx->rx_sleep == 0) {
@@ -412,7 +374,7 @@ io_state_rxng(struct connection *cx)
 		);
 	}
 
-	io_cb_info(cx, "Attemping reconnect in %02u:%02u",
+	io_info(cx, "Attemping reconnect in %02u:%02u",
 		(cx->rx_sleep / 60),
 		(cx->rx_sleep % 60));
 
@@ -421,10 +383,10 @@ io_state_rxng(struct connection *cx)
 	return IO_ST_CXNG;
 }
 
-static enum io_state_t
+static enum io_state
 io_state_cxng(struct connection *cx)
 {
-	if ((cx->soc = io_net_connect(cx)) < 0)
+	if ((io_net_connect(cx)) < 0)
 		return IO_ST_RXNG;
 
 	if ((cx->flags & IO_TLS_ENABLED) && io_tls_establish(cx) < 0)
@@ -433,12 +395,12 @@ io_state_cxng(struct connection *cx)
 	return IO_ST_CXED;
 }
 
-static enum io_state_t
+static enum io_state
 io_state_cxed(struct connection *cx)
 {
 	int ret;
 
-	while ((ret = io_cx_read(cx, IO_PING_MIN)) > 0)
+	while ((ret = io_cx_read(cx, SEC_IN_MS(IO_PING_MIN))) > 0)
 		continue;
 
 	if (ret == MBEDTLS_ERR_SSL_TIMEOUT)
@@ -446,28 +408,30 @@ io_state_cxed(struct connection *cx)
 
 	switch (ret) {
 		case MBEDTLS_ERR_SSL_WANT_READ:
-		case MBEDTLS_ERR_SSL_WANT_WRITE:
 			break;
 		case MBEDTLS_ERR_SSL_PEER_CLOSE_NOTIFY:
-			io_cb_info(cx, "connection closed gracefully");
+			io_info(cx, "connection closed gracefully");
 			break;
 		case MBEDTLS_ERR_NET_CONN_RESET:
 		case 0:
-			io_cb_err(cx, "connection reset by peer");
+			io_error(cx, "connection reset by peer");
 			break;
 		default:
-			io_cb_err(cx, "connection tls error");
+			io_error(cx, "connection error");
 			break;
 	}
 
-	mbedtls_net_free(&(cx->tls_fd));
-	mbedtls_ssl_config_free(&(cx->tls_conf));
-	mbedtls_ssl_free(&(cx->tls_ctx));
+	mbedtls_net_free(&(cx->net_ctx));
+
+	if (cx->flags & IO_TLS_ENABLED) {
+		mbedtls_ssl_config_free(&(cx->tls_conf));
+		mbedtls_ssl_free(&(cx->tls_ctx));
+	}
 
 	return IO_ST_CXNG;
 }
 
-static enum io_state_t
+static enum io_state
 io_state_ping(struct connection *cx)
 {
 	int ret;
@@ -475,7 +439,7 @@ io_state_ping(struct connection *cx)
 	if (cx->ping >= IO_PING_MAX)
 		return IO_ST_CXNG;
 
-	if ((ret = io_cx_read(cx, IO_PING_REFRESH)) > 0)
+	if ((ret = io_cx_read(cx, SEC_IN_MS(IO_PING_REFRESH))) > 0)
 		return IO_ST_CXED;
 
 	if (ret == MBEDTLS_ERR_SSL_TIMEOUT)
@@ -483,23 +447,25 @@ io_state_ping(struct connection *cx)
 
 	switch (ret) {
 		case MBEDTLS_ERR_SSL_WANT_READ:
-		case MBEDTLS_ERR_SSL_WANT_WRITE:
 			break;
 		case MBEDTLS_ERR_SSL_PEER_CLOSE_NOTIFY:
-			io_cb_info(cx, "connection closed gracefully");
+			io_info(cx, "connection closed gracefully");
 			break;
 		case MBEDTLS_ERR_NET_CONN_RESET:
 		case 0:
-			io_cb_err(cx, "connection reset by peer");
+			io_error(cx, "connection reset by peer");
 			break;
 		default:
-			io_cb_err(cx, "connection ssl error");
+			io_error(cx, "connection error");
 			break;
 	}
 
-	mbedtls_net_free(&(cx->tls_fd));
-	mbedtls_ssl_config_free(&(cx->tls_conf));
-	mbedtls_ssl_free(&(cx->tls_ctx));
+	mbedtls_net_free(&(cx->net_ctx));
+
+	if (cx->flags & IO_TLS_ENABLED) {
+		mbedtls_ssl_config_free(&(cx->tls_conf));
+		mbedtls_ssl_free(&(cx->tls_ctx));
+	}
 
 	return IO_ST_CXNG;
 }
@@ -519,9 +485,11 @@ io_thread(void *arg)
 
 	cx->st_cur = IO_ST_CXNG;
 
+	io_info(cx, "Connecting to %s:%s", cx->host, cx->port);
+
 	do {
-		enum io_state_t st_cur;
-		enum io_state_t st_new;
+		enum io_state st_cur;
+		enum io_state st_new;
 
 		switch ((st_cur = cx->st_cur)) {
 			case IO_ST_CXED: st_new = io_state_cxed(cx); break;
@@ -547,43 +515,40 @@ io_thread(void *arg)
 		switch (ST_X(st_cur, st_new)) {
 			case ST_X(IO_ST_DXED, IO_ST_CXNG): /* A1 */
 			case ST_X(IO_ST_RXNG, IO_ST_CXNG): /* A2,C */
-				io_cb_info(cx, "Connecting to %s:%s", cx->host, cx->port);
+				io_info(cx, "Connecting to %s:%s", cx->host, cx->port);
 				break;
 			case ST_X(IO_ST_CXED, IO_ST_CXNG): /* F1 */
-				io_cb_dxed(cx);
+				io_dxed(cx);
 				break;
 			case ST_X(IO_ST_PING, IO_ST_CXNG): /* F2 */
-				io_cb_err(cx, "Connection timeout (%u)", cx->ping);
-				io_cb_dxed(cx);
+				io_error(cx, "Connection timeout (%u)", cx->ping);
+				io_dxed(cx);
 				break;
 			case ST_X(IO_ST_RXNG, IO_ST_DXED): /* B1 */
 			case ST_X(IO_ST_CXNG, IO_ST_DXED): /* B2 */
-				io_cb_info(cx, "Connection cancelled");
+				io_info(cx, "Connection cancelled");
 				break;
 			case ST_X(IO_ST_CXED, IO_ST_DXED): /* B3 */
 			case ST_X(IO_ST_PING, IO_ST_DXED): /* B4 */
-				io_cb_info(cx, "Connection closed");
-				io_cb_dxed(cx);
+				io_info(cx, "Connection closed");
+				io_dxed(cx);
 				break;
 			case ST_X(IO_ST_CXNG, IO_ST_CXED): /* D */
-				io_cb_info(cx, " .. Connection successful");
-				io_cb_cxed(cx);
+				io_info(cx, " .. Connection successful");
+				io_cxed(cx);
 				cx->rx_sleep = 0;
 				break;
 			case ST_X(IO_ST_CXNG, IO_ST_RXNG): /* E */
-				io_cb_err(cx, " .. Connection failed -- retrying");
+				io_error(cx, " .. Connection failed -- retrying");
 				break;
 			case ST_X(IO_ST_CXED, IO_ST_PING): /* G */
-				cx->ping = IO_PING_MIN;
-				io_cb_ping_1(cx, cx->ping);
+				io_ping(cx, (cx->ping = IO_PING_MIN));
 				break;
 			case ST_X(IO_ST_PING, IO_ST_PING): /* H */
-				cx->ping += IO_PING_REFRESH;
-				io_cb_ping_n(cx, cx->ping);
+				io_ping(cx, (cx->ping += IO_PING_REFRESH));
 				break;
 			case ST_X(IO_ST_PING, IO_ST_CXED): /* I */
-				cx->ping = 0;
-				io_cb_ping_0(cx, cx->ping);
+				io_ping(cx, (cx->ping = 0));
 				break;
 			default:
 				fatal("BAD ST_X from: %d to: %d", st_cur, st_new);
@@ -595,24 +560,35 @@ io_thread(void *arg)
 }
 
 static int
-io_cx_read(struct connection *cx, unsigned timeout)
+io_cx_read(struct connection *cx, uint32_t timeout)
 {
 	int ret;
+	struct pollfd fd[1];
 	unsigned char buf[1024];
 
+	fd[0].fd = cx->net_ctx.fd;
+	fd[0].events = POLLIN;
+
+	while ((ret = poll(fd, 1, timeout)) < 0 && errno == EAGAIN)
+		continue;
+
+	if (ret == 0)
+		return MBEDTLS_ERR_SSL_TIMEOUT;
+
+	if (ret < 0 && errno == EINTR)
+		return MBEDTLS_ERR_SSL_WANT_READ;
+
+	if (ret < 0)
+		fatal("poll: %s", strerror(errno));
+
 	if (cx->flags & IO_TLS_ENABLED) {
-		mbedtls_ssl_conf_read_timeout(&(cx->tls_conf), SEC_IN_MS(timeout));
-		if ((ret = mbedtls_ssl_read(&(cx->tls_ctx), buf, sizeof(buf))) > 0) {
-			PT_LK(&io_cb_mutex);
-			io_cb_read_soc((char *)buf, (size_t)ret,  cx->obj);
-			PT_UL(&io_cb_mutex);
-		}
+		ret = mbedtls_ssl_read(&(cx->tls_ctx), buf, sizeof(buf));
 	} else {
-		while ((ret = recv(cx->soc, buf, sizeof(buf), 0)) > 0) {
-			PT_LK(&io_cb_mutex);
-			io_cb_read_soc((char *)buf, (size_t)ret,  cx->obj);
-			PT_UL(&io_cb_mutex);
-		}
+		ret = mbedtls_net_recv(&(cx->net_ctx), buf, sizeof(buf));
+	}
+
+	if (ret > 0) {
+		IO_CB(io_cb_read_soc((char *)buf, (size_t)ret,  cx->obj));
 	}
 
 	return ret;
@@ -633,10 +609,8 @@ io_fatal(const char *f, int errnum)
 static void
 io_sig_handle(int sig)
 {
-	if (sig == SIGWINCH) {
+	if (sig == SIGWINCH)
 		flag_sigwinch_cb = 1;
-		flag_tty_resized = 0;
-	}
 }
 
 static void
@@ -676,6 +650,8 @@ io_tty_init(void)
 
 	if (atexit(io_tty_term))
 		fatal("atexit");
+
+	io_tty_winsize();
 }
 
 static void
@@ -716,10 +692,10 @@ io_net_connect(struct connection *cx)
 			return -1;
 
 		if (ret == EAI_SYSTEM) {
-			io_cb_err(cx, " .. Failed to resolve host: %s",
+			io_error(cx, " .. Failed to resolve host: %s",
 				io_strerror(buf, sizeof(buf)));
 		} else {
-			io_cb_err(cx, " .. Failed to resolve host: %s",
+			io_error(cx, " .. Failed to resolve host: %s",
 				gai_strerror(ret));
 		}
 
@@ -742,13 +718,13 @@ io_net_connect(struct connection *cx)
 			goto err;
 	}
 
-	if (!p && soc < -1) {
-		io_cb_err(cx, " .. Failed to obtain socket: %s", io_strerror(buf, sizeof(buf)));
+	if (!p && soc < 0) {
+		io_error(cx, " .. Failed to obtain socket: %s", io_strerror(buf, sizeof(buf)));
 		goto err;
 	}
 
 	if (!p && soc >= 0) {
-		io_cb_err(cx, " .. Failed to connect: %s", io_strerror(buf, sizeof(buf)));
+		io_error(cx, " .. Failed to connect: %s", io_strerror(buf, sizeof(buf)));
 		goto err;
 	}
 
@@ -758,14 +734,14 @@ io_net_connect(struct connection *cx)
 		addr = &(((struct sockaddr_in6*)p->ai_addr)->sin6_addr);
 
 	if (inet_ntop(p->ai_family, addr, buf, sizeof(buf)))
-		io_cb_info(cx, " .. Connected [%s]", buf);
+		io_info(cx, " .. Connected [%s]", buf);
 
 	ret = soc;
 
 err:
 	freeaddrinfo(res);
 
-	return ret;
+	return (cx->net_ctx.fd = ret);
 }
 
 static void
@@ -793,20 +769,17 @@ io_tls_establish(struct connection *cx)
 {
 	int ret;
 
-	io_cb_info(cx, " .. Establishing TLS connection");
+	io_info(cx, " .. Establishing TLS connection");
 
-	mbedtls_net_init(&(cx->tls_fd));
 	mbedtls_ssl_init(&(cx->tls_ctx));
 	mbedtls_ssl_config_init(&(cx->tls_conf));
-
-	cx->tls_fd.fd = cx->soc;
 
 	if ((ret = mbedtls_ssl_config_defaults(
 			&(cx->tls_conf),
 			MBEDTLS_SSL_IS_CLIENT,
 			MBEDTLS_SSL_TRANSPORT_STREAM,
 			MBEDTLS_SSL_PRESET_DEFAULT))) {
-		io_cb_err(cx, " .. %s ", io_tls_err(ret));
+		io_error(cx, " .. %s ", io_tls_err(ret));
 		goto err;
 	}
 
@@ -834,27 +807,27 @@ io_tls_establish(struct connection *cx)
 			mbedtls_ssl_conf_authmode(&(cx->tls_conf), MBEDTLS_SSL_VERIFY_REQUIRED);
 	}
 
-	if ((ret = mbedtls_net_set_block(&(cx->tls_fd)))) {
-		io_cb_err(cx, " .. %s ", io_tls_err(ret));
+	if ((ret = mbedtls_net_set_block(&(cx->net_ctx)))) {
+		io_error(cx, " .. %s ", io_tls_err(ret));
 		goto err;
 	}
 
 	if ((ret = mbedtls_ssl_setup(&(cx->tls_ctx), &(cx->tls_conf)))) {
-		io_cb_err(cx, " .. %s ", io_tls_err(ret));
+		io_error(cx, " .. %s ", io_tls_err(ret));
 		goto err;
 	}
 
 	if ((ret = mbedtls_ssl_set_hostname(&(cx->tls_ctx), cx->host))) {
-		io_cb_err(cx, " .. %s ", io_tls_err(ret));
+		io_error(cx, " .. %s ", io_tls_err(ret));
 		goto err;
 	}
 
 	mbedtls_ssl_set_bio(
 		&(cx->tls_ctx),
-		&(cx->tls_fd),
+		&(cx->net_ctx),
 		mbedtls_net_send,
-		NULL,
-		mbedtls_net_recv_timeout);
+		mbedtls_net_recv,
+		NULL);
 
 	while ((ret = mbedtls_ssl_handshake(&(cx->tls_ctx)))) {
 		if (ret != MBEDTLS_ERR_SSL_WANT_READ
@@ -863,31 +836,31 @@ io_tls_establish(struct connection *cx)
 	}
 
 	if (ret && cx->flags & IO_TLS_VRFY_DISABLED) {
-		io_cb_err(cx, " .. %s ", io_tls_err(ret));
+		io_error(cx, " .. %s ", io_tls_err(ret));
 		goto err;
 	}
 
 	if (io_tls_x509_vrfy(cx) < 0)
-		io_cb_err(cx, " .... Unknown x509 error");
+		io_error(cx, " .... Unknown x509 error");
 
 	if (ret) {
-		io_cb_err(cx, " .. %s ", io_tls_err(ret));
+		io_error(cx, " .. %s ", io_tls_err(ret));
 		goto err;
 	}
 
-	io_cb_info(cx, " .. TLS connection established");
-	io_cb_info(cx, " ..   - version:     %s", mbedtls_ssl_get_version(&(cx->tls_ctx)));
-	io_cb_info(cx, " ..   - ciphersuite: %s", mbedtls_ssl_get_ciphersuite(&(cx->tls_ctx)));
+	io_info(cx, " .. TLS connection established");
+	io_info(cx, " ..   - version:     %s", mbedtls_ssl_get_version(&(cx->tls_ctx)));
+	io_info(cx, " ..   - ciphersuite: %s", mbedtls_ssl_get_ciphersuite(&(cx->tls_ctx)));
 
 	return 0;
 
 err:
 
-	io_cb_err(cx, " .. TLS connection failure");
+	io_error(cx, " .. TLS connection failure");
 
 	mbedtls_ssl_config_free(&(cx->tls_conf));
 	mbedtls_ssl_free(&(cx->tls_ctx));
-	mbedtls_net_free(&(cx->tls_fd));
+	mbedtls_net_free(&(cx->net_ctx));
 
 	return -1;
 }
@@ -914,7 +887,7 @@ io_tls_x509_vrfy(struct connection *cx)
 		if ((p = strchr(buf, '\n')))
 			*p++ = 0;
 
-		io_cb_err(cx, " .... %s", s);
+		io_error(cx, " .... %s", s);
 
 	} while ((s = p));
 

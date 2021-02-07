@@ -179,7 +179,8 @@ static void
 test_irc_message_split(void)
 {
 	char *param;
-	char *trailing;
+	const char *params;
+	const char *trailing;
 	struct irc_message m;
 
 #define CHECK_IRC_MESSAGE_PARAM(R, S) \
@@ -190,8 +191,8 @@ test_irc_message_split(void)
 	assert_eq(irc_message_parse(&m, (M)), (R));
 
 #define CHECK_IRC_MESSAGE_SPLIT(R, P, T) \
-	assert_eq(irc_message_split(&m, &trailing), (R)); \
-	assert_strcmp(m.params, (P)); \
+	assert_eq(irc_message_split(&m, &params, &trailing), (R)); \
+	assert_strcmp(params,   (P)); \
 	assert_strcmp(trailing, (T));
 
 	/* Test empty params */
@@ -354,39 +355,56 @@ test_irc_pinged(void)
 {
 	/* Test detecting user's nick in message */
 
-	const char *nick = "testnick";
+	const char *nick;
 
-	/* Test message contains nick */
-	const char *mesg1 = "testing testnick testing";
-	assert_eq(irc_pinged(CASEMAPPING_RFC1459, mesg1, nick), 1);
+#define CHECK_IRC_PINGED(M, R) \
+	assert_eq(irc_pinged(CASEMAPPING_RFC1459, (M), nick), (R));
 
-	/* Test common way of addressing messages to nicks */
-	const char *mesg2 = "testnick: testing";
-	assert_eq(irc_pinged(CASEMAPPING_RFC1459, mesg2, nick), 1);
+	nick = "nick";
 
-	/* Test non-nick char prefix */
-	const char *mesg3 = "testing !@#testnick testing";
-	assert_eq(irc_pinged(CASEMAPPING_RFC1459, mesg3, nick), 1);
+	CHECK_IRC_PINGED("nick", 1);
+	CHECK_IRC_PINGED("nick ", 1);
+	CHECK_IRC_PINGED("nick:", 1);
+	CHECK_IRC_PINGED("nick: ", 1);
+	CHECK_IRC_PINGED(" nick", 1);
+	CHECK_IRC_PINGED(" nick ", 1);
+	CHECK_IRC_PINGED(" nick:", 1);
+	CHECK_IRC_PINGED(" nick: ", 1);
+	CHECK_IRC_PINGED("xxx 'nick'! ", 1);
+	CHECK_IRC_PINGED("xxx @nick?! xxx", 1);
+	CHECK_IRC_PINGED("xxx @NICK?! xxx", 1);
 
-	/* Test non-nick char suffix */
-	const char *mesg4 = "testing testnick!@#$ testing";
-	assert_eq(irc_pinged(CASEMAPPING_RFC1459, mesg4, nick), 1);
+	CHECK_IRC_PINGED("", 0);
+	CHECK_IRC_PINGED(" ", 0);
+	CHECK_IRC_PINGED("xxx", 0);
+	CHECK_IRC_PINGED("xnick", 0);
+	CHECK_IRC_PINGED("xnick:", 0);
+	CHECK_IRC_PINGED("xnick: ", 0);
+	CHECK_IRC_PINGED(" xnick", 0);
+	CHECK_IRC_PINGED(" xnick:", 0);
 
-	/* Test non-nick char prefix and suffix */
-	const char *mesg5 = "testing !testnick! testing";
-	assert_eq(irc_pinged(CASEMAPPING_RFC1459, mesg5, nick), 1);
+	/* Test server assigns a non standard nick */
+	nick = "000nick";
 
-	/* Test case insensitive nick detection */
-	const char *mesg6 = "testing TeStNiCk testing";
-	assert_eq(irc_pinged(CASEMAPPING_RFC1459, mesg6, nick), 1);
+	CHECK_IRC_PINGED("000nick", 1);
+	CHECK_IRC_PINGED("000nick ", 1);
+	CHECK_IRC_PINGED("000nick:", 1);
+	CHECK_IRC_PINGED("000nick: ", 1);
+	CHECK_IRC_PINGED(" 000nick", 1);
+	CHECK_IRC_PINGED(" 000nick ", 1);
+	CHECK_IRC_PINGED(" 000nick:", 1);
+	CHECK_IRC_PINGED(" 000nick: ", 1);
+	CHECK_IRC_PINGED("xxx '000nick'! ", 1);
+	CHECK_IRC_PINGED("xxx @000nick?! xxx", 1);
+	CHECK_IRC_PINGED("xxx @000NICK?! xxx", 1);
 
-	/* Error: message doesn't contain nick */
-	const char *mesg7 = "testing testing";
-	assert_eq(irc_pinged(CASEMAPPING_RFC1459, mesg7, nick), 0);
+	CHECK_IRC_PINGED("x000nick", 0);
+	CHECK_IRC_PINGED("x000nick:", 0);
+	CHECK_IRC_PINGED("x000nick: ", 0);
+	CHECK_IRC_PINGED(" x000nick", 0);
+	CHECK_IRC_PINGED(" x000nick:", 0);
 
-	/* Error: message contains nick prefix */
-	const char *mesg8 = "testing testnickshouldfail testing";
-	assert_eq(irc_pinged(CASEMAPPING_RFC1459, mesg8, nick), 0);
+#undef CHECK_IRC_PINGED
 }
 
 static void
@@ -450,7 +468,7 @@ test_irc_toupper(void)
 }
 
 static void
-test_strsep(void)
+test_irc_strsep(void)
 {
 	char *p;
 
@@ -458,145 +476,145 @@ test_strsep(void)
 	char mesg2[] = " ";
 	char mesg3[] = "  ";
 
-	assert_ptr_null(strsep(NULL));
+	assert_ptr_null(irc_strsep(NULL));
 
 	p = mesg1;
-	assert_ptr_null(strsep(&p));
+	assert_ptr_null(irc_strsep(&p));
 
 	p = mesg2;
-	assert_ptr_null(strsep(&p));
+	assert_ptr_null(irc_strsep(&p));
 
 	p = mesg3;
-	assert_ptr_null(strsep(&p));
+	assert_ptr_null(irc_strsep(&p));
 
 	char mesg4[] = "test1";
 	p = mesg4;
-	assert_strcmp(strsep(&p), "test1");
-	assert_ptr_null(strsep(&p));
+	assert_strcmp(irc_strsep(&p), "test1");
+	assert_ptr_null(irc_strsep(&p));
 
 	char mesg5[] = "test2 test3";
 	p = mesg5;
-	assert_strcmp(strsep(&p), "test2");
-	assert_strcmp(strsep(&p), "test3");
-	assert_ptr_null(strsep(&p));
+	assert_strcmp(irc_strsep(&p), "test2");
+	assert_strcmp(irc_strsep(&p), "test3");
+	assert_ptr_null(irc_strsep(&p));
 
 	char mesg6[] = "  test4   test5  test6   ";
 	p = mesg6;
-	assert_strcmp(strsep(&p), "test4");
-	assert_strcmp(strsep(&p), "test5");
-	assert_strcmp(strsep(&p), "test6");
-	assert_ptr_null(strsep(&p));
+	assert_strcmp(irc_strsep(&p), "test4");
+	assert_strcmp(irc_strsep(&p), "test5");
+	assert_strcmp(irc_strsep(&p), "test6");
+	assert_ptr_null(irc_strsep(&p));
 }
 
 static void
-test_strtrim(void)
+test_irc_strtrim(void)
 {
 	/* Test skipping space at the begging of a string pointer
 	 * and returning 0 when no non-space character is found */
 
 	char *mesg1 = "testing";
-	assert_ptr_eq(strtrim(&mesg1), mesg1);
+	assert_ptr_eq(irc_strtrim(&mesg1), mesg1);
 	assert_strcmp(mesg1, "testing");
 
 	char *mesg2 = " testing ";
-	assert_ptr_eq(strtrim(&mesg2), mesg2);
+	assert_ptr_eq(irc_strtrim(&mesg2), mesg2);
 	assert_strcmp(mesg2, "testing ");
 
 	char *mesg3 = "";
-	assert_ptr_null(strtrim(&mesg3));
+	assert_ptr_null(irc_strtrim(&mesg3));
 	assert_strcmp(mesg3, "");
 
 	char *mesg4 = " ";
-	assert_ptr_null(strtrim(&mesg4));
+	assert_ptr_null(irc_strtrim(&mesg4));
 	assert_strcmp(mesg4, "");
 }
 
 static void
-test_word_wrap(void)
+test_irc_strwrap(void)
 {
 	char *ret, *seg1, *seg2, *end, str[256] = {0};
 
-#define CHECK_WORD_WRAP(S, SS, L1, L2)  \
+#define CHECK_IRC_STRWRAP(S, SS, L1, L2)  \
 	strncpy(str, (S), sizeof(str) - 1); \
 	end = str + strlen(str); \
 	seg1 = seg2 = str; \
-	ret = word_wrap(strlen(SS), &seg2, end); \
+	ret = irc_strwrap(strlen(SS), &seg2, end); \
 	*ret = 0; \
 	assert_strcmp(seg1, (L1)); \
 	assert_strcmp(seg2, (L2));
 
 	/* Test fits */
-	CHECK_WORD_WRAP(
+	CHECK_IRC_STRWRAP(
 		"test1 test2 test3",
 		"test1 test2 test3",
 		"test1 test2 test3",
 		"");
 
-	CHECK_WORD_WRAP(
+	CHECK_IRC_STRWRAP(
 		"test1 test2 test3",
 		"test1 test2 test3xxxxx",
 		"test1 test2 test3",
 		"");
 
 	/* Test wrap on word */
-	CHECK_WORD_WRAP(
+	CHECK_IRC_STRWRAP(
 		"test1 test2 test3",
 		"test1 t",
 		"test1",
 		"test2 test3");
 
-	CHECK_WORD_WRAP(
+	CHECK_IRC_STRWRAP(
 		"test1 test2 test3",
 		"test1 test",
 		"test1",
 		"test2 test3");
 
-	CHECK_WORD_WRAP(
+	CHECK_IRC_STRWRAP(
 		"test1 test2 test3",
 		"test1 test2",
 		"test1 test2",
 		"test3");
 
 	/* Test wrap on whitespace */
-	CHECK_WORD_WRAP(
+	CHECK_IRC_STRWRAP(
 		"test1 test2 test3",
 		"test1 test2 ",
 		"test1 test2",
 		"test3");
 
-	CHECK_WORD_WRAP(
+	CHECK_IRC_STRWRAP(
 		"test1 test2   test3",
 		"test1 test2",
 		"test1 test2",
 		"test3");
 
-	CHECK_WORD_WRAP(
+	CHECK_IRC_STRWRAP(
 		"test1 test2   test3",
 		"test1 test2 ",
 		"test1 test2",
 		"test3");
 
-	CHECK_WORD_WRAP(
+	CHECK_IRC_STRWRAP(
 		"test1 test2   test3",
 		"test1 test2   ",
 		"test1 test2",
 		"test3");
 
 	/* Test edge case: single space */
-	CHECK_WORD_WRAP(
+	CHECK_IRC_STRWRAP(
 		" ",
 		"   ",
 		" ",
 		"");
 
 	/* Test edge case: empty string*/
-	CHECK_WORD_WRAP(
+	CHECK_IRC_STRWRAP(
 		"",
 		"   ",
 		"",
 		"");
 
-#undef CHECK_WORD_WRAP
+#undef CHECK_IRC_STRWRAP
 
 	if (seg1 != seg2 || seg2 != end)
 		test_fail("seg1 should be advanced to end of string");
@@ -607,7 +625,7 @@ test_word_wrap(void)
 
 	end = m1 + strlen(m1);
 	seg1 = seg2 = m1;
-	ret = word_wrap(strlen(m2), &seg2, end);
+	ret = irc_strwrap(strlen(m2), &seg2, end);
 	*ret = '!';
 	assert_strcmp(seg1, "test1!est2 test3");
 	assert_strcmp(seg2, "!est2 test3");
@@ -618,7 +636,7 @@ test_word_wrap(void)
 
 	end = m3 + strlen(m3);
 	seg1 = seg2 = m3;
-	ret = word_wrap(strlen(m4), &seg2, end);
+	ret = irc_strwrap(strlen(m4), &seg2, end);
 	*ret = '!';
 	assert_strcmp(seg1, " te!ting");
 	assert_strcmp(seg2, "!ting");
@@ -634,10 +652,10 @@ main(void)
 		TESTCASE(test_irc_pinged),
 		TESTCASE(test_irc_strcmp),
 		TESTCASE(test_irc_strncmp),
-		TESTCASE(test_irc_toupper),
-		TESTCASE(test_strsep),
-		TESTCASE(test_strtrim),
-		TESTCASE(test_word_wrap)
+		TESTCASE(test_irc_strsep),
+		TESTCASE(test_irc_strtrim),
+		TESTCASE(test_irc_strwrap),
+		TESTCASE(test_irc_toupper)
 	};
 
 	return run_tests(tests);

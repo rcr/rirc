@@ -1,5 +1,5 @@
-#ifndef SERVER_H
-#define SERVER_H
+#ifndef RIRC_COMPONENTS_SERVER_H
+#define RIRC_COMPONENTS_SERVER_H
 
 #include "src/components/buffer.h"
 #include "src/components/channel.h"
@@ -17,7 +17,7 @@ struct server
 	const char *username;
 	const char *realname;
 	const char *nick;
-	enum casemapping_t casemapping;
+	enum casemapping casemapping;
 	struct {
 		size_t next;
 		size_t size;
@@ -26,7 +26,6 @@ struct server
 	} nicks;
 	struct channel *channel;
 	struct channel_list clist;
-	struct channel_list ulist; // TODO: seperate privmsg
 	struct ircv3_caps ircv3_caps;
 	struct mode usermodes;
 	struct mode_str mode_str;
@@ -35,7 +34,8 @@ struct server
 	struct server *prev;
 	struct user_list ignore;
 	unsigned ping;
-	unsigned quitting : 1;
+	unsigned connected  : 1;
+	unsigned quitting   : 1;
 	unsigned registered : 1;
 	void *connection;
 	// TODO: move this to utils

@@ -182,17 +182,17 @@ test_avl_add(void)
 	assert_ptr_null(t6.node.tree_right);
 
 	/* Retrieve the nodes */
-	assert_ptr_eq(test_tree_AVL_GET(&tl, &t0, 0), &t0);
-	assert_ptr_eq(test_tree_AVL_GET(&tl, &t1, 0), &t1);
-	assert_ptr_eq(test_tree_AVL_GET(&tl, &t2, 0), &t2);
-	assert_ptr_eq(test_tree_AVL_GET(&tl, &t3, 0), &t3);
-	assert_ptr_eq(test_tree_AVL_GET(&tl, &t4, 0), &t4);
-	assert_ptr_eq(test_tree_AVL_GET(&tl, &t5, 0), &t5);
-	assert_ptr_eq(test_tree_AVL_GET(&tl, &t6, 0), &t6);
+	assert_ptr_eq(test_tree_AVL_GET(&tl, &t0, 0, 0), &t0);
+	assert_ptr_eq(test_tree_AVL_GET(&tl, &t1, 0, 0), &t1);
+	assert_ptr_eq(test_tree_AVL_GET(&tl, &t2, 0, 0), &t2);
+	assert_ptr_eq(test_tree_AVL_GET(&tl, &t3, 0, 0), &t3);
+	assert_ptr_eq(test_tree_AVL_GET(&tl, &t4, 0, 0), &t4);
+	assert_ptr_eq(test_tree_AVL_GET(&tl, &t5, 0, 0), &t5);
+	assert_ptr_eq(test_tree_AVL_GET(&tl, &t6, 0, 0), &t6);
 
 	struct test_node t7 = { .val = -1 };
 
-	assert_ptr_null(test_tree_AVL_GET(&tl, &t7, 0));
+	assert_ptr_null(test_tree_AVL_GET(&tl, &t7, 0, 0));
 }
 
 static void
@@ -386,8 +386,8 @@ test_avl_get_n(void)
 	assert_ptr_eq(test_tree_AVL_ADD(&tl, &t1, 0), &t1);
 	assert_ptr_eq(test_tree_AVL_ADD(&tl, &t2, 0), &t2);
 
-	assert_ptr_eq(test_tree_AVL_NGET(&tl, &t3, 0,  2), &t1);
-	assert_ptr_eq(test_tree_AVL_NGET(&tl, &t3, 0, -3), &t2);
+	assert_ptr_eq(test_tree_AVL_GET(&tl, &t3, 0,  2), &t1);
+	assert_ptr_eq(test_tree_AVL_GET(&tl, &t3, 0, -3), &t2);
 }
 
 static void

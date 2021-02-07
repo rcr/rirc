@@ -102,18 +102,34 @@ test_user_list_casemapping(void)
 	memset(&ulist, 0, sizeof(ulist));
 
 	assert_eq(user_list_add(&ulist, CASEMAPPING_RFC1459, "aaa", MODE_EMPTY), USER_ERR_NONE);
-	assert_eq(user_list_add(&ulist, CASEMAPPING_RFC1459, "aAa", MODE_EMPTY), USER_ERR_DUPLICATE);
+	assert_eq(user_list_add(&ulist, CASEMAPPING_RFC1459, "AaA", MODE_EMPTY), USER_ERR_DUPLICATE);
+	assert_eq(user_list_add(&ulist, CASEMAPPING_RFC1459, "{}^", MODE_EMPTY), USER_ERR_NONE);
+	assert_eq(user_list_add(&ulist, CASEMAPPING_RFC1459, "[}~", MODE_EMPTY), USER_ERR_DUPLICATE);
+	assert_eq(user_list_add(&ulist, CASEMAPPING_RFC1459, "zzz", MODE_EMPTY), USER_ERR_NONE);
 
-	if ((u = user_list_get(&ulist, CASEMAPPING_RFC1459, "a", 1)) == NULL)
+	assert_eq(ulist.count, 3);
+
+	if ((u = user_list_get(&ulist, CASEMAPPING_RFC1459, "AAA", 0)) == NULL)
 		test_abort("Failed to retrieve u");
 
-	assert_ptr_eq(user_list_get(&ulist, CASEMAPPING_RFC1459, "Aaa", 0), u);
-	assert_ptr_eq(user_list_get(&ulist, CASEMAPPING_RFC1459, "A", 1), u);
+	assert_ptr_eq(user_list_get(&ulist, CASEMAPPING_RFC1459, "aAa", 3), u);
+	assert_ptr_eq(user_list_get(&ulist, CASEMAPPING_RFC1459, "A",   1), u);
 
-	assert_eq(user_list_rpl(&ulist, CASEMAPPING_RFC1459, "aaa", "aAa"), USER_ERR_DUPLICATE);
-	assert_eq(user_list_rpl(&ulist, CASEMAPPING_RFC1459, "aAa", "zzz"), USER_ERR_NONE);
+	assert_eq(user_list_rpl(&ulist, CASEMAPPING_RFC1459, "AaA", "bbb"), USER_ERR_NONE);
+	assert_eq(user_list_del(&ulist, CASEMAPPING_RFC1459, "aaa"),        USER_ERR_NOT_FOUND);
+	assert_eq(user_list_del(&ulist, CASEMAPPING_RFC1459, "BBB"),        USER_ERR_NONE);
 
-	assert_eq(user_list_del(&ulist, CASEMAPPING_RFC1459, "ZZZ"), USER_ERR_NONE);
+	assert_eq(ulist.count, 2);
+
+	assert_eq(user_list_rpl(&ulist, CASEMAPPING_RFC1459, "{}^", "[}~"), USER_ERR_NONE);
+	assert_eq(user_list_rpl(&ulist, CASEMAPPING_RFC1459, "zzz", "ZzZ"), USER_ERR_NONE);
+
+	assert_eq(ulist.count, 2);
+
+	assert_ptr_not_null(user_list_get(&ulist, CASEMAPPING_RFC1459, "zZz", 0));
+	assert_ptr_not_null(user_list_get(&ulist, CASEMAPPING_RFC1459, "{]^", 0));
+
+	user_list_free(&ulist);
 }
 
 static void

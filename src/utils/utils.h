@@ -1,14 +1,11 @@
-#ifndef UTILS_H
-#define UTILS_H
+#ifndef RIRC_UTILS_UTILS_H
+#define RIRC_UTILS_UTILS_H
 
 #include <stdio.h>
 #include <stdlib.h>
 
 #define MAX(A, B) ((A) > (B) ? (A) : (B))
 #define MIN(A, B) ((A) > (B) ? (B) : (A))
-
-#define ELEMS(X) (sizeof((X)) / sizeof((X)[0]))
-#define ARR_ELEM(A, E) ((E) >= 0 && (size_t)(E) < ELEMS((A)))
 
 #define SEC_IN_MS(X) ((X) * 1000)
 #define SEC_IN_US(X) ((X) * 1000 * 1000)
@@ -44,7 +41,7 @@
 	do { MESSAGE("FATAL", __VA_ARGS__); } while (0)
 #endif
 
-enum casemapping_t
+enum casemapping
 {
 	CASEMAPPING_INVALID,
 	CASEMAPPING_ASCII,
@@ -66,21 +63,16 @@ struct irc_message
 };
 
 int irc_ischan(const char*);
-int irc_ischanchar(char, int);
 int irc_isnick(const char*);
-int irc_isnickchar(char, int);
-int irc_pinged(enum casemapping_t, const char*, const char*);
-int irc_strcmp(enum casemapping_t, const char*, const char*);
-int irc_strncmp(enum casemapping_t, const char*, const char*, size_t);
+int irc_pinged(enum casemapping, const char*, const char*);
+int irc_strcmp(enum casemapping, const char*, const char*);
+int irc_strncmp(enum casemapping, const char*, const char*, size_t);
+char* irc_strsep(char**);
+char* irc_strtrim(char**);
+char* irc_strwrap(unsigned, char**, char*);
 
 int irc_message_param(struct irc_message*, char**);
 int irc_message_parse(struct irc_message*, char*);
-int irc_message_split(struct irc_message*, char**);
-
-char* strdup(const char*);
-char* strsep(char**);
-char* strtrim(char**);
-char* word_wrap(int, char**, char*);
-void* memdup(const void*, size_t);
+int irc_message_split(struct irc_message*, const char**, const char**);
 
 #endif
