@@ -18,8 +18,8 @@ fi
 
 DIR="$1"
 
-COVERITY_OUT="$DIR/cov-int"
-COVERITY_TAR="$DIR/cov-int.tgz"
+COVERITY_OUT="cov-int"
+COVERITY_TAR="cov-int.tgz"
 
 VERSION=$(git rev-parse --short HEAD)
 
@@ -38,3 +38,6 @@ curl https://scan.coverity.com/builds?project=rcr%2Frirc \
 	--form file=@"$COVERITY_TAR" \
 	--form token="$COVERITY_TOKEN" \
 	--form version="$VERSION"
+
+mv $COVERITY_OUT "$DIR"
+mv $COVERITY_TAR "$DIR"
