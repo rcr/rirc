@@ -14,7 +14,7 @@ SONAR_VER="4.6.0.2311"
 
 SONAR_CONFIG="$DIR/sonar-project.properties"
 
-SONAR_SCANNER_BIN="$DIR/sonar-scanner-$SONAR_VERSION-linux/bin/sonar-scanner"
+SONAR_SCANNER_BIN="$DIR/sonar-scanner-$SONAR_VER-linux/bin/sonar-scanner"
 BUILD_WRAPPER_BIN="$DIR/build-wrapper-linux-x86/build-wrapper-linux-x86-64"
 BUILD_WRAPPER_OUT="$DIR/bw-out"
 
@@ -44,7 +44,7 @@ sonar.links.ci       = https://builds.sr.ht/~rcr/rirc/
 sonar.cfamily.build-wrapper-output = $BUILD_WRAPPER_OUT
 sonar.cfamily.cache.enabled        = false
 sonar.cfamily.threads              = $(nproc)
-sonar.sources                      = src,test
+sonar.sources                      = src
 
 # Output
 sonar.working.directory = $DIR/scannerwork
