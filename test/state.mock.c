@@ -19,7 +19,7 @@ mock_reset_state(void)
 }
 
 void
-newlinef(struct channel *c, enum buffer_line_t t, const char *f, const char *fmt, ...)
+newlinef(struct channel *c, enum buffer_line_type t, const char *f, const char *fmt, ...)
 {
 	va_list ap;
 	int r1;
@@ -43,7 +43,7 @@ newlinef(struct channel *c, enum buffer_line_t t, const char *f, const char *fmt
 }
 
 void
-newline(struct channel *c, enum buffer_line_t t, const char *f, const char *fmt)
+newline(struct channel *c, enum buffer_line_type t, const char *f, const char *fmt)
 {
 	int r1;
 	int r2;

@@ -27,7 +27,7 @@
 struct ircv3_cap
 {
 	unsigned req          : 1; /* cap REQ sent */
-	unsigned req_auto     : 1; /* cap REQ sent during registration */
+	unsigned req_auto     : 1; /* cap REQ sent automatically */
 	unsigned set          : 1; /* cap is unset/set */
 	unsigned supported    : 1; /* cap is supported by server */
 	unsigned supports_del : 1; /* cap supports CAP DEL */

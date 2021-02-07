@@ -1,9 +1,9 @@
 #include "src/handlers/ircv3.h"
 
-#include <string.h>
-
 #include "src/io.h"
 #include "src/state.h"
+
+#include <string.h>
 
 #define failf(S, ...) \
 	do { server_error((S), __VA_ARGS__); \
@@ -30,6 +30,7 @@ IRCV3_RECV_HANDLERS
 #undef X
 
 static int ircv3_cap_req_count(struct ircv3_caps*);
+static int ircv3_cap_req_send(struct ircv3_caps*, struct server*);
 
 int
 ircv3_recv_CAP(struct server *s, struct irc_message *m)
@@ -93,27 +94,26 @@ ircv3_recv_cap_LS(struct server *s, struct irc_message *m)
 		return 0;
 	}
 
-	while ((cap = strsep(&(caps)))) {
+	while ((cap = irc_strsep(&(caps)))) {
 
 		struct ircv3_cap *c;
 
-		if ((c = ircv3_cap_get(&(s->ircv3_caps), cap)))
-			c->supported = 1;
+		if (!(c = ircv3_cap_get(&(s->ircv3_caps), cap)))
+			continue;
+
+		c->supported = 1;
+
+		if (c->req_auto)
+			c->req = 1;
 	}
 
 	if (multiline)
 		return 0;
 
-	#define X(CAP, VAR, ATTRS)     \
-	if (s->ircv3_caps.VAR.supported && s->ircv3_caps.VAR.req_auto) { \
-		s->ircv3_caps.VAR.req = 1; \
-		sendf(s, "CAP REQ :" CAP); \
-	}
-	IRCV3_CAPS
-	#undef X
+	if (ircv3_cap_req_count(&(s->ircv3_caps)))
+		return ircv3_cap_req_send(&(s->ircv3_caps), s);
 
-	if (!ircv3_cap_req_count(&(s->ircv3_caps)))
-		sendf(s, "CAP END");
+	sendf(s, "CAP END");
 
 	return 0;
 }
@@ -180,7 +180,7 @@ ircv3_recv_cap_ACK(struct server *s, struct irc_message *m)
 	if (!irc_message_param(m, &caps))
 		failf(s, "CAP ACK: parameter is null");
 
-	if (!(cap = strsep(&(caps))))
+	if (!(cap = irc_strsep(&(caps))))
 		failf(s, "CAP ACK: parameter is empty");
 
 	do {
@@ -219,7 +219,7 @@ ircv3_recv_cap_ACK(struct server *s, struct irc_message *m)
 
 		server_info(s, "capability change accepted: %s%s", (unset ? "-" : ""), cap);
 
-	} while ((cap = strsep(&(caps))));
+	} while ((cap = irc_strsep(&(caps))));
 
 	if (errors)
 		failf(s, "CAP ACK: parameter errors");
@@ -245,7 +245,7 @@ ircv3_recv_cap_NAK(struct server *s, struct irc_message *m)
 	if (!irc_message_param(m, &caps))
 		failf(s, "CAP NAK: parameter is null");
 
-	if (!(cap = strsep(&(caps))))
+	if (!(cap = irc_strsep(&(caps))))
 		failf(s, "CAP NAK: parameter is empty");
 
 	do {
@@ -256,7 +256,7 @@ ircv3_recv_cap_NAK(struct server *s, struct irc_message *m)
 
 		server_info(s, "capability change rejected: %s", cap);
 
-	} while ((cap = strsep(&(caps))));
+	} while ((cap = irc_strsep(&(caps))));
 
 	if (!s->registered && !ircv3_cap_req_count(&(s->ircv3_caps)))
 		sendf(s, "CAP END");
@@ -282,7 +282,7 @@ ircv3_recv_cap_DEL(struct server *s, struct irc_message *m)
 	if (!irc_message_param(m, &caps))
 		failf(s, "CAP DEL: parameter is null");
 
-	if (!(cap = strsep(&(caps))))
+	if (!(cap = irc_strsep(&(caps))))
 		failf(s, "CAP DEL: parameter is empty");
 
 	do {
@@ -300,7 +300,7 @@ ircv3_recv_cap_DEL(struct server *s, struct irc_message *m)
 
 		server_info(s, "capability lost: %s", cap);
 
-	} while ((cap = strsep(&(caps))));
+	} while ((cap = irc_strsep(&(caps))));
 
 	return 0;
 }
@@ -317,29 +317,34 @@ ircv3_recv_cap_NEW(struct server *s, struct irc_message *m)
 
 	char *cap;
 	char *caps;
+	struct ircv3_caps batch_reqs = {0};
 
 	if (!irc_message_param(m, &caps))
 		failf(s, "CAP NEW: parameter is null");
 
-	if (!(cap = strsep(&(caps))))
+	if (!(cap = irc_strsep(&(caps))))
 		failf(s, "CAP NEW: parameter is empty");
 
 	do {
-		struct ircv3_cap *c;
+		struct ircv3_cap *c1 = ircv3_cap_get(&(s->ircv3_caps), cap);
+		struct ircv3_cap *c2 = ircv3_cap_get(&batch_reqs, cap);
 
-		if (!(c = ircv3_cap_get(&(s->ircv3_caps), cap)))
+		if (!c1 || !c2)
 			continue;
 
-		c->supported = 1;
+		c1->supported = 1;
 
-		if (!c->set && !c->req && c->req_auto) {
-			c->req = 1;
-			sendf(s, "CAP REQ :%s", cap);
+		if (c1->set || c1->req || !c1->req_auto) {
+			server_info(s, "new capability: %s", cap);
+		} else {
+			c1->req = 1;
+			c2->req = 1;
+			server_info(s, "new capability: %s (auto-req)", cap);
 		}
+	} while ((cap = irc_strsep(&(caps))));
 
-		server_info(s, "new capability: %s", cap);
-
-	} while ((cap = strsep(&(caps))));
+	if (ircv3_cap_req_count(&batch_reqs))
+		return ircv3_cap_req_send(&batch_reqs, s);
 
 	return 0;
 }
@@ -347,11 +352,33 @@ ircv3_recv_cap_NEW(struct server *s, struct irc_message *m)
 static int
 ircv3_cap_req_count(struct ircv3_caps *caps)
 {
-	int ret = 0;
+	#define X(CAP, VAR, ATTRS) + !!caps->VAR.req
+	return 0 IRCV3_CAPS;
+	#undef X
+}
+
+static int
+ircv3_cap_req_send(struct ircv3_caps *caps, struct server *s)
+{
+	int mid = 0;
+	int ret;
+
 	#define X(CAP, VAR, ATTRS) \
-	if (caps->VAR.req) \
-		ret++;
+	const char *sep_##VAR = (caps->VAR.req && mid++ ? " " : ""); \
+	const char *str_##VAR = (caps->VAR.req          ? CAP : "");
 	IRCV3_CAPS
 	#undef X
-	return ret;
+
+	if ((ret = io_sendf(s->connection, "CAP REQ :"
+		#define X(CAP, VAR, ATTRS) "%s%s"
+		IRCV3_CAPS
+		#undef X
+		#define X(CAP, VAR, ATTRS) ,sep_##VAR,str_##VAR
+		IRCV3_CAPS
+		#undef X
+	))) {
+		failf(s, "Send fail: %s", io_err(ret));
+	}
+
+	return 0;
 }

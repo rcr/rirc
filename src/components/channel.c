@@ -1,13 +1,13 @@
 #include "src/components/channel.h"
 
+#include "src/utils/utils.h"
+
 #include <errno.h>
 #include <stdlib.h>
 #include <string.h>
 
-#include "src/utils/utils.h"
-
 struct channel*
-channel(const char *name, enum channel_t type)
+channel(const char *name, enum channel_type type)
 {
 	struct channel *c;
 
@@ -91,7 +91,7 @@ channel_list_del(struct channel_list *cl, struct channel *c)
 }
 
 struct channel*
-channel_list_get(struct channel_list *cl, const char *name, enum casemapping_t cm)
+channel_list_get(struct channel_list *cl, const char *name, enum casemapping cm)
 {
 	struct channel *tmp;
 

@@ -1,9 +1,9 @@
 #include "src/components/input.h"
 
+#include "src/utils/utils.h"
+
 #include <errno.h>
 #include <string.h>
-
-#include "src/utils/utils.h"
 
 #define INPUT_MASK(X) ((X) & (INPUT_HIST_MAX - 1))
 

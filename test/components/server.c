@@ -9,7 +9,7 @@
 #include "src/utils/utils.c"
 
 void
-newline(struct channel *c, enum buffer_line_t t, const char *f, const char *m)
+newline(struct channel *c, enum buffer_line_type t, const char *f, const char *m)
 {
 	/* Mock */
 	UNUSED(c);
@@ -19,7 +19,7 @@ newline(struct channel *c, enum buffer_line_t t, const char *f, const char *m)
 }
 
 void
-newlinef(struct channel *c, enum buffer_line_t t, const char *f, const char *m, ...)
+newlinef(struct channel *c, enum buffer_line_type t, const char *f, const char *m, ...)
 {
 	/* Mock */
 	UNUSED(c);

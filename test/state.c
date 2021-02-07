@@ -92,8 +92,8 @@ test_command_close(void)
 
 	c1->server = s;
 	c2->server = s;
-	channel_list_add(&s->clist, c1);
-	channel_list_add(&s->clist, c2);
+	channel_list_add(&(s->clist), c1);
+	channel_list_add(&(s->clist), c2);
 
 	if (server_list_add(state_server_list(), s))
 		test_abort("Failed to add server");

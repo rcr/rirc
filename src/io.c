@@ -1,5 +1,16 @@
 #include "src/io.h"
 
+#include "config.h"
+#include "src/rirc.h"
+#include "src/utils/utils.h"
+
+#include "mbedtls/ctr_drbg.h"
+#include "mbedtls/entropy.h"
+#include "mbedtls/error.h"
+#include "mbedtls/net_sockets.h"
+#include "mbedtls/ssl.h"
+#include "mbedtls/x509_crt.h"
+
 #include <arpa/inet.h>
 #include <errno.h>
 #include <netdb.h>
@@ -13,17 +24,6 @@
 #include <sys/ioctl.h>
 #include <termios.h>
 #include <unistd.h>
-
-#include "config.h"
-#include "src/rirc.h"
-#include "src/utils/utils.h"
-
-#include "mbedtls/ctr_drbg.h"
-#include "mbedtls/entropy.h"
-#include "mbedtls/error.h"
-#include "mbedtls/net_sockets.h"
-#include "mbedtls/ssl.h"
-#include "mbedtls/x509_crt.h"
 
 /* RFC 2812, section 2.3 */
 #define IO_MESG_LEN 510
@@ -88,7 +88,7 @@
 /* state transition */
 #define ST_X(OLD, NEW) (((OLD) << 3) | (NEW))
 
-enum io_err_t
+enum io_err
 {
 	IO_ERR_NONE,
 	IO_ERR_CXED,
@@ -105,7 +105,7 @@ struct connection
 	const void *obj;
 	const char *host;
 	const char *port;
-	enum io_state_t {
+	enum io_state {
 		IO_ST_INVALID,
 		IO_ST_DXED, /* Socket disconnected, passive */
 		IO_ST_RXNG, /* Socket disconnected, pending reconnect */
@@ -124,10 +124,10 @@ struct connection
 	unsigned rx_sleep;
 };
 
-static enum io_state_t io_state_cxed(struct connection*);
-static enum io_state_t io_state_cxng(struct connection*);
-static enum io_state_t io_state_ping(struct connection*);
-static enum io_state_t io_state_rxng(struct connection*);
+static enum io_state io_state_cxed(struct connection*);
+static enum io_state io_state_cxng(struct connection*);
+static enum io_state io_state_ping(struct connection*);
+static enum io_state io_state_rxng(struct connection*);
 static int io_cx_read(struct connection*, uint32_t);
 static void io_fatal(const char*, int);
 static void io_sig_handle(int);
@@ -187,7 +187,7 @@ connection_free(struct connection *cx)
 int
 io_cx(struct connection *cx)
 {
-	enum io_err_t err = IO_ERR_NONE;
+	enum io_err err = IO_ERR_NONE;
 	sigset_t sigset;
 	sigset_t sigset_old;
 
@@ -223,7 +223,7 @@ io_cx(struct connection *cx)
 int
 io_dx(struct connection *cx)
 {
-	enum io_err_t err = IO_ERR_NONE;
+	enum io_err err = IO_ERR_NONE;
 
 	if (cx->st_cur == IO_ST_DXED)
 		return IO_ERR_DXED;
@@ -362,7 +362,7 @@ io_err(int err)
 	}
 }
 
-static enum io_state_t
+static enum io_state
 io_state_rxng(struct connection *cx)
 {
 	if (cx->rx_sleep == 0) {
@@ -383,7 +383,7 @@ io_state_rxng(struct connection *cx)
 	return IO_ST_CXNG;
 }
 
-static enum io_state_t
+static enum io_state
 io_state_cxng(struct connection *cx)
 {
 	if ((io_net_connect(cx)) < 0)
@@ -395,7 +395,7 @@ io_state_cxng(struct connection *cx)
 	return IO_ST_CXED;
 }
 
-static enum io_state_t
+static enum io_state
 io_state_cxed(struct connection *cx)
 {
 	int ret;
@@ -431,7 +431,7 @@ io_state_cxed(struct connection *cx)
 	return IO_ST_CXNG;
 }
 
-static enum io_state_t
+static enum io_state
 io_state_ping(struct connection *cx)
 {
 	int ret;
@@ -488,8 +488,8 @@ io_thread(void *arg)
 	io_info(cx, "Connecting to %s:%s", cx->host, cx->port);
 
 	do {
-		enum io_state_t st_cur;
-		enum io_state_t st_new;
+		enum io_state st_cur;
+		enum io_state st_new;
 
 		switch ((st_cur = cx->st_cur)) {
 			case IO_ST_CXED: st_new = io_state_cxed(cx); break;

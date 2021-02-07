@@ -39,7 +39,118 @@ static struct channel *c3;
 static struct server *s;
 
 static void
-test_irc_353(void)
+test_irc_generic(void)
+{
+	server_reset(s);
+
+	#define CHECK_IRC_GENERIC(M, C, F, RET, LINE_N) \
+	do { \
+		mock_reset_io(); \
+		mock_reset_state(); \
+		IRC_MESSAGE_PARSE(M); \
+		assert_eq(irc_generic(s, &m, (C), (F)), (RET)); \
+		assert_eq(mock_line_n, (LINE_N)); \
+		assert_eq(mock_send_n, 0); \
+	} while (0)
+
+	CHECK_IRC_GENERIC("COMMAND", NULL, NULL, 1, 0);
+
+	/* test no command, only args */
+	CHECK_IRC_GENERIC("COMMAND arg1", NULL, NULL, 0, 1);
+	assert_strcmp(mock_line[0], "[arg1]");
+
+	/* test no command, only trailing */
+	CHECK_IRC_GENERIC("COMMAND :trailing arg", NULL, NULL, 0, 1);
+	assert_strcmp(mock_line[0], "trailing arg");
+
+	/* test no command, args and trailing */
+	CHECK_IRC_GENERIC("COMMAND arg1 arg2 :trailing arg", NULL, NULL, 0, 1);
+	assert_strcmp(mock_line[0], "[arg1 arg2] ~ trailing arg");
+
+	/* test command, no args or trailing */
+	CHECK_IRC_GENERIC("COMMAND", "COMMAND", NULL, 0, 1);
+	assert_strcmp(mock_line[0], "[COMMAND]");
+
+	/* test command, only args */
+	CHECK_IRC_GENERIC("COMMAND arg1", "COMMAND", NULL, 0, 1);
+	assert_strcmp(mock_line[0], "[COMMAND] [arg1]");
+
+	/* test command, only trailing */
+	CHECK_IRC_GENERIC("COMMAND :trailing arg", "COMMAND", NULL, 0, 1);
+	assert_strcmp(mock_line[0], "[COMMAND] ~ trailing arg");
+
+	/* test command, args and trailing */
+	CHECK_IRC_GENERIC("COMMAND arg1 arg2 :trailing arg", "COMMAND", NULL, 0, 1);
+	assert_strcmp(mock_line[0], "[COMMAND] [arg1 arg2] ~ trailing arg");
+
+	#undef CHECK_IRC_GENERIC
+}
+
+static void
+test_irc_generic_error(void)
+{
+	server_reset(s);
+
+	char m1[] = "COMMAND arg1 arg2 :trailing arg";
+
+	mock_reset_io();
+	mock_reset_state();
+	assert_eq(irc_message_parse(&m, m1), 0);
+	assert_eq(irc_generic_error(s, &m), 0);
+	assert_eq(mock_line_n, 1);
+	assert_eq(mock_send_n, 0);
+	assert_strcmp(mock_line[0], "[arg1 arg2] ~ trailing arg");
+}
+
+static void
+test_irc_generic_ignore(void)
+{
+	server_reset(s);
+
+	char m1[] = "COMMAND arg1 arg2 :trailing arg";
+
+	mock_reset_io();
+	mock_reset_state();
+	assert_eq(irc_message_parse(&m, m1), 0);
+	assert_eq(irc_generic_ignore(s, &m), 0);
+	assert_eq(mock_line_n, 0);
+	assert_eq(mock_send_n, 0);
+}
+
+static void
+test_irc_generic_info(void)
+{
+	server_reset(s);
+
+	char m1[] = "COMMAND arg1 arg2 :trailing arg";
+
+	mock_reset_io();
+	mock_reset_state();
+	assert_eq(irc_message_parse(&m, m1), 0);
+	assert_eq(irc_generic_info(s, &m), 0);
+	assert_eq(mock_line_n, 1);
+	assert_eq(mock_send_n, 0);
+	assert_strcmp(mock_line[0], "[arg1 arg2] ~ trailing arg");
+}
+
+static void
+test_irc_generic_unknown(void)
+{
+	server_reset(s);
+
+	char m1[] = "COMMAND arg1 arg2 :trailing arg";
+
+	mock_reset_io();
+	mock_reset_state();
+	assert_eq(irc_message_parse(&m, m1), 0);
+	assert_eq(irc_generic_unknown(s, &m), 0);
+	assert_eq(mock_line_n, 1);
+	assert_eq(mock_send_n, 0);
+	assert_strcmp(mock_line[0], "[COMMAND] [arg1 arg2] ~ trailing arg");
+}
+
+static void
+test_irc_numeric_353(void)
 {
 	/* 353 <nick> <type> <channel> 1*(<modes><nick>) */
 
@@ -118,6 +229,17 @@ test_irc_353(void)
 	assert_eq(u2->prfxmodes.lower, (flag_bit('v')));
 	assert_eq(u3->prfxmodes.lower, (flag_bit('o') | flag_bit('v')));
 	assert_eq(u4->prfxmodes.lower, (flag_bit('o') | flag_bit('v')));
+}
+
+static void
+test_recv(void)
+{
+	server_reset(s);
+
+	/* test unhandled command type */
+	CHECK_RECV("UNHANDLED", 0, 1, 0);
+	assert_strcmp(mock_chan[0], "host");
+	assert_strcmp(mock_line[0], "[UNHANDLED]");
 }
 
 static void
@@ -413,14 +535,10 @@ test_recv_numeric(void)
 	CHECK_RECV(":hostname 001 test", 1, 1, 0);
 	assert_strcmp(mock_line[0], "NUMERIC: target 'test' is invalid");
 
-	CHECK_RECV(":hostname 666 me arg1 arg2 :trailing arg", 1, 1, 0);
-	assert_strcmp(mock_line[0], "NUMERIC: 666 unhandled: [arg1 arg2 :trailing arg]");
-
-	CHECK_RECV(":hostname 666 me", 1, 1, 0);
-	assert_strcmp(mock_line[0], "NUMERIC: 666 unhandled");
-
-	/* Numeric 375 (RPL_MOTDSTART) is ignored */
-	CHECK_RECV(":hostname 375 me :trailing arg", 0, 0, 0);
+	/* Test numeric unhandled */
+	CHECK_RECV(":hostname 666 me arg1 arg2 :trailing arg", 0, 1, 0);
+	assert_strcmp(mock_line[0], "[666] [arg1 arg2] ~ trailing arg");
+	assert_ptr_null(irc_numerics[666]);
 }
 
 static void
@@ -793,7 +911,13 @@ main(void)
 	server_nick_set(s, "me");
 
 	struct testcase tests[] = {
-		TESTCASE(test_irc_353),
+		TESTCASE(test_irc_generic),
+		TESTCASE(test_irc_generic_error),
+		TESTCASE(test_irc_generic_ignore),
+		TESTCASE(test_irc_generic_info),
+		TESTCASE(test_irc_generic_unknown),
+		TESTCASE(test_irc_numeric_353),
+		TESTCASE(test_recv),
 		TESTCASE(test_recv_error),
 		TESTCASE(test_recv_invite),
 		TESTCASE(test_recv_join),
