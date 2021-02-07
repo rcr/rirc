@@ -8,7 +8,7 @@ if [[ -z $1 ]]; then
 	fail "Usage: '$0 dir'"
 fi
 
-SONAR_VER="4.5.0.2216"
+SONAR_VER="4.6.0.2311"
 
 BUILD_ZIP="$1/build-wrapper.zip"
 SONAR_ZIP="$1/sonar-scanner.zip"
