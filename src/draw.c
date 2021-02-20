@@ -413,12 +413,17 @@ print_header:
 			print_p1 = p1;
 			print_p2 = irc_strwrap(text_w, &p1, p2);
 
-			fputs(draw_colour(line->text[0] == QUOTE_CHAR
-					? BUFFER_LINE_TEXT_FG_GREEN
-					: BUFFER_LINE_TEXT_FG_NEUTRAL,
-					-1),
-				stdout);
+			unsigned text_fg = BUFFER_TEXT_FG;
+			unsigned text_bg = BUFFER_TEXT_BG;
 
+			if (line->type == BUFFER_LINE_CHAT && sizeof(QUOTE_LEADER) > 1) {
+				if (!strncmp(line->text, QUOTE_LEADER, sizeof(QUOTE_LEADER) - 1)) {
+					text_fg = QUOTE_TEXT_FG;
+					text_bg = QUOTE_TEXT_BG;
+				}
+			}
+
+			fputs(draw_colour(text_fg, text_bg), stdout);
 			printf("%.*s", (int)(print_p2 - print_p1), print_p1);
 		}
 

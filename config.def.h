@@ -35,8 +35,8 @@
 #define BUFFER_LINE_HEADER_FG_PINGED  250
 #define BUFFER_LINE_HEADER_BG_PINGED  1
 
-#define BUFFER_LINE_TEXT_FG_NEUTRAL 250
-#define BUFFER_LINE_TEXT_FG_GREEN   113
+#define BUFFER_TEXT_FG 250;
+#define BUFFER_TEXT_BG -1;
 
 /* Number of buffer lines to keep in history, must be power of 2 */
 #define BUFFER_LINES_MAX (1 << 10)
@@ -55,7 +55,6 @@
 #define NAV_CURRENT_CHAN 255
 
 /* Characters */
-#define QUOTE_CHAR '>'
 #define HORIZONTAL_SEPARATOR "-"
 #define VERTICAL_SEPARATOR "~"
 
@@ -71,6 +70,12 @@
 /* Input line text colours */
 #define INPUT_FG 250
 #define INPUT_BG -1
+
+/* Buffer text quoting
+ *   ("": no text quoting) */
+#define QUOTE_LEADER ">"
+#define QUOTE_TEXT_FG 2
+#define QUOTE_TEXT_BG -1
 
 /* BUFFER_PADDING:
  * How the buffer line headers will be padded [0, 1]
