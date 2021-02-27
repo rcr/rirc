@@ -12,18 +12,18 @@
 #error BUFFER_LINES_MAX must be a power of 2
 #endif
 
-static inline unsigned int buffer_full(struct buffer*);
-static inline unsigned int buffer_size(struct buffer*);
+static inline unsigned buffer_full(struct buffer*);
+static inline unsigned buffer_size(struct buffer*);
 
 static struct buffer_line* buffer_push(struct buffer*);
 
-static inline unsigned int
+static inline unsigned
 buffer_full(struct buffer *b)
 {
 	return buffer_size(b) == BUFFER_LINES_MAX;
 }
 
-static inline unsigned int
+static inline unsigned
 buffer_size(struct buffer *b)
 {
 	return b->head - b->tail;
@@ -68,7 +68,7 @@ buffer_tail(struct buffer *b)
 }
 
 struct buffer_line*
-buffer_line(struct buffer *b, unsigned int i)
+buffer_line(struct buffer *b, unsigned i)
 {
 	/* Return the buffer line indexed by i */
 
@@ -99,8 +99,8 @@ buffer_line(struct buffer *b, unsigned int i)
 	return &b->buffer_lines[BUFFER_MASK(i)];
 }
 
-unsigned int
-buffer_line_rows(struct buffer_line *line, unsigned int w)
+unsigned
+buffer_line_rows(struct buffer_line *line, unsigned w)
 {
 	/* Return the number of times a buffer line will wrap within w columns */
 

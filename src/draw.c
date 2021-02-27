@@ -302,9 +302,6 @@ draw_buffer(struct buffer *b, struct coords coords)
 	}
 }
 
-/* FIXME: works except when it doesn't.
- *
- * Fails when line headers are very long compared to text. tests/draw.c needed */
 static void
 draw_buffer_line(
 		struct buffer_line *line,
@@ -316,10 +313,8 @@ draw_buffer_line(
 {
 	check_coords(coords);
 
-	char *print_p1,
-	     *print_p2,
-	     *p1 = line->text,
-	     *p2 = line->text + line->text_len;
+	char *p1 = line->text;
+	char *p2 = line->text + line->text_len;
 
 	if (!line->cached.initialized) {
 		/* Initialize static cached properties of drawn lines */
@@ -399,7 +394,7 @@ print_header:
 		irc_strwrap(text_w, &p1, p2);
 
 	do {
-		char *sep = " "VERTICAL_SEPARATOR" ";
+		const char *sep = " "VERTICAL_SEPARATOR" ";
 
 		if ((coords.cN - coords.c0) >= sizeof(*sep) + text_w) {
 			printf(C_MOVE(%d, %d), coords.r0, (int)(coords.cN - (sizeof(*sep) + text_w + 1)));
@@ -408,23 +403,21 @@ print_header:
 		}
 
 		if (*p1) {
-			printf(C_MOVE(%d, %d), coords.r0, head_w);
-
-			print_p1 = p1;
-			print_p2 = irc_strwrap(text_w, &p1, p2);
-
+			const char *text_p1 = p1;
+			const char *text_p2 = irc_strwrap(text_w, &p1, p2);
 			unsigned text_fg = BUFFER_TEXT_FG;
 			unsigned text_bg = BUFFER_TEXT_BG;
+			unsigned text_len = text_p2 - text_p1;
 
-			if (line->type == BUFFER_LINE_CHAT && sizeof(QUOTE_LEADER) > 1) {
-				if (!strncmp(line->text, QUOTE_LEADER, sizeof(QUOTE_LEADER) - 1)) {
+			if (line->type == BUFFER_LINE_CHAT && strlen(QUOTE_LEADER)) {
+				if (!strncmp(line->text, QUOTE_LEADER, strlen(QUOTE_LEADER))) {
 					text_fg = QUOTE_TEXT_FG;
 					text_bg = QUOTE_TEXT_BG;
 				}
 			}
 
-			fputs(draw_colour(text_fg, text_bg), stdout);
-			printf("%.*s", (int)(print_p2 - print_p1), print_p1);
+			printf(C_MOVE(%d, %d), coords.r0, head_w);
+			printf("%s%.*s", draw_colour(text_fg, text_bg), text_len, text_p1);
 		}
 
 		coords.r0++;
@@ -496,16 +489,6 @@ print_input:
 	printf(C_SAVE);
 }
 
-/* TODO
- *
- * | [server-name[:port]] *#chan |
- *
- * - Disconnected/parted channels are printed (#chan)
- * - Servers with non-standard ports are printed: server-name:port
- * - Channels that won't fit are printed at a minimum: #...
- *     - eg: | ...chan #chan2 chan3 |   Right printing
- *           | #chan1 #chan2 #ch... |   Left printing
- * */
 static void
 draw_nav(struct channel *c)
 {
@@ -618,8 +601,6 @@ draw_nav(struct channel *c)
 static void
 draw_status(struct channel *c)
 {
-	/* TODO: channel modes, channel type_flag, servermodes */
-
 	/* server / private chat:
 	 * |-[usermodes]-(ping)---...|
 	 *

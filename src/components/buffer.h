@@ -35,34 +35,34 @@ struct buffer_line
 	size_t text_len;
 	time_t time;
 	struct {
-		unsigned int colour; /* Cached colour of `from` text */
-		unsigned int rows;   /* Cached number of rows occupied when wrapping on w columns */
-		unsigned int w;      /* Cached width for rows */
-		unsigned int initialized : 1;
+		unsigned colour; /* Cached colour of `from` text */
+		unsigned rows;   /* Cached number of rows occupied when wrapping on w columns */
+		unsigned w;      /* Cached width for rows */
+		unsigned initialized : 1;
 	} cached;
 };
 
 struct buffer
 {
-	unsigned int head;
-	unsigned int tail;
-	unsigned int scrollback; /* Index of the current line between [tail, head) for scrollback */
+	unsigned head;
+	unsigned tail;
+	unsigned scrollback; /* Index of the current line between [tail, head) for scrollback */
 	size_t pad;              /* Pad 'from' when printing to be at least this wide */
 	struct buffer_line buffer_lines[BUFFER_LINES_MAX];
 };
 
 float buffer_scrollback_status(struct buffer*);
 
-int buffer_page_back(struct buffer*, unsigned int, unsigned int);
-int buffer_page_forw(struct buffer*, unsigned int, unsigned int);
+int buffer_page_back(struct buffer*, unsigned, unsigned);
+int buffer_page_forw(struct buffer*, unsigned, unsigned);
 
-unsigned int buffer_line_rows(struct buffer_line*, unsigned int);
+unsigned buffer_line_rows(struct buffer_line*, unsigned);
 
 void buffer(struct buffer*);
 
 struct buffer_line* buffer_head(struct buffer*);
 struct buffer_line* buffer_tail(struct buffer*);
-struct buffer_line* buffer_line(struct buffer*, unsigned int);
+struct buffer_line* buffer_line(struct buffer*, unsigned);
 
 void buffer_newline(
 	struct buffer*,

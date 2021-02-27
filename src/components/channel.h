@@ -40,8 +40,8 @@ struct channel
 	struct mode_str chanmodes_str;
 	struct server *server;
 	struct user_list users;
-	unsigned int parted : 1;
-	unsigned int joined : 1;
+	unsigned parted : 1;
+	unsigned joined : 1;
 	char _[];
 };
 
