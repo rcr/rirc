@@ -38,6 +38,8 @@
 #define BUFFER_PADDING 1
 #endif
 
+#define UTF8_CONT(C) (((unsigned char)(C) & 0xC0) == 0x80)
+
 /* Terminal coordinate row/column boundaries (inclusive)
  * for objects being drawn. The origin for terminal
  * coordinates is in the top left, indexed from 1
@@ -88,6 +90,8 @@ static void check_coords(struct coords);
 static int actv_colours[ACTIVITY_T_SIZE] = ACTIVITY_COLOURS
 static int nick_colours[] = NICK_COLOURS
 static struct draw_state draw_state;
+
+static unsigned drawf(unsigned, const char*, ...);
 
 void
 draw(enum draw_bit bit)
@@ -608,6 +612,9 @@ draw_status(struct channel *c)
 	 * |-[usermodes]-[chancount chantype chanmodes]/[priv]-(ping)---...|
 	 */
 
+	// TODO: rewrite status bar
+	(void)drawf;
+
 	float sb;
 	int ret;
 	unsigned col = 0;
@@ -795,4 +802,80 @@ draw_fmt(char **ptr, size_t *buff_n, size_t *text_n, int txt, const char *fmt, .
 	*ptr += _ret;
 
 	return 1;
+}
+
+static unsigned
+drawf(unsigned cols, const char *fmt, ...)
+{
+	/* Draw formatted text up to a given number of
+	 * columns. Returns number of unused columns.
+	 *
+	 *  %c -- clear formatting attributes
+	 *  %f -- set foreground colour
+	 *  %b -- set background colour
+	 *  %d -- output signed integer
+	 *  %u -- output unsigned integer
+	 *  %s -- output string
+	 *  %% -- output literal %
+	 */
+
+	char buf[64];
+	char c;
+	const char *str;
+	unsigned substr_col;
+	unsigned substr_len;
+	va_list arg;
+
+	va_start(arg, fmt);
+
+	while (cols && (c = *fmt++)) {
+		if (c == '%') {
+			switch ((c = *fmt++)) {
+				case 'f':
+					printf(ATTR_FG(%u), va_arg(arg, unsigned));
+					break;
+				case 'b':
+					printf(ATTR_BG(%u), va_arg(arg, unsigned));
+					break;
+				case 'c':
+					printf(ATTR_RESET);
+					break;
+				case 'd':
+					snprintf(buf, sizeof(buf), "%d", va_arg(arg, int));
+					cols -= (unsigned) printf("%.*s", cols, buf);
+					break;
+				case 'u':
+					snprintf(buf, sizeof(buf), "%u", va_arg(arg, unsigned));
+					cols -= (unsigned) printf("%.*s", cols, buf);
+					break;
+				case 's':
+					str = va_arg(arg, const char *);
+					substr_col = 0;
+					substr_len = 0;
+					while (str[substr_len] && substr_col < cols) {
+						substr_col++;
+						substr_len++;
+						while (UTF8_CONT(str[substr_len]))
+							substr_len++;
+					}
+					printf("%.*s", substr_len, str);
+					cols -= substr_col;
+					break;
+				case '%':
+					cols -= (unsigned) printf("%%");
+					break;
+				default:
+					fatal("unknown drawf format character '%c'", c);
+			}
+		} else {
+			printf("%c", c);
+			while (UTF8_CONT(*fmt))
+				printf("%c", *fmt++);
+			cols--;
+		}
+	}
+
+	va_end(arg);
+
+	return cols;
 }
