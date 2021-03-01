@@ -7,7 +7,6 @@
 #include "src/state.h"
 #include "src/utils/utils.h"
 
-#include <alloca.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -16,16 +15,18 @@
 /* Control sequence initiator */
 #define CSI "\x1b["
 
-#define ATTR_FG(X)   CSI "38;5;"#X"m"
-#define ATTR_BG(X)   CSI "48;5;"#X"m"
-#define ATTR_RESET   CSI "0m"
+#define ATTR_FG(X)    CSI "38;5;"#X"m"
+#define ATTR_BG(X)    CSI "48;5;"#X"m"
+#define ATTR_RESET    CSI "0m"
+#define ATTR_RESET_FG CSI "39m"
+#define ATTR_RESET_BG CSI "49m"
 
-#define CLEAR_FULL   CSI "2J"
-#define CLEAR_LINE   CSI "2K"
+#define CLEAR_FULL    CSI "2J"
+#define CLEAR_LINE    CSI "2K"
 
-#define C_MOVE(X, Y) CSI ""#X";"#Y"H"
-#define C_SAVE       CSI "s"
-#define C_RESTORE    CSI "u"
+#define C_MOVE(X, Y)  CSI ""#X";"#Y"H"
+#define C_SAVE        CSI "s"
+#define C_RESTORE     CSI "u"
 
 /* Minimum rows or columns to safely draw */
 #define COLS_MIN 5
@@ -65,10 +66,11 @@ struct draw_state
 {
 	union {
 		struct {
-			unsigned buffer : 1;
-			unsigned input  : 1;
-			unsigned nav    : 1;
-			unsigned status : 1;
+			unsigned separators : 1;
+			unsigned buffer     : 1;
+			unsigned input      : 1;
+			unsigned nav        : 1;
+			unsigned status     : 1;
 		};
 		unsigned all;
 	} bits;
@@ -78,6 +80,7 @@ struct draw_state
 static void draw_bits(void);
 static void draw_buffer(struct buffer*, struct coords);
 static void draw_buffer_line(struct buffer_line*, struct coords, unsigned, unsigned, unsigned, unsigned);
+static void draw_separators(void);
 static void draw_input(struct input*, struct coords);
 static void draw_nav(struct channel*);
 static void draw_status(struct channel*);
@@ -92,6 +95,8 @@ static int nick_colours[] = NICK_COLOURS
 static struct draw_state draw_state;
 
 static unsigned drawf(unsigned, const char*, ...);
+static void draw_bg(int);
+static void draw_fg(int);
 
 void
 draw(enum draw_bit bit)
@@ -148,6 +153,11 @@ draw_bits(void)
 	}
 
 	printf(C_SAVE);
+
+	if (draw_state.bits.separators) {
+		printf(ATTR_RESET);
+		draw_separators();
+	}
 
 	if (draw_state.bits.buffer) {
 		printf(ATTR_RESET);
@@ -398,7 +408,7 @@ print_header:
 		irc_strwrap(text_w, &p1, p2);
 
 	do {
-		const char *sep = " "VERTICAL_SEPARATOR" ";
+		const char *sep = " " SEP_VERT " ";
 
 		if ((coords.cN - coords.c0) >= sizeof(*sep) + text_w) {
 			printf(C_MOVE(%d, %d), coords.r0, (int)(coords.cN - (sizeof(*sep) + text_w + 1)));
@@ -427,6 +437,18 @@ print_header:
 		coords.r0++;
 
 	} while (*p1 && coords.r0 <= coords.rN);
+}
+
+static void
+draw_separators(void)
+{
+	printf(C_MOVE(2, 1));
+
+	draw_bg(SEP_BG);
+	draw_fg(SEP_FG);
+
+	for (unsigned i = 0; i < state_cols(); i++)
+		printf(SEP_HORZ);
 }
 
 static void
@@ -605,108 +627,80 @@ draw_nav(struct channel *c)
 static void
 draw_status(struct channel *c)
 {
-	/* server / private chat:
-	 * |-[usermodes]-(ping)---...|
+	/* server buffer:
+	 *  -[usermodes]-(ping)-(scrollback)
 	 *
-	 * channel:
-	 * |-[usermodes]-[chancount chantype chanmodes]/[priv]-(ping)---...|
+	 * private buffer:
+	 *  -[usermodes]-[priv]-(ping)-(scrollback)
+	 *
+	 * channel buffer:
+	 *  -[usermodes]-[chantype chanmodes chancount]-(ping)-(scrollback)
 	 */
 
-	// TODO: rewrite status bar
-	(void)drawf;
+	#define STATUS_SEP_HORZ \
+		"%f%b" SEP_HORZ "%f%b", \
+			SEP_FG, \
+			SEP_BG, \
+			STATUS_FG, \
+			STATUS_BG
 
-	float sb;
-	int ret;
-	unsigned col = 0;
 	unsigned cols = state_cols();
 	unsigned rows = state_rows();
+	unsigned scrollback;
 
-	/* Insufficient columns for meaningful status */
-	if (cols < 3)
+	if (!cols || !(rows > 1))
 		return;
 
-	printf(C_MOVE(2, 1));
-	printf("%.*s", cols, (char *)(memset(alloca(cols), *HORIZONTAL_SEPARATOR, cols)));
-
-	printf(C_MOVE(%d, 1) CLEAR_LINE, rows - 1);
-
-	/* Print status to temporary buffer */
-	char status_buff[cols + 1];
-
-	memset(status_buff, 0, cols + 1);
+	printf(C_MOVE(%d, 1), rows - 1);
 
 	/* -[usermodes] */
 	if (c->server && *(c->server->mode_str.str)) {
-		ret = snprintf(status_buff + col, cols - col + 1, "%s", HORIZONTAL_SEPARATOR "[+");
-		if (ret < 0 || (col += ret) >= cols)
-			goto print_status;
-
-		ret = snprintf(status_buff + col, cols - col + 1, "%s", c->server->mode_str.str);
-		if (ret < 0 || (col += ret) >= cols)
-			goto print_status;
-
-		ret = snprintf(status_buff + col, cols - col + 1, "%s", "]");
-		if (ret < 0 || (col += ret) >= cols)
-			goto print_status;
+		if (!(cols = drawf(cols, STATUS_SEP_HORZ)))
+			return;
+		if (!(cols = drawf(cols, "[+%s]", c->server->mode_str.str)))
+			return;
 	}
 
-	/* If private chat buffer:
-	 * -[priv] */
+	/* -[priv] */
 	if (c->type == CHANNEL_T_PRIVATE) {
-		ret = snprintf(status_buff + col, cols - col + 1, "%s", HORIZONTAL_SEPARATOR "[priv]");
-		if (ret < 0 || (col += ret) >= cols)
-			goto print_status;
+		if (!(cols = drawf(cols, STATUS_SEP_HORZ)))
+			return;
+		if (!(cols = drawf(cols, "[priv]")))
+			return;
 	}
 
-	/* If IRC channel buffer:
-	 * -[chancount chantype chanmodes] */
+	/* -[chantype chanmodes chancount] */
 	if (c->type == CHANNEL_T_CHANNEL) {
-
-		ret = snprintf(status_buff + col, cols - col + 1,
-				HORIZONTAL_SEPARATOR "[%d", c->users.count);
-		if (ret < 0 || (col += ret) >= cols)
-			goto print_status;
-
-		if (c->chanmodes.prefix) {
-			ret = snprintf(status_buff + col, cols - col + 1, " %c", c->chanmodes.prefix);
-			if (ret < 0 || (col += ret) >= cols)
-				goto print_status;
-		}
-
-		if (*(c->chanmodes_str.str)) {
-			ret = snprintf(status_buff + col, cols - col + 1, " +%s", c->chanmodes_str.str);
-			if (ret < 0 || (col += ret) >= cols)
-				goto print_status;
-		}
-
-		ret = snprintf(status_buff + col, cols - col + 1, "%s", "]");
-		if (ret < 0 || (col += ret) >= cols)
-			goto print_status;
+		if (!(cols = drawf(cols, STATUS_SEP_HORZ)))
+			return;
+		if (!(cols = drawf(cols, "[%c %s %u]",
+				c->chanmodes.prefix,
+				c->chanmodes_str.str,
+				c->users.count)))
+			return;
 	}
 
 	/* -(ping) */
 	if (c->server && c->server->ping) {
-		ret = snprintf(status_buff + col, cols - col + 1,
-				HORIZONTAL_SEPARATOR "(%llds)", (long long) c->server->ping);
-		if (ret < 0 || (col += ret) >= cols)
-			goto print_status;
+		if (!(cols = drawf(cols, STATUS_SEP_HORZ)))
+			return;
+		if (!(cols = drawf(cols, "(%us)", c->server->ping)))
+			return;
 	}
 
-	/* -(scrollback%) */
-	if ((sb = buffer_scrollback_status(&c->buffer))) {
-		ret = snprintf(status_buff + col, cols - col + 1,
-				HORIZONTAL_SEPARATOR "(%02d%%)", (int)(sb * 100));
-		if (ret < 0 || (col += ret) >= cols)
-			goto print_status;
+	/* -(scrollback) */
+	if ((scrollback = buffer_scrollback_status(&c->buffer))) {
+		if (!(cols = drawf(cols, STATUS_SEP_HORZ)))
+			return;
+		if (!(cols = drawf(cols, "(%u%%)", scrollback)))
+			return;
 	}
 
-print_status:
+	draw_bg(SEP_BG);
+	draw_fg(SEP_FG);
 
-	fputs(status_buff, stdout);
-
-	/* Trailing separator */
-	while (col++ < cols)
-		printf(HORIZONTAL_SEPARATOR);
+	while (cols--)
+		printf(SEP_HORZ);
 }
 
 static void
@@ -810,13 +804,14 @@ drawf(unsigned cols, const char *fmt, ...)
 	/* Draw formatted text up to a given number of
 	 * columns. Returns number of unused columns.
 	 *
-	 *  %c -- clear formatting attributes
-	 *  %f -- set foreground colour
-	 *  %b -- set background colour
+	 *  %a -- attribute reset
+	 *  %b -- set background colour attribute
+	 *  %f -- set foreground colour attribute
+	 *  %c -- output char
 	 *  %d -- output signed integer
 	 *  %u -- output unsigned integer
 	 *  %s -- output string
-	 *  %% -- output literal %
+	 *  %% -- output literal '%'
 	 */
 
 	char buf[64];
@@ -831,14 +826,17 @@ drawf(unsigned cols, const char *fmt, ...)
 	while (cols && (c = *fmt++)) {
 		if (c == '%') {
 			switch ((c = *fmt++)) {
-				case 'f':
-					printf(ATTR_FG(%u), va_arg(arg, unsigned));
+				case 'a':
+					printf(ATTR_RESET);
 					break;
 				case 'b':
-					printf(ATTR_BG(%u), va_arg(arg, unsigned));
+					draw_bg(va_arg(arg, int));
+					break;
+				case 'f':
+					draw_fg(va_arg(arg, int));
 					break;
 				case 'c':
-					printf(ATTR_RESET);
+					cols -= (unsigned) printf("%c", va_arg(arg, int));
 					break;
 				case 'd':
 					snprintf(buf, sizeof(buf), "%d", va_arg(arg, int));
@@ -878,4 +876,24 @@ drawf(unsigned cols, const char *fmt, ...)
 	va_end(arg);
 
 	return cols;
+}
+
+static void
+draw_bg(int bg)
+{
+	if (bg == -1)
+		printf(ATTR_RESET_BG);
+
+	if (bg >= 0 && bg <= 255)
+		printf(ATTR_BG(%d), bg);
+}
+
+static void
+draw_fg(int fg)
+{
+	if (fg == -1)
+		printf(ATTR_RESET_FG);
+
+	if (fg >= 0 && fg <= 255)
+		printf(ATTR_FG(%d), fg);
 }

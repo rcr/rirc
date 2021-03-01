@@ -54,9 +54,17 @@
 
 #define NAV_CURRENT_CHAN 255
 
-/* Characters */
-#define HORIZONTAL_SEPARATOR "-"
-#define VERTICAL_SEPARATOR "~"
+/* Separator characters */
+#define SEP_HORZ "─"
+#define SEP_VERT "~"
+
+/* Separator colours */
+#define SEP_FG 239
+#define SEP_BG -1
+
+/* Status bar colours */
+#define STATUS_FG -1
+#define STATUS_BG -1
 
 /* Prefix string for the input line and colours */
 #define INPUT_PREFIX " >>> "

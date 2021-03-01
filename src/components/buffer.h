@@ -51,7 +51,7 @@ struct buffer
 	struct buffer_line buffer_lines[BUFFER_LINES_MAX];
 };
 
-float buffer_scrollback_status(struct buffer*);
+unsigned buffer_scrollback_status(struct buffer*);
 
 int buffer_page_back(struct buffer*, unsigned, unsigned);
 int buffer_page_forw(struct buffer*, unsigned, unsigned);

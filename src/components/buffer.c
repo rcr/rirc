@@ -172,7 +172,7 @@ buffer_newline(
 	}
 }
 
-float
+unsigned
 buffer_scrollback_status(struct buffer *b)
 {
 	/* Return the buffer scrollback status as a number between [0, 100] */
@@ -180,7 +180,7 @@ buffer_scrollback_status(struct buffer *b)
 	if (buffer_line(b, b->scrollback) == buffer_head(b))
 		return 0;
 
-	return (float)(b->head - b->scrollback) / (float)(buffer_size(b));
+	return (100 * (float)(b->head - b->scrollback) / (float)(buffer_size(b)));
 }
 
 void
@@ -199,7 +199,7 @@ buffer_line_split(
 	unsigned cols,
 	unsigned pad)
 {
-	unsigned _head_w = sizeof(" HH:MM   "VERTICAL_SEPARATOR" ");
+	unsigned _head_w = sizeof(" HH:MM   " SEP_VERT " ");
 
 	if (BUFFER_PADDING)
 		_head_w += pad;
