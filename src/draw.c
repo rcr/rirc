@@ -531,10 +531,12 @@ draw_nav(struct channel *c)
 	               *c_last = channel_get_last(),
 	               *tmp;
 
+	unsigned cols = state_cols();
+
 	c->activity = ACTIVITY_DEFAULT;
 
 	/* By default assume drawing starts towards the next channel */
-	int colour, nextward = 1;
+	int nextward = 1;
 
 	size_t len, total_len = 0;
 
@@ -608,12 +610,9 @@ draw_nav(struct channel *c)
 	/* Draw coloured channel names, from frame to frame */
 	for (tmp = frame_prev; ; tmp = channel_get_next(tmp)) {
 
-		colour = (tmp == c) ? NAV_CURRENT_CHAN : actv_colours[tmp->activity];
+		int fg = (tmp == c) ? NAV_CURRENT_CHAN : actv_colours[tmp->activity];
 
-		if (fputs(draw_colour(colour, -1), stdout) < 0)
-			break;
-
-		if (printf(" %s ", tmp->name) < 0)
+		if (!(cols = drawf(cols, "%f %s ", fg, tmp->name)))
 			break;
 
 		if (tmp == frame_next)
