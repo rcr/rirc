@@ -7,6 +7,7 @@
 #include "src/state.h"
 #include "src/utils/utils.h"
 
+#include <ctype.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -45,9 +46,9 @@
  * for objects being drawn. The origin for terminal
  * coordinates is in the top left, indexed from 1
  *
- *   \ c0     cN
+ *   \ c1     cN
  *    +---------+
- *  r0|         |
+ *  r1|         |
  *    |         |
  *    |         |
  *  rN|         |
@@ -56,10 +57,8 @@
 
 struct coords
 {
-	unsigned c0;
-	unsigned cN;
-	unsigned r0;
-	unsigned rN;
+	unsigned c1, cN;
+	unsigned r1, rN;
 };
 
 struct draw_state
@@ -161,18 +160,18 @@ draw_bits(void)
 
 	if (draw_state.bits.buffer) {
 		printf(ATTR_RESET);
-		coords.c0 = 1;
+		coords.c1 = 1;
 		coords.cN = state_cols();
-		coords.r0 = 3;
+		coords.r1 = 3;
 		coords.rN = state_rows() - 2;
 		draw_buffer(&c->buffer, coords);
 	}
 
 	if (draw_state.bits.input) {
 		printf(ATTR_RESET);
-		coords.c0 = 1;
+		coords.c1 = 1;
 		coords.cN = state_cols();
-		coords.r0 = state_rows();
+		coords.r1 = state_rows();
 		coords.rN = state_rows();
 		draw_input(&c->input, coords);
 	}
@@ -206,7 +205,7 @@ draw_buffer(struct buffer *b, struct coords coords)
 	 * Rows are numbered from the top down, 1 to term_rows, so for term_rows = N,
 	 * the drawable area for the buffer is bounded [r3, rN-2]:
 	 *      __________________________
-	 * r0   |         (nav)          |
+	 * r1   |         (nav)          |
 	 * r2   |------------------------|
 	 * r3   |    ::buffer start::    |
 	 *      |                        |
@@ -235,16 +234,16 @@ draw_buffer(struct buffer *b, struct coords coords)
 
 	unsigned row,
 	         row_count = 0,
-	         row_total = coords.rN - coords.r0 + 1;
+	         row_total = coords.rN - coords.r1 + 1;
 
-	unsigned col_total = coords.cN - coords.c0 + 1;
+	unsigned col_total = coords.cN - coords.c1 + 1;
 
 	unsigned buffer_i = b->scrollback,
 	         head_w,
 	         text_w;
 
 	/* Clear the buffer area */
-	for (row = coords.r0; row <= coords.rN; row++)
+	for (row = coords.r1; row <= coords.rN; row++)
 		printf(C_MOVE(%d, 1) CLEAR_LINE, row);
 
 	struct buffer_line *line = buffer_line(b, buffer_i);
@@ -285,7 +284,7 @@ draw_buffer(struct buffer *b, struct coords coords)
 			BUFFER_PADDING ? (b->pad - line->from_len) : 0
 		);
 
-		coords.r0 += buffer_line_rows(line, text_w) - (row_count - row_total);
+		coords.r1 += buffer_line_rows(line, text_w) - (row_count - row_total);
 
 		if (line == head)
 			return;
@@ -294,7 +293,7 @@ draw_buffer(struct buffer *b, struct coords coords)
 	}
 
 	/* Draw all remaining lines */
-	while (coords.r0 <= coords.rN) {
+	while (coords.r1 <= coords.rN) {
 
 		buffer_line_split(line, &head_w, &text_w, col_total, b->pad);
 
@@ -307,7 +306,7 @@ draw_buffer(struct buffer *b, struct coords coords)
 			BUFFER_PADDING ? (b->pad - line->from_len) : 0
 		);
 
-		coords.r0 += buffer_line_rows(line, text_w);
+		coords.r1 += buffer_line_rows(line, text_w);
 
 		if (line == head)
 			return;
@@ -401,7 +400,7 @@ draw_buffer_line(
 
 print_header:
 		/* Print the line header */
-		printf(C_MOVE(%d, 1) "%s " ATTR_RESET, coords.r0, header);
+		printf(C_MOVE(%d, 1) "%s " ATTR_RESET, coords.r1, header);
 	}
 
 	while (skip--)
@@ -410,8 +409,8 @@ print_header:
 	do {
 		const char *sep = " " SEP_VERT " ";
 
-		if ((coords.cN - coords.c0) >= sizeof(*sep) + text_w) {
-			printf(C_MOVE(%d, %d), coords.r0, (int)(coords.cN - (sizeof(*sep) + text_w + 1)));
+		if ((coords.cN - coords.c1) >= sizeof(*sep) + text_w) {
+			printf(C_MOVE(%d, %d), coords.r1, (int)(coords.cN - (sizeof(*sep) + text_w + 1)));
 			fputs(draw_colour(BUFFER_LINE_HEADER_FG_NEUTRAL, -1), stdout);
 			fputs(sep, stdout);
 		}
@@ -430,13 +429,13 @@ print_header:
 				}
 			}
 
-			printf(C_MOVE(%d, %d), coords.r0, head_w);
+			printf(C_MOVE(%d, %d), coords.r1, head_w);
 			printf("%s%.*s", draw_colour(text_fg, text_bg), text_len, text_p1);
 		}
 
-		coords.r0++;
+		coords.r1++;
 
-	} while (*p1 && coords.r0 <= coords.rN);
+	} while (*p1 && coords.r1 <= coords.rN);
 }
 
 static void
@@ -458,60 +457,58 @@ draw_input(struct input *inp, struct coords coords)
 
 	check_coords(coords);
 
-	unsigned cols_t = coords.cN - coords.c0 + 1,
-	         cursor = coords.c0;
+	const char *action;
+	unsigned cols = coords.cN - coords.c1 + 1;
+	unsigned cursor_row = coords.r1;
+	unsigned cursor_col = coords.cN;
 
-	printf(C_MOVE(%d, 1) CLEAR_LINE, coords.rN);
-	printf(C_SAVE);
+	printf(C_MOVE(%d, %d), coords.r1, coords.c1);
 
-	/* Insufficient columns for meaningful input drawing */
-	if (cols_t < 3)
-		return;
+	if ((action = action_message())) {
+		if (!(cols = drawf(cols, "%b%f%s%b%f-- %s --",
+				INPUT_PREFIX_BG,
+				INPUT_PREFIX_FG,
+				INPUT_PREFIX,
+				ACTION_BG,
+				ACTION_FG,
+				action)))
+			goto cursor;
 
-	char input[cols_t + COLOUR_SIZE * 2 + 1];
-	char *input_ptr = input;
-
-	size_t buff_n = sizeof(input) - 1,
-	       text_n = cols_t;
-
-	if (sizeof(INPUT_PREFIX)) {
-
-		if (!draw_fmt(&input_ptr, &buff_n, &text_n, 0,
-				"%s", draw_colour(INPUT_PREFIX_FG, INPUT_PREFIX_BG)))
-			goto print_input;
-
-		cursor = coords.c0 + sizeof(INPUT_PREFIX) - 1;
-
-		if (!draw_fmt(&input_ptr, &buff_n, &text_n, 1,
-				INPUT_PREFIX))
-			goto print_input;
-	}
-
-	if (action_message()) {
-
-		if (!draw_fmt(&input_ptr, &buff_n, &text_n, 0,
-				"%s", draw_colour(ACTION_FG, ACTION_BG)))
-			goto print_input;
-
-		cursor = coords.cN;
-
-		if (!draw_fmt(&input_ptr, &buff_n, &text_n, 1, "-- %s --", action_message()))
-			goto print_input;
-
-		cursor = cols_t - text_n + 1;
-
+		cursor_col = coords.cN - coords.c1 - cols + 3;
 	} else {
-		if (!draw_fmt(&input_ptr, &buff_n, &text_n, 0,
-				"%s", draw_colour(INPUT_FG, INPUT_BG)))
-			goto print_input;
+		char input[INPUT_LEN_MAX];
+		unsigned cursor_pre;
+		unsigned cursor_inp;
 
-		cursor += input_frame(inp, input_ptr, text_n);
+		if (!(cols = drawf(cols, "%b%f%s",
+				INPUT_PREFIX_BG,
+				INPUT_PREFIX_FG,
+				INPUT_PREFIX)))
+			goto cursor;
+
+		cursor_pre = coords.cN - coords.c1 - cols + 1;
+		cursor_inp = input_frame(inp, input, cols);
+
+		if (!(cols = drawf(cols, "%b%f%s",
+				INPUT_BG,
+				INPUT_FG,
+				input)))
+			goto cursor;
+
+		cursor_col = cursor_pre + cursor_inp + 1;
 	}
 
-print_input:
+	printf(ATTR_RESET);
 
-	fputs(input, stdout);
-	printf(C_MOVE(%d, %d), coords.rN, (cursor >= coords.c0 && cursor <= coords.cN) ? cursor : coords.cN);
+	while (cols--)
+		printf(" ");
+
+cursor:
+
+	cursor_row = MIN(cursor_row, coords.rN);
+	cursor_col = MIN(cursor_col, coords.cN);
+
+	printf(C_MOVE(%d, %d), cursor_row, cursor_col);
 	printf(C_SAVE);
 }
 
@@ -638,11 +635,11 @@ draw_status(struct channel *c)
 	 */
 
 	#define STATUS_SEP_HORZ \
-		"%f%b" SEP_HORZ "%f%b", \
-			SEP_FG, \
+		"%b%f" SEP_HORZ "%b%f", \
 			SEP_BG, \
-			STATUS_FG, \
-			STATUS_BG
+			SEP_FG, \
+			STATUS_BG, \
+			STATUS_FG
 
 	unsigned cols = state_cols();
 	unsigned rows = state_rows();
@@ -708,11 +705,11 @@ check_coords(struct coords coords)
 {
 	/* Check coordinate validity before drawing, ensure at least one row, column */
 
-	if (coords.r0 > coords.rN)
-		fatal("row coordinates invalid (%u > %u)", coords.r0, coords.rN);
+	if (coords.r1 > coords.rN)
+		fatal("row coordinates invalid (%u > %u)", coords.r1, coords.rN);
 
-	if (coords.c0 > coords.cN)
-		fatal("col coordinates invalid (%u > %u)", coords.c0, coords.cN);
+	if (coords.c1 > coords.cN)
+		fatal("col coordinates invalid (%u > %u)", coords.c1, coords.cN);
 }
 
 static unsigned

@@ -82,8 +82,6 @@ input_delete_forw(struct input *inp)
 int
 input_insert(struct input *inp, const char *c, size_t count)
 {
-	/* TODO: may want to discard control characters */
-
 	size_t i = count;
 
 	while (!input_text_isfull(inp) && i--) {
@@ -279,24 +277,23 @@ input_frame(struct input *inp, char *buf, uint16_t max)
 uint16_t
 input_write(struct input *inp, char *buf, uint16_t max, uint16_t pos)
 {
-	uint16_t i = pos,
-	         j = 0;
+	uint16_t buf_len = 0;
 
-	while (max > 1 && i < inp->head) {
-		buf[j++] = inp->text[i++];
+	while (max > 1 && pos < inp->head) {
+		buf[buf_len++] = inp->text[pos++];
 		max--;
 	}
 
-	i = inp->tail;
+	pos = inp->tail;
 
-	while (max > 1 && i < INPUT_LEN_MAX) {
-		buf[j++] = inp->text[i++];
+	while (max > 1 && pos < INPUT_LEN_MAX) {
+		buf[buf_len++] = inp->text[pos++];
 		max--;
 	}
 
-	buf[j] = 0;
+	buf[buf_len] = 0;
 
-	return j;
+	return buf_len;
 }
 
 static char*
