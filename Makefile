@@ -18,7 +18,7 @@ STDS := -std=c11 -D_POSIX_C_SOURCE=200809L
 
 CC := cc
 PP := cc -E
-CFLAGS   := $(CC_EXT) $(STDS) $(TLS_INCL) -I. -DVERSION=\"$(VERSION)\" -Wall -Wextra -pedantic
+CFLAGS   := $(CC_EXT) $(STDS) $(TLS_INCL) -I. -DVERSION=\"$(VERSION)\" -D_DARWIN_C_SOURCE -Wall -Wextra -pedantic
 CFLAGS_R := $(CFLAGS) -O2 -flto -DNDEBUG
 CFLAGS_D := $(CFLAGS) -O0 -g
 LDFLAGS  := $(LD_EXT) -lpthread
