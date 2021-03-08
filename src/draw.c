@@ -96,6 +96,10 @@ static struct draw_state draw_state;
 static unsigned drawf(unsigned, const char*, ...);
 static void draw_bg(int);
 static void draw_fg(int);
+static void draw_char(int);
+
+static int bg_last = -1;
+static int fg_last = -1;
 
 void
 draw(enum draw_bit bit)
@@ -812,9 +816,6 @@ drawf(unsigned cols, const char *fmt, ...)
 
 	char buf[64];
 	char c;
-	const char *str;
-	unsigned substr_col;
-	unsigned substr_len;
 	va_list arg;
 
 	va_start(arg, fmt);
@@ -832,40 +833,36 @@ drawf(unsigned cols, const char *fmt, ...)
 					draw_fg(va_arg(arg, int));
 					break;
 				case 'c':
-					cols -= (unsigned) printf("%c", va_arg(arg, int));
+					draw_char(va_arg(arg, int));
+					cols--;
 					break;
 				case 'd':
-					snprintf(buf, sizeof(buf), "%d", va_arg(arg, int));
+					(void) snprintf(buf, sizeof(buf), "%d", va_arg(arg, int));
 					cols -= (unsigned) printf("%.*s", cols, buf);
 					break;
 				case 'u':
-					snprintf(buf, sizeof(buf), "%u", va_arg(arg, unsigned));
+					(void) snprintf(buf, sizeof(buf), "%u", va_arg(arg, unsigned));
 					cols -= (unsigned) printf("%.*s", cols, buf);
 					break;
 				case 's':
-					str = va_arg(arg, const char *);
-					substr_col = 0;
-					substr_len = 0;
-					while (str[substr_len] && substr_col < cols) {
-						substr_col++;
-						substr_len++;
-						while (UTF8_CONT(str[substr_len]))
-							substr_len++;
+					for (const char *str = va_arg(arg, const char*); *str && cols; cols--) {
+						do {
+							draw_char(*str++);
+						} while (UTF8_CONT(*str));
 					}
-					printf("%.*s", substr_len, str);
-					cols -= substr_col;
 					break;
 				case '%':
-					cols -= (unsigned) printf("%%");
+					putchar('%');
+					cols--;
 					break;
 				default:
 					fatal("unknown drawf format character '%c'", c);
 			}
 		} else {
-			printf("%c", c);
-			while (UTF8_CONT(*fmt))
-				printf("%c", *fmt++);
 			cols--;
+			draw_char(c);
+			while (UTF8_CONT(*fmt))
+				draw_char(*fmt++);
 		}
 	}
 
@@ -882,6 +879,8 @@ draw_bg(int bg)
 
 	if (bg >= 0 && bg <= 255)
 		printf(ATTR_BG(%d), bg);
+
+	bg_last = bg;
 }
 
 static void
@@ -892,4 +891,22 @@ draw_fg(int fg)
 
 	if (fg >= 0 && fg <= 255)
 		printf(ATTR_FG(%d), fg);
+
+	fg_last = fg;
+}
+
+static void
+draw_char(int c)
+{
+	if (iscntrl(c)) {
+		int ctrl_bg_last = bg_last;
+		int ctrl_fg_last = fg_last;
+		draw_bg(CTRL_BG);
+		draw_fg(CTRL_FG);
+		putchar((c | 0x40));
+		draw_bg(ctrl_bg_last);
+		draw_fg(ctrl_fg_last);
+	} else {
+		putchar(c);
+	}
 }

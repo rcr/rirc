@@ -238,13 +238,13 @@ test_buffer_scrollback_status(void)
 	assert_true(buffer_full(&b));
 
 	b.scrollback = b.tail;
-	assert_ueq((100 * buffer_scrollback_status(&b)), 100);
+	assert_ueq((buffer_scrollback_status(&b)), 100);
 
 	b.scrollback = b.tail + (BUFFER_LINES_MAX / 2);
-	assert_ueq((100 * buffer_scrollback_status(&b)), 50);
+	assert_ueq((buffer_scrollback_status(&b)), 50);
 
 	b.scrollback = b.head - 1;
-	assert_ueq((100 * buffer_scrollback_status(&b)), 0);
+	assert_ueq((buffer_scrollback_status(&b)), 0);
 }
 
 static void
