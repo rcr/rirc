@@ -1,6 +1,7 @@
-image: alpine/latest
+image: fedora/latest
 
 packages:
+  - cmake
   - gperf
 
 sources:
@@ -15,6 +16,8 @@ tasks:
   - build: |
       cd rirc
       make all
+  - check: |
+      cd rirc
       make check
 
 triggers:

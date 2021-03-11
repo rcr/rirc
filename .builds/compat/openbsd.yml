@@ -1,0 +1,27 @@
+image: openbsd/latest
+
+packages:
+  - cmake
+  - gmake
+  - gperf
+
+sources:
+  - https://git.sr.ht/~rcr/rirc
+
+tasks:
+  - setup: |
+      cd rirc
+      git submodule init
+      git submodule update --recursive
+      export MAKEFLAGS='-j $(nproc)'
+  - build: |
+      cd rirc
+      gmake all
+  - check: |
+      cd rirc
+      gmake check
+
+triggers:
+  - action: email
+    condition: failure
+    to: mail+sourcehut+builds@rcr.io

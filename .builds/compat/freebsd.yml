@@ -1,9 +1,9 @@
-image: alpine/edge
+image: freebsd/latest
 
 packages:
   - cmake
+  - gmake
   - gperf
-  - perl
 
 sources:
   - https://git.sr.ht/~rcr/rirc
@@ -16,9 +16,10 @@ tasks:
       export MAKEFLAGS='-j $(nproc)'
   - build: |
       cd rirc
-      make clean
-      make all
-      make check
+      gmake all
+  - check: |
+      cd rirc
+      gmake check
 
 triggers:
   - action: email

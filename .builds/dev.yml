@@ -1,10 +1,9 @@
-image: debian/stable
+image: alpine/latest
 
 packages:
   - cmake
   - curl
   - gperf
-  - perl
   - unzip
 
 sources:
@@ -22,8 +21,9 @@ tasks:
       export MAKEFLAGS='-j $(nproc)'
   - build: |
       cd rirc
-      make clean
       make all
+  - check: |
+      cd rirc
       make check
   - static-analysis: |
       cd rirc
