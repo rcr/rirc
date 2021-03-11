@@ -26,6 +26,8 @@
 
 # rirc
 
+test
+
 A minimalistic irc client written in C.
 
 Connections are TLS enabled over port 6697 by default.
