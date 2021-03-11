@@ -15,6 +15,8 @@
 
 #define MAX_CLI_SERVERS 16
 
+test build failure
+
 #define arg_error(...) \
 	do { fprintf(stderr, "%s ", runtime_name); \
 	     fprintf(stderr, __VA_ARGS__); \
