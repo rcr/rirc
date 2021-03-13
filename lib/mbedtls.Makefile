@@ -17,9 +17,9 @@ $(MBEDTLS_LIBS): $(MBEDTLS_CFG) $(MBEDTLS_SRC)
 	@$(MAKE) --silent -C $(MBEDTLS_SRC) CFLAGS="$(CFLAGS) -DMBEDTLS_CONFIG_FILE='<$(MBEDTLS_CFG)>'" lib
 
 $(MBEDTLS_SRC): $(MBEDTLS_SHA)
-	@echo "curl $(MBEDTLS_TAR)..."
+	@echo "$(MBEDTLS_TAR)..."
 	@curl -LfsS $(MBEDTLS_URL) -o $(MBEDTLS_TAR)
-	@sha256sum --quiet --check $(MBEDTLS_SHA)
+	@sha256sum -c $(MBEDTLS_SHA)
 	@tar -xmf $(MBEDTLS_TAR) --directory $(DIR_L)
 
 $(MBEDTLS_SHA):
