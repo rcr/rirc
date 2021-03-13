@@ -14,6 +14,8 @@ DIR_S := src
 DIR_L := lib
 DIR_T := test
 
+CONFIG := config.h
+
 include lib/mbedtls.Makefile
 
 CFLAGS ?= -O2 -flto
@@ -57,19 +59,19 @@ $(BIN_D): $(MBEDTLS_LIBS) $(OBJS_G) $(OBJS_D)
 	@$(CC) $(LDFLAGS) -o $@ $(OBJS_D) $(MBEDTLS_LIBS)
 
 # Release build objects
-$(DIR_B)/%.o: $(DIR_S)/%.c | $(DIR_B)
+$(DIR_B)/%.o: $(DIR_S)/%.c $(CONFIG) | $(DIR_B)
 	@echo "  CC    $<"
 	@$(CPP) $(CFLAGS) $(CFLAGS_LOCAL) -MM -MP -MT $@ -MF $(@:.o=.o.d) $<
 	@$(CC)  $(CFLAGS) $(CFLAGS_LOCAL) -c -o $@ $<
 
 # Debug build objects
-$(DIR_B)/%.db.o: $(DIR_S)/%.c | $(DIR_B)
+$(DIR_B)/%.db.o: $(DIR_S)/%.c $(CONFIG) | $(DIR_B)
 	@echo "  CC    $<"
 	@$(CPP) $(CFLAGS_DEBUG) $(CFLAGS_LOCAL) -MM -MP -MT $@ -MF $(@:.o=.o.d) $<
 	@$(CC)  $(CFLAGS_DEBUG) $(CFLAGS_LOCAL) -c -o $@ $<
 
 # Testcases
-$(DIR_B)/%.t: $(DIR_T)/%.c $(OBJS_G) | $(DIR_B)
+$(DIR_B)/%.t: $(DIR_T)/%.c $(OBJS_G) $(CONFIG) | $(DIR_B)
 	@$(CPP) $(CFLAGS_DEBUG) $(CFLAGS_LOCAL) -MM -MP -MT $@ -MF $(@:.t=.t.d) $<
 	@$(CC)  $(CFLAGS_DEBUG) $(CFLAGS_LOCAL) -c -o $(@:.t=.t.o) $<
 	@$(CC)  $(CFLAGS_DEBUG) $(CFLAGS_LOCAL) -o $@ $(@:.t=.t.o)
@@ -80,7 +82,7 @@ $(DIR_B)/%.t: $(DIR_T)/%.c $(OBJS_G) | $(DIR_B)
 $(DIR_B):
 	@for dir in $(patsubst $(DIR_S)/%, $(DIR_B)/%, $(SUBDIRS)); do mkdir -p $$dir; done
 
-config.h:
+$(CONFIG):
 	cp config.def.h config.h
 
 %.gperf.out: %.gperf

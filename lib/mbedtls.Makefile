@@ -19,7 +19,7 @@ $(MBEDTLS_LIBS): $(MBEDTLS_CFG) $(MBEDTLS_SRC)
 $(MBEDTLS_SRC): $(MBEDTLS_SHA)
 	@echo "curl $(MBEDTLS_TAR)..."
 	@curl -LfsS $(MBEDTLS_URL) -o $(MBEDTLS_TAR)
-	@shasum -a 256 -q --check $(MBEDTLS_SHA)
+	@sha256sum --quiet --check $(MBEDTLS_SHA)
 	@tar -xmf $(MBEDTLS_TAR) --directory $(DIR_L)
 
 $(MBEDTLS_SHA):
