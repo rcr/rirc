@@ -11,6 +11,7 @@ sources:
 tasks:
   - build: |
       cd rirc
+      MAKEFLAGS="-j $(nproc)" gmake libs
       MAKEFLAGS="-j $(nproc)" gmake all
   - check: |
       cd rirc

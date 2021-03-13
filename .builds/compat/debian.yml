@@ -10,6 +10,7 @@ sources:
 tasks:
   - build: |
       cd rirc
+      MAKEFLAGS="-j $(nproc)" make libs
       MAKEFLAGS="-j $(nproc)" make all
   - check: |
       cd rirc
