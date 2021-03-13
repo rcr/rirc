@@ -4,15 +4,15 @@ set -e
 
 export CC=clang
 
-export CC_EXT="-fsanitize=address,undefined -fno-omit-frame-pointer"
-export LD_EXT="-fsanitize=address,undefined"
+export CFLAGS_DEBUG="-fsanitize=address,undefined -fno-omit-frame-pointer"
+export LDFLAGS="-fsanitize=address,undefined"
 
 make -e clean rirc.debug
 
 mv rirc.debug rirc.debug.address
 
-export CC_EXT="-fsanitize=thread,undefined -fno-omit-frame-pointer"
-export LD_EXT="-fsanitize=thread,undefined"
+export CFLAGS_DEBUG="-fsanitize=thread,undefined -fno-omit-frame-pointer"
+export LDFLAGS="-fsanitize=thread,undefined"
 
 make -e clean rirc.debug
 

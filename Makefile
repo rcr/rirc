@@ -1,6 +1,6 @@
 VERSION := 0.1.4
 
-# Release and debug build executable names
+# Release and debug executable names
 BIN_R := rirc
 BIN_D := rirc.debug
 
@@ -8,27 +8,28 @@ BIN_D := rirc.debug
 BIN_DIR := /usr/local/bin
 MAN_DIR := /usr/local/share/man/man1
 
-TLS_CONF := $(PWD)/lib/mbedtls.h
-TLS_INCL := -I $(PWD)/lib/mbedtls/include/ -DMBEDTLS_CONFIG_FILE='<$(TLS_CONF)>'
-TLS_LIBS := ./lib/mbedtls/library/libmbedtls.a \
-            ./lib/mbedtls/library/libmbedx509.a \
-            ./lib/mbedtls/library/libmbedcrypto.a
-
-STDS := -std=c11 -D_POSIX_C_SOURCE=200809L
-
-CC := cc
-PP := cc -E
-CFLAGS   := $(CC_EXT) $(STDS) $(TLS_INCL) -I. -DVERSION=\"$(VERSION)\" -D_DARWIN_C_SOURCE -Wall -Wextra -pedantic
-CFLAGS_R := $(CFLAGS) -O2 -flto -DNDEBUG
-CFLAGS_D := $(CFLAGS) -O0 -g
-LDFLAGS  := $(LD_EXT) -lpthread
-
-# Build, source, test source directories
+# Build, source, lib, and test directories
 DIR_B := bld
 DIR_S := src
+DIR_L := lib
 DIR_T := test
 
-PWD  := $(shell pwd)
+include lib/mbedtls.Makefile
+
+CFLAGS ?= -O2 -flto
+CFLAGS += -D NDEBUG
+
+CFLAGS_DEBUG ?=
+CFLAGS_DEBUG += -O0 -g3
+
+CFLAGS_LOCAL := -std=c11 -Wall -Wextra -Werror -D VERSION=\"$(VERSION)\"
+CFLAGS_LOCAL += -I . -I $(MBEDTLS_SRC)/include/
+CFLAGS_LOCAL += -D MBEDTLS_CONFIG_FILE='<$(MBEDTLS_CFG)>'
+CFLAGS_LOCAL += -D _POSIX_C_SOURCE=200809L
+CFLAGS_LOCAL += -D _DARWIN_C_SOURCE
+
+LDFLAGS ?=
+LDFLAGS += -lpthread
 
 SRC     := $(shell find $(DIR_S) -name '*.c')
 SUBDIRS += $(shell find $(DIR_S) -name '*.c' -exec dirname {} \; | sort -u)
@@ -36,7 +37,7 @@ SUBDIRS += $(shell find $(DIR_S) -name '*.c' -exec dirname {} \; | sort -u)
 SRC_G   := $(shell find $(DIR_S) -name '*.gperf')
 SUBDIRS += $(shell find $(DIR_S) -name '*.gperf' -exec dirname {} \; | sort -u)
 
-# Release, debug, testcase build objects
+# Release, debug, and testcase build objects
 OBJS_D := $(patsubst $(DIR_S)/%.c, $(DIR_B)/%.db.o, $(SRC))
 OBJS_R := $(patsubst $(DIR_S)/%.c, $(DIR_B)/%.o,    $(SRC))
 OBJS_T := $(patsubst $(DIR_S)/%.c, $(DIR_B)/%.t,    $(SRC))
@@ -46,49 +47,44 @@ OBJS_T += $(DIR_B)/utils/tree.t # Header only file
 OBJS_G := $(patsubst %.gperf, %.gperf.out, $(SRC_G))
 
 # Release build executable
-$(BIN_R): $(TLS_LIBS) $(OBJS_G) $(OBJS_R)
-	@echo " CC  $@"
-	@$(CC) $(LDFLAGS) -o $@ $(OBJS_R) $(TLS_LIBS)
+$(BIN_R): $(MBEDTLS_LIBS) $(OBJS_G) $(OBJS_R)
+	@echo "  CC    $@"
+	@$(CC) $(LDFLAGS) -o $@ $(OBJS_R) $(MBEDTLS_LIBS)
 
 # Debug build executable
-$(BIN_D): $(TLS_LIBS) $(OBJS_G) $(OBJS_D)
-	@echo " CC  $@"
-	@$(CC) $(LDFLAGS) -o $@ $(OBJS_D) $(TLS_LIBS)
+$(BIN_D): $(MBEDTLS_LIBS) $(OBJS_G) $(OBJS_D)
+	@echo "  CC    $@"
+	@$(CC) $(LDFLAGS) -o $@ $(OBJS_D) $(MBEDTLS_LIBS)
 
 # Release build objects
-$(DIR_B)/%.o: $(DIR_S)/%.c config.h | $(DIR_B)
-	@echo " CC  $<"
-	@$(PP) $(CFLAGS_R) -MM -MP -MT $@ -MF $(@:.o=.o.d) $<
-	@$(CC) $(CFLAGS_R) -c -o $@ $<
+$(DIR_B)/%.o: $(DIR_S)/%.c | $(DIR_B)
+	@echo "  CC    $<"
+	@$(CPP) $(CFLAGS) $(CFLAGS_LOCAL) -MM -MP -MT $@ -MF $(@:.o=.o.d) $<
+	@$(CC)  $(CFLAGS) $(CFLAGS_LOCAL) -c -o $@ $<
 
 # Debug build objects
-$(DIR_B)/%.db.o: $(DIR_S)/%.c config.h | $(DIR_B)
-	@echo " CC  $<"
-	@$(PP) $(CFLAGS_D) -MM -MP -MT $@ -MF $(@:.o=.o.d) $<
-	@$(CC) $(CFLAGS_D) -c -o $@ $<
+$(DIR_B)/%.db.o: $(DIR_S)/%.c | $(DIR_B)
+	@echo "  CC    $<"
+	@$(CPP) $(CFLAGS_DEBUG) $(CFLAGS_LOCAL) -MM -MP -MT $@ -MF $(@:.o=.o.d) $<
+	@$(CC)  $(CFLAGS_DEBUG) $(CFLAGS_LOCAL) -c -o $@ $<
 
 # Testcases
 $(DIR_B)/%.t: $(DIR_T)/%.c $(OBJS_G) | $(DIR_B)
-	@$(PP) $(CFLAGS_D) -MM -MP -MT $@ -MF $(@:.t=.t.d) $<
-	@$(CC) $(CFLAGS_D) -c -o $(@:.t=.t.o) $<
-	@$(CC) $(CFLAGS_D) -o $@ $(@:.t=.t.o)
-	@$(TEST_EXT) ./$@ || mv $@ $(@:.t=.td)
+	@$(CPP) $(CFLAGS_DEBUG) $(CFLAGS_LOCAL) -MM -MP -MT $@ -MF $(@:.t=.t.d) $<
+	@$(CC)  $(CFLAGS_DEBUG) $(CFLAGS_LOCAL) -c -o $(@:.t=.t.o) $<
+	@$(CC)  $(CFLAGS_DEBUG) $(CFLAGS_LOCAL) -o $@ $(@:.t=.t.o)
+	@./$@ || mv $@ $(@:.t=.td)
 	@[ -f $@ ]
+
+# Build directories
+$(DIR_B):
+	@for dir in $(patsubst $(DIR_S)/%, $(DIR_B)/%, $(SUBDIRS)); do mkdir -p $$dir; done
 
 config.h:
 	cp config.def.h config.h
 
 %.gperf.out: %.gperf
 	gperf --output-file=$@ $<
-
-# Build directories
-$(DIR_B):
-	@for dir in $(patsubst $(DIR_S)/%, %, $(SUBDIRS)); do mkdir -p $(DIR_B)/$$dir; done
-
-# TLS libraries
-$(TLS_LIBS): $(TLS_CONF)
-	@CFLAGS="$(TLS_INCL)" $(MAKE) --silent -C ./lib/mbedtls clean
-	@CFLAGS="$(TLS_INCL)" $(MAKE) --silent -C ./lib/mbedtls lib
 
 all:
 	@$(MAKE) --silent $(BIN_R)
@@ -101,7 +97,8 @@ clean:
 	@rm -rf $(DIR_B)
 	@rm -vf $(BIN_R) $(BIN_D) $(OBJS_G)
 
-libs: $(TLS_LIBS)
+libs:
+	@$(MAKE) --silent $(MBEDTLS_LIBS)
 
 install: $(BIN_R)
 	@echo installing executable to $(BIN_DIR)
@@ -120,4 +117,8 @@ uninstall:
 -include $(OBJS_D:.o=.o.d)
 -include $(OBJS_T:.t=.t.d)
 
+.DEFAULT_GOAL := $(BIN_R)
+
 .PHONY: all check clean libs install uninstall
+
+.SUFFIXES:

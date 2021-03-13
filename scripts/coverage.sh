@@ -5,8 +5,7 @@ set -e
 CDIR="coverage"
 
 export CC=gcc
-export CC_EXT="-fprofile-arcs -ftest-coverage -fprofile-abs-path"
-export LD_EXT="-fprofile-arcs"
+export CFLAGS_DEBUG="-fprofile-arcs -ftest-coverage -fprofile-abs-path"
 
 export MAKEFLAGS="-e -j $(nproc)"
 

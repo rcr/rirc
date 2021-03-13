@@ -43,9 +43,12 @@ See: https://www.gnu.org/software/gperf/
 Build rirc:
 
 ```
-git submodule init
-git submodule update --recursive
 make
+```
+
+The build toolchain can be configured via standard environment variables, e.g.:
+```
+CC=clang CFLAGS='-Os' LDFLAGS='-fuse-ld=lld' make
 ```
 
 ### Installing:

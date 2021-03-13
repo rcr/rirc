@@ -1,7 +1,6 @@
 image: alpine/latest
 
 packages:
-  - cmake
   - curl
   - gperf
   - unzip
@@ -14,17 +13,12 @@ secrets:
   - a58d0951-f57f-44ef-8ef2-25f2f84f0e89
 
 tasks:
-  - setup: |
-      cd rirc
-      git submodule init
-      git submodule update --recursive
-      export MAKEFLAGS='-j $(nproc)'
   - build: |
       cd rirc
-      make all
+      MAKEFLAGS='-j $(nproc)' make all
   - check: |
       cd rirc
-      make check
+      MAKEFLAGS='-j $(nproc)' make check
   - static-analysis: |
       cd rirc
       [ $(git name-rev --name-only HEAD) = "remotes/origin/static_analysis" ] || complete-build
