@@ -22,9 +22,9 @@ mkdir -p "$1"
 
 echo "*" > "$1/.gitignore"
 
-curl -fs --show-error "$BUILD_ZIP_URL" -o "$BUILD_ZIP"
-curl -fs --show-error "$SONAR_ZIP_URL" -o "$SONAR_ZIP"
-curl -fs --show-error "$SONAR_MD5_URL" -o "$SONAR_MD5"
+curl -fsS "$BUILD_ZIP_URL" -o "$BUILD_ZIP"
+curl -fsS "$SONAR_ZIP_URL" -o "$SONAR_ZIP"
+curl -fsS "$SONAR_MD5_URL" -o "$SONAR_MD5"
 
 printf "%s\t$SONAR_ZIP" "$(cat "$SONAR_MD5")" | md5sum --quiet -c -
 

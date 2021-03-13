@@ -30,7 +30,7 @@ make libs
 
 cov-build --dir "$COVERITY_OUT" make all check
 
-tar czf "$COVERITY_TAR" "$COVERITY_OUT"
+tar -czf "$COVERITY_TAR" "$COVERITY_OUT"
 
 curl https://scan.coverity.com/builds?project=rcr%2Frirc \
 	--form description="$VERSION" \
