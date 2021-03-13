@@ -11,11 +11,10 @@ sources:
 tasks:
   - build: |
       cd rirc
-      MAKEFLAGS="-j $(nproc)" gmake libs
-      MAKEFLAGS="-j $(nproc)" gmake all
+      gmake all
   - check: |
       cd rirc
-      MAKEFLAGS="-j $(nproc)" gmake check
+      gmake check
 
 triggers:
   - action: email
