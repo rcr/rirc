@@ -7,13 +7,14 @@
 *.t
 *.td
 .cache
-bld
+build
 compile_commands.json
 config.h
 coverage
 lib/mbedtls-*
 lib/mbedtls.sha256
 rirc
+rirc.1
 rirc.debug
 rirc.debug.address
 rirc.debug.thread
