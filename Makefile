@@ -82,16 +82,16 @@ libs:
 
 install: rirc
 	@sed "s/VERSION/$(VERSION)/g" < docs/rirc.1 > rirc.1
-	mkdir -p $(BIN_PATH)
-	mkdir -p $(MAN_PATH)
-	cp -f rirc   $(BIN_PATH)
-	cp -f rirc.1 $(MAN_PATH)
-	chmod 755 $(BIN_PATH)/rirc
-	chmod 644 $(MAN_PATH)/rirc.1
+	mkdir -p $(PATH_BIN)
+	mkdir -p $(PATH_MAN)
+	cp -f rirc   $(PATH_BIN)
+	cp -f rirc.1 $(PATH_MAN)
+	chmod 755 $(PATH_BIN)/rirc
+	chmod 644 $(PATH_MAN)/rirc.1
 
 uninstall:
-	rm -f $(BIN_PATH)/rirc
-	rm -f $(MAN_PATH)/rirc.1
+	rm -f $(PATH_BIN)/rirc
+	rm -f $(PATH_MAN)/rirc.1
 
 -include $(OBJS_R:.o=.o.d)
 -include $(OBJS_D:.o=.o.d)
