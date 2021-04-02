@@ -93,7 +93,7 @@ static int actv_colours[ACTIVITY_T_SIZE] = ACTIVITY_COLOURS
 static int nick_colours[] = NICK_COLOURS
 static struct draw_state draw_state;
 
-static unsigned drawf(unsigned, const char*, ...);
+static unsigned drawf(unsigned*, const char*, ...);
 static void draw_bg(int);
 static void draw_fg(int);
 static void draw_char(int);
@@ -469,13 +469,13 @@ draw_input(struct input *inp, struct coords coords)
 	printf(C_MOVE(%d, %d), coords.r1, coords.c1);
 
 	if ((action = action_message())) {
-		if (!(cols = drawf(cols, "%b%f%s%b%f-- %s --",
+		if (!drawf(&cols, "%b%f%s%b%f-- %s --",
 				INPUT_PREFIX_BG,
 				INPUT_PREFIX_FG,
 				INPUT_PREFIX,
 				ACTION_BG,
 				ACTION_FG,
-				action)))
+				action))
 			goto cursor;
 
 		cursor_col = coords.cN - coords.c1 - cols + 3;
@@ -484,19 +484,19 @@ draw_input(struct input *inp, struct coords coords)
 		unsigned cursor_pre;
 		unsigned cursor_inp;
 
-		if (!(cols = drawf(cols, "%b%f%s",
+		if (!drawf(&cols, "%b%f%s",
 				INPUT_PREFIX_BG,
 				INPUT_PREFIX_FG,
-				INPUT_PREFIX)))
+				INPUT_PREFIX))
 			goto cursor;
 
 		cursor_pre = coords.cN - coords.c1 - cols + 1;
 		cursor_inp = input_frame(inp, input, cols);
 
-		if (!(cols = drawf(cols, "%b%f%s",
+		if (!drawf(&cols, "%b%f%s",
 				INPUT_BG,
 				INPUT_FG,
-				input)))
+				input))
 			goto cursor;
 
 		cursor_col = cursor_pre + cursor_inp + 1;
@@ -616,7 +616,7 @@ draw_nav(struct channel *c)
 
 		int fg = (tmp == c) ? NAV_CURRENT_CHAN : actv_colours[tmp->activity];
 
-		if (!(cols = drawf(cols, "%f %s ", fg, tmp->name)))
+		if (!drawf(&cols, "%f %s ", fg, tmp->name))
 			break;
 
 		if (tmp == frame_next)
@@ -655,44 +655,44 @@ draw_status(struct channel *c)
 
 	/* -[usermodes] */
 	if (c->server && *(c->server->mode_str.str)) {
-		if (!(cols = drawf(cols, STATUS_SEP_HORZ)))
+		if (!drawf(&cols, STATUS_SEP_HORZ))
 			return;
-		if (!(cols = drawf(cols, "[+%s]", c->server->mode_str.str)))
+		if (!drawf(&cols, "[+%s]", c->server->mode_str.str))
 			return;
 	}
 
 	/* -[priv] */
 	if (c->type == CHANNEL_T_PRIVATE) {
-		if (!(cols = drawf(cols, STATUS_SEP_HORZ)))
+		if (!drawf(&cols, STATUS_SEP_HORZ))
 			return;
-		if (!(cols = drawf(cols, "[priv]")))
+		if (!drawf(&cols, "[priv]"))
 			return;
 	}
 
 	/* -[chantype chanmodes chancount] */
 	if (c->type == CHANNEL_T_CHANNEL) {
-		if (!(cols = drawf(cols, STATUS_SEP_HORZ)))
+		if (!drawf(&cols, STATUS_SEP_HORZ))
 			return;
-		if (!(cols = drawf(cols, "[%c %s %u]",
+		if (!drawf(&cols, "[%c %s %u]",
 				c->chanmodes.prefix,
 				c->chanmodes_str.str,
-				c->users.count)))
+				c->users.count))
 			return;
 	}
 
 	/* -(ping) */
 	if (c->server && c->server->ping) {
-		if (!(cols = drawf(cols, STATUS_SEP_HORZ)))
+		if (!drawf(&cols, STATUS_SEP_HORZ))
 			return;
-		if (!(cols = drawf(cols, "(%us)", c->server->ping)))
+		if (!drawf(&cols, "(%us)", c->server->ping))
 			return;
 	}
 
 	/* -(scrollback) */
 	if ((scrollback = buffer_scrollback_status(&c->buffer))) {
-		if (!(cols = drawf(cols, STATUS_SEP_HORZ)))
+		if (!drawf(&cols, STATUS_SEP_HORZ))
 			return;
-		if (!(cols = drawf(cols, "(%u%%)", scrollback)))
+		if (!drawf(&cols, "(%u%s)", scrollback, "%"))
 			return;
 	}
 
@@ -799,7 +799,7 @@ draw_fmt(char **ptr, size_t *buff_n, size_t *text_n, int txt, const char *fmt, .
 }
 
 static unsigned
-drawf(unsigned cols, const char *fmt, ...)
+drawf(unsigned *cols_p, const char *fmt, ...)
 {
 	/* Draw formatted text up to a given number of
 	 * columns. Returns number of unused columns.
@@ -811,12 +811,15 @@ drawf(unsigned cols, const char *fmt, ...)
 	 *  %d -- output signed integer
 	 *  %u -- output unsigned integer
 	 *  %s -- output string
-	 *  %% -- output literal '%'
 	 */
 
 	char buf[64];
 	char c;
 	va_list arg;
+	unsigned cols;
+
+	if (!(cols = *cols_p))
+		return 0;
 
 	va_start(arg, fmt);
 
@@ -852,9 +855,6 @@ drawf(unsigned cols, const char *fmt, ...)
 					}
 					break;
 				case '%':
-					putchar('%');
-					cols--;
-					break;
 				default:
 					fatal("unknown drawf format character '%c'", c);
 			}
@@ -868,7 +868,7 @@ drawf(unsigned cols, const char *fmt, ...)
 
 	va_end(arg);
 
-	return cols;
+	return (*cols_p = cols);
 }
 
 static void
