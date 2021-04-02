@@ -16,25 +16,20 @@
 /* Control sequence initiator */
 #define CSI "\x1b["
 
-#define ATTR_FG(X)    CSI "38;5;"#X"m"
-#define ATTR_BG(X)    CSI "48;5;"#X"m"
-#define ATTR_RESET    CSI "0m"
-#define ATTR_RESET_FG CSI "39m"
-#define ATTR_RESET_BG CSI "49m"
-
-#define CLEAR_FULL    CSI "2J"
-#define CLEAR_LINE    CSI "2K"
-
-#define C_MOVE(X, Y)  CSI ""#X";"#Y"H"
-#define C_SAVE        CSI "s"
-#define C_RESTORE     CSI "u"
+#define ATTR_BG(X)         CSI "48;5;"#X"m"
+#define ATTR_FG(X)         CSI "38;5;"#X"m"
+#define ATTR_RESET         CSI "0m"
+#define ATTR_RESET_BG      CSI "49m"
+#define ATTR_RESET_FG      CSI "39m"
+#define CLEAR_FULL         CSI "2J"
+#define CLEAR_LINE         CSI "2K"
+#define CURSOR_POS(X, Y)   CSI #X";"#Y"H"
+#define CURSOR_POS_RESTORE CSI "u"
+#define CURSOR_POS_SAVE    CSI "s"
 
 /* Minimum rows or columns to safely draw */
 #define COLS_MIN 5
 #define ROWS_MIN 5
-
-/* Size of a full colour string for purposes of pre-formating text to print */
-#define COLOUR_SIZE sizeof(ATTR_RESET ATTR_FG(255) ATTR_BG(255))
 
 #ifndef BUFFER_PADDING
 #define BUFFER_PADDING 1
@@ -57,11 +52,13 @@
 
 struct coords
 {
-	unsigned c1, cN;
-	unsigned r1, rN;
+	unsigned c1;
+	unsigned cN;
+	unsigned r1;
+	unsigned rN;
 };
 
-struct draw_state
+static struct
 {
 	union {
 		struct {
@@ -74,30 +71,34 @@ struct draw_state
 		unsigned all;
 	} bits;
 	unsigned bell : 1;
-};
+} draw_state;
+
+static struct coords coords(unsigned, unsigned, unsigned, unsigned);
+static unsigned nick_col(char*);
+static unsigned drawf(unsigned*, const char*, ...);
 
 static void draw_bits(void);
 static void draw_buffer(struct buffer*, struct coords);
 static void draw_buffer_line(struct buffer_line*, struct coords, unsigned, unsigned, unsigned, unsigned);
-static void draw_separators(void);
 static void draw_input(struct input*, struct coords);
 static void draw_nav(struct channel*);
+static void draw_separators(void);
 static void draw_status(struct channel*);
 
-static unsigned nick_col(char*);
-static void check_coords(struct coords);
+static void draw_attr_bg(int);
+static void draw_attr_fg(int);
+static void draw_attr_reset(void);
+static void draw_char(int);
+static void draw_clear_full(void);
+static void draw_clear_line(void);
+static void draw_cursor_pos(int, int);
+static void draw_cursor_pos_restore(void);
+static void draw_cursor_pos_save(void);
 
 static int actv_colours[ACTIVITY_T_SIZE] = ACTIVITY_COLOURS
-static int nick_colours[] = NICK_COLOURS
-static struct draw_state draw_state;
-
-static unsigned drawf(unsigned*, const char*, ...);
-static void draw_bg(int);
-static void draw_fg(int);
-static void draw_char(int);
-
 static int bg_last = -1;
 static int fg_last = -1;
+static int nick_colours[] = NICK_COLOURS
 
 void
 draw(enum draw_bit bit)
@@ -127,8 +128,8 @@ draw(enum draw_bit bit)
 			draw_state.bits.all = -1;
 			break;
 		case DRAW_CLEAR:
-			printf(ATTR_RESET);
-			printf(CLEAR_FULL);
+			draw_attr_reset();
+			draw_clear_full();
 			break;
 		default:
 			fatal("unknown draw bit");
@@ -144,52 +145,48 @@ draw_bits(void)
 	if (!draw_state.bits.all)
 		return;
 
-	struct coords coords;
 	struct channel *c = current_channel();
 
-	if (state_cols() < COLS_MIN || state_rows() < ROWS_MIN) {
-		printf(CLEAR_FULL C_MOVE(1, 1) "rirc");
-		fflush(stdout);
-		return;
+	unsigned cols = state_cols();
+	unsigned rows = state_rows();
+
+	draw_cursor_pos_save();
+
+	if (cols < COLS_MIN || rows < ROWS_MIN) {
+		draw_clear_full();
+		draw_cursor_pos(1, 1);
+		goto flush;
 	}
 
-	printf(C_SAVE);
-
 	if (draw_state.bits.separators) {
-		printf(ATTR_RESET);
+		draw_attr_reset();
 		draw_separators();
 	}
 
 	if (draw_state.bits.buffer) {
-		printf(ATTR_RESET);
-		coords.c1 = 1;
-		coords.cN = state_cols();
-		coords.r1 = 3;
-		coords.rN = state_rows() - 2;
-		draw_buffer(&c->buffer, coords);
+		draw_attr_reset();
+		draw_buffer(&c->buffer, coords(1, cols, 3, rows - 2));
 	}
 
 	if (draw_state.bits.input) {
-		printf(ATTR_RESET);
-		coords.c1 = 1;
-		coords.cN = state_cols();
-		coords.r1 = state_rows();
-		coords.rN = state_rows();
-		draw_input(&c->input, coords);
+		draw_attr_reset();
+		draw_input(&c->input, coords(1, cols, rows, rows));
 	}
 
 	if (draw_state.bits.nav) {
-		printf(ATTR_RESET);
+		draw_attr_reset();
 		draw_nav(c);
 	}
 
 	if (draw_state.bits.status) {
-		printf(ATTR_RESET);
+		draw_attr_reset();
 		draw_status(c);
 	}
 
-	printf(ATTR_RESET);
-	printf(C_RESTORE);
+flush:
+
+	draw_attr_reset();
+	draw_cursor_pos_restore();
 
 	fflush(stdout);
 }
@@ -232,8 +229,6 @@ draw_buffer(struct buffer *b, struct coords coords)
 	 *    is encountered
 	 */
 
-	check_coords(coords);
-
 	unsigned buffer_i = b->scrollback;
 	unsigned col_total = coords.cN - coords.c1 + 1;
 	unsigned row;
@@ -243,8 +238,10 @@ draw_buffer(struct buffer *b, struct coords coords)
 	unsigned text_w;
 
 	/* Clear the buffer area */
-	for (row = coords.r1; row <= coords.rN; row++)
-		printf(C_MOVE(%d, 1) CLEAR_LINE, row);
+	for (row = coords.r1; row <= coords.rN; row++) {
+		draw_cursor_pos(row, 1);
+		draw_clear_line();
+	}
 
 	struct buffer_line *line = buffer_line(b, buffer_i);
 
@@ -324,8 +321,6 @@ draw_buffer_line(
 		unsigned skip,
 		unsigned pad)
 {
-	check_coords(coords);
-
 	char *p1 = line->text;
 	char *p2 = line->text + line->text_len;
 
@@ -353,7 +348,7 @@ draw_buffer_line(
 		(void) snprintf(buf_h, sizeof(buf_h), "%02d", tm->tm_hour);
 		(void) snprintf(buf_m, sizeof(buf_h), "%02d", tm->tm_min);
 
-		printf(C_MOVE(%d, %d), coords.r1, head_col);
+		draw_cursor_pos(coords.r1, head_col);
 
 		if (!drawf(&head_cols, " %b%f%s:%s%a ",
 				BUFFER_LINE_HEADER_BG,
@@ -407,7 +402,7 @@ print_text:
 	do {
 		unsigned text_cols = text_w;
 
-		printf(C_MOVE(%d, %d), coords.r1, text_col);
+		draw_cursor_pos(coords.r1, text_col);
 
 		if (!drawf(&text_cols, "%b%f%s%a ",
 				BUFFER_LINE_HEADER_BG,
@@ -421,13 +416,13 @@ print_text:
 			const char *text_p1 = p1;
 			const char *text_p2 = irc_strwrap(text_cols, &p1, p2);
 
-			draw_bg(text_bg);
-			draw_fg(text_fg);
+			draw_attr_bg(text_bg);
+			draw_attr_fg(text_fg);
 
 			for (unsigned i = 0; i < (text_p2 - text_p1); i++)
 				draw_char(text_p1[i]);
 
-			printf(ATTR_RESET);
+			draw_attr_reset();
 		}
 
 		coords.r1++;
@@ -438,13 +433,15 @@ print_text:
 static void
 draw_separators(void)
 {
-	printf(C_MOVE(2, 1));
+	unsigned cols = state_cols();
 
-	draw_bg(SEP_BG);
-	draw_fg(SEP_FG);
+	draw_cursor_pos(2, 1);
 
-	for (unsigned i = 0; i < state_cols(); i++)
-		printf(SEP_HORZ);
+	draw_attr_bg(SEP_BG);
+	draw_attr_fg(SEP_FG);
+
+	while (drawf(&cols, "%s", SEP_HORZ))
+		;
 }
 
 static void
@@ -452,14 +449,12 @@ draw_input(struct input *inp, struct coords coords)
 {
 	/* Draw the input line, or the current action message */
 
-	check_coords(coords);
-
 	const char *action;
 	unsigned cols = coords.cN - coords.c1 + 1;
 	unsigned cursor_row = coords.r1;
 	unsigned cursor_col = coords.cN;
 
-	printf(C_MOVE(%d, %d), coords.r1, coords.c1);
+	draw_cursor_pos(coords.r1, coords.c1);
 
 	if ((action = action_message())) {
 		if (!drawf(&cols, "%b%f%s%b%f-- %s --",
@@ -495,18 +490,18 @@ draw_input(struct input *inp, struct coords coords)
 		cursor_col = cursor_pre + cursor_inp + 1;
 	}
 
-	printf(ATTR_RESET);
+	draw_attr_reset();
 
 	while (cols--)
-		printf(" ");
+		draw_char(' ');
 
 cursor:
 
 	cursor_row = MIN(cursor_row, coords.rN);
 	cursor_col = MIN(cursor_col, coords.cN);
 
-	printf(C_MOVE(%d, %d), cursor_row, cursor_col);
-	printf(C_SAVE);
+	draw_cursor_pos(cursor_row, cursor_col);
+	draw_cursor_pos_save();
 }
 
 static void
@@ -519,7 +514,8 @@ draw_nav(struct channel *c)
 	 *  - The nav is kept framed between the first and last channels
 	 */
 
-	printf(C_MOVE(1, 1) CLEAR_LINE);
+	draw_cursor_pos(1, 1);
+	draw_clear_line();
 
 	static struct channel *frame_prev,
 	                      *frame_next;
@@ -631,11 +627,7 @@ draw_status(struct channel *c)
 	 */
 
 	#define STATUS_SEP_HORZ \
-		"%b%f" SEP_HORZ "%b%f", \
-			SEP_BG, \
-			SEP_FG, \
-			STATUS_BG, \
-			STATUS_FG
+		"%b%f" SEP_HORZ "%b%f", SEP_BG, SEP_FG, STATUS_BG, STATUS_FG
 
 	unsigned cols = state_cols();
 	unsigned rows = state_rows();
@@ -644,7 +636,7 @@ draw_status(struct channel *c)
 	if (!cols || !(rows > 1))
 		return;
 
-	printf(C_MOVE(%d, 1), rows - 1);
+	draw_cursor_pos(rows - 1, 1);
 
 	/* -[usermodes] */
 	if (c->server && *(c->server->mode_str.str)) {
@@ -689,23 +681,26 @@ draw_status(struct channel *c)
 			return;
 	}
 
-	draw_bg(SEP_BG);
-	draw_fg(SEP_FG);
+	draw_attr_bg(SEP_BG);
+	draw_attr_fg(SEP_FG);
 
-	while (cols--)
-		printf(SEP_HORZ);
+	while (drawf(&cols, "%s", SEP_HORZ))
+		;
 }
 
-static void
-check_coords(struct coords coords)
+static struct coords
+coords(unsigned c1, unsigned cN, unsigned r1, unsigned rN)
 {
-	/* Check coordinate validity before drawing, ensure at least one row, column */
+	unsigned cols = state_cols();
+	unsigned rows = state_rows();
 
-	if (coords.r1 > coords.rN)
-		fatal("row coordinates invalid (%u > %u)", coords.r1, coords.rN);
+	if (!c1 || c1 > cN || cN > cols)
+		fatal("Invalid coordinates: cols: %u %u %u", cols, c1, cN);
 
-	if (coords.c1 > coords.cN)
-		fatal("col coordinates invalid (%u > %u)", coords.c1, coords.cN);
+	if (!r1 || r1 > rN || rN > rows)
+		fatal("Invalid coordinates: rows: %u %u %u", rows, r1, rN);
+
+	return (struct coords) { .c1 = c1, .cN = cN, .r1 = r1, .rN = rN };
 }
 
 static unsigned
@@ -748,13 +743,13 @@ drawf(unsigned *cols_p, const char *fmt, ...)
 		if (c == '%') {
 			switch ((c = *fmt++)) {
 				case 'a':
-					printf(ATTR_RESET);
+					draw_attr_reset();
 					break;
 				case 'b':
-					draw_bg(va_arg(arg, int));
+					draw_attr_bg(va_arg(arg, int));
 					break;
 				case 'f':
-					draw_fg(va_arg(arg, int));
+					draw_attr_fg(va_arg(arg, int));
 					break;
 				case 'c':
 					draw_char(va_arg(arg, int));
@@ -793,7 +788,7 @@ drawf(unsigned *cols_p, const char *fmt, ...)
 }
 
 static void
-draw_bg(int bg)
+draw_attr_bg(int bg)
 {
 	if (bg == -1)
 		printf(ATTR_RESET_BG);
@@ -805,7 +800,7 @@ draw_bg(int bg)
 }
 
 static void
-draw_fg(int fg)
+draw_attr_fg(int fg)
 {
 	if (fg == -1)
 		printf(ATTR_RESET_FG);
@@ -817,17 +812,53 @@ draw_fg(int fg)
 }
 
 static void
+draw_attr_reset(void)
+{
+	printf(ATTR_RESET);
+}
+
+static void
+draw_clear_full(void)
+{
+	printf(CLEAR_FULL);
+}
+
+static void
+draw_clear_line(void)
+{
+	printf(CLEAR_LINE);
+}
+
+static void
 draw_char(int c)
 {
 	if (iscntrl(c)) {
 		int ctrl_bg_last = bg_last;
 		int ctrl_fg_last = fg_last;
-		draw_bg(CTRL_BG);
-		draw_fg(CTRL_FG);
+		draw_attr_bg(CTRL_BG);
+		draw_attr_fg(CTRL_FG);
 		putchar((c | 0x40));
-		draw_bg(ctrl_bg_last);
-		draw_fg(ctrl_fg_last);
+		draw_attr_bg(ctrl_bg_last);
+		draw_attr_fg(ctrl_fg_last);
 	} else {
 		putchar(c);
 	}
+}
+
+static void
+draw_cursor_pos(int row, int col)
+{
+	printf(CURSOR_POS(%d, %d), row, col);
+}
+
+static void
+draw_cursor_pos_save(void)
+{
+	printf(CURSOR_POS_SAVE);
+}
+
+static void
+draw_cursor_pos_restore(void)
+{
+	printf(CURSOR_POS_RESTORE);
 }
