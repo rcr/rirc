@@ -199,7 +199,7 @@ buffer_line_split(
 	unsigned cols,
 	unsigned pad)
 {
-	unsigned _head_w = sizeof(" HH:MM   " SEP_VERT " ");
+	unsigned _head_w = sizeof(" HH:MM  ");
 
 	if (BUFFER_PADDING)
 		_head_w += pad;
@@ -216,5 +216,5 @@ buffer_line_split(
 		*head_w = _head_w;
 
 	if (text_w)
-		*text_w = cols - _head_w + 1;
+		*text_w = cols - _head_w;
 }

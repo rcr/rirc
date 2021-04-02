@@ -84,8 +84,6 @@ static void draw_input(struct input*, struct coords);
 static void draw_nav(struct channel*);
 static void draw_status(struct channel*);
 
-static char* draw_colour(int, int);
-static int draw_fmt(char**, size_t*, size_t*, int, const char*, ...);
 static unsigned nick_col(char*);
 static void check_coords(struct coords);
 
@@ -236,15 +234,13 @@ draw_buffer(struct buffer *b, struct coords coords)
 
 	check_coords(coords);
 
-	unsigned row,
-	         row_count = 0,
-	         row_total = coords.rN - coords.r1 + 1;
-
+	unsigned buffer_i = b->scrollback;
 	unsigned col_total = coords.cN - coords.c1 + 1;
-
-	unsigned buffer_i = b->scrollback,
-	         head_w,
-	         text_w;
+	unsigned row;
+	unsigned row_count = 0;
+	unsigned row_total = coords.rN - coords.r1 + 1;
+	unsigned head_w;
+	unsigned text_w;
 
 	/* Clear the buffer area */
 	for (row = coords.r1; row <= coords.rN; row++)
@@ -333,6 +329,9 @@ draw_buffer_line(
 	char *p1 = line->text;
 	char *p2 = line->text + line->text_len;
 
+	unsigned head_col = coords.c1;
+	unsigned text_col = coords.c1 + head_w;
+
 	if (!line->cached.initialized) {
 		/* Initialize static cached properties of drawn lines */
 		line->cached.colour = nick_col(line->from);
@@ -341,100 +340,94 @@ draw_buffer_line(
 
 	if (skip == 0) {
 
-		/* Print the line header
-		 *
-		 * Since formatting codes don't occupy columns, enough space
-		 * should be allocated for all such sequences
-		 * */
-		char header[head_w + COLOUR_SIZE * 4 + 1];
-		char *header_ptr = header;
+		/* Print the line header */
 
-		size_t buff_n = sizeof(header) - 1,
-		       text_n = head_w - 1;
+		char buf_h[3] = {0};
+		char buf_m[3] = {0};
+		int from_bg;
+		int from_fg;
+		unsigned head_cols = head_w;
 
-		struct tm *line_tm = localtime(&line->time);
+		struct tm *tm = localtime(&line->time);
 
-		if (!draw_fmt(&header_ptr, &buff_n, &text_n, 0,
-				draw_colour(BUFFER_LINE_HEADER_FG_NEUTRAL, -1)))
-			goto print_header;
+		(void) snprintf(buf_h, sizeof(buf_h), "%02d", tm->tm_hour);
+		(void) snprintf(buf_m, sizeof(buf_h), "%02d", tm->tm_min);
 
-		if (!draw_fmt(&header_ptr, &buff_n, &text_n, 1,
-				" %02d:%02d ", line_tm->tm_hour, line_tm->tm_min))
-			goto print_header;
+		printf(C_MOVE(%d, %d), coords.r1, head_col);
 
-		if (!draw_fmt(&header_ptr, &buff_n, &text_n, 1,
-				"%*s", pad, ""))
-			goto print_header;
+		if (!drawf(&head_cols, " %b%f%s:%s%a ",
+				BUFFER_LINE_HEADER_BG,
+				BUFFER_LINE_HEADER_FG,
+				buf_h,
+				buf_m))
+			goto print_text;
 
-		if (!draw_fmt(&header_ptr, &buff_n, &text_n, 0, ATTR_RESET))
-			goto print_header;
-
-		switch (line->type) {
-			case BUFFER_LINE_OTHER:
-			case BUFFER_LINE_SERVER_INFO:
-			case BUFFER_LINE_SERVER_ERROR:
-			case BUFFER_LINE_JOIN:
-			case BUFFER_LINE_NICK:
-			case BUFFER_LINE_PART:
-			case BUFFER_LINE_QUIT:
-				if (!draw_fmt(&header_ptr, &buff_n, &text_n, 0,
-						draw_colour(BUFFER_LINE_HEADER_FG_NEUTRAL, -1)))
-					goto print_header;
-				break;
-
-			case BUFFER_LINE_CHAT:
-				if (!draw_fmt(&header_ptr, &buff_n, &text_n, 0,
-						draw_colour(line->cached.colour, -1)))
-					goto print_header;
-				break;
-
-			case BUFFER_LINE_PINGED:
-				if (!draw_fmt(&header_ptr, &buff_n, &text_n, 0,
-						draw_colour(BUFFER_LINE_HEADER_FG_PINGED, BUFFER_LINE_HEADER_BG_PINGED)))
-					goto print_header;
-				break;
-
-			case BUFFER_LINE_T_SIZE:
-				fatal("Invalid line type");
+		while (pad--) {
+			if (!drawf(&head_cols, "%s", " "))
+				goto print_text;
 		}
 
-		if (!draw_fmt(&header_ptr, &buff_n, &text_n, 1,
-				"%s", line->from))
-			goto print_header;
+		switch (line->type) {
+			case BUFFER_LINE_CHAT:
+				from_bg = BUFFER_LINE_HEADER_BG;
+				from_fg = line->cached.colour;
+				break;
+			case BUFFER_LINE_PINGED:
+				from_bg = BUFFER_LINE_HEADER_BG_PINGED;
+				from_fg = BUFFER_LINE_HEADER_FG_PINGED;
+				break;
+			default:
+				from_bg = BUFFER_LINE_HEADER_BG;
+				from_fg = BUFFER_LINE_HEADER_FG;
+				break;
+		}
 
-print_header:
-		/* Print the line header */
-		printf(C_MOVE(%d, 1) "%s " ATTR_RESET, coords.r1, header);
+		if (!drawf(&head_cols, "%b%f%s%a ",
+				from_bg,
+				from_fg,
+				line->from))
+			goto print_text;
 	}
+
+print_text:
 
 	while (skip--)
 		irc_strwrap(text_w, &p1, p2);
 
-	do {
-		const char *sep = " " SEP_VERT " ";
+	unsigned text_bg = BUFFER_TEXT_BG;
+	unsigned text_fg = BUFFER_TEXT_FG;
 
-		if ((coords.cN - coords.c1) >= sizeof(*sep) + text_w) {
-			printf(C_MOVE(%d, %d), coords.r1, (int)(coords.cN - (sizeof(*sep) + text_w + 1)));
-			fputs(draw_colour(BUFFER_LINE_HEADER_FG_NEUTRAL, -1), stdout);
-			fputs(sep, stdout);
+	if (strlen(QUOTE_LEADER) && line->type == BUFFER_LINE_CHAT) {
+		if (!strncmp(line->text, QUOTE_LEADER, strlen(QUOTE_LEADER))) {
+			text_bg = QUOTE_TEXT_BG;
+			text_fg = QUOTE_TEXT_FG;
+		}
+	}
+
+	do {
+		unsigned text_cols = text_w;
+
+		printf(C_MOVE(%d, %d), coords.r1, text_col);
+
+		if (!drawf(&text_cols, "%b%f%s%a ",
+				BUFFER_LINE_HEADER_BG,
+				BUFFER_LINE_HEADER_FG,
+				SEP_VERT)) {
+			coords.r1++;
+			continue;
 		}
 
 		if (*p1) {
 			const char *text_p1 = p1;
-			const char *text_p2 = irc_strwrap(text_w, &p1, p2);
-			unsigned text_fg = BUFFER_TEXT_FG;
-			unsigned text_bg = BUFFER_TEXT_BG;
-			unsigned text_len = text_p2 - text_p1;
+			const char *text_p2 = irc_strwrap(text_cols, &p1, p2);
 
-			if (line->type == BUFFER_LINE_CHAT && strlen(QUOTE_LEADER)) {
-				if (!strncmp(line->text, QUOTE_LEADER, strlen(QUOTE_LEADER))) {
-					text_fg = QUOTE_TEXT_FG;
-					text_bg = QUOTE_TEXT_BG;
-				}
-			}
+			draw_bg(text_bg);
+			draw_fg(text_fg);
 
-			printf(C_MOVE(%d, %d), coords.r1, head_w);
-			printf("%s%.*s", draw_colour(text_fg, text_bg), text_len, text_p1);
+			for (unsigned i = 0; i < (text_p2 - text_p1); i++)
+				draw_char(text_p1[i]);
+
+			printf(ATTR_RESET);
 		}
 
 		coords.r1++;
@@ -724,78 +717,6 @@ nick_col(char *nick)
 		colour += *nick++;
 
 	return nick_colours[colour % sizeof(nick_colours) / sizeof(nick_colours[0])];
-}
-
-static char*
-draw_colour(int fg, int bg)
-{
-	/* Set terminal foreground and background colours to a value [0, 255],
-	 * or reset colour if given anything else */
-
-	static char buf[COLOUR_SIZE + 1] = ATTR_RESET;
-	size_t len = sizeof(ATTR_RESET) - 1;
-	int ret = 0;
-
-	if (fg >= 0 && fg <= 255) {
-		if ((ret = snprintf(buf + len, sizeof(buf) - len, ATTR_FG(%d), fg)) < 0)
-			buf[len] = 0;
-		else
-			len += ret;
-	}
-
-	if (bg >= 0 && bg <= 255) {
-		if ((snprintf(buf + len, sizeof(buf) - len, ATTR_BG(%d), bg)) < 0)
-			buf[len] = 0;
-	}
-
-	return buf;
-}
-
-static int
-draw_fmt(char **ptr, size_t *buff_n, size_t *text_n, int txt, const char *fmt, ...)
-{
-	/* Write formatted text to a buffer for purposes of preparing an object to be drawn
-	 * to the terminal.
-	 *
-	 * Calls to this function should distinguish between formatting and printed text
-	 * with the txt flag.
-	 *
-	 *  - ptr    : pointer to location in buffer being printed to
-	 *  - buff_n : remaining bytes available in buff
-	 *  - text_n : remaining columns available for text
-	 *  - txt    : flag set true if bytes being written are printable text
-	 *
-	 *  returns 0 on error, or if no more prints to this buffer can occur
-	 */
-
-	int ret;
-	va_list ap;
-
-	va_start(ap, fmt);
-	ret = vsnprintf(*ptr, *buff_n, fmt, ap);
-	va_end(ap);
-
-	if (ret < 0)
-		return (**ptr = 0);
-
-	size_t _ret = (size_t) ret;
-
-	if (!txt && _ret >= *buff_n)
-		return (**ptr = 0);
-
-	if (txt) {
-		if (*text_n > _ret)
-			*text_n -= _ret;
-		else {
-			*ptr += *text_n;
-			**ptr = 0;
-			return (*text_n = 0);
-		}
-	}
-
-	*ptr += _ret;
-
-	return 1;
 }
 
 static unsigned

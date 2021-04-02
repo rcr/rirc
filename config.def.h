@@ -30,8 +30,9 @@
 #define DEFAULT_QUIT_MESG "rirc v" VERSION
 #define DEFAULT_PART_MESG "rirc v" VERSION
 
-#define BUFFER_LINE_HEADER_FG_NEUTRAL 239
-
+/* Buffer colours */
+#define BUFFER_LINE_HEADER_FG         239
+#define BUFFER_LINE_HEADER_BG         -1
 #define BUFFER_LINE_HEADER_FG_PINGED  250
 #define BUFFER_LINE_HEADER_BG_PINGED  1
 
