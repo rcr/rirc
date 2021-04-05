@@ -2,6 +2,7 @@
 
 #include "src/utils/utils.h"
 
+#include <ctype.h>
 #include <errno.h>
 #include <string.h>
 
@@ -82,13 +83,21 @@ input_delete_forw(struct input *inp)
 int
 input_insert(struct input *inp, const char *c, size_t count)
 {
-	size_t i = count;
+	if (input_text_isfull(inp))
+		return 0;
 
-	while (!input_text_isfull(inp) && i--) {
-		inp->text[inp->head++] = *c++;
+	while (!input_text_isfull(inp) && count--) {
+
+		if (iscntrl(*c))
+			inp->text[inp->head++] = ' ';
+
+		if (isprint(*c))
+			inp->text[inp->head++] = *c;
+
+		c++;
 	}
 
-	return (i != count);
+	return 1;
 }
 
 int
