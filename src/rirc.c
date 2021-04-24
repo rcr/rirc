@@ -13,18 +13,17 @@
 #include <string.h>
 #include <unistd.h>
 
-#define MAX_CLI_SERVERS 16
+#define MAX_CLI_SERVERS 64
 
 #define arg_error(...) \
 	do { fprintf(stderr, "%s ", runtime_name); \
 	     fprintf(stderr, __VA_ARGS__); \
 	     fprintf(stderr, "\n%s --help for usage\n", runtime_name); \
-	     return -1; \
 	} while (0)
 
-static const char* opt_arg_str(char);
-static const char* getpwuid_pw_name(void);
-static int parse_args(int, char**);
+static const char* rirc_opt_str(char);
+static const char* rirc_pw_name(void);
+static int rirc_parse_args(int, char**);
 
 #ifdef CA_CERT_PATH
 const char *ca_cert_path = CA_CERT_PATH;
@@ -32,10 +31,10 @@ const char *ca_cert_path = CA_CERT_PATH;
 #error "CA_CERT_PATH required"
 #endif
 
-#ifdef DEFAULT_NICK_SET
-const char *default_nick_set = DEFAULT_NICK_SET;
+#ifdef DEFAULT_NICKS
+const char *default_nicks = DEFAULT_NICKS;
 #else
-const char *default_nick_set;
+const char *default_nicks;
 #endif
 
 #ifdef DEFAULT_USERNAME
@@ -90,7 +89,7 @@ static const char *const rirc_version =
 #endif
 
 static const char*
-opt_arg_str(char c)
+rirc_opt_str(char c)
 {
 	switch (c) {
 		case 's': return "-s/--server";
@@ -111,9 +110,9 @@ opt_arg_str(char c)
 }
 
 static const char*
-getpwuid_pw_name(void)
+rirc_pw_name(void)
 {
-	static struct passwd *passwd;
+	static const struct passwd *passwd;
 
 	errno = 0;
 
@@ -124,23 +123,35 @@ getpwuid_pw_name(void)
 }
 
 static int
-parse_args(int argc, char **argv)
+rirc_parse_args(int argc, char **argv)
 {
-	int opt_c = 0,
-	    opt_i = 0;
+	int opt_c = 0;
+	int opt_i = 0;
 
 	size_t n_servers = 0;
 
-	opterr = 0;
+	struct cli_server {
+		const char *host;
+		const char *port;
+		const char *pass;
+		const char *username;
+		const char *realname;
+		const char *nicks;
+		const char *chans;
+		int ipv;
+		int tls;
+		int tls_vrfy;
+		struct server *s;
+	} cli_servers[MAX_CLI_SERVERS];
 
 	struct option long_opts[] = {
 		{"server",      required_argument, 0, 's'},
 		{"port",        required_argument, 0, 'p'},
 		{"pass",        required_argument, 0, 'w'},
-		{"nicks",       required_argument, 0, 'n'},
-		{"chans",       required_argument, 0, 'c'},
 		{"username",    required_argument, 0, 'u'},
 		{"realname",    required_argument, 0, 'r'},
+		{"nicks",       required_argument, 0, 'n'},
+		{"chans",       required_argument, 0, 'c'},
 		{"help",        no_argument,       0, 'h'},
 		{"version",     no_argument,       0, 'v'},
 		{"ipv4",        no_argument,       0, '4'},
@@ -150,49 +161,45 @@ parse_args(int argc, char **argv)
 		{0, 0, 0, 0}
 	};
 
-	struct cli_server {
-		const char *host;
-		const char *port;
-		const char *pass;
-		const char *nicks;
-		const char *chans;
-		const char *username;
-		const char *realname;
-		int ipv;
-		int tls;
-		int tls_vrfy;
-		struct server *s;
-	} cli_servers[MAX_CLI_SERVERS];
+	opterr = 0;
 
-	while (0 < (opt_c = getopt_long(argc, argv, ":s:p:w:n:c:r:u:hv", long_opts, &opt_i))) {
+	while (0 < (opt_c = getopt_long(argc, argv, ":s:p:w:r:u:n:c:hv", long_opts, &opt_i))) {
 
 		switch (opt_c) {
 
 			case 's': /* Connect to server */
 
-				if (*optarg == '-')
+				if (*optarg == '-') {
 					arg_error("-s/--server requires an argument");
+					return -1;
+				}
 
-				if (++n_servers == MAX_CLI_SERVERS)
+				if (++n_servers == MAX_CLI_SERVERS) {
 					arg_error("exceeded maximum number of servers (%d)", MAX_CLI_SERVERS);
+					return -1;
+				}
 
 				cli_servers[n_servers - 1].host     = optarg;
 				cli_servers[n_servers - 1].port     = NULL;
 				cli_servers[n_servers - 1].pass     = NULL;
-				cli_servers[n_servers - 1].nicks    = NULL;
+				cli_servers[n_servers - 1].username = default_username;
+				cli_servers[n_servers - 1].realname = default_realname;
+				cli_servers[n_servers - 1].nicks    = default_nicks;
 				cli_servers[n_servers - 1].chans    = NULL;
-				cli_servers[n_servers - 1].username = NULL;
-				cli_servers[n_servers - 1].realname = NULL;
 				cli_servers[n_servers - 1].ipv      = IO_IPV_UNSPEC;
 				cli_servers[n_servers - 1].tls      = IO_TLS_ENABLED;
 				cli_servers[n_servers - 1].tls_vrfy = IO_TLS_VRFY_REQUIRED;
 				break;
 
 			#define CHECK_SERVER_OPTARG(OPT_C, REQ) \
-				if ((REQ) && *optarg == '-') \
-					arg_error("option '%s' requires an argument", opt_arg_str((OPT_C))); \
-				if (n_servers == 0) \
-					arg_error("option '%s' requires a server argument first", opt_arg_str((OPT_C)));
+				if ((REQ) && *optarg == '-') { \
+					arg_error("option '%s' requires an argument", rirc_opt_str((OPT_C))); \
+					return -1; \
+				} \
+				if (n_servers == 0) { \
+					arg_error("option '%s' requires a server argument first", rirc_opt_str((OPT_C))); \
+					return -1; \
+				}
 
 			case 'p': /* Connect using port */
 				CHECK_SERVER_OPTARG(opt_c, 1);
@@ -204,16 +211,6 @@ parse_args(int argc, char **argv)
 				cli_servers[n_servers - 1].pass = optarg;
 				break;
 
-			case 'n': /* Comma separated list of nicks to use */
-				CHECK_SERVER_OPTARG(opt_c, 1);
-				cli_servers[n_servers - 1].nicks = optarg;
-				break;
-
-			case 'c': /* Comma separated list of channels to join */
-				CHECK_SERVER_OPTARG(opt_c, 1);
-				cli_servers[n_servers - 1].chans = optarg;
-				break;
-
 			case 'u': /* Connect using username */
 				CHECK_SERVER_OPTARG(opt_c, 1);
 				cli_servers[n_servers - 1].username = optarg;
@@ -222,6 +219,16 @@ parse_args(int argc, char **argv)
 			case 'r': /* Connect using realname */
 				CHECK_SERVER_OPTARG(opt_c, 1);
 				cli_servers[n_servers - 1].realname = optarg;
+				break;
+
+			case 'n': /* Comma separated list of nicks to use */
+				CHECK_SERVER_OPTARG(opt_c, 1);
+				cli_servers[n_servers - 1].nicks = optarg;
+				break;
+
+			case 'c': /* Comma separated list of channels to join */
+				CHECK_SERVER_OPTARG(opt_c, 1);
+				cli_servers[n_servers - 1].chans = optarg;
 				break;
 
 			case '4': /* Connect using ipv4 only */
@@ -253,7 +260,8 @@ parse_args(int argc, char **argv)
 					cli_servers[n_servers -1].tls_vrfy = IO_TLS_VRFY_REQUIRED;
 					break;
 				}
-				arg_error("option '--tls-verify' mode must be 'disabled', 'optional', or 'required'");
+				arg_error("invalid option for '--tls-verify' '%s'", optarg);
+				return -1;
 
 			#undef CHECK_SERVER_OPTARG
 
@@ -266,29 +274,23 @@ parse_args(int argc, char **argv)
 				exit(EXIT_SUCCESS);
 
 			case '?':
-				arg_error("unknown options '%s'", argv[optind - 1]);
+				arg_error("unknown option '%s'", argv[optind - 1]);
+				return -1;
 
 			case ':':
-				arg_error("option '%s' requires an argument", opt_arg_str(optopt));
+				arg_error("option '%s' requires an argument", rirc_opt_str(optopt));
+				return -1;
 
 			default:
 				arg_error("unknown opt error");
+				return -1;
 		}
 	}
 
-	if (optind < argc)
+	if (optind < argc) {
 		arg_error("unused option '%s'", argv[optind]);
-
-	if (!default_nick_set || !default_nick_set[0])
-		default_nick_set = getpwuid_pw_name();
-
-	if (!default_username || !default_username[0])
-		default_username = getpwuid_pw_name();
-
-	if (!default_realname || !default_realname[0])
-		default_realname = getpwuid_pw_name();
-
-	state_init();
+		return -1;
+	}
 
 	for (size_t i = 0; i < n_servers; i++) {
 
@@ -300,34 +302,45 @@ parse_args(int argc, char **argv)
 		if (cli_servers[i].port == NULL)
 			cli_servers[i].port = (cli_servers[i].tls == IO_TLS_ENABLED) ? "6697" : "6667";
 
-		struct server *s = server(
+		cli_servers[i].s = server(
 			cli_servers[i].host,
 			cli_servers[i].port,
 			cli_servers[i].pass,
-			(cli_servers[i].username ? cli_servers[i].username : default_username),
-			(cli_servers[i].realname ? cli_servers[i].realname : default_realname)
+			cli_servers[i].username,
+			cli_servers[i].realname
 		);
 
-		s->connection = connection(s, cli_servers[i].host, cli_servers[i].port, flags);
+		cli_servers[i].s->connection = connection(
+			cli_servers[i].s,
+			cli_servers[i].host,
+			cli_servers[i].port,
+			flags);
 
-		if (server_list_add(state_server_list(), s))
+		if (server_list_add(state_server_list(), cli_servers[i].s)) {
 			arg_error("duplicate server: %s:%s", cli_servers[i].host, cli_servers[i].port);
+			return -1;
+		}
 
-		if (cli_servers[i].chans && state_server_set_chans(s, cli_servers[i].chans))
-			arg_error("invalid chans: '%s'", cli_servers[i].chans);
+		if (cli_servers[i].nicks && server_set_nicks(cli_servers[i].s, cli_servers[i].nicks)) {
+			arg_error("invalid %s: '%s'", rirc_opt_str('n'), cli_servers[i].nicks);
+			return -1;
+		}
 
-		if (server_set_nicks(s, (cli_servers[i].nicks ? cli_servers[i].nicks : default_nick_set)))
-			arg_error("invalid nicks: '%s'", cli_servers[i].nicks);
+		if (cli_servers[i].chans && server_set_chans(cli_servers[i].s, cli_servers[i].chans)) {
+			arg_error("invalid %s: '%s'", rirc_opt_str('c'), cli_servers[i].chans);
+			return -1;
+		}
 
-		cli_servers[i].s = s;
-
-		channel_set_current(s->channel);
+		channel_set_current(cli_servers[i].s->channel);
 	}
 
-	io_init();
+	for (size_t i = 0; i < n_servers; i++) {
 
-	for (size_t i = 0; i < n_servers; i++)
-		io_cx(cli_servers[i].s->connection);
+		int ret;
+
+		if ((ret = io_cx(cli_servers[i].s->connection)))
+			server_error(cli_servers[i].s, "failed to connect: %s", io_err(ret));
+	}
 
 	return 0;
 }
@@ -336,19 +349,33 @@ parse_args(int argc, char **argv)
 int
 main(int argc, char **argv)
 {
-	int ret;
-
-	if (argc > 0)
+	if (argc)
 		runtime_name = argv[0];
+
+	if (!default_username || !default_username[0])
+		default_username = rirc_pw_name();
+
+	if (!default_realname || !default_realname[0])
+		default_realname = rirc_pw_name();
+
+	if (!default_nicks || !default_nicks[0])
+		default_nicks = rirc_pw_name();
 
 	srand(time(NULL));
 
-	if ((ret = parse_args(argc, argv)) == 0) {
-		io_start();
+	state_init();
+	io_init();
+
+	if (rirc_parse_args(argc, argv)) {
 		state_term();
-		draw(DRAW_CLEAR);
+		return EXIT_FAILURE;
 	}
 
-	return ret;
+	draw_init();
+	io_start();
+	draw_term();
+	state_term();
+
+	return EXIT_SUCCESS;
 }
 #endif

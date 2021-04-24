@@ -112,6 +112,12 @@ test_server_list(void)
 }
 
 static void
+test_server_set_chans(void)
+{
+	/* TODO */
+}
+
+static void
 test_server_set_nicks(void)
 {
 	struct server *s = server("host", "port", NULL, "", "");
@@ -251,6 +257,7 @@ main(void)
 {
 	struct testcase tests[] = {
 		TESTCASE(test_server_list),
+		TESTCASE(test_server_set_chans),
 		TESTCASE(test_server_set_nicks),
 		TESTCASE(test_parse_005)
 	};

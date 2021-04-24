@@ -399,11 +399,21 @@ irc_ischanchar(char c, int first)
 	 * channelid  = 5( %x41-5A / digit )   ; 5( A-Z / 0-9 )
 	 */
 
-	/* TODO: CHANTYPES */
-	(void)c;
-	(void)first;
+	if (first)
+		return (c == '#' || c == '+' || c == '&');
 
-	return 1;
+	switch (c) {
+		case 0x00: /* NUL */
+		case 0x07: /* BEL */
+		case 0x0D: /* CR */
+		case 0x0A: /* LF */
+		case ' ':
+		case ',':
+		case ':':
+			return 0;
+		default:
+			return 1;
+	}
 }
 
 static inline int

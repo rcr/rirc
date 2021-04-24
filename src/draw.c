@@ -100,6 +100,22 @@ static int bg_last = -1;
 static int fg_last = -1;
 static int nick_colours[] = NICK_COLOURS
 
+static int drawing;
+
+void
+draw_init(void)
+{
+	drawing = 1;
+}
+
+void
+draw_term(void)
+{
+	drawing = 0;
+
+	draw(DRAW_CLEAR);
+}
+
 void
 draw(enum draw_bit bit)
 {
@@ -139,6 +155,9 @@ draw(enum draw_bit bit)
 static void
 draw_bits(void)
 {
+	if (!drawing)
+		return;
+
 	if (draw_state.bell && BELL_ON_PINGED)
 		putchar('\a');
 

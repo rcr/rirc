@@ -3,11 +3,11 @@
  * Colours can be set [0, 255], Any other value (e.g. -1) will set
  * the default terminal foreground/background */
 
-/* Default comma separated set of Nicks to try on connection
+/* Comma separated set of default nicks to try on connection
  *   String
  *   ("": defaults to effective user id name)
  */
-#define DEFAULT_NICK_SET ""
+#define DEFAULT_NICKS ""
 
 /* Default Username and Realname sent during connection
  *   String

@@ -94,7 +94,7 @@ static const char *cmd_list[] = {
 void
 state_init(void)
 {
-	state.default_channel = state.current_channel = channel("rirc", CHANNEL_T_RIRC);
+	state.default_channel = channel("rirc", CHANNEL_T_RIRC);
 
 	newlinef(state.default_channel, 0, FROM_INFO, "      _");
 	newlinef(state.default_channel, 0, FROM_INFO, " _ __(_)_ __ ___");
@@ -107,6 +107,8 @@ state_init(void)
 #ifndef NDEBUG
 	newlinef(state.default_channel, 0, FROM_INFO, " - compiled with DEBUG flags");
 #endif
+
+	channel_set_current(state.default_channel);
 }
 
 void
@@ -213,42 +215,6 @@ _newline(struct channel *c, enum buffer_line_type type, const char *from, const 
 		c->activity = MAX(c->activity, ACTIVITY_ACTIVE);
 		draw(DRAW_NAV);
 	}
-}
-
-int
-state_server_set_chans(struct server *s, const char *chans)
-{
-	char *p1, *p2, *base;
-	size_t n = 0;
-
-	p2 = base = strdup(chans);
-
-	do {
-		n++;
-
-		p1 = p2;
-		p2 = strchr(p2, ',');
-
-		if (p2)
-			*p2++ = 0;
-
-		if (!irc_ischan(p1)) {
-			free(base);
-			return -1;
-		}
-	} while (p2);
-
-	for (const char *chan = base; n; n--) {
-		struct channel *c;
-		c = channel(chan, CHANNEL_T_CHANNEL);
-		c->server = s;
-		channel_list_add(&s->clist, c);
-		chan = strchr(chan, 0) + 1;
-	}
-
-	free(base);
-
-	return 0;
 }
 
 static int
@@ -374,7 +340,7 @@ state_channel_close(int action_confirm)
 
 		if (s->connected && c->type == CHANNEL_T_CHANNEL && !c->parted) {
 			if ((ret = io_sendf(s->connection, "PART %s :%s", c->name, DEFAULT_PART_MESG)))
-				newlinef(s->channel, 0, FROM_ERROR, "sendf fail: %s", io_err(ret));
+				server_error(s, "sendf fail: %s", io_err(ret));
 		}
 
 		channel_set_current(c->next);
@@ -387,7 +353,7 @@ state_channel_close(int action_confirm)
 
 		if (s->connected) {
 			if ((ret = io_sendf(s->connection, "QUIT :%s", DEFAULT_QUIT_MESG)))
-				newlinef(s->channel, 0, FROM_ERROR, "sendf fail: %s", io_err(ret));
+				server_error(s, "sendf fail: %s", io_err(ret));
 			io_dx(s->connection);
 		}
 

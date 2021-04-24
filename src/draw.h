@@ -14,6 +14,9 @@ enum draw_bit
 	DRAW_CLEAR,  /* clear the terminal */
 };
 
+void draw_init(void);
+void draw_term(void);
+
 void draw(enum draw_bit);
 
 #endif

@@ -2,6 +2,18 @@
 #include "src/utils/utils.c"
 
 static void
+test_irc_ischan(void)
+{
+	/* TODO */
+}
+
+static void
+test_irc_isnick(void)
+{
+	/* TODO */
+}
+
+static void
 test_irc_message_param(void)
 {
 	char *param;
@@ -646,6 +658,8 @@ int
 main(void)
 {
 	struct testcase tests[] = {
+		TESTCASE(test_irc_ischan),
+		TESTCASE(test_irc_isnick),
 		TESTCASE(test_irc_message_param),
 		TESTCASE(test_irc_message_parse),
 		TESTCASE(test_irc_message_split),
