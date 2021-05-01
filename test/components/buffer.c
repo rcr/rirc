@@ -238,19 +238,19 @@ test_buffer_scrollback_status(void)
 	assert_true(buffer_full(&b));
 
 	b.scrollback = b.tail;
-	assert_ueq((100 * buffer_scrollback_status(&b)), 100);
+	assert_ueq((buffer_scrollback_status(&b)), 100);
 
 	b.scrollback = b.tail + (BUFFER_LINES_MAX / 2);
-	assert_ueq((100 * buffer_scrollback_status(&b)), 50);
+	assert_ueq((buffer_scrollback_status(&b)), 50);
 
 	b.scrollback = b.head - 1;
-	assert_ueq((100 * buffer_scrollback_status(&b)), 0);
+	assert_ueq((buffer_scrollback_status(&b)), 0);
 }
 
 static void
 test_buffer_index_overflow(void)
 {
-	/* Test masked indexing after unsigned integer overflow */
+	/* Test masked indexing after unsigned overflow */
 
 	struct buffer b;
 
@@ -284,12 +284,12 @@ test_buffer_line_overlength(void)
 	buffer(&b);
 
 	/* Indices to first and last positions of lines, total length = 2.5 times the maximum */
-	unsigned int f1 = 0,
-	             l1 = TEXT_LENGTH_MAX - 1,
-	             f2 = TEXT_LENGTH_MAX,
-	             l2 = TEXT_LENGTH_MAX * 2 - 1,
-	             f3 = TEXT_LENGTH_MAX * 2,
-	             l3 = TEXT_LENGTH_MAX * 2 + TEXT_LENGTH_MAX / 2 - 1;
+	unsigned f1 = 0,
+	         l1 = TEXT_LENGTH_MAX - 1,
+	         f2 = TEXT_LENGTH_MAX,
+	         l2 = TEXT_LENGTH_MAX * 2 - 1,
+	         f3 = TEXT_LENGTH_MAX * 2,
+	         l3 = TEXT_LENGTH_MAX * 2 + TEXT_LENGTH_MAX / 2 - 1;
 
 	/* Add a line that's 2.5 times the maximum length */
 	char text[(l3 + 1) + 1];

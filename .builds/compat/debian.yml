@@ -1,23 +1,18 @@
-image: alpine/edge
+image: debian/stable
 
 packages:
-  - cmake
+  - curl
   - gperf
-  - perl
 
 sources:
   - https://git.sr.ht/~rcr/rirc
 
 tasks:
-  - setup: |
-      cd rirc
-      git submodule init
-      git submodule update --recursive
-      export MAKEFLAGS='-j $(nproc)'
   - build: |
       cd rirc
-      make clean
       make all
+  - check: |
+      cd rirc
       make check
 
 triggers:

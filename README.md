@@ -30,40 +30,30 @@ A minimalistic irc client written in C.
 
 Connections are TLS enabled over port 6697 by default.
 
-### Configuring:
+## Building, installing:
 
-Configure rirc by editing `config.h`. Defaults are in `config.def.h`
+Building rirc from source requires a c11 compiler, GNU gperf and GNU make.
 
-### Building:
-
-rirc requires the latest version of GNU gperf to compile.
-
-See: https://www.gnu.org/software/gperf/
-
-Build rirc:
+ - https://www.gnu.org/software/gperf/
+ - https://www.gnu.org/software/make/
 
 ```
-git submodule init
-git submodule update --recursive
 make
-```
-
-### Installing:
-
-Default install path:
-
-```
-BIN_DIR = /usr/local/bin
-MAN_DIR = /usr/local/share/man/man1
-```
-
-Edit `Makefile` to alter install path if needed, then:
-
-```
 make install
 ```
 
-### Usage:
+The build toolchain and install paths can be configured via standard
+environment variables, i.e.:
+
+```
+CC, CFLAGS, LDFLAGS, DESTDIR, PREFIX
+```
+
+## Configuring:
+
+Configure rirc by editing `config.h`. Defaults are in `config.def.h`
+
+## Usage:
 
 ```
 rirc [-hv] [-s server [...]]
@@ -114,6 +104,6 @@ Keys:
    ↓ : input history forward
 ```
 
-### More info:
+## More info:
 
 [https://rcr.io/rirc/](http://rcr.io/rirc/)

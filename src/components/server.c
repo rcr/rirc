@@ -155,6 +155,97 @@ server_free(struct server *s)
 	free(s);
 }
 
+int
+server_set_chans(struct server *s, const char *str)
+{
+	char *dup;
+	char *p1;
+	char *p2;
+	size_t n_chans = 0;
+
+	p2 = dup = strdup(str);
+
+	do {
+		n_chans++;
+
+		p1 = p2;
+		p2 = strchr(p2, ',');
+
+		if (p2)
+			*p2++ = 0;
+
+		if (!irc_ischan(p1) && !irc_isnick(p1)) {
+			free(dup);
+			return -1;
+		}
+	} while (p2);
+
+	for (const char *chan = dup; n_chans; n_chans--) {
+
+		struct channel *c;
+
+		if (channel_list_get(&s->clist, chan, s->casemapping))
+			continue;
+
+		if (irc_ischan(chan))
+			c = channel(chan, CHANNEL_T_CHANNEL);
+		else
+			c = channel(chan, CHANNEL_T_PRIVATE);
+
+		c->server = s;
+		channel_list_add(&s->clist, c);
+
+		chan = strchr(chan, 0) + 1;
+	}
+
+	free(dup);
+
+	return 0;
+}
+
+int
+server_set_nicks(struct server *s, const char *str)
+{
+	char *dup;
+	char *p1;
+	char *p2;
+	size_t n_nicks = 0;
+
+	p2 = dup = strdup(str);
+
+	do {
+		n_nicks++;
+
+		p1 = p2;
+		p2 = strchr(p2, ',');
+
+		if (p2)
+			*p2++ = 0;
+
+		if (!irc_isnick(p1)) {
+			free(dup);
+			return -1;
+		}
+	} while (p2);
+
+	free((void *)s->nicks.base);
+	free((void *)s->nicks.set);
+
+	s->nicks.next = 0;
+	s->nicks.size = n_nicks;
+	s->nicks.base = dup;
+
+	if ((s->nicks.set = malloc(sizeof(*s->nicks.set) * n_nicks)) == NULL)
+		fatal("malloc: %s", strerror(errno));
+
+	for (const char **set = s->nicks.set; n_nicks; n_nicks--, set++) {
+		*set = dup;
+		dup = strchr(dup, 0) + 1;
+	}
+
+	return 0;
+}
+
 void
 server_set_004(struct server *s, char *str)
 {
@@ -219,47 +310,6 @@ server_set_005(struct server *s, char *str)
 			}
 		}
 	}
-}
-
-int
-server_set_nicks(struct server *s, const char *nicks)
-{
-	char *p1, *p2, *base;
-	size_t n = 0;
-
-	p2 = base = strdup(nicks);
-
-	do {
-		n++;
-
-		p1 = p2;
-		p2 = strchr(p2, ',');
-
-		if (p2)
-			*p2++ = 0;
-
-		if (!irc_isnick(p1)) {
-			free(base);
-			return -1;
-		}
-	} while (p2);
-
-	free((void *)s->nicks.base);
-	free((void *)s->nicks.set);
-
-	s->nicks.next = 0;
-	s->nicks.size = n;
-	s->nicks.base = base;
-
-	if ((s->nicks.set = malloc(sizeof(*s->nicks.set) * n)) == NULL)
-		fatal("malloc: %s", strerror(errno));
-
-	for (const char **set = s->nicks.set; n; n--, set++) {
-		*set = base;
-		base = strchr(base, 0) + 1;
-	}
-
-	return 0;
 }
 
 static int

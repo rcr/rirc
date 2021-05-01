@@ -1037,7 +1037,6 @@ recv_notice(struct server *s, struct irc_message *m)
 
 	char *message;
 	char *target;
-	int urgent = 0;
 	struct channel *c;
 
 	if (!m->from)
@@ -1055,38 +1054,10 @@ recv_notice(struct server *s, struct irc_message *m)
 	if (IS_CTCP(message))
 		return ctcp_response(s, m->from, target, message);
 
-	if (!strcmp(target, "*")) {
+	if (!(c = channel_list_get(&(s->clist), m->from, s->casemapping)))
 		c = s->channel;
-	} else if (!strcmp(target, s->nick)) {
 
-		if ((c = channel_list_get(&s->clist, m->from, s->casemapping)) == NULL) {
-			c = channel(m->from, CHANNEL_T_PRIVATE);
-			c->server = s;
-			channel_list_add(&s->clist, c);
-		}
-
-		if (c != current_channel())
-			urgent = 1;
-
-	} else if ((c = channel_list_get(&s->clist, target, s->casemapping)) == NULL) {
-		failf(s, "NOTICE: channel '%s' not found", target);
-	}
-
-	if (irc_pinged(s->casemapping, message, s->nick)) {
-
-		if (c != current_channel())
-			urgent = 1;
-
-		newlinef(c, BUFFER_LINE_PINGED, m->from, "%s", message);
-	} else {
-		newlinef(c, BUFFER_LINE_CHAT, m->from, "%s", message);
-	}
-
-	if (urgent) {
-		c->activity = ACTIVITY_PINGED;
-		draw(DRAW_BELL);
-		draw(DRAW_NAV);
-	}
+	newlinef(c, BUFFER_LINE_CHAT, m->from, "%s", message);
 
 	return 0;
 }

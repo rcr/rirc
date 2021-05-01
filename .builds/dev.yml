@@ -1,10 +1,8 @@
-image: debian/stable
+image: alpine/latest
 
 packages:
-  - cmake
   - curl
   - gperf
-  - perl
   - unzip
 
 sources:
@@ -15,15 +13,11 @@ secrets:
   - a58d0951-f57f-44ef-8ef2-25f2f84f0e89
 
 tasks:
-  - setup: |
-      cd rirc
-      git submodule init
-      git submodule update --recursive
-      export MAKEFLAGS='-j $(nproc)'
   - build: |
       cd rirc
-      make clean
       make all
+  - check: |
+      cd rirc
       make check
   - static-analysis: |
       cd rirc

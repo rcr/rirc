@@ -1,0 +1,22 @@
+image: freebsd/latest
+
+packages:
+  - curl
+  - gmake
+  - gperf
+
+sources:
+  - https://git.sr.ht/~rcr/rirc
+
+tasks:
+  - build: |
+      cd rirc
+      gmake all
+  - check: |
+      cd rirc
+      gmake check
+
+triggers:
+  - action: email
+    condition: failure
+    to: mail+sourcehut+builds@rcr.io
