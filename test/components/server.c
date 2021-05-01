@@ -114,7 +114,49 @@ test_server_list(void)
 static void
 test_server_set_chans(void)
 {
-	/* TODO */
+	struct channel *c;
+	struct server *s;
+
+	s = server("host1", "port", NULL, "", "");
+	assert_eq(s->clist.count, 1);
+
+	/* empty values, invalid formats */
+	assert_eq(server_set_chans(s, ""), -1);
+	assert_eq(s->clist.count, 1);
+	assert_eq(server_set_chans(s, ","), -1);
+	assert_eq(s->clist.count, 1);
+	assert_eq(server_set_chans(s, ",,,"), -1);
+	assert_eq(s->clist.count, 1);
+	assert_eq(server_set_chans(s, ",#a,#b,c"), -1);
+	assert_eq(s->clist.count, 1);
+	assert_eq(server_set_chans(s, "#a,#b,c,"), -1);
+	assert_eq(s->clist.count, 1);
+	assert_eq(server_set_chans(s, "#a,#b,c "), -1);
+	assert_eq(s->clist.count, 1);
+	assert_eq(server_set_chans(s, "#a b #c"), -1);
+	assert_eq(s->clist.count, 1);
+
+	/* valid */
+	assert_eq(server_set_chans(s, "#a,b,c,#d"), 0);
+	assert_eq(s->clist.count, 5);
+
+	if (!(c = channel_list_get(&(s->clist), "#a", s->casemapping)))
+		test_abort("failed to find channel '#a'");
+	assert_eq(c->type, CHANNEL_T_CHANNEL);
+
+	if (!(c = channel_list_get(&(s->clist), "b", s->casemapping)))
+		test_abort("failed to find channel 'b'");
+	assert_eq(c->type, CHANNEL_T_PRIVATE);
+
+	if (!(c = channel_list_get(&(s->clist), "c", s->casemapping)))
+		test_abort("failed to find channel '#c'");
+	assert_eq(c->type, CHANNEL_T_PRIVATE);
+
+	if (!(c = channel_list_get(&(s->clist), "#d", s->casemapping)))
+		test_abort("failed to find channel 'd'");
+	assert_eq(c->type, CHANNEL_T_CHANNEL);
+
+	server_free(s);
 }
 
 static void

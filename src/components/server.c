@@ -156,36 +156,44 @@ server_free(struct server *s)
 }
 
 int
-server_set_chans(struct server *s, const char *chans)
+server_set_chans(struct server *s, const char *str)
 {
 	char *dup;
-	char *p;
-	size_t n_chans;
+	char *p1;
+	char *p2;
+	size_t n_chans = 0;
 
-	dup = strdup(chans);
+	p2 = dup = strdup(str);
 
-	for (n_chans = 0, p = dup; p; n_chans++) {
+	do {
+		n_chans++;
 
-		const char *chan = p;
+		p1 = p2;
+		p2 = strchr(p2, ',');
 
-		if ((p = strchr(p, ',')))
-			*p++ = 0;
+		if (p2)
+			*p2++ = 0;
 
-		if (!irc_ischan(chan)) {
+		if (!irc_ischan(p1) && !irc_isnick(p1)) {
 			free(dup);
 			return -1;
 		}
-	}
+	} while (p2);
 
 	for (const char *chan = dup; n_chans; n_chans--) {
 
 		struct channel *c;
 
-		if (!(c = channel_list_get(&s->clist, chan, s->casemapping))) {
+		if (channel_list_get(&s->clist, chan, s->casemapping))
+			continue;
+
+		if (irc_ischan(chan))
 			c = channel(chan, CHANNEL_T_CHANNEL);
-			c->server = s;
-			channel_list_add(&s->clist, c);
-		}
+		else
+			c = channel(chan, CHANNEL_T_PRIVATE);
+
+		c->server = s;
+		channel_list_add(&s->clist, c);
 
 		chan = strchr(chan, 0) + 1;
 	}
@@ -196,14 +204,14 @@ server_set_chans(struct server *s, const char *chans)
 }
 
 int
-server_set_nicks(struct server *s, const char *nicks)
+server_set_nicks(struct server *s, const char *str)
 {
+	char *dup;
 	char *p1;
 	char *p2;
-	char *base;
 	size_t n_nicks = 0;
 
-	p2 = base = strdup(nicks);
+	p2 = dup = strdup(str);
 
 	do {
 		n_nicks++;
@@ -215,7 +223,7 @@ server_set_nicks(struct server *s, const char *nicks)
 			*p2++ = 0;
 
 		if (!irc_isnick(p1)) {
-			free(base);
+			free(dup);
 			return -1;
 		}
 	} while (p2);
@@ -225,14 +233,14 @@ server_set_nicks(struct server *s, const char *nicks)
 
 	s->nicks.next = 0;
 	s->nicks.size = n_nicks;
-	s->nicks.base = base;
+	s->nicks.base = dup;
 
 	if ((s->nicks.set = malloc(sizeof(*s->nicks.set) * n_nicks)) == NULL)
 		fatal("malloc: %s", strerror(errno));
 
 	for (const char **set = s->nicks.set; n_nicks; n_nicks--, set++) {
-		*set = base;
-		base = strchr(base, 0) + 1;
+		*set = dup;
+		dup = strchr(dup, 0) + 1;
 	}
 
 	return 0;

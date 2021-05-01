@@ -30,6 +30,7 @@
  *    - test_failf(M, ...)
  *    - test_abort(M)
  *    - test_abortf(M, ...)
+ *    - test_abort_main(M)
  */
 
 #include <inttypes.h>
@@ -187,6 +188,17 @@
 	do { \
 		_print_testcase_name_(__func__); \
 		printf("    %d: " M "\n", __LINE__); \
+		printf("    ---Testcase aborted---\n"); \
+		_failures_++; \
+		return; \
+	} while (0)
+
+#define test_abortf(M, ...) \
+	do { \
+		_print_testcase_name_(__func__); \
+		printf("    %d: ", __LINE__); \
+		printf((M), __VA_ARGS__); \
+		printf("\n"); \
 		printf("    ---Testcase aborted---\n"); \
 		_failures_++; \
 		return; \
