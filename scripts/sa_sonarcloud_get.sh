@@ -26,7 +26,7 @@ curl -fsS "$BUILD_ZIP_URL" -o "$BUILD_ZIP"
 curl -fsS "$SONAR_ZIP_URL" -o "$SONAR_ZIP"
 curl -fsS "$SONAR_MD5_URL" -o "$SONAR_MD5"
 
-printf "%s\t$SONAR_ZIP" "$(cat "$SONAR_MD5")" | md5sum -c -
+printf "%s  %s" "$(cat "$SONAR_MD5")" "$SONAR_TGZ" | md5sum -c -
 
 unzip -qq "$BUILD_ZIP" -d "$1"
 unzip -qq "$SONAR_ZIP" -d "$1"
