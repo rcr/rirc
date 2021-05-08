@@ -1,4 +1,4 @@
-image: alpine/latest
+image: debian/stable
 
 packages:
   - curl
