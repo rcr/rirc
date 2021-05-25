@@ -36,6 +36,9 @@ static struct irc_message m;
 static struct channel *c1;
 static struct channel *c2;
 static struct channel *c3;
+static struct channel *p1;
+static struct channel *p2;
+static struct channel *p3;
 static struct server *s;
 
 static void
@@ -229,6 +232,44 @@ test_irc_numeric_353(void)
 	assert_eq(u2->prfxmodes.lower, (flag_bit('v')));
 	assert_eq(u3->prfxmodes.lower, (flag_bit('o') | flag_bit('v')));
 	assert_eq(u4->prfxmodes.lower, (flag_bit('o') | flag_bit('v')));
+}
+
+static void
+test_irc_numeric_401(void)
+{
+	/* <nick> :No such nick/channel */
+
+	server_reset(s);
+
+	/* test errors */
+	CHECK_RECV("401 me", 1, 1, 0);
+	assert_strcmp(mock_chan[0], "host");
+	assert_strcmp(mock_line[0], "ERR_NOSUCHNICK: nick is null");
+
+	/* test channel buffer not found */
+	CHECK_RECV("401 me #notfound", 0, 1, 0);
+	assert_strcmp(mock_chan[0], "host");
+	assert_strcmp(mock_line[0], "[#notfound] No such nick/channel");
+
+	/* test privmsg buffer not found */
+	CHECK_RECV("401 me notfound", 0, 1, 0);
+	assert_strcmp(mock_chan[0], "host");
+	assert_strcmp(mock_line[0], "[notfound] No such nick/channel");
+
+	/* test channel buffer found */
+	CHECK_RECV("401 me #c1", 0, 1, 0);
+	assert_strcmp(mock_chan[0], "#c1");
+	assert_strcmp(mock_line[0], "[#c1] No such nick/channel");
+
+	/* test privmsg buffer found */
+	CHECK_RECV("401 me p1", 0, 1, 0);
+	assert_strcmp(mock_chan[0], "p1");
+	assert_strcmp(mock_line[0], "[p1] No such nick/channel");
+
+	/* test with message */
+	CHECK_RECV("401 me p1 :401 message", 0, 1, 0);
+	assert_strcmp(mock_chan[0], "p1");
+	assert_strcmp(mock_line[0], "[p1] 401 message");
 }
 
 static void
@@ -899,14 +940,21 @@ main(void)
 	c1 = channel("#c1", CHANNEL_T_CHANNEL);
 	c2 = channel("#c2", CHANNEL_T_CHANNEL);
 	c3 = channel("#c3", CHANNEL_T_CHANNEL);
+	p1 = channel("p1", CHANNEL_T_PRIVMSG);
+	p2 = channel("p2", CHANNEL_T_PRIVMSG);
+	p3 = channel("p3", CHANNEL_T_PRIVMSG);
+
 	s = server("host", "port", NULL, "user", "real");
 
-	if (!s || !c1 || !c2 || !c3)
+	if (!s || !c1 || !c2 || !c3 || !p1 || !p2 || !p3)
 		test_abort_main("Failed test setup");
 
 	channel_list_add(&s->clist, c1);
 	channel_list_add(&s->clist, c2);
 	channel_list_add(&s->clist, c3);
+	channel_list_add(&s->clist, p1);
+	channel_list_add(&s->clist, p2);
+	channel_list_add(&s->clist, p3);
 
 	server_nick_set(s, "me");
 
@@ -917,6 +965,7 @@ main(void)
 		TESTCASE(test_irc_generic_info),
 		TESTCASE(test_irc_generic_unknown),
 		TESTCASE(test_irc_numeric_353),
+		TESTCASE(test_irc_numeric_401),
 		TESTCASE(test_recv),
 		TESTCASE(test_recv_error),
 		TESTCASE(test_recv_invite),

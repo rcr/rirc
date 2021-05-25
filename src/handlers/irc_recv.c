@@ -46,6 +46,7 @@ static int irc_numeric_329(struct server*, struct irc_message*);
 static int irc_numeric_332(struct server*, struct irc_message*);
 static int irc_numeric_333(struct server*, struct irc_message*);
 static int irc_numeric_353(struct server*, struct irc_message*);
+static int irc_numeric_401(struct server*, struct irc_message*);
 static int irc_numeric_433(struct server*, struct irc_message*);
 
 static int irc_recv_numeric(struct server*, struct irc_message*);
@@ -154,7 +155,7 @@ static const irc_recv_f irc_numerics[] = {
 	[381] = irc_generic_info,   /* RPL_YOUREOPER */
 	[391] = irc_generic_info,   /* RPL_TIME */
 	[396] = irc_generic_info,   /* RPL_VISIBLEHOST */
-	[401] = irc_generic_error,  /* ERR_NOSUCHNICK */
+	[401] = irc_numeric_401,    /* ERR_NOSUCHNICK */
 	[402] = irc_generic_error,  /* ERR_NOSUCHSERVER */
 	[403] = irc_generic_error,  /* ERR_NOSUCHCHANNEL */
 	[404] = irc_generic_error,  /* ERR_CANNOTSENDTOCHAN */
@@ -551,6 +552,31 @@ irc_numeric_353(struct server *s, struct irc_message *m)
 	}
 
 	draw(DRAW_STATUS);
+
+	return 0;
+}
+
+static int
+irc_numeric_401(struct server *s, struct irc_message *m)
+{
+	/* <nick> :No such nick/channel */
+
+	char *message;
+	char *nick;
+	struct channel *c;
+
+	if (!irc_message_param(m, &nick))
+		failf(s, "ERR_NOSUCHNICK: nick is null");
+
+	if (!(c = channel_list_get(&(s->clist), nick, s->casemapping)))
+		c = s->channel;
+
+	irc_message_param(m, &message);
+
+	if (message && *message)
+		newlinef(c, 0, FROM_ERROR, "[%s] %s", nick, message);
+	else
+		newlinef(c, 0, FROM_ERROR, "[%s] No such nick/channel", nick);
 
 	return 0;
 }
