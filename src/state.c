@@ -326,7 +326,7 @@ state_channel_close(int action_confirm)
 
 	if (action_confirm) {
 
-		if (c->type == CHANNEL_T_CHANNEL || c->type == CHANNEL_T_PRIVATE)
+		if (c->type == CHANNEL_T_CHANNEL || c->type == CHANNEL_T_PRIVMSG)
 			action(action_close, "Close '%s'?   [y/n]", c->name);
 
 		if (c->type == CHANNEL_T_SERVER)
@@ -336,7 +336,7 @@ state_channel_close(int action_confirm)
 		return;
 	}
 
-	if (c->type == CHANNEL_T_CHANNEL || c->type == CHANNEL_T_PRIVATE) {
+	if (c->type == CHANNEL_T_CHANNEL || c->type == CHANNEL_T_PRIVMSG) {
 
 		if (s->connected && c->type == CHANNEL_T_CHANNEL && !c->parted) {
 			if ((ret = io_sendf(s->connection, "PART %s :%s", c->name, DEFAULT_PART_MESG)))

@@ -22,7 +22,7 @@
 	         failf((C), "Send fail: %s", io_err(ret)); \
 	} while (0)
 
-static const char* nick_or_priv(struct channel*, char*);
+static const char* irc_send_target(struct channel*, char*);
 
 int
 irc_send_command(struct server *s, struct channel *c, char *m)
@@ -66,7 +66,7 @@ irc_send_privmsg(struct server *s, struct channel *c, char *m)
 	if (!s->registered)
 		failf(c, "Not registered with server");
 
-	if (!(c->type == CHANNEL_T_CHANNEL || c->type == CHANNEL_T_PRIVATE))
+	if (!(c->type == CHANNEL_T_CHANNEL || c->type == CHANNEL_T_PRIVMSG))
 		failf(c, "This is not a channel");
 
 	if (c->type == CHANNEL_T_CHANNEL && (!c->joined || c->parted))
@@ -83,14 +83,14 @@ irc_send_privmsg(struct server *s, struct channel *c, char *m)
 }
 
 static const char*
-nick_or_priv(struct channel *c, char *m)
+irc_send_target(struct channel *c, char *m)
 {
-	const char *nick;
+	const char *target;
 
-	if ((nick = irc_strsep(&m)))
-		return nick;
+	if ((target = irc_strsep(&m)))
+		return target;
 
-	if (c->type == CHANNEL_T_PRIVATE)
+	if (c->type == CHANNEL_T_PRIVMSG)
 		return c->name;
 
 	return NULL;
@@ -110,15 +110,15 @@ send_away(struct server *s, struct channel *c, char *m)
 static int
 send_notice(struct server *s, struct channel *c, char *m)
 {
-	const char *targ;
+	const char *target;
 
-	if (!(targ = irc_strsep(&m)))
+	if (!(target = irc_strsep(&m)))
 		failf(c, "Usage: /notice <target> <message>");
 
 	if (!m || !*m)
 		failf(c, "Usage: /notice <target> <message>");
 
-	sendf(s, c, "NOTICE %s :%s", targ, m);
+	sendf(s, c, "NOTICE %s :%s", target, m);
 
 	return 0;
 }
@@ -140,15 +140,15 @@ send_part(struct server *s, struct channel *c, char *m)
 static int
 send_privmsg(struct server *s, struct channel *c, char *m)
 {
-	const char *targ;
+	const char *target;
 
-	if (!(targ = irc_strsep(&m)))
+	if (!(target = irc_strsep(&m)))
 		failf(c, "Usage: /privmsg <target> <message>");
 
 	if (!m || !*m)
 		failf(c, "Usage: /privmsg <target> <message>");
 
-	sendf(s, c, "PRIVMSG %s :%s", targ, m);
+	sendf(s, c, "PRIVMSG %s :%s", target, m);
 
 	return 0;
 }
@@ -197,12 +197,12 @@ send_topic_unset(struct server *s, struct channel *c, char *m)
 static int
 send_ctcp_action(struct server *s, struct channel *c, char *m)
 {
-	const char *nick;
+	const char *target;
 
-	if (!(nick = irc_strsep(&m)) || !irc_strtrim(&m))
-		failf(c, "Usage: /ctcp-action <nick> <text>");
+	if (!(target = irc_strsep(&m)) || !irc_strtrim(&m))
+		failf(c, "Usage: /ctcp-action <target> <text>");
 
-	sendf(s, c, "PRIVMSG %s :\001ACTION %s\001", nick, m);
+	sendf(s, c, "PRIVMSG %s :\001ACTION %s\001", target, m);
 
 	return 0;
 }
@@ -210,12 +210,12 @@ send_ctcp_action(struct server *s, struct channel *c, char *m)
 static int
 send_ctcp_clientinfo(struct server *s, struct channel *c, char *m)
 {
-	const char *nick;
+	const char *target;
 
-	if (!(nick = nick_or_priv(c, m)))
-		failf(c, "Usage: /ctcp-clientinfo <nick>");
+	if (!(target = irc_send_target(c, m)))
+		failf(c, "Usage: /ctcp-clientinfo <target>");
 
-	sendf(s, c, "PRIVMSG %s :\001CLIENTINFO\001", nick);
+	sendf(s, c, "PRIVMSG %s :\001CLIENTINFO\001", target);
 
 	return 0;
 }
@@ -223,12 +223,12 @@ send_ctcp_clientinfo(struct server *s, struct channel *c, char *m)
 static int
 send_ctcp_finger(struct server *s, struct channel *c, char *m)
 {
-	const char *nick;
+	const char *target;
 
-	if (!(nick = nick_or_priv(c, m)))
-		failf(c, "Usage: /ctcp-finger <nick>");
+	if (!(target = irc_send_target(c, m)))
+		failf(c, "Usage: /ctcp-finger <target>");
 
-	sendf(s, c, "PRIVMSG %s :\001FINGER\001", nick);
+	sendf(s, c, "PRIVMSG %s :\001FINGER\001", target);
 
 	return 0;
 }
@@ -236,15 +236,15 @@ send_ctcp_finger(struct server *s, struct channel *c, char *m)
 static int
 send_ctcp_ping(struct server *s, struct channel *c, char *m)
 {
-	const char *nick;
+	const char *target;
 	struct timeval t;
 
-	if (!(nick = nick_or_priv(c, m)))
-		failf(c, "Usage: /ctcp-ping <nick>");
+	if (!(target = irc_send_target(c, m)))
+		failf(c, "Usage: /ctcp-ping <target>");
 
 	(void) gettimeofday(&t, NULL);
 
-	sendf(s, c, "PRIVMSG %s :\001PING %llu %llu\001", nick,
+	sendf(s, c, "PRIVMSG %s :\001PING %llu %llu\001", target,
 		(unsigned long long)t.tv_sec,
 		(unsigned long long)t.tv_usec);
 
@@ -254,12 +254,12 @@ send_ctcp_ping(struct server *s, struct channel *c, char *m)
 static int
 send_ctcp_source(struct server *s, struct channel *c, char *m)
 {
-	const char *nick;
+	const char *target;
 
-	if (!(nick = nick_or_priv(c, m)))
-		failf(c, "Usage: /ctcp-source <nick>");
+	if (!(target = irc_send_target(c, m)))
+		failf(c, "Usage: /ctcp-source <target>");
 
-	sendf(s, c, "PRIVMSG %s :\001SOURCE\001", nick);
+	sendf(s, c, "PRIVMSG %s :\001SOURCE\001", target);
 
 	return 0;
 }
@@ -267,12 +267,12 @@ send_ctcp_source(struct server *s, struct channel *c, char *m)
 static int
 send_ctcp_time(struct server *s, struct channel *c, char *m)
 {
-	const char *nick;
+	const char *target;
 
-	if (!(nick = nick_or_priv(c, m)))
-		failf(c, "Usage: /ctcp-time <nick>");
+	if (!(target = irc_send_target(c, m)))
+		failf(c, "Usage: /ctcp-time <target>");
 
-	sendf(s, c, "PRIVMSG %s :\001TIME\001", nick);
+	sendf(s, c, "PRIVMSG %s :\001TIME\001", target);
 
 	return 0;
 }
@@ -280,12 +280,12 @@ send_ctcp_time(struct server *s, struct channel *c, char *m)
 static int
 send_ctcp_userinfo(struct server *s, struct channel *c, char *m)
 {
-	const char *nick;
+	const char *target;
 
-	if (!(nick = nick_or_priv(c, m)))
-		failf(c, "Usage: /ctcp-userinfo <nick>");
+	if (!(target = irc_send_target(c, m)))
+		failf(c, "Usage: /ctcp-userinfo <target>");
 
-	sendf(s, c, "PRIVMSG %s :\001USERINFO\001", nick);
+	sendf(s, c, "PRIVMSG %s :\001USERINFO\001", target);
 
 	return 0;
 }
@@ -293,12 +293,12 @@ send_ctcp_userinfo(struct server *s, struct channel *c, char *m)
 static int
 send_ctcp_version(struct server *s, struct channel *c, char *m)
 {
-	const char *nick;
+	const char *target;
 
-	if (!(nick = nick_or_priv(c, m)))
-		failf(c, "Usage: /ctcp-version <nick>");
+	if (!(target = irc_send_target(c, m)))
+		failf(c, "Usage: /ctcp-version <target>");
 
-	sendf(s, c, "PRIVMSG %s :\001VERSION\001", nick);
+	sendf(s, c, "PRIVMSG %s :\001VERSION\001", target);
 
 	return 0;
 }

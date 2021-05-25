@@ -20,9 +20,9 @@ enum channel_type
 {
 	CHANNEL_T_INVALID,
 	CHANNEL_T_RIRC,    /* Default buffer */
-	CHANNEL_T_CHANNEL, /* Channel message buffer */
+	CHANNEL_T_CHANNEL, /* Channel buffer */
+	CHANNEL_T_PRIVMSG, /* Privmsg buffer */
 	CHANNEL_T_SERVER,  /* Server message buffer */
-	CHANNEL_T_PRIVATE, /* Private message buffer */
 	CHANNEL_T_SIZE
 };
 

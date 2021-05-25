@@ -484,7 +484,7 @@ int
 main(void)
 {
 	c_chan = channel("chan", CHANNEL_T_CHANNEL);
-	c_priv = channel("nick", CHANNEL_T_PRIVATE);
+	c_priv = channel("nick", CHANNEL_T_PRIVMSG);
 
 	s = server("h1", "p1", NULL, "u1", "r1");
 

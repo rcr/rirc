@@ -113,7 +113,7 @@ ctcp_request_action(struct server *s, const char *from, const char *targ, char *
 
 	if (!irc_strcmp(s->casemapping, targ, s->nick)) {
 		if ((c = channel_list_get(&s->clist, from, s->casemapping)) == NULL) {
-			c = channel(from, CHANNEL_T_PRIVATE);
+			c = channel(from, CHANNEL_T_PRIVMSG);
 			c->activity = ACTIVITY_PINGED;
 			c->server = s;
 			channel_list_add(&s->clist, c);

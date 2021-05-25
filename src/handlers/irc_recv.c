@@ -1167,7 +1167,7 @@ recv_privmsg(struct server *s, struct irc_message *m)
 	if (!strcmp(target, s->nick)) {
 
 		if ((c = channel_list_get(&s->clist, m->from, s->casemapping)) == NULL) {
-			c = channel(m->from, CHANNEL_T_PRIVATE);
+			c = channel(m->from, CHANNEL_T_PRIVMSG);
 			c->server = s;
 			channel_list_add(&s->clist, c);
 		}

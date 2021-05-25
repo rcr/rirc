@@ -219,9 +219,9 @@ test_send_ctcp_action(void)
 	char m3[] = "ctcp-action target ";
 	char m4[] = "ctcp-action target action message";
 
-	CHECK_SEND_COMMAND(c_chan, m1, 1, 1, 0, "Usage: /ctcp-action <nick> <text>", "");
-	CHECK_SEND_COMMAND(c_chan, m2, 1, 1, 0, "Usage: /ctcp-action <nick> <text>", "");
-	CHECK_SEND_COMMAND(c_chan, m3, 1, 1, 0, "Usage: /ctcp-action <nick> <text>", "");
+	CHECK_SEND_COMMAND(c_chan, m1, 1, 1, 0, "Usage: /ctcp-action <target> <text>", "");
+	CHECK_SEND_COMMAND(c_chan, m2, 1, 1, 0, "Usage: /ctcp-action <target> <text>", "");
+	CHECK_SEND_COMMAND(c_chan, m3, 1, 1, 0, "Usage: /ctcp-action <target> <text>", "");
 	CHECK_SEND_COMMAND(c_chan, m4, 0, 0, 1, "", "PRIVMSG target :\001ACTION action message\001");
 }
 
@@ -233,8 +233,8 @@ test_send_ctcp_clientinfo(void)
 	char m3[] = "ctcp-clientinfo";
 	char m4[] = "ctcp-clientinfo targ";
 
-	CHECK_SEND_COMMAND(c_chan, m1, 1, 1, 0, "Usage: /ctcp-clientinfo <nick>", "");
-	CHECK_SEND_COMMAND(c_serv, m2, 1, 1, 0, "Usage: /ctcp-clientinfo <nick>", "");
+	CHECK_SEND_COMMAND(c_chan, m1, 1, 1, 0, "Usage: /ctcp-clientinfo <target>", "");
+	CHECK_SEND_COMMAND(c_serv, m2, 1, 1, 0, "Usage: /ctcp-clientinfo <target>", "");
 	CHECK_SEND_COMMAND(c_priv, m3, 0, 0, 1, "", "PRIVMSG priv :\001CLIENTINFO\001");
 	CHECK_SEND_COMMAND(c_priv, m4, 0, 0, 1, "", "PRIVMSG targ :\001CLIENTINFO\001");
 }
@@ -247,8 +247,8 @@ test_send_ctcp_finger(void)
 	char m3[] = "ctcp-finger";
 	char m4[] = "ctcp-finger targ";
 
-	CHECK_SEND_COMMAND(c_chan, m1, 1, 1, 0, "Usage: /ctcp-finger <nick>", "");
-	CHECK_SEND_COMMAND(c_serv, m2, 1, 1, 0, "Usage: /ctcp-finger <nick>", "");
+	CHECK_SEND_COMMAND(c_chan, m1, 1, 1, 0, "Usage: /ctcp-finger <target>", "");
+	CHECK_SEND_COMMAND(c_serv, m2, 1, 1, 0, "Usage: /ctcp-finger <target>", "");
 	CHECK_SEND_COMMAND(c_priv, m3, 0, 0, 1, "", "PRIVMSG priv :\001FINGER\001");
 	CHECK_SEND_COMMAND(c_priv, m4, 0, 0, 1, "", "PRIVMSG targ :\001FINGER\001");
 }
@@ -267,8 +267,8 @@ test_send_ctcp_ping(void)
 	const char *arg2;
 	const char *arg3;
 
-	CHECK_SEND_COMMAND(c_chan, m1, 1, 1, 0, "Usage: /ctcp-ping <nick>", "");
-	CHECK_SEND_COMMAND(c_serv, m2, 1, 1, 0, "Usage: /ctcp-ping <nick>", "");
+	CHECK_SEND_COMMAND(c_chan, m1, 1, 1, 0, "Usage: /ctcp-ping <target>", "");
+	CHECK_SEND_COMMAND(c_serv, m2, 1, 1, 0, "Usage: /ctcp-ping <target>", "");
 
 	/* test send to channel */
 	errno = 0;
@@ -337,8 +337,8 @@ test_send_ctcp_source(void)
 	char m3[] = "ctcp-source";
 	char m4[] = "ctcp-source targ";
 
-	CHECK_SEND_COMMAND(c_chan, m1, 1, 1, 0, "Usage: /ctcp-source <nick>", "");
-	CHECK_SEND_COMMAND(c_serv, m2, 1, 1, 0, "Usage: /ctcp-source <nick>", "");
+	CHECK_SEND_COMMAND(c_chan, m1, 1, 1, 0, "Usage: /ctcp-source <target>", "");
+	CHECK_SEND_COMMAND(c_serv, m2, 1, 1, 0, "Usage: /ctcp-source <target>", "");
 	CHECK_SEND_COMMAND(c_priv, m3, 0, 0, 1, "", "PRIVMSG priv :\001SOURCE\001");
 	CHECK_SEND_COMMAND(c_priv, m4, 0, 0, 1, "", "PRIVMSG targ :\001SOURCE\001");
 }
@@ -351,8 +351,8 @@ test_send_ctcp_time(void)
 	char m3[] = "ctcp-time";
 	char m4[] = "ctcp-time targ";
 
-	CHECK_SEND_COMMAND(c_chan, m1, 1, 1, 0, "Usage: /ctcp-time <nick>", "");
-	CHECK_SEND_COMMAND(c_serv, m2, 1, 1, 0, "Usage: /ctcp-time <nick>", "");
+	CHECK_SEND_COMMAND(c_chan, m1, 1, 1, 0, "Usage: /ctcp-time <target>", "");
+	CHECK_SEND_COMMAND(c_serv, m2, 1, 1, 0, "Usage: /ctcp-time <target>", "");
 	CHECK_SEND_COMMAND(c_priv, m3, 0, 0, 1, "", "PRIVMSG priv :\001TIME\001");
 	CHECK_SEND_COMMAND(c_priv, m4, 0, 0, 1, "", "PRIVMSG targ :\001TIME\001");
 }
@@ -365,8 +365,8 @@ test_send_ctcp_userinfo(void)
 	char m3[] = "ctcp-userinfo";
 	char m4[] = "ctcp-userinfo targ";
 
-	CHECK_SEND_COMMAND(c_chan, m1, 1, 1, 0, "Usage: /ctcp-userinfo <nick>", "");
-	CHECK_SEND_COMMAND(c_serv, m2, 1, 1, 0, "Usage: /ctcp-userinfo <nick>", "");
+	CHECK_SEND_COMMAND(c_chan, m1, 1, 1, 0, "Usage: /ctcp-userinfo <target>", "");
+	CHECK_SEND_COMMAND(c_serv, m2, 1, 1, 0, "Usage: /ctcp-userinfo <target>", "");
 	CHECK_SEND_COMMAND(c_priv, m3, 0, 0, 1, "", "PRIVMSG priv :\001USERINFO\001");
 	CHECK_SEND_COMMAND(c_priv, m4, 0, 0, 1, "", "PRIVMSG targ :\001USERINFO\001");
 }
@@ -379,8 +379,8 @@ test_send_ctcp_version(void)
 	char m3[] = "ctcp-version";
 	char m4[] = "ctcp-version targ";
 
-	CHECK_SEND_COMMAND(c_chan, m1, 1, 1, 0, "Usage: /ctcp-version <nick>", "");
-	CHECK_SEND_COMMAND(c_serv, m2, 1, 1, 0, "Usage: /ctcp-version <nick>", "");
+	CHECK_SEND_COMMAND(c_chan, m1, 1, 1, 0, "Usage: /ctcp-version <target>", "");
+	CHECK_SEND_COMMAND(c_serv, m2, 1, 1, 0, "Usage: /ctcp-version <target>", "");
 	CHECK_SEND_COMMAND(c_priv, m3, 0, 0, 1, "", "PRIVMSG priv :\001VERSION\001");
 	CHECK_SEND_COMMAND(c_priv, m4, 0, 0, 1, "", "PRIVMSG targ :\001VERSION\001");
 }
@@ -409,7 +409,7 @@ int
 main(void)
 {
 	c_chan = channel("chan", CHANNEL_T_CHANNEL);
-	c_priv = channel("priv", CHANNEL_T_PRIVATE);
+	c_priv = channel("priv", CHANNEL_T_PRIVMSG);
 
 	s = server("h1", "p1", NULL, "u1", "r1");
 
