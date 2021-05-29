@@ -349,7 +349,7 @@ test_recv_join(void)
 	assert_eq(user_list_add(&(c1->users), CASEMAPPING_RFC1459, "nick1", MODE_EMPTY), USER_ERR_NONE);
 	assert_eq(user_list_add(&(c2->users), CASEMAPPING_RFC1459, "nick1", MODE_EMPTY), USER_ERR_NONE);
 
-	join_threshold = 0;
+	threshold_join = 0;
 
 	CHECK_RECV("JOIN #c1", 1, 1, 0);
 	assert_strcmp(mock_chan[0], "host");
@@ -389,7 +389,7 @@ test_recv_join(void)
 	assert_strcmp(mock_chan[0], "#c1");
 	assert_strcmp(mock_line[0], "nick6!user@host has joined [account - real name]");
 
-	join_threshold = 2;
+	threshold_join = 2;
 
 	CHECK_RECV(":nick2!user@host JOIN #c2", 0, 0, 0);
 
@@ -602,7 +602,7 @@ test_recv_part(void)
 	assert_eq(user_list_add(&(c1->users), CASEMAPPING_RFC1459, "nick4", MODE_EMPTY), USER_ERR_NONE);
 	assert_eq(user_list_add(&(c1->users), CASEMAPPING_RFC1459, "nick5", MODE_EMPTY), USER_ERR_NONE);
 
-	part_threshold = 0;
+	threshold_part = 0;
 
 	CHECK_RECV("PART #c1 :part message", 1, 1, 0);
 	assert_strcmp(mock_chan[0], "host");
@@ -634,7 +634,7 @@ test_recv_part(void)
 	assert_strcmp(mock_line[0], "nick3!user@host has parted");
 	assert_ptr_null(user_list_get(&(c1->users), s->casemapping, "nick3", 0));
 
-	part_threshold = 1;
+	threshold_part = 1;
 
 	CHECK_RECV(":nick4!user@host PART #c1", 0, 0, 0);
 	assert_ptr_null(user_list_get(&(c1->users), s->casemapping, "nick4", 0));
@@ -712,7 +712,7 @@ test_recv_quit(void)
 	assert_eq(user_list_add(&(c3->users), CASEMAPPING_RFC1459, "nick1", MODE_EMPTY), USER_ERR_NONE);
 	assert_eq(user_list_add(&(c3->users), CASEMAPPING_RFC1459, "nick2", MODE_EMPTY), USER_ERR_NONE);
 
-	quit_threshold = 0;
+	threshold_quit = 0;
 
 	CHECK_RECV("QUIT message", 1, 1, 0);
 	assert_strcmp(mock_chan[0], "host");
@@ -741,7 +741,7 @@ test_recv_quit(void)
 	assert_strcmp(mock_line[0], "nick4!user@host has quit");
 	assert_ptr_null(user_list_get(&(c1->users), s->casemapping, "nick4", 0));
 
-	quit_threshold = 1;
+	threshold_quit = 1;
 
 	/* c1 = {nick1, nick5}, c3 = {nick1} */
 	CHECK_RECV(":nick1!user@host QUIT", 0, 1, 0);
@@ -817,7 +817,7 @@ test_recv_ircv3_account(void)
 	assert_eq(user_list_add(&(c1->users), CASEMAPPING_RFC1459, "nick2", MODE_EMPTY), USER_ERR_NONE);
 	assert_eq(user_list_add(&(c3->users), CASEMAPPING_RFC1459, "nick1", MODE_EMPTY), USER_ERR_NONE);
 
-	account_threshold = 0;
+	threshold_account = 0;
 
 	CHECK_RECV("ACCOUNT *", 1, 1, 0);
 	assert_strcmp(mock_chan[0], "host");
@@ -843,7 +843,7 @@ test_recv_ircv3_account(void)
 	assert_strcmp(mock_chan[1], "#c3");
 	assert_strcmp(mock_line[1], "nick1 has logged out");
 
-	account_threshold = 2;
+	threshold_account = 2;
 
 	CHECK_RECV(":nick1!user@host ACCOUNT *", 0, 1, 0);
 	assert_strcmp(mock_chan[0], "#c3");
@@ -863,7 +863,7 @@ test_recv_ircv3_away(void)
 	assert_eq(user_list_add(&(c1->users), CASEMAPPING_RFC1459, "nick2", MODE_EMPTY), USER_ERR_NONE);
 	assert_eq(user_list_add(&(c3->users), CASEMAPPING_RFC1459, "nick1", MODE_EMPTY), USER_ERR_NONE);
 
-	away_threshold = 0;
+	threshold_away = 0;
 
 	CHECK_RECV("AWAY *", 1, 1, 0);
 	assert_strcmp(mock_chan[0], "host");
@@ -886,7 +886,7 @@ test_recv_ircv3_away(void)
 	assert_strcmp(mock_chan[1], "#c3");
 	assert_strcmp(mock_line[1], "nick1 is no longer away");
 
-	away_threshold = 2;
+	threshold_away = 2;
 
 	CHECK_RECV(":nick1!user@host AWAY", 0, 1, 0);
 	assert_strcmp(mock_chan[0], "#c3");
@@ -906,7 +906,7 @@ test_recv_ircv3_chghost(void)
 	assert_eq(user_list_add(&(c1->users), CASEMAPPING_RFC1459, "nick2", MODE_EMPTY), USER_ERR_NONE);
 	assert_eq(user_list_add(&(c3->users), CASEMAPPING_RFC1459, "nick1", MODE_EMPTY), USER_ERR_NONE);
 
-	chghost_threshold = 0;
+	threshold_chghost = 0;
 
 	CHECK_RECV("CHGHOST new_user new_host", 1, 1, 0);
 	assert_strcmp(mock_chan[0], "host");
@@ -927,7 +927,7 @@ test_recv_ircv3_chghost(void)
 	assert_strcmp(mock_chan[1], "#c3");
 	assert_strcmp(mock_line[1], "nick1 has changed user/host: new_user/new_host");
 
-	chghost_threshold = 2;
+	threshold_chghost = 2;
 
 	CHECK_RECV(":nick1!user@host CHGHOST new_user new_host", 0, 1, 0);
 	assert_strcmp(mock_chan[0], "#c3");
