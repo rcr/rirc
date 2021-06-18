@@ -69,7 +69,11 @@ test_command_close(void)
 {
 	static struct channel *c1;
 	static struct channel *c2;
-	struct server *s;
+	static struct channel *c3;
+	static struct channel *c4;
+	static struct channel *c5;
+	struct server *s1;
+	struct server *s2;
 
 	state_init();
 
@@ -83,19 +87,34 @@ test_command_close(void)
 	/* clear error */
 	INP_C(0x0A);
 
+	/* host1 #c1 #c2, host2 #c3 #c4 */
 	c1 = channel("#c1", CHANNEL_T_CHANNEL);
 	c2 = channel("#c2", CHANNEL_T_CHANNEL);
-	s = server("host", "port", NULL, "user", "real");
+	c3 = channel("#c3", CHANNEL_T_CHANNEL);
+	c4 = channel("#c4", CHANNEL_T_CHANNEL);
+	c5 = channel("#c5", CHANNEL_T_CHANNEL);
+	s1 = server("host1", "port1", NULL, "user1", "real1");
+	s2 = server("host2", "port2", NULL, "user2", "real2");
 
-	if (!s || !c1 || !c2)
-		test_abort("Failed to create server and channels");
+	if (!s1 || !s2 || !c1 || !c2 || !c3 || !c4 || !c5)
+		test_abort("Failed to create servers and channels");
 
-	c1->server = s;
-	c2->server = s;
-	channel_list_add(&(s->clist), c1);
-	channel_list_add(&(s->clist), c2);
+	c1->server = s1;
+	c2->server = s1;
+	channel_list_add(&(s1->clist), c1);
+	channel_list_add(&(s1->clist), c2);
 
-	if (server_list_add(state_server_list(), s))
+	c3->server = s2;
+	c4->server = s2;
+	c5->server = s2;
+	channel_list_add(&(s2->clist), c3);
+	channel_list_add(&(s2->clist), c4);
+	channel_list_add(&(s2->clist), c5);
+
+	if (server_list_add(state_server_list(), s1))
+		test_abort("Failed to add server");
+
+	if (server_list_add(state_server_list(), s2))
 		test_abort("Failed to add server");
 
 	channel_set_current(c1);
@@ -108,23 +127,45 @@ test_command_close(void)
 	/* clear error */
 	INP_C(0x0A);
 
-	INP_S(":close");
-	INP_C(0x0A);
-
-	assert_ptr_null(action_handler);
-	assert_ptr_null(action_message());
-	assert_ptr_null(CURRENT_LINE);
-	assert_strcmp(current_channel()->name, "#c2");
-
-	channel_set_current(s->channel);
+	/* test closing last channel on server */
+	channel_set_current(c2);
 
 	INP_S(":close");
 	INP_C(0x0A);
 
 	assert_ptr_null(action_handler);
 	assert_ptr_null(action_message());
-	assert_strcmp(current_channel()->name, "rirc");
-	assert_strcmp(CURRENT_LINE, " - compiled with DEBUG flags");
+	assert_strcmp(current_channel()->name, "host2");
+
+	/* test closing server channel */
+	channel_set_current(s1->channel);
+
+	INP_S(":close");
+	INP_C(0x0A);
+
+	assert_ptr_null(action_handler);
+	assert_ptr_null(action_message());
+	assert_strcmp(current_channel()->name, "host2");
+
+	/* test closing middle channel*/
+	channel_set_current(c3);
+
+	INP_S(":close");
+	INP_C(0x0A);
+
+	assert_ptr_null(action_handler);
+	assert_ptr_null(action_message());
+	assert_strcmp(current_channel()->name, "#c4");
+
+	/* test closing last channel*/
+	channel_set_current(c5);
+
+	INP_S(":close");
+	INP_C(0x0A);
+
+	assert_ptr_null(action_handler);
+	assert_ptr_null(action_message());
+	assert_strcmp(current_channel()->name, "#c4");
 
 	state_term();
 }

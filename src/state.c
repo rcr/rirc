@@ -343,7 +343,11 @@ state_channel_close(int action_confirm)
 				server_error(s, "sendf fail: %s", io_err(ret));
 		}
 
-		channel_set_current(c->next);
+		if (c == channel_get_last())
+			channel_set_current(channel_get_prev(c));
+		else
+			channel_set_current(channel_get_next(c));
+
 		channel_list_del(&(s->clist), c);
 		channel_free(c);
 		return;
@@ -597,7 +601,6 @@ command(struct channel *c, char *buf)
 			action(action_error, "clear: Unknown arg '%s'", arg);
 			return;
 		}
-
 		state_channel_clear(0);
 		return;
 	}
@@ -607,7 +610,6 @@ command(struct channel *c, char *buf)
 			action(action_error, "close: Unknown arg '%s'", arg);
 			return;
 		}
-
 		state_channel_close(0);
 		return;
 	}
