@@ -911,9 +911,8 @@ io_tls_err(int err)
 static void
 io_tls_init(void)
 {
-	char buf[512];
+	const unsigned char pers[] = "rirc-drbg-seed";
 	int ret;
-	struct timespec ts;
 
 	mbedtls_ctr_drbg_init(&tls_ctr_drbg);
 	mbedtls_entropy_init(&tls_entropy);
@@ -922,18 +921,12 @@ io_tls_init(void)
 	if (atexit(io_tls_term))
 		fatal("atexit");
 
-	if (timespec_get(&ts, TIME_UTC) != TIME_UTC)
-		fatal("timespec_get");
-
-	if (snprintf(buf, sizeof(buf), "rirc-%lu-%lu", ts.tv_sec, ts.tv_nsec) < 0)
-		fatal("snprintf");
-
 	if ((ret = mbedtls_ctr_drbg_seed(
 			&tls_ctr_drbg,
 			mbedtls_entropy_func,
 			&tls_entropy,
-			(const unsigned char *)buf,
-			strlen(buf)))) {
+			pers,
+			sizeof(pers)))) {
 		fatal("mbedtls_ctr_drbg_seed: %s", io_tls_err(ret));
 	}
 
