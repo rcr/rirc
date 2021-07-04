@@ -17,7 +17,7 @@
 	do { \
 		mock_reset_io(); \
 		mock_reset_state(); \
-		assert_eq(irc_send_privmsg(s, (C), (M)), (RET)); \
+		assert_eq(irc_send_message(s, (C), (M)), (RET)); \
 		assert_eq(mock_line_n, (LINE_N)); \
 		assert_eq(mock_send_n, (SEND_N)); \
 		assert_strcmp(mock_line[0], (LINE)); \
@@ -79,7 +79,7 @@ test_irc_send_command(void)
 }
 
 static void
-test_irc_send_privmsg(void)
+test_irc_send_message(void)
 {
 	char m1[] = "chan test 1";
 	char m2[] = "serv test 2";
@@ -98,7 +98,7 @@ test_irc_send_privmsg(void)
 
 	mock_reset_io();
 	mock_reset_state();
-	assert_eq(irc_send_privmsg(NULL, c_chan, "test"), 1);
+	assert_eq(irc_send_message(NULL, c_chan, "test"), 1);
 	assert_strcmp(mock_line[0], "This is not a server");
 	assert_strcmp(mock_send[0], "");
 
@@ -496,7 +496,7 @@ main(void)
 {
 	struct testcase tests[] = {
 		TESTCASE(test_irc_send_command),
-		TESTCASE(test_irc_send_privmsg),
+		TESTCASE(test_irc_send_message),
 #define X(cmd) TESTCASE(test_send_##cmd),
 		SEND_HANDLERS
 #undef X

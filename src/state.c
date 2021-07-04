@@ -769,18 +769,18 @@ state_input_linef(struct channel *c)
 	switch (buf[0]) {
 		case ':':
 			if (len > 1 && buf[1] == ':')
-				irc_send_privmsg(current_channel()->server, current_channel(), buf + 1);
+				irc_send_message(current_channel()->server, current_channel(), buf + 1);
 			else
 				command(current_channel(), buf + 1);
 			break;
 		case '/':
 			if (len > 1 && buf[1] == '/')
-				irc_send_privmsg(current_channel()->server, current_channel(), buf + 1);
+				irc_send_message(current_channel()->server, current_channel(), buf + 1);
 			else
 				irc_send_command(current_channel()->server, current_channel(), buf + 1);
 			break;
 		default:
-			irc_send_privmsg(current_channel()->server, current_channel(), buf);
+			irc_send_message(current_channel()->server, current_channel(), buf);
 	}
 
 	return 1;

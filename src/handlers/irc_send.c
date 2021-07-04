@@ -58,7 +58,7 @@ irc_send_command(struct server *s, struct channel *c, char *m)
 }
 
 int
-irc_send_privmsg(struct server *s, struct channel *c, char *m)
+irc_send_message(struct server *s, struct channel *c, const char *m)
 {
 	if (!s)
 		failf(c, "This is not a server");
@@ -97,7 +97,7 @@ irc_send_target(struct channel *c, char *m)
 }
 
 static int
-send_away(struct server *s, struct channel *c, char *m)
+irc_send_away(struct server *s, struct channel *c, char *m)
 {
 	if (irc_strtrim(&m))
 		sendf(s, c, "AWAY :%s", m);
@@ -108,7 +108,7 @@ send_away(struct server *s, struct channel *c, char *m)
 }
 
 static int
-send_notice(struct server *s, struct channel *c, char *m)
+irc_send_notice(struct server *s, struct channel *c, char *m)
 {
 	const char *target;
 
@@ -124,7 +124,7 @@ send_notice(struct server *s, struct channel *c, char *m)
 }
 
 static int
-send_part(struct server *s, struct channel *c, char *m)
+irc_send_part(struct server *s, struct channel *c, char *m)
 {
 	if (c->type != CHANNEL_T_CHANNEL)
 		failf(c, "This is not a channel");
@@ -138,7 +138,7 @@ send_part(struct server *s, struct channel *c, char *m)
 }
 
 static int
-send_privmsg(struct server *s, struct channel *c, char *m)
+irc_send_privmsg(struct server *s, struct channel *c, char *m)
 {
 	const char *target;
 	char *dup;
@@ -185,7 +185,7 @@ send_privmsg(struct server *s, struct channel *c, char *m)
 }
 
 static int
-send_quit(struct server *s, struct channel *c, char *m)
+irc_send_quit(struct server *s, struct channel *c, char *m)
 {
 	s->quitting = 1;
 
@@ -198,7 +198,7 @@ send_quit(struct server *s, struct channel *c, char *m)
 }
 
 static int
-send_topic(struct server *s, struct channel *c, char *m)
+irc_send_topic(struct server *s, struct channel *c, char *m)
 {
 	if (c->type != CHANNEL_T_CHANNEL)
 		failf(c, "This is not a channel");
@@ -212,7 +212,7 @@ send_topic(struct server *s, struct channel *c, char *m)
 }
 
 static int
-send_topic_unset(struct server *s, struct channel *c, char *m)
+irc_send_topic_unset(struct server *s, struct channel *c, char *m)
 {
 	if (c->type != CHANNEL_T_CHANNEL)
 		failf(c, "This is not a channel");
@@ -226,7 +226,7 @@ send_topic_unset(struct server *s, struct channel *c, char *m)
 }
 
 static int
-send_ctcp_action(struct server *s, struct channel *c, char *m)
+irc_send_ctcp_action(struct server *s, struct channel *c, char *m)
 {
 	const char *target;
 
@@ -239,7 +239,7 @@ send_ctcp_action(struct server *s, struct channel *c, char *m)
 }
 
 static int
-send_ctcp_clientinfo(struct server *s, struct channel *c, char *m)
+irc_send_ctcp_clientinfo(struct server *s, struct channel *c, char *m)
 {
 	const char *target;
 
@@ -252,7 +252,7 @@ send_ctcp_clientinfo(struct server *s, struct channel *c, char *m)
 }
 
 static int
-send_ctcp_finger(struct server *s, struct channel *c, char *m)
+irc_send_ctcp_finger(struct server *s, struct channel *c, char *m)
 {
 	const char *target;
 
@@ -265,7 +265,7 @@ send_ctcp_finger(struct server *s, struct channel *c, char *m)
 }
 
 static int
-send_ctcp_ping(struct server *s, struct channel *c, char *m)
+irc_send_ctcp_ping(struct server *s, struct channel *c, char *m)
 {
 	const char *target;
 	struct timeval t;
@@ -283,7 +283,7 @@ send_ctcp_ping(struct server *s, struct channel *c, char *m)
 }
 
 static int
-send_ctcp_source(struct server *s, struct channel *c, char *m)
+irc_send_ctcp_source(struct server *s, struct channel *c, char *m)
 {
 	const char *target;
 
@@ -296,7 +296,7 @@ send_ctcp_source(struct server *s, struct channel *c, char *m)
 }
 
 static int
-send_ctcp_time(struct server *s, struct channel *c, char *m)
+irc_send_ctcp_time(struct server *s, struct channel *c, char *m)
 {
 	const char *target;
 
@@ -309,7 +309,7 @@ send_ctcp_time(struct server *s, struct channel *c, char *m)
 }
 
 static int
-send_ctcp_userinfo(struct server *s, struct channel *c, char *m)
+irc_send_ctcp_userinfo(struct server *s, struct channel *c, char *m)
 {
 	const char *target;
 
@@ -322,7 +322,7 @@ send_ctcp_userinfo(struct server *s, struct channel *c, char *m)
 }
 
 static int
-send_ctcp_version(struct server *s, struct channel *c, char *m)
+irc_send_ctcp_version(struct server *s, struct channel *c, char *m)
 {
 	const char *target;
 
@@ -335,7 +335,7 @@ send_ctcp_version(struct server *s, struct channel *c, char *m)
 }
 
 static int
-send_ircv3_cap_ls(struct server *s, struct channel *c, char *m)
+irc_send_ircv3_cap_ls(struct server *s, struct channel *c, char *m)
 {
 	if (irc_strtrim(&m))
 		failf(c, "Usage: /cap-ls");
@@ -346,7 +346,7 @@ send_ircv3_cap_ls(struct server *s, struct channel *c, char *m)
 }
 
 static int
-send_ircv3_cap_list(struct server *s, struct channel *c, char *m)
+irc_send_ircv3_cap_list(struct server *s, struct channel *c, char *m)
 {
 	if (irc_strtrim(&m))
 		failf(c, "Usage: /cap-list");
