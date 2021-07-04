@@ -308,6 +308,8 @@ io_start(void)
 {
 	io_running = 1;
 
+	io_tty_winsize();
+
 	while (io_running) {
 
 		char buf[128];
@@ -650,8 +652,6 @@ io_tty_init(void)
 
 	if (atexit(io_tty_term))
 		fatal("atexit");
-
-	io_tty_winsize();
 }
 
 static void
