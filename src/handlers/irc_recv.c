@@ -47,6 +47,7 @@ static int irc_numeric_332(struct server*, struct irc_message*);
 static int irc_numeric_333(struct server*, struct irc_message*);
 static int irc_numeric_353(struct server*, struct irc_message*);
 static int irc_numeric_401(struct server*, struct irc_message*);
+static int irc_numeric_403(struct server*, struct irc_message*);
 static int irc_numeric_433(struct server*, struct irc_message*);
 
 static int irc_recv_numeric(struct server*, struct irc_message*);
@@ -157,7 +158,7 @@ static const irc_recv_f irc_numerics[] = {
 	[396] = irc_generic_info,   /* RPL_VISIBLEHOST */
 	[401] = irc_numeric_401,    /* ERR_NOSUCHNICK */
 	[402] = irc_generic_error,  /* ERR_NOSUCHSERVER */
-	[403] = irc_generic_error,  /* ERR_NOSUCHCHANNEL */
+	[403] = irc_numeric_403,    /* ERR_NOSUCHCHANNEL */
 	[404] = irc_generic_error,  /* ERR_CANNOTSENDTOCHAN */
 	[405] = irc_generic_error,  /* ERR_TOOMANYCHANNELS */
 	[406] = irc_generic_error,  /* ERR_WASNOSUCHNICK */
@@ -577,6 +578,31 @@ irc_numeric_401(struct server *s, struct irc_message *m)
 		newlinef(c, 0, FROM_ERROR, "[%s] %s", nick, message);
 	else
 		newlinef(c, 0, FROM_ERROR, "[%s] No such nick/channel", nick);
+
+	return 0;
+}
+
+static int
+irc_numeric_403(struct server *s, struct irc_message *m)
+{
+	/* <chan> :No such channel */
+
+	char *message;
+	char *chan;
+	struct channel *c;
+
+	if (!irc_message_param(m, &chan))
+		failf(s, "ERR_NOSUCHCHANNEL: chan is null");
+
+	if (!(c = channel_list_get(&(s->clist), chan, s->casemapping)))
+		c = s->channel;
+
+	irc_message_param(m, &message);
+
+	if (message && *message)
+		newlinef(c, 0, FROM_ERROR, "[%s] %s", chan, message);
+	else
+		newlinef(c, 0, FROM_ERROR, "[%s] No such channel", chan);
 
 	return 0;
 }

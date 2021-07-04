@@ -273,6 +273,44 @@ test_irc_numeric_401(void)
 }
 
 static void
+test_irc_numeric_403(void)
+{
+	/* <chan> :No such channel */
+
+	server_reset(s);
+
+	/* test errors */
+	CHECK_RECV("403 me", 1, 1, 0);
+	assert_strcmp(mock_chan[0], "host");
+	assert_strcmp(mock_line[0], "ERR_NOSUCHCHANNEL: chan is null");
+
+	/* test channel buffer not found */
+	CHECK_RECV("403 me #notfound", 0, 1, 0);
+	assert_strcmp(mock_chan[0], "host");
+	assert_strcmp(mock_line[0], "[#notfound] No such channel");
+
+	/* test privmsg buffer not found */
+	CHECK_RECV("403 me notfound", 0, 1, 0);
+	assert_strcmp(mock_chan[0], "host");
+	assert_strcmp(mock_line[0], "[notfound] No such channel");
+
+	/* test channel buffer found */
+	CHECK_RECV("403 me #c1", 0, 1, 0);
+	assert_strcmp(mock_chan[0], "#c1");
+	assert_strcmp(mock_line[0], "[#c1] No such channel");
+
+	/* test privmsg buffer found */
+	CHECK_RECV("403 me p1", 0, 1, 0);
+	assert_strcmp(mock_chan[0], "p1");
+	assert_strcmp(mock_line[0], "[p1] No such channel");
+
+	/* test with message */
+	CHECK_RECV("403 me p1 :403 message", 0, 1, 0);
+	assert_strcmp(mock_chan[0], "p1");
+	assert_strcmp(mock_line[0], "[p1] 403 message");
+}
+
+static void
 test_recv(void)
 {
 	server_reset(s);
@@ -982,6 +1020,7 @@ main(void)
 		TESTCASE(test_irc_generic_unknown),
 		TESTCASE(test_irc_numeric_353),
 		TESTCASE(test_irc_numeric_401),
+		TESTCASE(test_irc_numeric_403),
 		TESTCASE(test_recv),
 		TESTCASE(test_recv_error),
 		TESTCASE(test_recv_invite),

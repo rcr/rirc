@@ -69,7 +69,7 @@ test_irc_send_command(void)
 	CHECK_SEND_COMMAND(c_chan, m2, 1, 1, 0, "Messages beginning with '/' require a command", "");
 	CHECK_SEND_COMMAND(c_chan, m3, 0, 0, 1, "", "TEST");
 	CHECK_SEND_COMMAND(c_chan, m4, 0, 0, 1, "", "TEST arg1 arg2 arg3");
-	CHECK_SEND_COMMAND(c_chan, m5, 0, 0, 1, "", "PRIVMSG targ :test message");
+	CHECK_SEND_COMMAND(c_chan, m5, 0, 1, 1, "test message", "PRIVMSG targ :test message");
 
 	s->registered = 0;
 
@@ -155,16 +155,73 @@ static void
 test_send_privmsg(void)
 {
 	char m1[] = "privmsg";
-	char m2[] = "privmsg test1";
-	char m3[] = "privmsg test2 ";
-	char m4[] = "privmsg test3  ";
-	char m5[] = "privmsg test4 test privmsg message";
+	char m2[] = "privmsg chan";
+	char m3[] = "privmsg chan ";
+
+	struct channel *c1;
+	struct channel *c2;
+	struct channel *c3;
+	struct channel *c4;
+
+	assert_eq(s->clist.count, 3);
 
 	CHECK_SEND_COMMAND(c_chan, m1, 1, 1, 0, "Usage: /privmsg <target> <message>", "");
 	CHECK_SEND_COMMAND(c_chan, m2, 1, 1, 0, "Usage: /privmsg <target> <message>", "");
 	CHECK_SEND_COMMAND(c_chan, m3, 1, 1, 0, "Usage: /privmsg <target> <message>", "");
-	CHECK_SEND_COMMAND(c_chan, m4, 0, 0, 1, "", "PRIVMSG test3 : ");
-	CHECK_SEND_COMMAND(c_chan, m5, 0, 0, 1, "", "PRIVMSG test4 :test privmsg message");
+
+	/* test sending to existing channel */
+	char m4[] = "privmsg chan  ";
+	char m5[] = "privmsg chan test 1";
+
+	CHECK_SEND_COMMAND(c_chan, m4, 0, 1, 1, " ",      "PRIVMSG chan : ");
+	CHECK_SEND_COMMAND(c_chan, m5, 0, 1, 1, "test 1", "PRIVMSG chan :test 1");
+
+	assert_eq(s->clist.count, 3);
+
+	/* test sending to single new target */
+	char m6[] = "privmsg #new1 test 2";
+
+	CHECK_SEND_COMMAND(c_chan, m6, 0, 1, 1, "test 2", "PRIVMSG #new1 :test 2");
+
+	if (!(c1 = channel_list_get(&(s->clist), "#new1", s->casemapping)))
+		test_abort("channel '#new1' not found");
+
+	assert_eq(c1->type, CHANNEL_T_CHANNEL);
+	assert_eq(s->clist.count, 4);
+
+	/* test sending to multiple new targets */
+	char m7[] = "privmsg #new2,priv1,#new3,priv2 test 3";
+
+	CHECK_SEND_COMMAND(c_chan, m7, 0, 4, 1, "test 3", "PRIVMSG #new2,priv1,#new3,priv2 :test 3");
+
+	if (!(c1 = channel_list_get(&(s->clist), "#new2", s->casemapping)))
+		test_abort("channel '#new2' not found");
+
+	if (!(c2 = channel_list_get(&(s->clist), "priv1", s->casemapping)))
+		test_abort("channel 'priv1' not found");
+
+	if (!(c3 = channel_list_get(&(s->clist), "#new3", s->casemapping)))
+		test_abort("channel '#new3' not found");
+
+	if (!(c4 = channel_list_get(&(s->clist), "priv2", s->casemapping)))
+		test_abort("channel 'priv2' not found");
+
+	assert_eq(c1->type, CHANNEL_T_CHANNEL);
+	assert_eq(c2->type, CHANNEL_T_PRIVMSG);
+	assert_eq(c3->type, CHANNEL_T_CHANNEL);
+	assert_eq(c4->type, CHANNEL_T_PRIVMSG);
+	assert_eq(s->clist.count, 8);
+
+	/* test with some duplicates channels */
+	char m8[] = "privmsg priv3,priv1,priv2 test 4";
+
+	CHECK_SEND_COMMAND(c_chan, m8, 0, 3, 1, "test 4", "PRIVMSG priv3,priv1,priv2 :test 4");
+
+	if (!(c1 = channel_list_get(&(s->clist), "priv3", s->casemapping)))
+		test_abort("channel 'priv3' not found");
+
+	assert_eq(c1->type, CHANNEL_T_PRIVMSG);
+	assert_eq(s->clist.count, 9);
 }
 
 static void
