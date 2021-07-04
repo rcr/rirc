@@ -683,5 +683,5 @@ main(void)
 		TESTCASE(test_avl_foreach)
 	};
 
-	return run_tests(tests);
+	return run_tests(NULL, NULL, tests);
 }

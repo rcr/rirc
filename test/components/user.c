@@ -173,5 +173,5 @@ main(void)
 		TESTCASE(test_user_list_free)
 	};
 
-	return run_tests(tests);
+	return run_tests(NULL, NULL, tests);
 }

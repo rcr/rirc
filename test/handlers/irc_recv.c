@@ -934,20 +934,21 @@ test_recv_ircv3_chghost(void)
 	assert_strcmp(mock_line[0], "nick1 has changed user/host: new_user/new_host");
 }
 
-int
-main(void)
+static int
+test_init(void)
 {
+	s = server("host", "port", NULL, "user", "real");
+
 	c1 = channel("#c1", CHANNEL_T_CHANNEL);
 	c2 = channel("#c2", CHANNEL_T_CHANNEL);
 	c3 = channel("#c3", CHANNEL_T_CHANNEL);
+
 	p1 = channel("p1", CHANNEL_T_PRIVMSG);
 	p2 = channel("p2", CHANNEL_T_PRIVMSG);
 	p3 = channel("p3", CHANNEL_T_PRIVMSG);
 
-	s = server("host", "port", NULL, "user", "real");
-
 	if (!s || !c1 || !c2 || !c3 || !p1 || !p2 || !p3)
-		test_abort_main("Failed test setup");
+		return -1;
 
 	channel_list_add(&s->clist, c1);
 	channel_list_add(&s->clist, c2);
@@ -958,6 +959,21 @@ main(void)
 
 	server_nick_set(s, "me");
 
+	return 0;
+}
+
+
+static int
+test_term(void)
+{
+	server_free(s);
+
+	return 0;
+}
+
+int
+main(void)
+{
 	struct testcase tests[] = {
 		TESTCASE(test_irc_generic),
 		TESTCASE(test_irc_generic_error),
@@ -989,9 +1005,5 @@ main(void)
 		TESTCASE(test_recv_ircv3_chghost)
 	};
 
-	int ret = run_tests(tests);
-
-	server_free(s);
-
-	return ret;
+	return run_tests(test_init, test_term, tests);
 }

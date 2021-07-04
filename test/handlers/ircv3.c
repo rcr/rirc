@@ -595,14 +595,26 @@ test_ircv3_cap_req_send(void)
 	assert_strcmp(mock_send[0], "CAP REQ :cap-1 cap-3 cap-5");
 }
 
+static int
+test_init(void)
+{
+	if (!(s = server("host", "post", NULL, "user", "real")))
+		return -1;
+
+	return 0;
+}
+
+static int
+test_term(void)
+{
+	server_free(s);
+
+	return 0;
+}
+
 int
 main(void)
 {
-	s = server("host", "post", NULL, "user", "real");
-
-	if (!s)
-		test_abort_main("Failed test setup");
-
 	struct testcase tests[] = {
 		TESTCASE(test_ircv3_CAP),
 		TESTCASE(test_ircv3_CAP_LS),
@@ -615,9 +627,5 @@ main(void)
 		TESTCASE(test_ircv3_cap_req_send),
 	};
 
-	int ret = run_tests(tests);
-
-	server_free(s);
-
-	return ret;
+	return run_tests(test_init, test_term, tests);
 }

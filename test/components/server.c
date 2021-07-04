@@ -304,5 +304,5 @@ main(void)
 		TESTCASE(test_parse_005)
 	};
 
-	return run_tests(tests);
+	return run_tests(NULL, NULL, tests);
 }

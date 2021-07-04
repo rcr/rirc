@@ -672,5 +672,5 @@ main(void)
 		TESTCASE(test_irc_toupper)
 	};
 
-	return run_tests(tests);
+	return run_tests(NULL, NULL, tests);
 }

@@ -375,5 +375,5 @@ main(void)
 		TESTCASE(test_state),
 	};
 
-	return run_tests(tests);
+	return run_tests(NULL, NULL, tests);
 }

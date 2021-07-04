@@ -51,5 +51,5 @@ main(void)
 		TESTCASE(test_channel_list)
 	};
 
-	return run_tests(tests);
+	return run_tests(NULL, NULL, tests);
 }

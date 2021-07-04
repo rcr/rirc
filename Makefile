@@ -24,7 +24,7 @@ RIRC_CFLAGS += -D_DARWIN_C_SOURCE
 
 LDFLAGS += -lpthread
 
-SRC       := $(shell find $(PATH_SRC) -name '*.c')
+SRC       := $(shell find $(PATH_SRC) -name '*.c' | sort)
 SRC_GPERF := $(patsubst %, %.out, $(shell find $(PATH_SRC) -name '*.gperf'))
 
 # Release objects, debug objects, testcases
@@ -52,11 +52,11 @@ $(PATH_BUILD)/%.db.o: $(PATH_SRC)/%.c $(CONFIG) | $(PATH_BUILD)
 	@$(CC)  $(CFLAGS_DEBUG) $(RIRC_CFLAGS) -c -o $@ $<
 
 $(PATH_BUILD)/%.t: $(PATH_TEST)/%.c $(SRC_GPERF) $(CONFIG) | $(PATH_BUILD)
+	@rm -f $(@:.t=.td)
 	@$(CPP) $(CFLAGS_DEBUG) $(RIRC_CFLAGS) -MM -MP -MT $@ -MF $(@:.t=.t.d) $<
 	@$(CC)  $(CFLAGS_DEBUG) $(RIRC_CFLAGS) -c -o $(@:.t=.t.o) $<
 	@$(CC)  $(CFLAGS_DEBUG) $(RIRC_CFLAGS) -o $@ $(@:.t=.t.o)
 	@./$@ || mv $@ $(@:.t=.td)
-	@[ -f $@ ]
 
 $(PATH_BUILD):
 	@mkdir -p $(patsubst $(PATH_SRC)%, $(PATH_BUILD)%, $(shell find $(PATH_SRC) -type d))
@@ -71,8 +71,8 @@ all:
 	@$(MAKE) --silent rirc
 	@$(MAKE) --silent rirc.debug
 
-check:
-	@$(MAKE) --silent $(OBJS_T)
+check: $(OBJS_T)
+	@[ ! "$$(find $(PATH_BUILD) -name '*.td' -print -quit)" ] && echo OK
 
 clean:
 	@rm -rfv rirc rirc.debug $(SRC_GPERF) $(PATH_BUILD)

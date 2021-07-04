@@ -405,24 +405,38 @@ test_send_ircv3_cap_list(void)
 	CHECK_SEND_COMMAND(c_chan, m2, 1, 1, 0, "Usage: /cap-list", "");
 }
 
-int
-main(void)
+static int
+test_init(void)
 {
+	s = server("h1", "p1", NULL, "u1", "r1");
+
+	c_serv = s->channel;
+
 	c_chan = channel("chan", CHANNEL_T_CHANNEL);
 	c_priv = channel("priv", CHANNEL_T_PRIVMSG);
 
-	s = server("h1", "p1", NULL, "u1", "r1");
-
 	if (!s || !c_chan || !c_priv)
-		test_abort_main("Failed test setup");
+		return -1;
 
 	channel_list_add(&s->clist, c_chan);
 	channel_list_add(&s->clist, c_priv);
 
-	c_serv = s->channel;
-
 	s->registered = 1;
 
+	return 0;
+}
+
+static int
+test_term(void)
+{
+	server_free(s);
+
+	return 0;
+}
+
+int
+main(void)
+{
 	struct testcase tests[] = {
 		TESTCASE(test_irc_send_command),
 		TESTCASE(test_irc_send_privmsg),
@@ -437,9 +451,5 @@ main(void)
 #undef X
 	};
 
-	int ret = run_tests(tests);
-
-	server_free(s);
-
-	return ret;
+	return run_tests(test_init, test_term, tests);
 }
