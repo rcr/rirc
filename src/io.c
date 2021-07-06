@@ -892,13 +892,15 @@ io_tls_x509_vrfy(struct connection *cx)
 
 	s = buf;
 
-	do {
+	while (*s) {
+
 		if ((p = strchr(buf, '\n')))
 			*p++ = 0;
 
 		io_error(cx, " .... %s", s);
 
-	} while ((s = p));
+		s = p;
+	}
 
 	return 0;
 }
