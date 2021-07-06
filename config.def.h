@@ -110,7 +110,9 @@
 
 /* [NETWORK] */
 
-#define CA_CERT_PATH "/etc/ssl/certs/"
+/* Default CA certifate file path
+ *   ("": a list of known paths is checked) */
+#define CA_CERT_PATH ""
 
 /* Seconds before displaying ping
  *   Integer, [0, 150, 86400]

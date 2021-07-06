@@ -156,6 +156,15 @@ static int io_tls_x509_vrfy(struct connection*);
 static void io_tls_init(void);
 static void io_tls_term(void);
 
+const char *ca_cert_paths[] = {
+	"/etc/ssl/ca-bundle.pem",
+	"/etc/ssl/cert.pem",
+	"/etc/ssl/certs/ca-certificates.crt",
+	"/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem",
+	"/etc/pki/tls/cacert.pem",
+	"/etc/pki/tls/certs/ca-bundle.crt",
+};
+
 struct connection*
 connection(const void *obj, const char *host, const char *port, uint32_t flags)
 {
@@ -930,8 +939,20 @@ io_tls_init(void)
 		fatal("mbedtls_ctr_drbg_seed: %s", io_tls_err(ret));
 	}
 
-	if ((ret = mbedtls_x509_crt_parse_path(&tls_x509_crt, ca_cert_path)) < 0)
-		fatal("mbedtls_x509_crt_parse_path: %s", io_tls_err(ret));
+	if (ca_cert_path && *ca_cert_path) {
+
+		if ((ret = mbedtls_x509_crt_parse_file(&tls_x509_crt, ca_cert_path)) < 0)
+			fatal("mbedtls_x509_crt_parse_file: '%s': %s", ca_cert_path, io_tls_err(ret));
+
+	} else {
+
+		for (size_t i = 0; i < ARR_LEN(ca_cert_paths); i++) {
+			if ((ret = mbedtls_x509_crt_parse_file(&tls_x509_crt, ca_cert_paths[i])) >= 0)
+				return;
+		}
+
+		fatal("Failed to load ca cert: %s", io_tls_err(ret));
+	}
 }
 
 static void

@@ -28,7 +28,7 @@ static int rirc_parse_args(int, char**);
 #ifdef CA_CERT_PATH
 const char *ca_cert_path = CA_CERT_PATH;
 #else
-#error "CA_CERT_PATH required"
+const char *ca_cert_path;
 #endif
 
 #ifdef DEFAULT_NICKS
