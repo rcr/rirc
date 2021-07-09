@@ -577,7 +577,7 @@ io_cx_read(struct connection *cx, uint32_t timeout)
 	struct pollfd fd[1];
 	unsigned char buf[1024];
 
-	fd[0].fd = cx->net_ctx.fd;
+	fd[0].fd = cx->net_ctx.MBEDTLS_PRIVATE(fd);
 	fd[0].events = POLLIN;
 
 	while ((ret = poll(fd, 1, timeout)) < 0 && errno == EAGAIN)
@@ -750,7 +750,7 @@ io_net_connect(struct connection *cx)
 err:
 	freeaddrinfo(res);
 
-	return (cx->net_ctx.fd = ret);
+	return (cx->net_ctx.MBEDTLS_PRIVATE(fd) = ret);
 }
 
 static void
@@ -890,16 +890,12 @@ io_tls_x509_vrfy(struct connection *cx)
 	if (mbedtls_x509_crt_verify_info(buf, sizeof(buf), "", ret) < 0)
 		return -1;
 
-	s = buf;
-
-	while (*s) {
+	for (s = buf; s && *s; s = p) {
 
 		if ((p = strchr(buf, '\n')))
 			*p++ = 0;
 
 		io_error(cx, " .... %s", s);
-
-		s = p;
 	}
 
 	return 0;
