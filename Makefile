@@ -22,6 +22,7 @@ RIRC_CFLAGS += -std=c11 -I. -DVERSION=\"$(VERSION)\"
 RIRC_CFLAGS += -D_POSIX_C_SOURCE=200809L
 RIRC_CFLAGS += -D_DARWIN_C_SOURCE
 
+LDFLAGS ?= -flto
 LDFLAGS += -lpthread
 
 SRC       := $(shell find $(PATH_SRC) -name '*.c' | sort)
@@ -34,20 +35,20 @@ OBJS_T := $(patsubst $(PATH_SRC)/%.c, $(PATH_BUILD)/%.t,    $(SRC))
 OBJS_T += $(PATH_BUILD)/utils/tree.t # Header only file
 
 rirc: $(RIRC_LIBS) $(SRC_GPERF) $(OBJS_R)
-	@echo "  CC    $@"
+	@echo "$(CC) $(LDFLAGS) $@"
 	@$(CC) $(LDFLAGS) -o $@ $(OBJS_R) $(RIRC_LIBS)
 
 rirc.debug: $(RIRC_LIBS) $(SRC_GPERF) $(OBJS_D)
-	@echo "  CC    $@"
+	@echo "$(CC) $(LDFLAGS) $@"
 	@$(CC) $(LDFLAGS) -o $@ $(OBJS_D) $(RIRC_LIBS)
 
 $(PATH_BUILD)/%.o: $(PATH_SRC)/%.c $(CONFIG) | $(PATH_BUILD)
-	@echo "  CC    $<"
+	@echo "$(CC) $(CFLAGS) $<"
 	@$(CPP) $(CFLAGS) $(RIRC_CFLAGS) -MM -MP -MT $@ -MF $(@:.o=.o.d) $<
 	@$(CC)  $(CFLAGS) $(RIRC_CFLAGS) -c -o $@ $<
 
 $(PATH_BUILD)/%.db.o: $(PATH_SRC)/%.c $(CONFIG) | $(PATH_BUILD)
-	@echo "  CC    $<"
+	@echo "$(CC) $(CFLAGS_DEBUG) $<"
 	@$(CPP) $(CFLAGS_DEBUG) $(RIRC_CFLAGS) -MM -MP -MT $@ -MF $(@:.o=.o.d) $<
 	@$(CC)  $(CFLAGS_DEBUG) $(RIRC_CFLAGS) -c -o $@ $<
 

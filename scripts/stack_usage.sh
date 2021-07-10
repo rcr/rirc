@@ -3,8 +3,8 @@
 set -e
 
 export CC=gcc
-export CFLAGS_DEBUG="-fstack-usage"
+export CFLAGS="-fstack-usage"
 
-make -e clean rirc.debug
+make clean rirc
 
-find bld -name "*.su" -exec cat "{}" ";" | sort -n -k2 | column -t
+find build -name "*.su" -exec cat "{}" ";" | sort -n -k2 | column -t
