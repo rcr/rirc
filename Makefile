@@ -1,123 +1,105 @@
-VERSION := 0.1.4
+VERSION := 0.1.5
 
-# Release and debug build executable names
-BIN_R := rirc
-BIN_D := rirc.debug
+PREFIX   ?= /usr/local
+PATH_BIN := $(DESTDIR)$(PREFIX)/bin
+PATH_MAN := $(DESTDIR)$(PREFIX)/share/man/man1
 
-# Install paths
-BIN_DIR := /usr/local/bin
-MAN_DIR := /usr/local/share/man/man1
+PATH_BUILD := build
+PATH_LIB   := lib
+PATH_SRC   := src
+PATH_TEST  := test
 
-TLS_CONF := $(PWD)/lib/mbedtls.h
-TLS_INCL := -I $(PWD)/lib/mbedtls/include/ -DMBEDTLS_CONFIG_FILE='<$(TLS_CONF)>'
-TLS_LIBS := ./lib/mbedtls/library/libmbedtls.a \
-            ./lib/mbedtls/library/libmbedx509.a \
-            ./lib/mbedtls/library/libmbedcrypto.a
+include lib/mbedtls.Makefile
 
-STDS := -std=c11 -D_POSIX_C_SOURCE=200809L
+CONFIG := config.h
 
-CC := cc
-PP := cc -E
-CFLAGS   := $(CC_EXT) $(STDS) $(TLS_INCL) -I. -DVERSION=\"$(VERSION)\" -Wall -Wextra -pedantic
-CFLAGS_R := $(CFLAGS) -O2 -flto -DNDEBUG
-CFLAGS_D := $(CFLAGS) -O0 -g
-LDFLAGS  := $(LD_EXT) -lpthread
+CFLAGS ?= -O2 -flto
+CFLAGS += -DNDEBUG
 
-# Build, source, test source directories
-DIR_B := bld
-DIR_S := src
-DIR_T := test
+CFLAGS_DEBUG += -O0 -g3 -Wall -Wextra -Werror
 
-PWD  := $(shell pwd)
+RIRC_CFLAGS += -std=c11 -I. -DVERSION=\"$(VERSION)\"
+RIRC_CFLAGS += -D_POSIX_C_SOURCE=200809L
+RIRC_CFLAGS += -D_DARWIN_C_SOURCE
 
-SRC     := $(shell find $(DIR_S) -name '*.c')
-SUBDIRS += $(shell find $(DIR_S) -name '*.c' -exec dirname {} \; | sort -u)
+LDFLAGS ?= -flto
+LDFLAGS += -lpthread
 
-SRC_G   := $(shell find $(DIR_S) -name '*.gperf')
-SUBDIRS += $(shell find $(DIR_S) -name '*.gperf' -exec dirname {} \; | sort -u)
+SRC       := $(shell find $(PATH_SRC) -name '*.c' | sort)
+SRC_GPERF := $(patsubst %, %.out, $(shell find $(PATH_SRC) -name '*.gperf'))
 
-# Release, debug, testcase build objects
-OBJS_D := $(patsubst $(DIR_S)/%.c, $(DIR_B)/%.db.o, $(SRC))
-OBJS_R := $(patsubst $(DIR_S)/%.c, $(DIR_B)/%.o,    $(SRC))
-OBJS_T := $(patsubst $(DIR_S)/%.c, $(DIR_B)/%.t,    $(SRC))
-OBJS_T += $(DIR_B)/utils/tree.t # Header only file
+# Release objects, debug objects, testcases
+OBJS_R := $(patsubst $(PATH_SRC)/%.c, $(PATH_BUILD)/%.o,    $(SRC))
+OBJS_D := $(patsubst $(PATH_SRC)/%.c, $(PATH_BUILD)/%.db.o, $(SRC))
+OBJS_T := $(patsubst $(PATH_SRC)/%.c, $(PATH_BUILD)/%.t,    $(SRC))
+OBJS_T += $(PATH_BUILD)/utils/tree.t # Header only file
 
-# Gperf generated source files
-OBJS_G := $(patsubst %.gperf, %.gperf.out, $(SRC_G))
+rirc: $(RIRC_LIBS) $(SRC_GPERF) $(OBJS_R)
+	@echo "$(CC) $(LDFLAGS) $@"
+	@$(CC) $(LDFLAGS) -o $@ $(OBJS_R) $(RIRC_LIBS)
 
-# Release build executable
-$(BIN_R): $(TLS_LIBS) $(OBJS_G) $(OBJS_R)
-	@echo " CC  $@"
-	@$(CC) $(LDFLAGS) -o $@ $(OBJS_R) $(TLS_LIBS)
+rirc.debug: $(RIRC_LIBS) $(SRC_GPERF) $(OBJS_D)
+	@echo "$(CC) $(LDFLAGS) $@"
+	@$(CC) $(LDFLAGS) -o $@ $(OBJS_D) $(RIRC_LIBS)
 
-# Debug build executable
-$(BIN_D): $(TLS_LIBS) $(OBJS_G) $(OBJS_D)
-	@echo " CC  $@"
-	@$(CC) $(LDFLAGS) -o $@ $(OBJS_D) $(TLS_LIBS)
+$(PATH_BUILD)/%.o: $(PATH_SRC)/%.c $(CONFIG) | $(PATH_BUILD)
+	@echo "$(CC) $(CFLAGS) $<"
+	@$(CPP) $(CFLAGS) $(RIRC_CFLAGS) -MM -MP -MT $@ -MF $(@:.o=.o.d) $<
+	@$(CC)  $(CFLAGS) $(RIRC_CFLAGS) -c -o $@ $<
 
-# Release build objects
-$(DIR_B)/%.o: $(DIR_S)/%.c config.h | $(DIR_B)
-	@echo " CC  $<"
-	@$(PP) $(CFLAGS_R) -MM -MP -MT $@ -MF $(@:.o=.o.d) $<
-	@$(CC) $(CFLAGS_R) -c -o $@ $<
+$(PATH_BUILD)/%.db.o: $(PATH_SRC)/%.c $(CONFIG) | $(PATH_BUILD)
+	@echo "$(CC) $(CFLAGS_DEBUG) $<"
+	@$(CPP) $(CFLAGS_DEBUG) $(RIRC_CFLAGS) -MM -MP -MT $@ -MF $(@:.o=.o.d) $<
+	@$(CC)  $(CFLAGS_DEBUG) $(RIRC_CFLAGS) -c -o $@ $<
 
-# Debug build objects
-$(DIR_B)/%.db.o: $(DIR_S)/%.c config.h | $(DIR_B)
-	@echo " CC  $<"
-	@$(PP) $(CFLAGS_D) -MM -MP -MT $@ -MF $(@:.o=.o.d) $<
-	@$(CC) $(CFLAGS_D) -c -o $@ $<
+$(PATH_BUILD)/%.t: $(PATH_TEST)/%.c $(SRC_GPERF) $(CONFIG) | $(PATH_BUILD)
+	@rm -f $(@:.t=.td)
+	@$(CPP) $(CFLAGS_DEBUG) $(RIRC_CFLAGS) -MM -MP -MT $@ -MF $(@:.t=.t.d) $<
+	@$(CC)  $(CFLAGS_DEBUG) $(RIRC_CFLAGS) -c -o $(@:.t=.t.o) $<
+	@$(CC)  $(CFLAGS_DEBUG) $(RIRC_CFLAGS) -o $@ $(@:.t=.t.o)
+	@./$@ || mv $@ $(@:.t=.td)
 
-# Testcases
-$(DIR_B)/%.t: $(DIR_T)/%.c $(OBJS_G) | $(DIR_B)
-	@$(PP) $(CFLAGS_D) -MM -MP -MT $@ -MF $(@:.t=.t.d) $<
-	@$(CC) $(CFLAGS_D) -c -o $(@:.t=.t.o) $<
-	@$(CC) $(CFLAGS_D) -o $@ $(@:.t=.t.o)
-	@$(TEST_EXT) ./$@ || mv $@ $(@:.t=.td)
-	@[ -f $@ ]
+$(PATH_BUILD):
+	@mkdir -p $(patsubst $(PATH_SRC)%, $(PATH_BUILD)%, $(shell find $(PATH_SRC) -type d))
 
-config.h:
+$(CONFIG):
 	cp config.def.h config.h
 
 %.gperf.out: %.gperf
 	gperf --output-file=$@ $<
 
-# Build directories
-$(DIR_B):
-	@for dir in $(patsubst $(DIR_S)/%, %, $(SUBDIRS)); do mkdir -p $(DIR_B)/$$dir; done
-
-# TLS libraries
-$(TLS_LIBS): $(TLS_CONF)
-	@CFLAGS="$(TLS_INCL)" $(MAKE) --silent -C ./lib/mbedtls clean
-	@CFLAGS="$(TLS_INCL)" $(MAKE) --silent -C ./lib/mbedtls lib
-
 all:
-	@$(MAKE) --silent $(BIN_R)
-	@$(MAKE) --silent $(BIN_D)
+	@$(MAKE) --silent rirc
+	@$(MAKE) --silent rirc.debug
 
-check:
-	@$(MAKE) --silent $(OBJS_T)
+check: $(OBJS_T)
+	@[ ! "$$(find $(PATH_BUILD) -name '*.td' -print -quit)" ] && echo OK
 
 clean:
-	@rm -rf $(DIR_B)
-	@rm -vf $(BIN_R) $(BIN_D) $(OBJS_G)
+	@rm -rfv rirc rirc.debug $(SRC_GPERF) $(PATH_BUILD)
 
-libs: $(TLS_LIBS)
+libs:
+	@$(MAKE) --silent $(RIRC_LIBS)
 
-install: $(BIN_R)
-	@echo installing executable to $(BIN_DIR)
-	@echo installing manual page to $(MAN_DIR)
-	@mkdir -p $(BIN_DIR)
-	@mkdir -p $(MAN_DIR)
-	@cp -f rirc $(BIN_DIR)
-	@chmod 755 $(BIN_DIR)/rirc
-	@sed "s/VERSION/$(VERSION)/g" < rirc.1 > $(MAN_DIR)/rirc.1
+install: rirc
+	@sed "s/VERSION/$(VERSION)/g" < docs/rirc.1 > rirc.1
+	mkdir -p $(PATH_BIN)
+	mkdir -p $(PATH_MAN)
+	cp -f rirc   $(PATH_BIN)
+	cp -f rirc.1 $(PATH_MAN)
+	chmod 755 $(PATH_BIN)/rirc
+	chmod 644 $(PATH_MAN)/rirc.1
 
 uninstall:
-	rm -f $(BIN_DIR)/rirc
-	rm -f $(MAN_DIR)/rirc.1
+	rm -f $(PATH_BIN)/rirc
+	rm -f $(PATH_MAN)/rirc.1
 
 -include $(OBJS_R:.o=.o.d)
 -include $(OBJS_D:.o=.o.d)
 -include $(OBJS_T:.t=.t.d)
 
+.DEFAULT_GOAL := rirc
+
 .PHONY: all check clean libs install uninstall
+
+.SUFFIXES:

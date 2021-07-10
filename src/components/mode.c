@@ -664,7 +664,7 @@ mode_cfg_modes(struct mode_cfg *cfg, const char *str)
 {
 	/* Parse and configure MODES, valid values are numeric strings [1-99] */
 
-	unsigned int modes = 0;
+	unsigned modes = 0;
 
 	for (; modes < 100 && *str; str++) {
 		if (isdigit(*str))

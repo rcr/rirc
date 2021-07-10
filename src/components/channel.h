@@ -20,9 +20,9 @@ enum channel_type
 {
 	CHANNEL_T_INVALID,
 	CHANNEL_T_RIRC,    /* Default buffer */
-	CHANNEL_T_CHANNEL, /* Channel message buffer */
+	CHANNEL_T_CHANNEL, /* Channel buffer */
+	CHANNEL_T_PRIVMSG, /* Privmsg buffer */
 	CHANNEL_T_SERVER,  /* Server message buffer */
-	CHANNEL_T_PRIVATE, /* Private message buffer */
 	CHANNEL_T_SIZE
 };
 
@@ -40,8 +40,8 @@ struct channel
 	struct mode_str chanmodes_str;
 	struct server *server;
 	struct user_list users;
-	unsigned int parted : 1;
-	unsigned int joined : 1;
+	unsigned parted : 1;
+	unsigned joined : 1;
 	char _[];
 };
 

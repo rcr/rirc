@@ -17,20 +17,21 @@
 #include "test/io.mock.c"
 
 static void
-test_STUB(void)
+test_rirc_parse_args(void)
 {
-	; /* TODO */
+	/* TODO */
+	(void)rirc_parse_args;
 }
 
 int
 main(void)
 {
 	/* FIXME: */
-	(void)parse_args;
+	(void)rirc_pw_name;
 
 	struct testcase tests[] = {
-		TESTCASE(test_STUB)
+		TESTCASE(test_rirc_parse_args)
 	};
 
-	return run_tests(tests);
+	return run_tests(NULL, NULL, tests);
 }

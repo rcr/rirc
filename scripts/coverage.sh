@@ -5,8 +5,7 @@ set -e
 CDIR="coverage"
 
 export CC=gcc
-export CC_EXT="-fprofile-arcs -ftest-coverage -fprofile-abs-path"
-export LD_EXT="-fprofile-arcs"
+export CFLAGS_DEBUG="-fprofile-arcs -ftest-coverage -fprofile-abs-path"
 
 export MAKEFLAGS="-e -j $(nproc)"
 
@@ -15,7 +14,7 @@ rm -rf $CDIR && mkdir -p $CDIR
 make clean
 make check
 
-GCNO=$(find bld -name '*.t.gcno')
+GCNO=$(find build -name '*.t.gcno')
 
 FILTER=$(cat << 'EOF'
 {

@@ -546,5 +546,5 @@ main(void)
 		TESTCASE(test_chanmode_type)
 	};
 
-	return run_tests(tests);
+	return run_tests(NULL, NULL, tests);
 }

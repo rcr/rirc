@@ -12,18 +12,18 @@
 #error BUFFER_LINES_MAX must be a power of 2
 #endif
 
-static inline unsigned int buffer_full(struct buffer*);
-static inline unsigned int buffer_size(struct buffer*);
+static inline unsigned buffer_full(struct buffer*);
+static inline unsigned buffer_size(struct buffer*);
 
 static struct buffer_line* buffer_push(struct buffer*);
 
-static inline unsigned int
+static inline unsigned
 buffer_full(struct buffer *b)
 {
 	return buffer_size(b) == BUFFER_LINES_MAX;
 }
 
-static inline unsigned int
+static inline unsigned
 buffer_size(struct buffer *b)
 {
 	return b->head - b->tail;
@@ -68,7 +68,7 @@ buffer_tail(struct buffer *b)
 }
 
 struct buffer_line*
-buffer_line(struct buffer *b, unsigned int i)
+buffer_line(struct buffer *b, unsigned i)
 {
 	/* Return the buffer line indexed by i */
 
@@ -99,8 +99,8 @@ buffer_line(struct buffer *b, unsigned int i)
 	return &b->buffer_lines[BUFFER_MASK(i)];
 }
 
-unsigned int
-buffer_line_rows(struct buffer_line *line, unsigned int w)
+unsigned
+buffer_line_rows(struct buffer_line *line, unsigned w)
 {
 	/* Return the number of times a buffer line will wrap within w columns */
 
@@ -172,7 +172,7 @@ buffer_newline(
 	}
 }
 
-float
+unsigned
 buffer_scrollback_status(struct buffer *b)
 {
 	/* Return the buffer scrollback status as a number between [0, 100] */
@@ -180,7 +180,7 @@ buffer_scrollback_status(struct buffer *b)
 	if (buffer_line(b, b->scrollback) == buffer_head(b))
 		return 0;
 
-	return (float)(b->head - b->scrollback) / (float)(buffer_size(b));
+	return (100 * (float)(b->head - b->scrollback) / (float)(buffer_size(b)));
 }
 
 void
@@ -199,7 +199,7 @@ buffer_line_split(
 	unsigned cols,
 	unsigned pad)
 {
-	unsigned _head_w = sizeof(" HH:MM   "VERTICAL_SEPARATOR" ");
+	unsigned _head_w = sizeof(" HH:MM  ");
 
 	if (BUFFER_PADDING)
 		_head_w += pad;
@@ -216,5 +216,5 @@ buffer_line_split(
 		*head_w = _head_w;
 
 	if (text_w)
-		*text_w = cols - _head_w + 1;
+		*text_w = cols - _head_w;
 }

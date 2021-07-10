@@ -26,7 +26,6 @@ unsigned state_cols(void);
 unsigned state_rows(void);
 
 const char *action_message(void);
-int state_server_set_chans(struct server*, const char*);
 struct channel* channel_get_first(void);
 struct channel* channel_get_last(void);
 struct channel* channel_get_next(struct channel*);

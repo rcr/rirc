@@ -1,0 +1,21 @@
+image: fedora/latest
+
+packages:
+  - curl
+  - gperf
+
+sources:
+  - https://git.sr.ht/~rcr/rirc
+
+tasks:
+  - build: |
+      cd rirc
+      make all
+  - check: |
+      cd rirc
+      make check
+
+triggers:
+  - action: email
+    condition: failure
+    to: mail+sourcehut+builds@rcr.io

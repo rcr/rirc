@@ -30,5 +30,5 @@ main(void)
 		TESTCASE(test_STUB)
 	};
 
-	return run_tests(tests);
+	return run_tests(NULL, NULL, tests);
 }

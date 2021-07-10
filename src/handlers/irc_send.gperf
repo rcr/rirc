@@ -24,15 +24,15 @@
 	X(ls) \
 	X(list)
 
-#define X(cmd) static int send_##cmd(struct server*, struct channel*, char*);
+#define X(cmd) static int irc_send_##cmd(struct server*, struct channel*, char*);
 SEND_HANDLERS
 #undef X
 
-#define X(cmd) static int send_ctcp_##cmd(struct server*, struct channel*, char*);
+#define X(cmd) static int irc_send_ctcp_##cmd(struct server*, struct channel*, char*);
 SEND_CTCP_HANDLERS
 #undef X
 
-#define X(cmd) static int send_ircv3_cap_##cmd(struct server*, struct channel*, char*);
+#define X(cmd) static int irc_send_ircv3_cap_##cmd(struct server*, struct channel*, char*);
 SEND_IRCV3_CAP_HANDLERS
 #undef X
 
@@ -56,21 +56,21 @@ struct send_handler
 %define initializer-suffix ,(irc_send_f)0
 struct send_handler;
 %%
-CAP-LS,          send_ircv3_cap_ls
-CAP-LIST,        send_ircv3_cap_list
-CTCP-ACTION,     send_ctcp_action
-CTCP-CLIENTINFO, send_ctcp_clientinfo
-CTCP-FINGER,     send_ctcp_finger
-CTCP-PING,       send_ctcp_ping
-CTCP-SOURCE,     send_ctcp_source
-CTCP-TIME,       send_ctcp_time
-CTCP-USERINFO,   send_ctcp_userinfo
-CTCP-VERSION,    send_ctcp_version
-AWAY,            send_away
-NOTICE,          send_notice
-PART,            send_part
-PRIVMSG,         send_privmsg
-QUIT,            send_quit
-TOPIC,           send_topic
-TOPIC-UNSET,     send_topic_unset
+CAP-LS,          irc_send_ircv3_cap_ls
+CAP-LIST,        irc_send_ircv3_cap_list
+CTCP-ACTION,     irc_send_ctcp_action
+CTCP-CLIENTINFO, irc_send_ctcp_clientinfo
+CTCP-FINGER,     irc_send_ctcp_finger
+CTCP-PING,       irc_send_ctcp_ping
+CTCP-SOURCE,     irc_send_ctcp_source
+CTCP-TIME,       irc_send_ctcp_time
+CTCP-USERINFO,   irc_send_ctcp_userinfo
+CTCP-VERSION,    irc_send_ctcp_version
+AWAY,            irc_send_away
+NOTICE,          irc_send_notice
+PART,            irc_send_part
+PRIVMSG,         irc_send_privmsg
+QUIT,            irc_send_quit
+TOPIC,           irc_send_topic
+TOPIC-UNSET,     irc_send_topic_unset
 %%

@@ -8,7 +8,7 @@ if [[ -z $1 ]]; then
 	fail "Usage: '$0 dir'"
 fi
 
-SONAR_VER="4.6.0.2311"
+SONAR_VER="4.6.2.2472"
 
 BUILD_ZIP="$1/build-wrapper.zip"
 SONAR_ZIP="$1/sonar-scanner.zip"
@@ -22,11 +22,11 @@ mkdir -p "$1"
 
 echo "*" > "$1/.gitignore"
 
-curl -fs --show-error "$BUILD_ZIP_URL" -o "$BUILD_ZIP"
-curl -fs --show-error "$SONAR_ZIP_URL" -o "$SONAR_ZIP"
-curl -fs --show-error "$SONAR_MD5_URL" -o "$SONAR_MD5"
+curl -fsS "$BUILD_ZIP_URL" -o "$BUILD_ZIP"
+curl -fsS "$SONAR_ZIP_URL" -o "$SONAR_ZIP"
+curl -fsS "$SONAR_MD5_URL" -o "$SONAR_MD5"
 
-printf "%s\t$SONAR_ZIP" "$(cat "$SONAR_MD5")" | md5sum --quiet -c -
+printf "%s  %s" "$(cat "$SONAR_MD5")" "$SONAR_ZIP" | md5sum --quiet -c -
 
 unzip -qq "$BUILD_ZIP" -d "$1"
 unzip -qq "$SONAR_ZIP" -d "$1"

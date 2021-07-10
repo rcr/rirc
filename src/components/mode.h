@@ -94,7 +94,7 @@ struct mode
 
 struct mode_cfg
 {
-	unsigned int MODES;    /* Numeric 005 MODES */
+	unsigned MODES;        /* Numeric 005 MODES */
 	struct mode chanmodes; /* Numeric 004 chanmodes string */
 	struct mode usermodes; /* Numeric 004 usermodes string */
 	struct

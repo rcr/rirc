@@ -65,5 +65,5 @@ main(void)
 		TESTCASE(test_ircv3_caps_reset),
 	};
 
-	return run_tests(tests);
+	return run_tests(NULL, NULL, tests);
 }

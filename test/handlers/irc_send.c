@@ -17,7 +17,7 @@
 	do { \
 		mock_reset_io(); \
 		mock_reset_state(); \
-		assert_eq(irc_send_privmsg(s, (C), (M)), (RET)); \
+		assert_eq(irc_send_message(s, (C), (M)), (RET)); \
 		assert_eq(mock_line_n, (LINE_N)); \
 		assert_eq(mock_send_n, (SEND_N)); \
 		assert_strcmp(mock_line[0], (LINE)); \
@@ -69,7 +69,7 @@ test_irc_send_command(void)
 	CHECK_SEND_COMMAND(c_chan, m2, 1, 1, 0, "Messages beginning with '/' require a command", "");
 	CHECK_SEND_COMMAND(c_chan, m3, 0, 0, 1, "", "TEST");
 	CHECK_SEND_COMMAND(c_chan, m4, 0, 0, 1, "", "TEST arg1 arg2 arg3");
-	CHECK_SEND_COMMAND(c_chan, m5, 0, 0, 1, "", "PRIVMSG targ :test message");
+	CHECK_SEND_COMMAND(c_chan, m5, 0, 1, 1, "test message", "PRIVMSG targ :test message");
 
 	s->registered = 0;
 
@@ -79,7 +79,7 @@ test_irc_send_command(void)
 }
 
 static void
-test_irc_send_privmsg(void)
+test_irc_send_message(void)
 {
 	char m1[] = "chan test 1";
 	char m2[] = "serv test 2";
@@ -98,7 +98,7 @@ test_irc_send_privmsg(void)
 
 	mock_reset_io();
 	mock_reset_state();
-	assert_eq(irc_send_privmsg(NULL, c_chan, "test"), 1);
+	assert_eq(irc_send_message(NULL, c_chan, "test"), 1);
 	assert_strcmp(mock_line[0], "This is not a server");
 	assert_strcmp(mock_send[0], "");
 
@@ -155,16 +155,73 @@ static void
 test_send_privmsg(void)
 {
 	char m1[] = "privmsg";
-	char m2[] = "privmsg test1";
-	char m3[] = "privmsg test2 ";
-	char m4[] = "privmsg test3  ";
-	char m5[] = "privmsg test4 test privmsg message";
+	char m2[] = "privmsg chan";
+	char m3[] = "privmsg chan ";
+
+	struct channel *c1;
+	struct channel *c2;
+	struct channel *c3;
+	struct channel *c4;
+
+	assert_eq(s->clist.count, 3);
 
 	CHECK_SEND_COMMAND(c_chan, m1, 1, 1, 0, "Usage: /privmsg <target> <message>", "");
 	CHECK_SEND_COMMAND(c_chan, m2, 1, 1, 0, "Usage: /privmsg <target> <message>", "");
 	CHECK_SEND_COMMAND(c_chan, m3, 1, 1, 0, "Usage: /privmsg <target> <message>", "");
-	CHECK_SEND_COMMAND(c_chan, m4, 0, 0, 1, "", "PRIVMSG test3 : ");
-	CHECK_SEND_COMMAND(c_chan, m5, 0, 0, 1, "", "PRIVMSG test4 :test privmsg message");
+
+	/* test sending to existing channel */
+	char m4[] = "privmsg chan  ";
+	char m5[] = "privmsg chan test 1";
+
+	CHECK_SEND_COMMAND(c_chan, m4, 0, 1, 1, " ",      "PRIVMSG chan : ");
+	CHECK_SEND_COMMAND(c_chan, m5, 0, 1, 1, "test 1", "PRIVMSG chan :test 1");
+
+	assert_eq(s->clist.count, 3);
+
+	/* test sending to single new target */
+	char m6[] = "privmsg #new1 test 2";
+
+	CHECK_SEND_COMMAND(c_chan, m6, 0, 1, 1, "test 2", "PRIVMSG #new1 :test 2");
+
+	if (!(c1 = channel_list_get(&(s->clist), "#new1", s->casemapping)))
+		test_abort("channel '#new1' not found");
+
+	assert_eq(c1->type, CHANNEL_T_CHANNEL);
+	assert_eq(s->clist.count, 4);
+
+	/* test sending to multiple new targets */
+	char m7[] = "privmsg #new2,priv1,#new3,priv2 test 3";
+
+	CHECK_SEND_COMMAND(c_chan, m7, 0, 4, 1, "test 3", "PRIVMSG #new2,priv1,#new3,priv2 :test 3");
+
+	if (!(c1 = channel_list_get(&(s->clist), "#new2", s->casemapping)))
+		test_abort("channel '#new2' not found");
+
+	if (!(c2 = channel_list_get(&(s->clist), "priv1", s->casemapping)))
+		test_abort("channel 'priv1' not found");
+
+	if (!(c3 = channel_list_get(&(s->clist), "#new3", s->casemapping)))
+		test_abort("channel '#new3' not found");
+
+	if (!(c4 = channel_list_get(&(s->clist), "priv2", s->casemapping)))
+		test_abort("channel 'priv2' not found");
+
+	assert_eq(c1->type, CHANNEL_T_CHANNEL);
+	assert_eq(c2->type, CHANNEL_T_PRIVMSG);
+	assert_eq(c3->type, CHANNEL_T_CHANNEL);
+	assert_eq(c4->type, CHANNEL_T_PRIVMSG);
+	assert_eq(s->clist.count, 8);
+
+	/* test with some duplicates channels */
+	char m8[] = "privmsg priv3,priv1,priv2 test 4";
+
+	CHECK_SEND_COMMAND(c_chan, m8, 0, 3, 1, "test 4", "PRIVMSG priv3,priv1,priv2 :test 4");
+
+	if (!(c1 = channel_list_get(&(s->clist), "priv3", s->casemapping)))
+		test_abort("channel 'priv3' not found");
+
+	assert_eq(c1->type, CHANNEL_T_PRIVMSG);
+	assert_eq(s->clist.count, 9);
 }
 
 static void
@@ -219,9 +276,9 @@ test_send_ctcp_action(void)
 	char m3[] = "ctcp-action target ";
 	char m4[] = "ctcp-action target action message";
 
-	CHECK_SEND_COMMAND(c_chan, m1, 1, 1, 0, "Usage: /ctcp-action <nick> <text>", "");
-	CHECK_SEND_COMMAND(c_chan, m2, 1, 1, 0, "Usage: /ctcp-action <nick> <text>", "");
-	CHECK_SEND_COMMAND(c_chan, m3, 1, 1, 0, "Usage: /ctcp-action <nick> <text>", "");
+	CHECK_SEND_COMMAND(c_chan, m1, 1, 1, 0, "Usage: /ctcp-action <target> <text>", "");
+	CHECK_SEND_COMMAND(c_chan, m2, 1, 1, 0, "Usage: /ctcp-action <target> <text>", "");
+	CHECK_SEND_COMMAND(c_chan, m3, 1, 1, 0, "Usage: /ctcp-action <target> <text>", "");
 	CHECK_SEND_COMMAND(c_chan, m4, 0, 0, 1, "", "PRIVMSG target :\001ACTION action message\001");
 }
 
@@ -233,8 +290,8 @@ test_send_ctcp_clientinfo(void)
 	char m3[] = "ctcp-clientinfo";
 	char m4[] = "ctcp-clientinfo targ";
 
-	CHECK_SEND_COMMAND(c_chan, m1, 1, 1, 0, "Usage: /ctcp-clientinfo <nick>", "");
-	CHECK_SEND_COMMAND(c_serv, m2, 1, 1, 0, "Usage: /ctcp-clientinfo <nick>", "");
+	CHECK_SEND_COMMAND(c_chan, m1, 1, 1, 0, "Usage: /ctcp-clientinfo <target>", "");
+	CHECK_SEND_COMMAND(c_serv, m2, 1, 1, 0, "Usage: /ctcp-clientinfo <target>", "");
 	CHECK_SEND_COMMAND(c_priv, m3, 0, 0, 1, "", "PRIVMSG priv :\001CLIENTINFO\001");
 	CHECK_SEND_COMMAND(c_priv, m4, 0, 0, 1, "", "PRIVMSG targ :\001CLIENTINFO\001");
 }
@@ -247,8 +304,8 @@ test_send_ctcp_finger(void)
 	char m3[] = "ctcp-finger";
 	char m4[] = "ctcp-finger targ";
 
-	CHECK_SEND_COMMAND(c_chan, m1, 1, 1, 0, "Usage: /ctcp-finger <nick>", "");
-	CHECK_SEND_COMMAND(c_serv, m2, 1, 1, 0, "Usage: /ctcp-finger <nick>", "");
+	CHECK_SEND_COMMAND(c_chan, m1, 1, 1, 0, "Usage: /ctcp-finger <target>", "");
+	CHECK_SEND_COMMAND(c_serv, m2, 1, 1, 0, "Usage: /ctcp-finger <target>", "");
 	CHECK_SEND_COMMAND(c_priv, m3, 0, 0, 1, "", "PRIVMSG priv :\001FINGER\001");
 	CHECK_SEND_COMMAND(c_priv, m4, 0, 0, 1, "", "PRIVMSG targ :\001FINGER\001");
 }
@@ -267,8 +324,8 @@ test_send_ctcp_ping(void)
 	const char *arg2;
 	const char *arg3;
 
-	CHECK_SEND_COMMAND(c_chan, m1, 1, 1, 0, "Usage: /ctcp-ping <nick>", "");
-	CHECK_SEND_COMMAND(c_serv, m2, 1, 1, 0, "Usage: /ctcp-ping <nick>", "");
+	CHECK_SEND_COMMAND(c_chan, m1, 1, 1, 0, "Usage: /ctcp-ping <target>", "");
+	CHECK_SEND_COMMAND(c_serv, m2, 1, 1, 0, "Usage: /ctcp-ping <target>", "");
 
 	/* test send to channel */
 	errno = 0;
@@ -337,8 +394,8 @@ test_send_ctcp_source(void)
 	char m3[] = "ctcp-source";
 	char m4[] = "ctcp-source targ";
 
-	CHECK_SEND_COMMAND(c_chan, m1, 1, 1, 0, "Usage: /ctcp-source <nick>", "");
-	CHECK_SEND_COMMAND(c_serv, m2, 1, 1, 0, "Usage: /ctcp-source <nick>", "");
+	CHECK_SEND_COMMAND(c_chan, m1, 1, 1, 0, "Usage: /ctcp-source <target>", "");
+	CHECK_SEND_COMMAND(c_serv, m2, 1, 1, 0, "Usage: /ctcp-source <target>", "");
 	CHECK_SEND_COMMAND(c_priv, m3, 0, 0, 1, "", "PRIVMSG priv :\001SOURCE\001");
 	CHECK_SEND_COMMAND(c_priv, m4, 0, 0, 1, "", "PRIVMSG targ :\001SOURCE\001");
 }
@@ -351,8 +408,8 @@ test_send_ctcp_time(void)
 	char m3[] = "ctcp-time";
 	char m4[] = "ctcp-time targ";
 
-	CHECK_SEND_COMMAND(c_chan, m1, 1, 1, 0, "Usage: /ctcp-time <nick>", "");
-	CHECK_SEND_COMMAND(c_serv, m2, 1, 1, 0, "Usage: /ctcp-time <nick>", "");
+	CHECK_SEND_COMMAND(c_chan, m1, 1, 1, 0, "Usage: /ctcp-time <target>", "");
+	CHECK_SEND_COMMAND(c_serv, m2, 1, 1, 0, "Usage: /ctcp-time <target>", "");
 	CHECK_SEND_COMMAND(c_priv, m3, 0, 0, 1, "", "PRIVMSG priv :\001TIME\001");
 	CHECK_SEND_COMMAND(c_priv, m4, 0, 0, 1, "", "PRIVMSG targ :\001TIME\001");
 }
@@ -365,8 +422,8 @@ test_send_ctcp_userinfo(void)
 	char m3[] = "ctcp-userinfo";
 	char m4[] = "ctcp-userinfo targ";
 
-	CHECK_SEND_COMMAND(c_chan, m1, 1, 1, 0, "Usage: /ctcp-userinfo <nick>", "");
-	CHECK_SEND_COMMAND(c_serv, m2, 1, 1, 0, "Usage: /ctcp-userinfo <nick>", "");
+	CHECK_SEND_COMMAND(c_chan, m1, 1, 1, 0, "Usage: /ctcp-userinfo <target>", "");
+	CHECK_SEND_COMMAND(c_serv, m2, 1, 1, 0, "Usage: /ctcp-userinfo <target>", "");
 	CHECK_SEND_COMMAND(c_priv, m3, 0, 0, 1, "", "PRIVMSG priv :\001USERINFO\001");
 	CHECK_SEND_COMMAND(c_priv, m4, 0, 0, 1, "", "PRIVMSG targ :\001USERINFO\001");
 }
@@ -379,8 +436,8 @@ test_send_ctcp_version(void)
 	char m3[] = "ctcp-version";
 	char m4[] = "ctcp-version targ";
 
-	CHECK_SEND_COMMAND(c_chan, m1, 1, 1, 0, "Usage: /ctcp-version <nick>", "");
-	CHECK_SEND_COMMAND(c_serv, m2, 1, 1, 0, "Usage: /ctcp-version <nick>", "");
+	CHECK_SEND_COMMAND(c_chan, m1, 1, 1, 0, "Usage: /ctcp-version <target>", "");
+	CHECK_SEND_COMMAND(c_serv, m2, 1, 1, 0, "Usage: /ctcp-version <target>", "");
 	CHECK_SEND_COMMAND(c_priv, m3, 0, 0, 1, "", "PRIVMSG priv :\001VERSION\001");
 	CHECK_SEND_COMMAND(c_priv, m4, 0, 0, 1, "", "PRIVMSG targ :\001VERSION\001");
 }
@@ -405,27 +462,41 @@ test_send_ircv3_cap_list(void)
 	CHECK_SEND_COMMAND(c_chan, m2, 1, 1, 0, "Usage: /cap-list", "");
 }
 
-int
-main(void)
+static int
+test_init(void)
 {
-	c_chan = channel("chan", CHANNEL_T_CHANNEL);
-	c_priv = channel("priv", CHANNEL_T_PRIVATE);
-
 	s = server("h1", "p1", NULL, "u1", "r1");
 
+	c_serv = s->channel;
+
+	c_chan = channel("chan", CHANNEL_T_CHANNEL);
+	c_priv = channel("priv", CHANNEL_T_PRIVMSG);
+
 	if (!s || !c_chan || !c_priv)
-		test_abort_main("Failed test setup");
+		return -1;
 
 	channel_list_add(&s->clist, c_chan);
 	channel_list_add(&s->clist, c_priv);
 
-	c_serv = s->channel;
-
 	s->registered = 1;
 
+	return 0;
+}
+
+static int
+test_term(void)
+{
+	server_free(s);
+
+	return 0;
+}
+
+int
+main(void)
+{
 	struct testcase tests[] = {
 		TESTCASE(test_irc_send_command),
-		TESTCASE(test_irc_send_privmsg),
+		TESTCASE(test_irc_send_message),
 #define X(cmd) TESTCASE(test_send_##cmd),
 		SEND_HANDLERS
 #undef X
@@ -437,9 +508,5 @@ main(void)
 #undef X
 	};
 
-	int ret = run_tests(tests);
-
-	server_free(s);
-
-	return ret;
+	return run_tests(test_init, test_term, tests);
 }

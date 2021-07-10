@@ -94,7 +94,7 @@ static const char *cmd_list[] = {
 void
 state_init(void)
 {
-	state.default_channel = state.current_channel = channel("rirc", CHANNEL_T_RIRC);
+	state.default_channel = channel("rirc", CHANNEL_T_RIRC);
 
 	newlinef(state.default_channel, 0, FROM_INFO, "      _");
 	newlinef(state.default_channel, 0, FROM_INFO, " _ __(_)_ __ ___");
@@ -107,6 +107,8 @@ state_init(void)
 #ifndef NDEBUG
 	newlinef(state.default_channel, 0, FROM_INFO, " - compiled with DEBUG flags");
 #endif
+
+	channel_set_current(state.default_channel);
 }
 
 void
@@ -213,42 +215,6 @@ _newline(struct channel *c, enum buffer_line_type type, const char *from, const 
 		c->activity = MAX(c->activity, ACTIVITY_ACTIVE);
 		draw(DRAW_NAV);
 	}
-}
-
-int
-state_server_set_chans(struct server *s, const char *chans)
-{
-	char *p1, *p2, *base;
-	size_t n = 0;
-
-	p2 = base = strdup(chans);
-
-	do {
-		n++;
-
-		p1 = p2;
-		p2 = strchr(p2, ',');
-
-		if (p2)
-			*p2++ = 0;
-
-		if (!irc_ischan(p1)) {
-			free(base);
-			return -1;
-		}
-	} while (p2);
-
-	for (const char *chan = base; n; n--) {
-		struct channel *c;
-		c = channel(chan, CHANNEL_T_CHANNEL);
-		c->server = s;
-		channel_list_add(&s->clist, c);
-		chan = strchr(chan, 0) + 1;
-	}
-
-	free(base);
-
-	return 0;
 }
 
 static int
@@ -360,7 +326,7 @@ state_channel_close(int action_confirm)
 
 	if (action_confirm) {
 
-		if (c->type == CHANNEL_T_CHANNEL || c->type == CHANNEL_T_PRIVATE)
+		if (c->type == CHANNEL_T_CHANNEL || c->type == CHANNEL_T_PRIVMSG)
 			action(action_close, "Close '%s'?   [y/n]", c->name);
 
 		if (c->type == CHANNEL_T_SERVER)
@@ -370,14 +336,18 @@ state_channel_close(int action_confirm)
 		return;
 	}
 
-	if (c->type == CHANNEL_T_CHANNEL || c->type == CHANNEL_T_PRIVATE) {
+	if (c->type == CHANNEL_T_CHANNEL || c->type == CHANNEL_T_PRIVMSG) {
 
 		if (s->connected && c->type == CHANNEL_T_CHANNEL && !c->parted) {
 			if ((ret = io_sendf(s->connection, "PART %s :%s", c->name, DEFAULT_PART_MESG)))
-				newlinef(s->channel, 0, FROM_ERROR, "sendf fail: %s", io_err(ret));
+				server_error(s, "sendf fail: %s", io_err(ret));
 		}
 
-		channel_set_current(c->next);
+		if (c == channel_get_last())
+			channel_set_current(channel_get_prev(c));
+		else
+			channel_set_current(channel_get_next(c));
+
 		channel_list_del(&(s->clist), c);
 		channel_free(c);
 		return;
@@ -387,7 +357,7 @@ state_channel_close(int action_confirm)
 
 		if (s->connected) {
 			if ((ret = io_sendf(s->connection, "QUIT :%s", DEFAULT_QUIT_MESG)))
-				newlinef(s->channel, 0, FROM_ERROR, "sendf fail: %s", io_err(ret));
+				server_error(s, "sendf fail: %s", io_err(ret));
 			io_dx(s->connection);
 		}
 
@@ -408,11 +378,11 @@ buffer_scrollback_back(struct channel *c)
 
 	struct buffer *b = &c->buffer;
 
-	unsigned int buffer_i = b->scrollback,
-	             count = 0,
-	             text_w = 0,
-	             cols = state_tty_cols,
-	             rows = state_tty_rows - 4;
+	unsigned buffer_i = b->scrollback,
+	         count = 0,
+	         text_w = 0,
+	         cols = state_tty_cols,
+	         rows = state_tty_rows - 4;
 
 	struct buffer_line *line = buffer_line(b, buffer_i);
 
@@ -451,10 +421,10 @@ buffer_scrollback_forw(struct channel *c)
 {
 	/* Scroll a buffer forward one page */
 
-	unsigned int count = 0,
-	             text_w = 0,
-	             cols = state_tty_cols,
-	             rows = state_tty_rows - 4;
+	unsigned count = 0,
+	         text_w = 0,
+	         cols = state_tty_cols,
+	         rows = state_tty_rows - 4;
 
 	struct buffer *b = &c->buffer;
 
@@ -631,7 +601,6 @@ command(struct channel *c, char *buf)
 			action(action_error, "clear: Unknown arg '%s'", arg);
 			return;
 		}
-
 		state_channel_clear(0);
 		return;
 	}
@@ -641,7 +610,6 @@ command(struct channel *c, char *buf)
 			action(action_error, "close: Unknown arg '%s'", arg);
 			return;
 		}
-
 		state_channel_close(0);
 		return;
 	}
@@ -801,18 +769,18 @@ state_input_linef(struct channel *c)
 	switch (buf[0]) {
 		case ':':
 			if (len > 1 && buf[1] == ':')
-				irc_send_privmsg(current_channel()->server, current_channel(), buf + 1);
+				irc_send_message(current_channel()->server, current_channel(), buf + 1);
 			else
 				command(current_channel(), buf + 1);
 			break;
 		case '/':
 			if (len > 1 && buf[1] == '/')
-				irc_send_privmsg(current_channel()->server, current_channel(), buf + 1);
+				irc_send_message(current_channel()->server, current_channel(), buf + 1);
 			else
 				irc_send_command(current_channel()->server, current_channel(), buf + 1);
 			break;
 		default:
-			irc_send_privmsg(current_channel()->server, current_channel(), buf);
+			irc_send_message(current_channel()->server, current_channel(), buf);
 	}
 
 	return 1;

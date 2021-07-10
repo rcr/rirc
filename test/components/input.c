@@ -571,5 +571,5 @@ main(void)
 		TESTCASE(test_input_text_size)
 	};
 
-	return run_tests(tests);
+	return run_tests(NULL, NULL, tests);
 }

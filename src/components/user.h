@@ -24,7 +24,7 @@ struct user
 struct user_list
 {
 	TREE_HEAD(user);
-	unsigned int count;
+	unsigned count;
 };
 
 enum user_err user_list_add(struct user_list*, enum casemapping, const char*, struct mode);

@@ -3,11 +3,11 @@
  * Colours can be set [0, 255], Any other value (e.g. -1) will set
  * the default terminal foreground/background */
 
-/* Default comma separated set of Nicks to try on connection
+/* Comma separated set of default nicks to try on connection
  *   String
  *   ("": defaults to effective user id name)
  */
-#define DEFAULT_NICK_SET ""
+#define DEFAULT_NICKS ""
 
 /* Default Username and Realname sent during connection
  *   String
@@ -30,13 +30,14 @@
 #define DEFAULT_QUIT_MESG "rirc v" VERSION
 #define DEFAULT_PART_MESG "rirc v" VERSION
 
-#define BUFFER_LINE_HEADER_FG_NEUTRAL 239
-
+/* Buffer colours */
+#define BUFFER_LINE_HEADER_FG         239
+#define BUFFER_LINE_HEADER_BG         -1
 #define BUFFER_LINE_HEADER_FG_PINGED  250
 #define BUFFER_LINE_HEADER_BG_PINGED  1
 
-#define BUFFER_LINE_TEXT_FG_NEUTRAL 250
-#define BUFFER_LINE_TEXT_FG_GREEN   113
+#define BUFFER_TEXT_FG 250;
+#define BUFFER_TEXT_BG -1;
 
 /* Number of buffer lines to keep in history, must be power of 2 */
 #define BUFFER_LINES_MAX (1 << 10)
@@ -54,10 +55,17 @@
 
 #define NAV_CURRENT_CHAN 255
 
-/* Characters */
-#define QUOTE_CHAR '>'
-#define HORIZONTAL_SEPARATOR "-"
-#define VERTICAL_SEPARATOR "~"
+/* Separator characters */
+#define SEP_HORZ "─"
+#define SEP_VERT "~"
+
+/* Separator colours */
+#define SEP_FG 239
+#define SEP_BG -1
+
+/* Status bar colours */
+#define STATUS_FG -1
+#define STATUS_BG -1
 
 /* Prefix string for the input line and colours */
 #define INPUT_PREFIX " >>> "
@@ -71,6 +79,16 @@
 /* Input line text colours */
 #define INPUT_FG 250
 #define INPUT_BG -1
+
+/* Buffer text quoting
+ *   ("": no text quoting) */
+#define QUOTE_LEADER ">"
+#define QUOTE_TEXT_FG 2
+#define QUOTE_TEXT_BG -1
+
+/* Control character print colour */
+#define CTRL_FG 0
+#define CTRL_BG 9
 
 /* BUFFER_PADDING:
  * How the buffer line headers will be padded [0, 1]
@@ -92,7 +110,9 @@
 
 /* [NETWORK] */
 
-#define CA_CERT_PATH "/etc/ssl/certs/"
+/* Default CA certifate file path
+ *   ("": a list of known paths is checked) */
+#define CA_CERT_PATH ""
 
 /* Seconds before displaying ping
  *   Integer, [0, 150, 86400]
