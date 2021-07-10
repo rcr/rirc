@@ -106,4 +106,4 @@ Keys:
 
 ## More info:
 
-[https://rcr.io/rirc/](http://rcr.io/rirc/)
+[https://rcr.io/rirc/](https://rcr.io/rirc/)
