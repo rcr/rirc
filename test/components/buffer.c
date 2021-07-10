@@ -449,5 +449,5 @@ main(void)
 		TESTCASE(test_buffer_newline_prefix),
 	};
 
-	return run_tests(tests);
+	return run_tests(NULL, NULL, tests);
 }

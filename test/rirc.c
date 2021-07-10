@@ -33,5 +33,5 @@ main(void)
 		TESTCASE(test_rirc_parse_args)
 	};
 
-	return run_tests(tests);
+	return run_tests(NULL, NULL, tests);
 }

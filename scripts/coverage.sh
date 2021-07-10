@@ -14,7 +14,7 @@ rm -rf $CDIR && mkdir -p $CDIR
 make clean
 make check
 
-GCNO=$(find bld -name '*.t.gcno')
+GCNO=$(find build -name '*.t.gcno')
 
 FILTER=$(cat << 'EOF'
 {

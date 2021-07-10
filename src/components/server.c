@@ -190,7 +190,7 @@ server_set_chans(struct server *s, const char *str)
 		if (irc_ischan(chan))
 			c = channel(chan, CHANNEL_T_CHANNEL);
 		else
-			c = channel(chan, CHANNEL_T_PRIVATE);
+			c = channel(chan, CHANNEL_T_PRIVMSG);
 
 		c->server = s;
 		channel_list_add(&s->clist, c);

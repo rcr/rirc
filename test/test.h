@@ -1,5 +1,5 @@
-#ifndef TEST_H
-#define TEST_H
+#ifndef RIRC_TEST_H
+#define RIRC_TEST_H
 
 /* test.h -- unit test framework for rirc
  *
@@ -30,7 +30,6 @@
  *    - test_failf(M, ...)
  *    - test_abort(M)
  *    - test_abortf(M, ...)
- *    - test_abort_main(M)
  */
 
 #include <inttypes.h>
@@ -39,8 +38,9 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define TESTCASE(X) { &(X), #X }
 #define TESTING
+
+#define TESTCASE(X) { &(X), #X }
 
 #define TOKEN_PASTE(x, y) x##y
 #define TOKEN(x, y) TOKEN_PASTE(x, y)
@@ -59,32 +59,32 @@
 
 #define assert_eq(X, Y) \
 	do { \
-		int __ret_x = (int)(X); \
-		int __ret_y = (int)(Y); \
+		int __ret_x = (X); \
+		int __ret_y = (Y); \
 		if (__ret_x != __ret_y) \
 			test_failf(#X " expected '%d', got '%d'", __ret_y, __ret_x); \
 	} while (0)
 
 #define assert_gt(X, Y) \
 	do { \
-		int __ret_x = (int)(X); \
-		int __ret_y = (int)(Y); \
+		int __ret_x = (X); \
+		int __ret_y = (Y); \
 		if (!(__ret_x > __ret_y)) \
 			test_failf(#X " expected '%d' to be greater than '%d'", __ret_y, __ret_x); \
 	} while (0)
 
 #define assert_lt(X, Y) \
 	do { \
-		int __ret_x = (int)(X); \
-		int __ret_y = (int)(Y); \
+		int __ret_x = (X); \
+		int __ret_y = (Y); \
 		if (!(__ret_x < __ret_y)) \
 			test_failf(#X " expected '%d' to be less than '%d'", __ret_y, __ret_x); \
 	} while (0)
 
 #define assert_ueq(X, Y) \
 	do { \
-		unsigned __ret_x = (unsigned)(X); \
-		unsigned __ret_y = (unsigned)(Y); \
+		unsigned __ret_x = (X); \
+		unsigned __ret_y = (Y); \
 		if (__ret_x != __ret_y) \
 			test_failf(#X " expected '%u', got '%u'", __ret_y, __ret_x); \
 	} while (0)
@@ -93,7 +93,7 @@
 	do { \
 		const char *__ret_x = (X); \
 		const char *__ret_y = (Y); \
-		if (_assert_strcmp(__ret_x, __ret_y)) \
+		if (_assert_strcmp_(__ret_x, __ret_y)) \
 			test_failf(#X " expected '%s', got '%s'", \
 				__ret_y == NULL ? "NULL" : __ret_y, \
 				__ret_x == NULL ? "NULL" : __ret_x); \
@@ -103,7 +103,7 @@
 	do { \
 		const char *__ret_x = (X); \
 		const char *__ret_y = (Y); \
-		if (_assert_strncmp(__ret_x, __ret_y, (N))) \
+		if (_assert_strncmp_(__ret_x, __ret_y, (N))) \
 			test_failf(#X " expected '%.*s', got '%.*s'", \
 				(int)(N), __ret_y == NULL ? "NULL" : __ret_y, \
 				(int)(N), __ret_x == NULL ? "NULL" : __ret_x); \
@@ -134,11 +134,11 @@
 #define assert_fatal(X) \
 	do { \
 		if (setjmp(_tc_fatal_expected_)) { \
-			_assert_fatal_ = 1; \
+			_tc_assert_fatal_ = 1; \
 			(X); \
-			if (_assert_fatal_) \
+			if (_tc_assert_fatal_) \
 				test_fail("'"#X "' should have exited fatally"); \
-			_assert_fatal_ = 0; \
+			_tc_assert_fatal_ = 0; \
 		} \
 	} while (0)
 
@@ -153,11 +153,11 @@
 #else
 #define _fatal(...) \
 	do { \
-		if (_assert_fatal_) { \
+		if (_tc_assert_fatal_) { \
 			longjmp(_tc_fatal_expected_, 1); \
 		} else { \
-			snprintf(_tc_errbuf_1, sizeof(_tc_errbuf_1), "%s:%d:%s:", __FILE__, __LINE__, __func__); \
-			snprintf(_tc_errbuf_2, sizeof(_tc_errbuf_2), __VA_ARGS__); \
+			snprintf(_tc_errbuf_1_, sizeof(_tc_errbuf_1_), "%s:%u:%s:", __FILE__, __LINE__, __func__); \
+			snprintf(_tc_errbuf_2_, sizeof(_tc_errbuf_2_), __VA_ARGS__); \
 			longjmp(_tc_fatal_unexpected_, 1); \
 		} \
 	} while (0)
@@ -165,51 +165,44 @@
 #define fatal_noexit _fatal
 #endif
 
-#define run_tests(X) \
-	_run_tests_(__FILE__, X, sizeof(X) / sizeof(X[0]))
-
 #define test_fail(M) \
 	do { \
 		_print_testcase_name_(__func__); \
-		printf("    %d: " M "\n", __LINE__); \
-		_failures_++; \
+		printf("    %u: " M "\n", __LINE__); \
+		_tc_failures_++; \
 	} while (0)
 
 #define test_failf(M, ...) \
 	do { \
 		_print_testcase_name_(__func__); \
-		printf("    %d: ", __LINE__); \
+		printf("    %u: ", __LINE__); \
 		printf((M), __VA_ARGS__); \
 		printf("\n"); \
-		_failures_++; \
+		_tc_failures_++; \
 	} while (0)
 
 #define test_abort(M) \
 	do { \
 		_print_testcase_name_(__func__); \
-		printf("    %d: " M "\n", __LINE__); \
-		printf("    ---Testcase aborted---\n"); \
-		_failures_++; \
+		printf("    %u: " M "\n", __LINE__); \
+		printf("    -- Testcase aborted --\n"); \
+		_tc_failures_++; \
 		return; \
 	} while (0)
 
 #define test_abortf(M, ...) \
 	do { \
 		_print_testcase_name_(__func__); \
-		printf("    %d: ", __LINE__); \
+		printf("    %u: ", __LINE__); \
 		printf((M), __VA_ARGS__); \
 		printf("\n"); \
-		printf("    ---Testcase aborted---\n"); \
-		_failures_++; \
+		printf("    -- Testcase aborted --\n"); \
+		_tc_failures_++; \
 		return; \
 	} while (0)
 
-#define test_abort_main(M) \
-	do { \
-		printf("    %d: " M "\n", __LINE__); \
-		printf("    ---Testcase aborted---\n"); \
-		return EXIT_FAILURE; \
-	} while (0)
+#define run_tests(INIT, TERM, TESTS) \
+	_run_tests_(__FILE__, INIT, TERM, TESTS, (sizeof(TESTS) / sizeof(TESTS[0])))
 
 struct testcase
 {
@@ -217,21 +210,16 @@ struct testcase
 	const char *tc_str;
 };
 
-static int _assert_strcmp(const char*, const char*);
-static int _assert_strncmp(const char*, const char*, size_t);
-static void _print_testcase_name_(const char*);
-
-static char _tc_errbuf_1[512];
-static char _tc_errbuf_2[512];
+static char _tc_errbuf_1_[512];
+static char _tc_errbuf_2_[512];
 static jmp_buf _tc_fatal_expected_;
 static jmp_buf _tc_fatal_unexpected_;
-static unsigned _assert_fatal_;
-static unsigned _failure_printed_;
-static unsigned _failures_;
-static unsigned _failures_t_;
+static unsigned _tc_assert_fatal_;
+static unsigned _tc_failures_;
+static unsigned _tc_failures_t_;
 
 static int
-_assert_strcmp(const char *p1, const char *p2)
+_assert_strcmp_(const char *p1, const char *p2)
 {
 	if (!p1 || !p2)
 		return p1 != p2;
@@ -240,7 +228,7 @@ _assert_strcmp(const char *p1, const char *p2)
 }
 
 static int
-_assert_strncmp(const char *p1, const char *p2, size_t n)
+_assert_strncmp_(const char *p1, const char *p2, size_t n)
 {
 	if (!p1 || !p2)
 		return p1 != p2;
@@ -251,61 +239,68 @@ _assert_strncmp(const char *p1, const char *p2, size_t n)
 static void
 _print_testcase_name_(const char *name)
 {
-	/* Print the testcase name once */
-	if (!_failure_printed_) {
-		_failure_printed_ = 1;
-
-		if (!_failures_t_)
-			puts("");
-
+	if (!_tc_failures_)
 		printf("  %s:\n", name);
-	}
 }
 
 static int
-_run_tests_(const char *filename, struct testcase testcases[], size_t len)
+_run_tests_(
+	const char *filename,
+	int (*tc_init)(void),
+	int (*tc_term)(void),
+	const struct testcase testcases[],
+	size_t len)
 {
 	/* Silence compiler warnings for unused test functions/vars */
-	((void)(_assert_strcmp));
-	((void)(_assert_strncmp));
-	((void)(_assert_fatal_));
-	((void)(_failure_printed_));
+	((void)(_assert_strcmp_));
+	((void)(_assert_strncmp_));
+	((void)(_tc_assert_fatal_));
 	((void)(_tc_fatal_expected_));
 	((void)(_tc_fatal_unexpected_));
 
-	printf("%s... ", filename);
-	fflush(stdout);
+	printf("%s...\n", filename);
 
-	struct testcase *tc;
+	for (const struct testcase *tc = testcases; len--; tc++) {
 
-	for (tc = testcases; len--; tc++) {
-
-		_failures_ = 0;
-		_failure_printed_ = 0;
+		_tc_failures_ = 0;
 
 		if (setjmp(_tc_fatal_unexpected_)) {
 			_print_testcase_name_(tc->tc_str);
 			printf("    Unexpected fatal error:\n");
-			printf("    %s %s\n", _tc_errbuf_1, _tc_errbuf_2);
-			printf("    -- aborting testcase --\n");
-			_failures_++;
-		} else {
-			(*tc->tc_ptr)();
+			printf("    %s %s\n", _tc_errbuf_1_, _tc_errbuf_2_);
+			printf("    -- Testcase aborted --\n"); \
+			_tc_failures_++;
+			continue;
 		}
 
-		if (_failures_) {
-			printf("      %d failure%s\n", _failures_, (_failures_ > 1) ? "s" : "");
-			_failures_t_ += _failures_;
+		if (tc_init && (*tc_init)()) {
+			_print_testcase_name_(tc->tc_str);
+			printf("    Testcase setup failed\n");
+			printf("    -- Tests aborted --\n");
+			return EXIT_FAILURE;
 		}
+
+		(*tc->tc_ptr)();
+
+		if (tc_term && (*tc_term)()) {
+			_print_testcase_name_(tc->tc_str);
+			printf("    Testcase cleanup failed\n");
+			printf("    -- Tests aborted --\n");
+			return EXIT_FAILURE;
+		}
+
+		if (_tc_failures_)
+			printf("      %u failure%s\n", _tc_failures_, (_tc_failures_ ? "s" : ""));
+
+		_tc_failures_t_ += _tc_failures_;
 	}
 
-	if (_failures_t_) {
-		printf("  %d failure%s total\n", _failures_t_, (_failures_t_ > 1) ? "s" : "");
+	if (_tc_failures_t_) {
+		printf("  %u failure%s total\n", _tc_failures_t_, (_tc_failures_t_ ? "s" : ""));
 		return EXIT_FAILURE;
-	} else {
-		printf(" OK\n");
-		return EXIT_SUCCESS;
 	}
+
+	return EXIT_SUCCESS;
 }
 
 #endif

@@ -36,6 +36,9 @@ static struct irc_message m;
 static struct channel *c1;
 static struct channel *c2;
 static struct channel *c3;
+static struct channel *p1;
+static struct channel *p2;
+static struct channel *p3;
 static struct server *s;
 
 static void
@@ -232,6 +235,82 @@ test_irc_numeric_353(void)
 }
 
 static void
+test_irc_numeric_401(void)
+{
+	/* <nick> :No such nick/channel */
+
+	server_reset(s);
+
+	/* test errors */
+	CHECK_RECV("401 me", 1, 1, 0);
+	assert_strcmp(mock_chan[0], "host");
+	assert_strcmp(mock_line[0], "ERR_NOSUCHNICK: nick is null");
+
+	/* test channel buffer not found */
+	CHECK_RECV("401 me #notfound", 0, 1, 0);
+	assert_strcmp(mock_chan[0], "host");
+	assert_strcmp(mock_line[0], "[#notfound] No such nick/channel");
+
+	/* test privmsg buffer not found */
+	CHECK_RECV("401 me notfound", 0, 1, 0);
+	assert_strcmp(mock_chan[0], "host");
+	assert_strcmp(mock_line[0], "[notfound] No such nick/channel");
+
+	/* test channel buffer found */
+	CHECK_RECV("401 me #c1", 0, 1, 0);
+	assert_strcmp(mock_chan[0], "#c1");
+	assert_strcmp(mock_line[0], "[#c1] No such nick/channel");
+
+	/* test privmsg buffer found */
+	CHECK_RECV("401 me p1", 0, 1, 0);
+	assert_strcmp(mock_chan[0], "p1");
+	assert_strcmp(mock_line[0], "[p1] No such nick/channel");
+
+	/* test with message */
+	CHECK_RECV("401 me p1 :401 message", 0, 1, 0);
+	assert_strcmp(mock_chan[0], "p1");
+	assert_strcmp(mock_line[0], "[p1] 401 message");
+}
+
+static void
+test_irc_numeric_403(void)
+{
+	/* <chan> :No such channel */
+
+	server_reset(s);
+
+	/* test errors */
+	CHECK_RECV("403 me", 1, 1, 0);
+	assert_strcmp(mock_chan[0], "host");
+	assert_strcmp(mock_line[0], "ERR_NOSUCHCHANNEL: chan is null");
+
+	/* test channel buffer not found */
+	CHECK_RECV("403 me #notfound", 0, 1, 0);
+	assert_strcmp(mock_chan[0], "host");
+	assert_strcmp(mock_line[0], "[#notfound] No such channel");
+
+	/* test privmsg buffer not found */
+	CHECK_RECV("403 me notfound", 0, 1, 0);
+	assert_strcmp(mock_chan[0], "host");
+	assert_strcmp(mock_line[0], "[notfound] No such channel");
+
+	/* test channel buffer found */
+	CHECK_RECV("403 me #c1", 0, 1, 0);
+	assert_strcmp(mock_chan[0], "#c1");
+	assert_strcmp(mock_line[0], "[#c1] No such channel");
+
+	/* test privmsg buffer found */
+	CHECK_RECV("403 me p1", 0, 1, 0);
+	assert_strcmp(mock_chan[0], "p1");
+	assert_strcmp(mock_line[0], "[p1] No such channel");
+
+	/* test with message */
+	CHECK_RECV("403 me p1 :403 message", 0, 1, 0);
+	assert_strcmp(mock_chan[0], "p1");
+	assert_strcmp(mock_line[0], "[p1] 403 message");
+}
+
+static void
 test_recv(void)
 {
 	server_reset(s);
@@ -308,7 +387,7 @@ test_recv_join(void)
 	assert_eq(user_list_add(&(c1->users), CASEMAPPING_RFC1459, "nick1", MODE_EMPTY), USER_ERR_NONE);
 	assert_eq(user_list_add(&(c2->users), CASEMAPPING_RFC1459, "nick1", MODE_EMPTY), USER_ERR_NONE);
 
-	join_threshold = 0;
+	threshold_join = 0;
 
 	CHECK_RECV("JOIN #c1", 1, 1, 0);
 	assert_strcmp(mock_chan[0], "host");
@@ -348,7 +427,7 @@ test_recv_join(void)
 	assert_strcmp(mock_chan[0], "#c1");
 	assert_strcmp(mock_line[0], "nick6!user@host has joined [account - real name]");
 
-	join_threshold = 2;
+	threshold_join = 2;
 
 	CHECK_RECV(":nick2!user@host JOIN #c2", 0, 0, 0);
 
@@ -561,7 +640,7 @@ test_recv_part(void)
 	assert_eq(user_list_add(&(c1->users), CASEMAPPING_RFC1459, "nick4", MODE_EMPTY), USER_ERR_NONE);
 	assert_eq(user_list_add(&(c1->users), CASEMAPPING_RFC1459, "nick5", MODE_EMPTY), USER_ERR_NONE);
 
-	part_threshold = 0;
+	threshold_part = 0;
 
 	CHECK_RECV("PART #c1 :part message", 1, 1, 0);
 	assert_strcmp(mock_chan[0], "host");
@@ -593,7 +672,7 @@ test_recv_part(void)
 	assert_strcmp(mock_line[0], "nick3!user@host has parted");
 	assert_ptr_null(user_list_get(&(c1->users), s->casemapping, "nick3", 0));
 
-	part_threshold = 1;
+	threshold_part = 1;
 
 	CHECK_RECV(":nick4!user@host PART #c1", 0, 0, 0);
 	assert_ptr_null(user_list_get(&(c1->users), s->casemapping, "nick4", 0));
@@ -671,7 +750,7 @@ test_recv_quit(void)
 	assert_eq(user_list_add(&(c3->users), CASEMAPPING_RFC1459, "nick1", MODE_EMPTY), USER_ERR_NONE);
 	assert_eq(user_list_add(&(c3->users), CASEMAPPING_RFC1459, "nick2", MODE_EMPTY), USER_ERR_NONE);
 
-	quit_threshold = 0;
+	threshold_quit = 0;
 
 	CHECK_RECV("QUIT message", 1, 1, 0);
 	assert_strcmp(mock_chan[0], "host");
@@ -700,7 +779,7 @@ test_recv_quit(void)
 	assert_strcmp(mock_line[0], "nick4!user@host has quit");
 	assert_ptr_null(user_list_get(&(c1->users), s->casemapping, "nick4", 0));
 
-	quit_threshold = 1;
+	threshold_quit = 1;
 
 	/* c1 = {nick1, nick5}, c3 = {nick1} */
 	CHECK_RECV(":nick1!user@host QUIT", 0, 1, 0);
@@ -776,7 +855,7 @@ test_recv_ircv3_account(void)
 	assert_eq(user_list_add(&(c1->users), CASEMAPPING_RFC1459, "nick2", MODE_EMPTY), USER_ERR_NONE);
 	assert_eq(user_list_add(&(c3->users), CASEMAPPING_RFC1459, "nick1", MODE_EMPTY), USER_ERR_NONE);
 
-	account_threshold = 0;
+	threshold_account = 0;
 
 	CHECK_RECV("ACCOUNT *", 1, 1, 0);
 	assert_strcmp(mock_chan[0], "host");
@@ -802,7 +881,7 @@ test_recv_ircv3_account(void)
 	assert_strcmp(mock_chan[1], "#c3");
 	assert_strcmp(mock_line[1], "nick1 has logged out");
 
-	account_threshold = 2;
+	threshold_account = 2;
 
 	CHECK_RECV(":nick1!user@host ACCOUNT *", 0, 1, 0);
 	assert_strcmp(mock_chan[0], "#c3");
@@ -822,7 +901,7 @@ test_recv_ircv3_away(void)
 	assert_eq(user_list_add(&(c1->users), CASEMAPPING_RFC1459, "nick2", MODE_EMPTY), USER_ERR_NONE);
 	assert_eq(user_list_add(&(c3->users), CASEMAPPING_RFC1459, "nick1", MODE_EMPTY), USER_ERR_NONE);
 
-	away_threshold = 0;
+	threshold_away = 0;
 
 	CHECK_RECV("AWAY *", 1, 1, 0);
 	assert_strcmp(mock_chan[0], "host");
@@ -845,7 +924,7 @@ test_recv_ircv3_away(void)
 	assert_strcmp(mock_chan[1], "#c3");
 	assert_strcmp(mock_line[1], "nick1 is no longer away");
 
-	away_threshold = 2;
+	threshold_away = 2;
 
 	CHECK_RECV(":nick1!user@host AWAY", 0, 1, 0);
 	assert_strcmp(mock_chan[0], "#c3");
@@ -865,7 +944,7 @@ test_recv_ircv3_chghost(void)
 	assert_eq(user_list_add(&(c1->users), CASEMAPPING_RFC1459, "nick2", MODE_EMPTY), USER_ERR_NONE);
 	assert_eq(user_list_add(&(c3->users), CASEMAPPING_RFC1459, "nick1", MODE_EMPTY), USER_ERR_NONE);
 
-	chghost_threshold = 0;
+	threshold_chghost = 0;
 
 	CHECK_RECV("CHGHOST new_user new_host", 1, 1, 0);
 	assert_strcmp(mock_chan[0], "host");
@@ -886,30 +965,53 @@ test_recv_ircv3_chghost(void)
 	assert_strcmp(mock_chan[1], "#c3");
 	assert_strcmp(mock_line[1], "nick1 has changed user/host: new_user/new_host");
 
-	chghost_threshold = 2;
+	threshold_chghost = 2;
 
 	CHECK_RECV(":nick1!user@host CHGHOST new_user new_host", 0, 1, 0);
 	assert_strcmp(mock_chan[0], "#c3");
 	assert_strcmp(mock_line[0], "nick1 has changed user/host: new_user/new_host");
 }
 
-int
-main(void)
+static int
+test_init(void)
 {
+	s = server("host", "port", NULL, "user", "real");
+
 	c1 = channel("#c1", CHANNEL_T_CHANNEL);
 	c2 = channel("#c2", CHANNEL_T_CHANNEL);
 	c3 = channel("#c3", CHANNEL_T_CHANNEL);
-	s = server("host", "port", NULL, "user", "real");
 
-	if (!s || !c1 || !c2 || !c3)
-		test_abort_main("Failed test setup");
+	p1 = channel("p1", CHANNEL_T_PRIVMSG);
+	p2 = channel("p2", CHANNEL_T_PRIVMSG);
+	p3 = channel("p3", CHANNEL_T_PRIVMSG);
+
+	if (!s || !c1 || !c2 || !c3 || !p1 || !p2 || !p3)
+		return -1;
 
 	channel_list_add(&s->clist, c1);
 	channel_list_add(&s->clist, c2);
 	channel_list_add(&s->clist, c3);
+	channel_list_add(&s->clist, p1);
+	channel_list_add(&s->clist, p2);
+	channel_list_add(&s->clist, p3);
 
 	server_nick_set(s, "me");
 
+	return 0;
+}
+
+
+static int
+test_term(void)
+{
+	server_free(s);
+
+	return 0;
+}
+
+int
+main(void)
+{
 	struct testcase tests[] = {
 		TESTCASE(test_irc_generic),
 		TESTCASE(test_irc_generic_error),
@@ -917,6 +1019,8 @@ main(void)
 		TESTCASE(test_irc_generic_info),
 		TESTCASE(test_irc_generic_unknown),
 		TESTCASE(test_irc_numeric_353),
+		TESTCASE(test_irc_numeric_401),
+		TESTCASE(test_irc_numeric_403),
 		TESTCASE(test_recv),
 		TESTCASE(test_recv_error),
 		TESTCASE(test_recv_invite),
@@ -940,9 +1044,5 @@ main(void)
 		TESTCASE(test_recv_ircv3_chghost)
 	};
 
-	int ret = run_tests(tests);
-
-	server_free(s);
-
-	return ret;
+	return run_tests(test_init, test_term, tests);
 }

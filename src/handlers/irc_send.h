@@ -5,6 +5,6 @@
 #include "src/components/server.h"
 
 int irc_send_command(struct server*, struct channel*, char*);
-int irc_send_privmsg(struct server*, struct channel*, char*);
+int irc_send_message(struct server*, struct channel*, const char*);
 
 #endif

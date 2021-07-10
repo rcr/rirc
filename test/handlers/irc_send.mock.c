@@ -8,7 +8,7 @@ irc_send_command(struct server *s, struct channel *c, char *m)
 }
 
 int
-irc_send_privmsg(struct server *s, struct channel *c, char *m)
+irc_send_message(struct server *s, struct channel *c, const char *m)
 {
 	UNUSED(s);
 	UNUSED(c);

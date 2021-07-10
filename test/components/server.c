@@ -146,11 +146,11 @@ test_server_set_chans(void)
 
 	if (!(c = channel_list_get(&(s->clist), "b", s->casemapping)))
 		test_abort("failed to find channel 'b'");
-	assert_eq(c->type, CHANNEL_T_PRIVATE);
+	assert_eq(c->type, CHANNEL_T_PRIVMSG);
 
 	if (!(c = channel_list_get(&(s->clist), "c", s->casemapping)))
 		test_abort("failed to find channel '#c'");
-	assert_eq(c->type, CHANNEL_T_PRIVATE);
+	assert_eq(c->type, CHANNEL_T_PRIVMSG);
 
 	if (!(c = channel_list_get(&(s->clist), "#d", s->casemapping)))
 		test_abort("failed to find channel 'd'");
@@ -304,5 +304,5 @@ main(void)
 		TESTCASE(test_parse_005)
 	};
 
-	return run_tests(tests);
+	return run_tests(NULL, NULL, tests);
 }

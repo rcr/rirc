@@ -156,6 +156,15 @@ static int io_tls_x509_vrfy(struct connection*);
 static void io_tls_init(void);
 static void io_tls_term(void);
 
+const char *ca_cert_paths[] = {
+	"/etc/ssl/ca-bundle.pem",
+	"/etc/ssl/cert.pem",
+	"/etc/ssl/certs/ca-certificates.crt",
+	"/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem",
+	"/etc/pki/tls/cacert.pem",
+	"/etc/pki/tls/certs/ca-bundle.crt",
+};
+
 struct connection*
 connection(const void *obj, const char *host, const char *port, uint32_t flags)
 {
@@ -307,6 +316,8 @@ void
 io_start(void)
 {
 	io_running = 1;
+
+	io_tty_winsize();
 
 	while (io_running) {
 
@@ -566,7 +577,7 @@ io_cx_read(struct connection *cx, uint32_t timeout)
 	struct pollfd fd[1];
 	unsigned char buf[1024];
 
-	fd[0].fd = cx->net_ctx.fd;
+	fd[0].fd = cx->net_ctx.MBEDTLS_PRIVATE(fd);
 	fd[0].events = POLLIN;
 
 	while ((ret = poll(fd, 1, timeout)) < 0 && errno == EAGAIN)
@@ -650,8 +661,6 @@ io_tty_init(void)
 
 	if (atexit(io_tty_term))
 		fatal("atexit");
-
-	io_tty_winsize();
 }
 
 static void
@@ -741,7 +750,7 @@ io_net_connect(struct connection *cx)
 err:
 	freeaddrinfo(res);
 
-	return (cx->net_ctx.fd = ret);
+	return (cx->net_ctx.MBEDTLS_PRIVATE(fd) = ret);
 }
 
 static void
@@ -881,15 +890,13 @@ io_tls_x509_vrfy(struct connection *cx)
 	if (mbedtls_x509_crt_verify_info(buf, sizeof(buf), "", ret) < 0)
 		return -1;
 
-	s = buf;
+	for (s = buf; s && *s; s = p) {
 
-	do {
 		if ((p = strchr(buf, '\n')))
 			*p++ = 0;
 
 		io_error(cx, " .... %s", s);
-
-	} while ((s = p));
+	}
 
 	return 0;
 }
@@ -911,9 +918,8 @@ io_tls_err(int err)
 static void
 io_tls_init(void)
 {
-	char buf[512];
+	const unsigned char pers[] = "rirc-drbg-seed";
 	int ret;
-	struct timespec ts;
 
 	mbedtls_ctr_drbg_init(&tls_ctr_drbg);
 	mbedtls_entropy_init(&tls_entropy);
@@ -922,23 +928,29 @@ io_tls_init(void)
 	if (atexit(io_tls_term))
 		fatal("atexit");
 
-	if (timespec_get(&ts, TIME_UTC) != TIME_UTC)
-		fatal("timespec_get");
-
-	if (snprintf(buf, sizeof(buf), "rirc-%lu-%lu", ts.tv_sec, ts.tv_nsec) < 0)
-		fatal("snprintf");
-
 	if ((ret = mbedtls_ctr_drbg_seed(
 			&tls_ctr_drbg,
 			mbedtls_entropy_func,
 			&tls_entropy,
-			(const unsigned char *)buf,
-			strlen(buf)))) {
+			pers,
+			sizeof(pers)))) {
 		fatal("mbedtls_ctr_drbg_seed: %s", io_tls_err(ret));
 	}
 
-	if ((ret = mbedtls_x509_crt_parse_path(&tls_x509_crt, ca_cert_path)) < 0)
-		fatal("mbedtls_x509_crt_parse_path: %s", io_tls_err(ret));
+	if (ca_cert_path && *ca_cert_path) {
+
+		if ((ret = mbedtls_x509_crt_parse_file(&tls_x509_crt, ca_cert_path)) < 0)
+			fatal("mbedtls_x509_crt_parse_file: '%s': %s", ca_cert_path, io_tls_err(ret));
+
+	} else {
+
+		for (size_t i = 0; i < ARR_LEN(ca_cert_paths); i++) {
+			if ((ret = mbedtls_x509_crt_parse_file(&tls_x509_crt, ca_cert_paths[i])) >= 0)
+				return;
+		}
+
+		fatal("Failed to load ca cert: %s", io_tls_err(ret));
+	}
 }
 
 static void

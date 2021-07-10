@@ -10,7 +10,7 @@ fi
 
 DIR="$1"
 
-SONAR_VER="4.6.0.2311"
+SONAR_VER="4.6.2.2472"
 
 SONAR_CONFIG="$DIR/sonar-project.properties"
 

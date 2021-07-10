@@ -46,18 +46,20 @@ static int irc_numeric_329(struct server*, struct irc_message*);
 static int irc_numeric_332(struct server*, struct irc_message*);
 static int irc_numeric_333(struct server*, struct irc_message*);
 static int irc_numeric_353(struct server*, struct irc_message*);
+static int irc_numeric_401(struct server*, struct irc_message*);
+static int irc_numeric_403(struct server*, struct irc_message*);
 static int irc_numeric_433(struct server*, struct irc_message*);
 
 static int irc_recv_numeric(struct server*, struct irc_message*);
 static int recv_mode_chanmodes(struct irc_message*, const struct mode_cfg*, struct server*, struct channel*);
 static int recv_mode_usermodes(struct irc_message*, const struct mode_cfg*, struct server*);
 
-static unsigned quit_threshold    = FILTER_THRESHOLD_QUIT;
-static unsigned join_threshold    = FILTER_THRESHOLD_JOIN;
-static unsigned part_threshold    = FILTER_THRESHOLD_PART;
-static unsigned account_threshold = FILTER_THRESHOLD_ACCOUNT;
-static unsigned away_threshold    = FILTER_THRESHOLD_AWAY;
-static unsigned chghost_threshold = FILTER_THRESHOLD_CHGHOST;
+static unsigned threshold_account = FILTER_THRESHOLD_ACCOUNT;
+static unsigned threshold_away    = FILTER_THRESHOLD_AWAY;
+static unsigned threshold_chghost = FILTER_THRESHOLD_CHGHOST;
+static unsigned threshold_join    = FILTER_THRESHOLD_JOIN;
+static unsigned threshold_part    = FILTER_THRESHOLD_PART;
+static unsigned threshold_quit    = FILTER_THRESHOLD_QUIT;
 
 static const irc_recv_f irc_numerics[] = {
 	  [1] = irc_numeric_001,    /* RPL_WELCOME */
@@ -154,9 +156,9 @@ static const irc_recv_f irc_numerics[] = {
 	[381] = irc_generic_info,   /* RPL_YOUREOPER */
 	[391] = irc_generic_info,   /* RPL_TIME */
 	[396] = irc_generic_info,   /* RPL_VISIBLEHOST */
-	[401] = irc_generic_error,  /* ERR_NOSUCHNICK */
+	[401] = irc_numeric_401,    /* ERR_NOSUCHNICK */
 	[402] = irc_generic_error,  /* ERR_NOSUCHSERVER */
-	[403] = irc_generic_error,  /* ERR_NOSUCHCHANNEL */
+	[403] = irc_numeric_403,    /* ERR_NOSUCHCHANNEL */
 	[404] = irc_generic_error,  /* ERR_CANNOTSENDTOCHAN */
 	[405] = irc_generic_error,  /* ERR_TOOMANYCHANNELS */
 	[406] = irc_generic_error,  /* ERR_WASNOSUCHNICK */
@@ -556,6 +558,56 @@ irc_numeric_353(struct server *s, struct irc_message *m)
 }
 
 static int
+irc_numeric_401(struct server *s, struct irc_message *m)
+{
+	/* <nick> :No such nick/channel */
+
+	char *message;
+	char *nick;
+	struct channel *c;
+
+	if (!irc_message_param(m, &nick))
+		failf(s, "ERR_NOSUCHNICK: nick is null");
+
+	if (!(c = channel_list_get(&(s->clist), nick, s->casemapping)))
+		c = s->channel;
+
+	irc_message_param(m, &message);
+
+	if (message && *message)
+		newlinef(c, 0, FROM_ERROR, "[%s] %s", nick, message);
+	else
+		newlinef(c, 0, FROM_ERROR, "[%s] No such nick/channel", nick);
+
+	return 0;
+}
+
+static int
+irc_numeric_403(struct server *s, struct irc_message *m)
+{
+	/* <chan> :No such channel */
+
+	char *message;
+	char *chan;
+	struct channel *c;
+
+	if (!irc_message_param(m, &chan))
+		failf(s, "ERR_NOSUCHCHANNEL: chan is null");
+
+	if (!(c = channel_list_get(&(s->clist), chan, s->casemapping)))
+		c = s->channel;
+
+	irc_message_param(m, &message);
+
+	if (message && *message)
+		newlinef(c, 0, FROM_ERROR, "[%s] %s", chan, message);
+	else
+		newlinef(c, 0, FROM_ERROR, "[%s] No such channel", chan);
+
+	return 0;
+}
+
+static int
 irc_numeric_433(struct server *s, struct irc_message *m)
 {
 	/* 433 <nick> :Nickname is already in use */
@@ -692,7 +744,7 @@ recv_join(struct server *s, struct irc_message *m)
 	if (user_list_add(&(c->users), s->casemapping, m->from, MODE_EMPTY) == USER_ERR_DUPLICATE)
 		failf(s, "JOIN: user '%s' already on channel '%s'", m->from, chan);
 
-	if (!join_threshold || join_threshold > c->users.count) {
+	if (!threshold_join || threshold_join > c->users.count) {
 
 		if (s->ircv3_caps.extended_join.set) {
 
@@ -1099,7 +1151,7 @@ recv_part(struct server *s, struct irc_message *m)
 		if (user_list_del(&(c->users), s->casemapping, m->from) == USER_ERR_NOT_FOUND)
 			failf(s, "PART: nick '%s' not found in '%s'", m->from, chan);
 
-		if (!part_threshold || part_threshold > c->users.count) {
+		if (!threshold_part || threshold_part > c->users.count) {
 
 			if (message && *message)
 				newlinef(c, 0, FROM_PART, "%s!%s has parted (%s)", m->from, m->host, message);
@@ -1167,7 +1219,7 @@ recv_privmsg(struct server *s, struct irc_message *m)
 	if (!strcmp(target, s->nick)) {
 
 		if ((c = channel_list_get(&s->clist, m->from, s->casemapping)) == NULL) {
-			c = channel(m->from, CHANNEL_T_PRIVATE);
+			c = channel(m->from, CHANNEL_T_PRIVMSG);
 			c->server = s;
 			channel_list_add(&s->clist, c);
 		}
@@ -1214,7 +1266,7 @@ recv_quit(struct server *s, struct irc_message *m)
 	do {
 		if (user_list_del(&(c->users), s->casemapping, m->from) == USER_ERR_NONE) {
 
-			if (quit_threshold && quit_threshold <= c->users.count)
+			if (threshold_quit && threshold_quit <= c->users.count)
 				continue;
 
 			if (message && *message)
@@ -1286,7 +1338,7 @@ recv_ircv3_account(struct server *s, struct irc_message *m)
 		if (!user_list_get(&(c->users), s->casemapping, m->from, 0))
 			continue;
 
-		if (account_threshold && account_threshold <= c->users.count)
+		if (threshold_account && threshold_account <= c->users.count)
 			continue;
 
 		if (!strcmp(account, "*"))
@@ -1316,7 +1368,7 @@ recv_ircv3_away(struct server *s, struct irc_message *m)
 		if (!user_list_get(&(c->users), s->casemapping, m->from, 0))
 			continue;
 
-		if (away_threshold && away_threshold <= c->users.count)
+		if (threshold_away && threshold_away <= c->users.count)
 			continue;
 
 		if (message)
@@ -1351,7 +1403,7 @@ recv_ircv3_chghost(struct server *s, struct irc_message *m)
 		if (!user_list_get(&(c->users), s->casemapping, m->from, 0))
 			continue;
 
-		if (chghost_threshold && chghost_threshold <= c->users.count)
+		if (threshold_chghost && threshold_chghost <= c->users.count)
 			continue;
 
 		newlinef(c, 0, FROM_INFO, "%s has changed user/host: %s/%s", m->from, user, host);

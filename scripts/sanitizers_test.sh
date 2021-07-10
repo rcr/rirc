@@ -9,4 +9,4 @@ export LDFLAGS="-fsanitize=address,undefined -fuse-ld=lld"
 # for core dumps:
 # export ASAN_OPTIONS="abort_on_error=1:disable_coredump=0"
 
-make -e clean check
+make clean check

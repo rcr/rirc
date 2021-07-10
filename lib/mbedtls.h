@@ -1,5 +1,4 @@
-#ifndef MBEDTLS_CONFIG_H
-#define MBEDTLS_CONFIG_H
+#define MBEDTLS_CONFIG_VERSION 0x03000000
 
 /* Enabled ciphersuites, in order of preference.
  *   - Only ECHDE key exchanges, AEAD ciphers
@@ -92,6 +91,7 @@
 #define MBEDTLS_PK_PARSE_C
 #define MBEDTLS_RSA_C
 #define MBEDTLS_SHA1_C
+#define MBEDTLS_SHA224_C
 #define MBEDTLS_SHA256_C
 #define MBEDTLS_SHA512_C
 #define MBEDTLS_SSL_TLS_C
@@ -110,7 +110,3 @@
 
 /* Error strings */
 #define MBEDTLS_ERROR_C
-
-#include "mbedtls/check_config.h"
-
-#endif

@@ -326,7 +326,7 @@ state_channel_close(int action_confirm)
 
 	if (action_confirm) {
 
-		if (c->type == CHANNEL_T_CHANNEL || c->type == CHANNEL_T_PRIVATE)
+		if (c->type == CHANNEL_T_CHANNEL || c->type == CHANNEL_T_PRIVMSG)
 			action(action_close, "Close '%s'?   [y/n]", c->name);
 
 		if (c->type == CHANNEL_T_SERVER)
@@ -336,14 +336,18 @@ state_channel_close(int action_confirm)
 		return;
 	}
 
-	if (c->type == CHANNEL_T_CHANNEL || c->type == CHANNEL_T_PRIVATE) {
+	if (c->type == CHANNEL_T_CHANNEL || c->type == CHANNEL_T_PRIVMSG) {
 
 		if (s->connected && c->type == CHANNEL_T_CHANNEL && !c->parted) {
 			if ((ret = io_sendf(s->connection, "PART %s :%s", c->name, DEFAULT_PART_MESG)))
 				server_error(s, "sendf fail: %s", io_err(ret));
 		}
 
-		channel_set_current(c->next);
+		if (c == channel_get_last())
+			channel_set_current(channel_get_prev(c));
+		else
+			channel_set_current(channel_get_next(c));
+
 		channel_list_del(&(s->clist), c);
 		channel_free(c);
 		return;
@@ -597,7 +601,6 @@ command(struct channel *c, char *buf)
 			action(action_error, "clear: Unknown arg '%s'", arg);
 			return;
 		}
-
 		state_channel_clear(0);
 		return;
 	}
@@ -607,7 +610,6 @@ command(struct channel *c, char *buf)
 			action(action_error, "close: Unknown arg '%s'", arg);
 			return;
 		}
-
 		state_channel_close(0);
 		return;
 	}
@@ -767,18 +769,18 @@ state_input_linef(struct channel *c)
 	switch (buf[0]) {
 		case ':':
 			if (len > 1 && buf[1] == ':')
-				irc_send_privmsg(current_channel()->server, current_channel(), buf + 1);
+				irc_send_message(current_channel()->server, current_channel(), buf + 1);
 			else
 				command(current_channel(), buf + 1);
 			break;
 		case '/':
 			if (len > 1 && buf[1] == '/')
-				irc_send_privmsg(current_channel()->server, current_channel(), buf + 1);
+				irc_send_message(current_channel()->server, current_channel(), buf + 1);
 			else
 				irc_send_command(current_channel()->server, current_channel(), buf + 1);
 			break;
 		default:
-			irc_send_privmsg(current_channel()->server, current_channel(), buf);
+			irc_send_message(current_channel()->server, current_channel(), buf);
 	}
 
 	return 1;

@@ -8,7 +8,7 @@ if [[ -z $1 ]]; then
 	fail "Usage: '$0 dir'"
 fi
 
-SONAR_VER="4.6.0.2311"
+SONAR_VER="4.6.2.2472"
 
 BUILD_ZIP="$1/build-wrapper.zip"
 SONAR_ZIP="$1/sonar-scanner.zip"
@@ -26,7 +26,7 @@ curl -fsS "$BUILD_ZIP_URL" -o "$BUILD_ZIP"
 curl -fsS "$SONAR_ZIP_URL" -o "$SONAR_ZIP"
 curl -fsS "$SONAR_MD5_URL" -o "$SONAR_MD5"
 
-printf "%s  %s" "$(cat "$SONAR_MD5")" "$SONAR_TGZ" | md5sum -c -
+printf "%s  %s" "$(cat "$SONAR_MD5")" "$SONAR_ZIP" | md5sum --quiet -c -
 
 unzip -qq "$BUILD_ZIP" -d "$1"
 unzip -qq "$SONAR_ZIP" -d "$1"
