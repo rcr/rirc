@@ -28,8 +28,8 @@ tasks:
       set -x
       ./scripts/sa_coverity_get.sh coverity
       ./scripts/sa_coverity_run.sh coverity
-      ./scripts/sa_sonarscan.sh sonarscan
-      ./scripts/sa_sonarscan.sh sonarscan
+      ./scripts/sa_sonarscan_get.sh sonarscan
+      ./scripts/sa_sonarscan_run.sh sonarscan
 
 triggers:
   - action: email
