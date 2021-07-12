@@ -589,56 +589,164 @@ state_complete(char *str, uint16_t len, uint16_t max, int first)
 static void
 command(struct channel *c, char *buf)
 {
-	const char *arg;
-	const char *cmd;
-	int err;
+	const char *str;
 
-	if (!(cmd = irc_strsep(&buf)))
+	if (!(str = irc_strsep(&buf)))
 		return;
 
-	if (!strcasecmp(cmd, "clear")) {
-		if ((arg = irc_strsep(&buf))) {
-			action(action_error, "clear: Unknown arg '%s'", arg);
+	if (!strcasecmp(str, "clear")) {
+		if ((str = irc_strsep(&buf))) {
+			action(action_error, "clear: Unknown arg '%s'", str);
 			return;
 		}
 		state_channel_clear(0);
 		return;
 	}
 
-	if (!strcasecmp(cmd, "close")) {
-		if ((arg = irc_strsep(&buf))) {
-			action(action_error, "close: Unknown arg '%s'", arg);
+	if (!strcasecmp(str, "close")) {
+		if ((str = irc_strsep(&buf))) {
+			action(action_error, "close: Unknown arg '%s'", str);
 			return;
 		}
 		state_channel_close(0);
 		return;
 	}
 
-	if (!strcasecmp(cmd, "connect")) {
-		if (!c->server) {
-			action(action_error, "connect: This is not a server");
-			return;
-		}
+	/* :connect [hostname [options]] */
+	if (!strcasecmp(str, "connect")) {
 
-		if ((arg = irc_strsep(&buf))) {
-			action(action_error, "connect: Unknown arg '%s'", arg);
-			return;
-		}
+		if (!(str = irc_strsep(&buf))) {
 
-		if ((err = io_cx(c->server->connection)))
-			action(action_error, "connect: %s", io_err(err));
+			int err;
+
+			if (!c->server) {
+				action(action_error, "connect: This is not a server");
+			} else if ((err = io_cx(c->server->connection))) {
+				action(action_error, "connect: %s", io_err(err));
+			}
+
+		} else {
+
+			int ret;
+			struct server *s;
+
+			const char *host     = str;
+			const char *port     = NULL;
+			const char *pass     = NULL;
+			const char *username = default_username;
+			const char *realname = default_realname;
+			const char *nicks    = default_nicks;
+			const char *chans    = NULL;
+			int ipv      = IO_IPV_UNSPEC;
+			int tls      = IO_TLS_ENABLED;
+			int tls_vrfy = IO_TLS_VRFY_REQUIRED;
+
+			while ((str = irc_strsep(&buf))) {
+
+				if (*str != '-') {
+					action(action_error, ":connect [hostname [options]]");
+					return;
+				} else if (!strcmp(str, "-p") || !strcmp(str, "--port")) {
+					if (!(port = irc_strsep(&buf))) {
+						action(action_error, "connect: '-p/--port' requires an argument");
+						return;
+					}
+				} else if (!strcmp(str, "-w") || !strcmp(str, "--pass")) {
+					if (!(pass = irc_strsep(&buf))) {
+						action(action_error, "connect: '-w/--pass' requires an argument");
+						return;
+					}
+				} else if (!strcmp(str, "-u") || !strcmp(str, "--username")) {
+					if (!(username = irc_strsep(&buf))) {
+						action(action_error, "connect: '-u/--username' requires an argument");
+						return;
+					}
+				} else if (!strcmp(str, "-r") || !strcmp(str, "--realname")) {
+					if (!(realname = irc_strsep(&buf))) {
+						action(action_error, "connect: '-r/--realname' requires an argument");
+						return;
+					}
+				} else if (!strcmp(str, "-n") || !strcmp(str, "--nicks")) {
+					if (!(nicks = irc_strsep(&buf))) {
+						action(action_error, "connect: '-n/--nicks' requires an argument");
+						return;
+					}
+				} else if (!strcmp(str, "-c") || !strcmp(str, "--chans")) {
+					if (!(chans = irc_strsep(&buf))) {
+						action(action_error, "connect: '-c/--chans' requires an argument");
+						return;
+					}
+				} else if (!strcmp(str, "--ipv4")) {
+					ipv = IO_IPV_4;
+				} else if (!strcmp(str, "--ipv6")) {
+					ipv = IO_IPV_6;
+				} else if (!strcmp(str, "--tls-disable")) {
+					tls = IO_TLS_DISABLED;
+				} else if (!strcmp(str, "--tls-verify")) {
+					if (!(str = irc_strsep(&buf))) {
+						action(action_error, "connect: '--tls-verify' requires an argument");
+						return;
+					} else if (!strcmp(str, "0") || !strcmp(str, "disabled")) {
+						tls_vrfy = IO_TLS_VRFY_DISABLED;
+					} else if (!strcmp(str, "1") || !strcmp(str, "optional")) {
+						tls_vrfy = IO_TLS_VRFY_OPTIONAL;
+					} else if (!strcmp(str, "2") || !strcmp(str, "required")) {
+						tls_vrfy = IO_TLS_VRFY_REQUIRED;
+					} else {
+						action(action_error, "connect: invalid option for '--tls-verify' '%s'", str);
+						return;
+					}
+				} else {
+					action(action_error, "connect: unknown option '%s'", str);
+					return;
+				}
+			}
+
+			if (port == NULL)
+				port = (tls == IO_TLS_ENABLED) ? "6697" : "6667";
+
+			s = server(host, port, pass, username, realname);
+
+			if (nicks && server_set_nicks(s, nicks)) {
+				action(action_error, "connect: invalid -n/--nicks: '%s'", nicks);
+				server_free(s);
+				return;
+			}
+
+			if (chans && server_set_chans(s, chans)) {
+				action(action_error, "connect: invalid -c/--chans: '%s'", chans);
+				server_free(s);
+				return;
+			}
+
+			if (server_list_add(state_server_list(), s)) {
+				action(action_error, "connect: duplicate server: %s:%s", host, port);
+				server_free(s);
+				return;
+			}
+
+			s->connection = connection(s, host, port, (ipv | tls | tls_vrfy));
+
+			if ((ret = io_cx(s->connection)))
+				server_error(s, "failed to connect: %s", io_err(ret));
+
+			channel_set_current(s->channel);
+		}
 
 		return;
 	}
 
-	if (!strcasecmp(cmd, "disconnect")) {
+	if (!strcasecmp(str, "disconnect")) {
+
+		int err;
+
 		if (!c->server) {
 			action(action_error, "disconnect: This is not a server");
 			return;
 		}
 
-		if ((arg = irc_strsep(&buf))) {
-			action(action_error, "disconnect: Unknown arg '%s'", arg);
+		if ((str = irc_strsep(&buf))) {
+			action(action_error, "disconnect: Unknown arg '%s'", str);
 			return;
 		}
 
@@ -648,9 +756,9 @@ command(struct channel *c, char *buf)
 		return;
 	}
 
-	if (!strcasecmp(cmd, "quit")) {
-		if ((arg = irc_strsep(&buf))) {
-			action(action_error, "quit: Unknown arg '%s'", arg);
+	if (!strcasecmp(str, "quit")) {
+		if ((str = irc_strsep(&buf))) {
+			action(action_error, "quit: Unknown arg '%s'", str);
 			return;
 		}
 
@@ -658,7 +766,7 @@ command(struct channel *c, char *buf)
 		return;
 	}
 
-	action(action_error, "Unknown command '%s'", cmd);
+	action(action_error, "Unknown command '%s'", str);
 }
 
 static int
