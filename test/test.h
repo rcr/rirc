@@ -133,13 +133,15 @@
 
 #define assert_fatal(X) \
 	do { \
+		_tc_assert_fatal_ = 1; \
 		if (setjmp(_tc_fatal_expected_)) { \
-			_tc_assert_fatal_ = 1; \
-			(X); \
-			if (_tc_assert_fatal_) \
-				test_fail("'"#X "' should have exited fatally"); \
 			_tc_assert_fatal_ = 0; \
+		} else { \
+			(X); \
 		} \
+		if (_tc_assert_fatal_) \
+			test_fail("'" #X "' should have exited fatally"); \
+		_tc_assert_fatal_ = 0; \
 	} while (0)
 
 /* Precludes the definition in utils.h
@@ -268,9 +270,8 @@ _run_tests_(
 			_print_testcase_name_(tc->tc_str);
 			printf("    Unexpected fatal error:\n");
 			printf("    %s %s\n", _tc_errbuf_1_, _tc_errbuf_2_);
-			printf("    -- Testcase aborted --\n"); \
-			_tc_failures_++;
-			continue;
+			printf("    -- Tests aborted --\n"); \
+			return EXIT_FAILURE;
 		}
 
 		if (tc_init && (*tc_init)()) {
@@ -290,13 +291,13 @@ _run_tests_(
 		}
 
 		if (_tc_failures_)
-			printf("      %u failure%s\n", _tc_failures_, (_tc_failures_ ? "s" : ""));
+			printf("      failures: %u\n", _tc_failures_);
 
 		_tc_failures_t_ += _tc_failures_;
 	}
 
 	if (_tc_failures_t_) {
-		printf("  %u failure%s total\n", _tc_failures_t_, (_tc_failures_t_ ? "s" : ""));
+		printf("  failures total: %u\n", _tc_failures_t_);
 		return EXIT_FAILURE;
 	}
 
