@@ -68,6 +68,7 @@ Server options:
   -w, --pass=PASS           Connect to SERVER using PASS
   -u, --username=USERNAME   Connect to SERVER using USERNAME
   -r, --realname=REALNAME   Connect to SERVER using REALNAME
+  -m, --mode=MODE           Connect to SERVER with user MODE
   -n, --nicks=NICKS         Comma separated list of nicks to use for SERVER
   -c, --chans=CHANNELS      Comma separated list of channels to join for SERVER
 

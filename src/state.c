@@ -635,6 +635,7 @@ command(struct channel *c, char *buf)
 			const char *pass     = NULL;
 			const char *username = default_username;
 			const char *realname = default_realname;
+			const char *mode     = NULL;
 			const char *nicks    = default_nicks;
 			const char *chans    = NULL;
 			int ipv      = IO_IPV_UNSPEC;
@@ -664,6 +665,11 @@ command(struct channel *c, char *buf)
 				} else if (!strcmp(str, "-r") || !strcmp(str, "--realname")) {
 					if (!(realname = irc_strsep(&buf))) {
 						action(action_error, "connect: '-r/--realname' requires an argument");
+						return;
+					}
+				} else if (!strcmp(str, "-m") || !strcmp(str, "--mode")) {
+					if (!(mode = irc_strsep(&buf))) {
+						action(action_error, "connect: '-m/--mode' requires an argument");
 						return;
 					}
 				} else if (!strcmp(str, "-n") || !strcmp(str, "--nicks")) {
@@ -705,7 +711,7 @@ command(struct channel *c, char *buf)
 			if (port == NULL)
 				port = (tls == IO_TLS_ENABLED) ? "6697" : "6667";
 
-			s = server(host, port, pass, username, realname);
+			s = server(host, port, pass, username, realname, mode);
 
 			if (nicks && server_set_nicks(s, nicks)) {
 				action(action_error, "connect: invalid -n/--nicks: '%s'", nicks);
@@ -971,7 +977,7 @@ io_cb_cxed(const void *cb_obj)
 	if ((ret = io_sendf(s->connection, "NICK %s", s->nick)))
 		newlinef(s->channel, 0, FROM_ERROR, "sendf fail: %s", io_err(ret));
 
-	if ((ret = io_sendf(s->connection, "USER %s 8 * :%s", s->username, s->realname)))
+	if ((ret = io_sendf(s->connection, "USER %s 0 * :%s", s->username, s->realname)))
 		newlinef(s->channel, 0, FROM_ERROR, "sendf fail: %s", io_err(ret));
 
 	draw(DRAW_STATUS);

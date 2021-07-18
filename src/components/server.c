@@ -28,18 +28,27 @@ HANDLED_005
 #undef X
 
 struct server*
-server(const char *host, const char *port, const char *pass, const char *user, const char *real)
+server(
+	const char *host,
+	const char *port,
+	const char *pass,
+	const char *username,
+	const char *realname,
+	const char *mode)
 {
 	struct server *s;
 
 	if ((s = calloc(1, sizeof(*s))) == NULL)
 		fatal("calloc: %s", strerror(errno));
 
-	s->host = strdup(host);
-	s->port = strdup(port);
-	s->pass = pass ? strdup(pass) : NULL;
-	s->username = strdup(user);
-	s->realname = strdup(real);
+	s->host     = strdup(host);
+	s->port     = strdup(port);
+	s->username = strdup(username);
+	s->realname = strdup(realname);
+
+	s->pass = (pass ? strdup(pass) : NULL);
+	s->mode = (mode ? strdup(mode) : NULL);
+
 	s->casemapping = CASEMAPPING_RFC1459;
 	s->mode_str.type = MODE_STR_USERMODE;
 	ircv3_caps(&(s->ircv3_caps));
@@ -149,6 +158,7 @@ server_free(struct server *s)
 	free((void *)s->pass);
 	free((void *)s->username);
 	free((void *)s->realname);
+	free((void *)s->mode);
 	free((void *)s->nick);
 	free((void *)s->nicks.base);
 	free((void *)s->nicks.set);

@@ -598,7 +598,7 @@ test_ircv3_cap_req_send(void)
 static int
 test_init(void)
 {
-	if (!(s = server("host", "post", NULL, "user", "real")))
+	if (!(s = server("host", "post", NULL, "user", "real", NULL)))
 		return -1;
 
 	return 0;

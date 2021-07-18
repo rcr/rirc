@@ -17,6 +17,7 @@ struct server
 	const char *username;
 	const char *realname;
 	const char *nick;
+	const char *mode;
 	enum casemapping casemapping;
 	struct {
 		size_t next;
@@ -58,7 +59,8 @@ struct server* server(
 	const char*,  /* port */
 	const char*,  /* pass */
 	const char*,  /* username */
-	const char*); /* realname */
+	const char*,  /* realname */
+	const char*); /* mode */
 
 struct server* server_list_add(struct server_list*, struct server*);
 struct server* server_list_del(struct server_list*, struct server*);

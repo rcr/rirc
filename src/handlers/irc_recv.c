@@ -313,15 +313,18 @@ irc_numeric_001(struct server *s, struct irc_message *m)
 
 	s->registered = 1;
 
-	do {
-		if (c->type == CHANNEL_T_CHANNEL && !c->parted)
-			sendf(s, "JOIN %s", c->name);
-	} while ((c = c->next) != s->channel);
-
 	if (irc_message_split(m, &params, &trailing))
 		newlinef(s->channel, 0, FROM_INFO, "%s", trailing);
 
 	server_info(s, "You are known as %s", s->nick);
+
+	if (s->mode)
+		sendf(s, "MODE %s +%s", s->nick, s->mode);
+
+	do {
+		if (c->type == CHANNEL_T_CHANNEL && !c->parted)
+			sendf(s, "JOIN %s", c->name);
+	} while ((c = c->next) != s->channel);
 
 	return 0;
 }

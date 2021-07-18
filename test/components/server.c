@@ -44,13 +44,13 @@ test_server_list(void)
 
 	memset(&servers, 0, sizeof(servers));
 
-	s1 = server("host1", "port1", NULL, "", "");
-	s2 = server("host1", "port1", "foo1", "", ""); /* duplicate host, port (s1) */
-	s3 = server("host1", "port2", "foo2", "", ""); /* duplicate host (s1), different port */
-	s4 = server("host2", "port1", "foo3", "", ""); /* duplicate port (s1), different host */
-	s5 = server("host2", "port2", NULL, "", "");   /* duplicate host (s4), duplicate port (s3) */
-	s6 = server("host1", "port2", NULL, "", "");   /* duplicate host, port (s4) */
-	s7 = server("host2", "port1", NULL, "", "");   /* duplicate host, port (s5) */
+	s1 = server("host1", "port1",   NULL, "real", "user", "abc");
+	s2 = server("host1", "port1", "foo1", "real", "user", "abc"); /* duplicate host, port (s1) */
+	s3 = server("host1", "port2", "foo2", "real", "user", "abc"); /* duplicate host (s1), different port */
+	s4 = server("host2", "port1", "foo3", "real", "user", NULL);  /* duplicate port (s1), different host */
+	s5 = server("host2", "port2",   NULL, "real", "user", NULL);  /* duplicate host (s4), duplicate port (s3) */
+	s6 = server("host1", "port2",   NULL, "real", "user", NULL);  /* duplicate host, port (s4) */
+	s7 = server("host2", "port1",   NULL, "real", "user", NULL);  /* duplicate host, port (s5) */
 
 	/* Test add */
 	assert_ptr_eq(server_list_add(&servers, s1), NULL);
@@ -117,7 +117,7 @@ test_server_set_chans(void)
 	struct channel *c;
 	struct server *s;
 
-	s = server("host1", "port", NULL, "", "");
+	s = server("host1", "port", NULL, "real", "user", NULL);
 	assert_eq(s->clist.count, 1);
 
 	/* empty values, invalid formats */
@@ -162,7 +162,7 @@ test_server_set_chans(void)
 static void
 test_server_set_nicks(void)
 {
-	struct server *s = server("host", "port", NULL, "", "");
+	struct server *s = server("host", "port", NULL, "real", "user", NULL);
 
 	server_nicks_next(s);
 	assert_strncmp(s->nick, "rirc", 4);

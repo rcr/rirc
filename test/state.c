@@ -77,8 +77,8 @@ test_command_close(void)
 	c3 = channel("#c3", CHANNEL_T_CHANNEL);
 	c4 = channel("#c4", CHANNEL_T_CHANNEL);
 	c5 = channel("#c5", CHANNEL_T_CHANNEL);
-	s1 = server("host1", "port1", NULL, "user1", "real1");
-	s2 = server("host2", "port2", NULL, "user2", "real2");
+	s1 = server("host1", "port1", NULL, "user1", "real1", NULL);
+	s2 = server("host2", "port2", NULL, "user2", "real2", NULL);
 
 	if (!s1 || !s2 || !c1 || !c2 || !c3 || !c4 || !c5)
 		test_abort("Failed to create servers and channels");
@@ -211,6 +211,16 @@ test_command_connect(void)
 	assert_strcmp(current_channel()->name, "host-1");
 	INP_C(0x0A);
 
+	INP_COMMAND(":connect host -m");
+	assert_strcmp(action_message(), "connect: '-m/--mode' requires an argument");
+	assert_strcmp(current_channel()->name, "host-1");
+	INP_C(0x0A);
+
+	INP_COMMAND(":connect host --mode");
+	assert_strcmp(action_message(), "connect: '-m/--mode' requires an argument");
+	assert_strcmp(current_channel()->name, "host-1");
+	INP_C(0x0A);
+
 	INP_COMMAND(":connect host -n");
 	assert_strcmp(action_message(), "connect: '-n/--nicks' requires an argument");
 	assert_strcmp(current_channel()->name, "host-1");
@@ -274,8 +284,10 @@ test_command_connect(void)
 
 	assert_strcmp(s->host, "host-2");
 	assert_strcmp(s->port, "6697");
+	assert_ptr_null(s->pass);
 	assert_strcmp(s->username, "username");
 	assert_strcmp(s->realname, "realname");
+	assert_ptr_null(s->mode);
 	assert_strcmp(s->nicks.set[0], "n1");
 	assert_strcmp(s->nicks.set[1], "n2");
 	assert_strcmp(s->nicks.set[2], "n3");
@@ -286,6 +298,7 @@ test_command_connect(void)
 		" --pass abcdef"
 		" --username xxx"
 		" --realname yyy"
+		" --mode zzz"
 		" --nicks x0,y1,z2"
 		" --chans #a1,b2,#c3"
 		" --ipv4"
@@ -303,8 +316,10 @@ test_command_connect(void)
 
 	assert_strcmp(s->host, "host-3");
 	assert_strcmp(s->port, "1234");
+	assert_strcmp(s->pass, "abcdef");
 	assert_strcmp(s->username, "xxx");
 	assert_strcmp(s->realname, "yyy");
+	assert_strcmp(s->mode, "zzz");
 	assert_strcmp(s->nicks.set[0], "x0");
 	assert_strcmp(s->nicks.set[1], "y1");
 	assert_strcmp(s->nicks.set[2], "z2");
@@ -330,7 +345,7 @@ test_command_disconnect(void)
 	/* clear error */
 	INP_C(0x0A);
 
-	if (!(s = server("host", "port", NULL, "user", "real")))
+	if (!(s = server("host", "port", NULL, "user", "real", NULL)))
 		test_abort("Failed test setup");
 
 	if (server_list_add(state_server_list(), s))
@@ -422,9 +437,9 @@ test_state(void)
 	assert_ptr_null(buffer_head(&current_channel()->buffer));
 
 	/* Test adding servers */
-	struct server *s1 = server("h1", "p1", NULL, "u1", "r1");
-	struct server *s2 = server("h2", "p2", NULL, "u2", "r2");
-	struct server *s3 = server("h3", "p3", NULL, "u3", "r3");
+	struct server *s1 = server("h1", "p1", NULL, "u1", "r1", NULL);
+	struct server *s2 = server("h2", "p2", NULL, "u2", "r2", NULL);
+	struct server *s3 = server("h3", "p3", NULL, "u3", "r3", NULL);
 
 	assert_ptr_eq(server_list_add(state_server_list(), s1), NULL);
 	assert_ptr_eq(server_list_add(state_server_list(), s2), NULL);

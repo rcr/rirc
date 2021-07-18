@@ -71,6 +71,7 @@ static const char *const rirc_help =
 "\n  -w, --pass=PASS           Connect to SERVER using PASS"
 "\n  -u, --username=USERNAME   Connect to SERVER using USERNAME"
 "\n  -r, --realname=REALNAME   Connect to SERVER using REALNAME"
+"\n  -m, --mode=MODE           Connect to SERVER with user MODE"
 "\n  -n, --nicks=NICKS         Comma separated list of nicks to use for SERVER"
 "\n  -c, --chans=CHANNELS      Comma separated list of channels to join for SERVER"
 "\n"
@@ -99,6 +100,7 @@ rirc_opt_str(char c)
 		case 'c': return "-c/--chans";
 		case 'u': return "-u/--username";
 		case 'r': return "-r/--realname";
+		case 'm': return "-m/--mode";
 		case '4': return "--ipv4";
 		case '6': return "--ipv6";
 		case 'x': return "--tls-disable";
@@ -136,6 +138,7 @@ rirc_parse_args(int argc, char **argv)
 		const char *pass;
 		const char *username;
 		const char *realname;
+		const char *mode;
 		const char *nicks;
 		const char *chans;
 		int ipv;
@@ -150,6 +153,7 @@ rirc_parse_args(int argc, char **argv)
 		{"pass",        required_argument, 0, 'w'},
 		{"username",    required_argument, 0, 'u'},
 		{"realname",    required_argument, 0, 'r'},
+		{"mode",        required_argument, 0, 'm'},
 		{"nicks",       required_argument, 0, 'n'},
 		{"chans",       required_argument, 0, 'c'},
 		{"help",        no_argument,       0, 'h'},
@@ -163,7 +167,7 @@ rirc_parse_args(int argc, char **argv)
 
 	opterr = 0;
 
-	while (0 < (opt_c = getopt_long(argc, argv, ":s:p:w:r:u:n:c:hv", long_opts, &opt_i))) {
+	while (0 < (opt_c = getopt_long(argc, argv, ":s:p:w:u:r:m:n:c:hv", long_opts, &opt_i))) {
 
 		switch (opt_c) {
 
@@ -184,6 +188,7 @@ rirc_parse_args(int argc, char **argv)
 				cli_servers[n_servers - 1].pass     = NULL;
 				cli_servers[n_servers - 1].username = default_username;
 				cli_servers[n_servers - 1].realname = default_realname;
+				cli_servers[n_servers - 1].mode     = NULL;
 				cli_servers[n_servers - 1].nicks    = default_nicks;
 				cli_servers[n_servers - 1].chans    = NULL;
 				cli_servers[n_servers - 1].ipv      = IO_IPV_UNSPEC;
@@ -219,6 +224,11 @@ rirc_parse_args(int argc, char **argv)
 			case 'r': /* Connect using realname */
 				CHECK_SERVER_OPTARG(opt_c, 1);
 				cli_servers[n_servers - 1].realname = optarg;
+				break;
+
+			case 'm': /* Connect with user mode */
+				CHECK_SERVER_OPTARG(opt_c, 1);
+				cli_servers[n_servers - 1].mode = optarg;
 				break;
 
 			case 'n': /* Comma separated list of nicks to use */
@@ -307,7 +317,8 @@ rirc_parse_args(int argc, char **argv)
 			cli_servers[i].port,
 			cli_servers[i].pass,
 			cli_servers[i].username,
-			cli_servers[i].realname
+			cli_servers[i].realname,
+			cli_servers[i].mode
 		);
 
 		cli_servers[i].s->connection = connection(
