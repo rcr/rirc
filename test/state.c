@@ -246,6 +246,11 @@ test_command_connect(void)
 	assert_strcmp(current_channel()->name, "host-1");
 	INP_C(0x0A);
 
+	INP_COMMAND(":connect host --tls-cert-ca");
+	assert_strcmp(action_message(), "connect: '--tls-cert-ca' requires an argument");
+	assert_strcmp(current_channel()->name, "host-1");
+	INP_C(0x0A);
+
 	/* Test invalid arguments */
 	INP_COMMAND(":connect host xyz");
 	assert_strcmp(action_message(), ":connect [hostname [options]]");
@@ -310,6 +315,7 @@ test_command_connect(void)
 		" --tls-verify disabled"
 		" --tls-verify optional"
 		" --tls-verify required"
+		" --tls-cert-ca path"
 	);
 
 	s = current_channel()->server;

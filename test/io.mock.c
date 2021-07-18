@@ -37,11 +37,12 @@ io_sendf(struct connection *c, const char *fmt, ...)
 }
 
 struct connection*
-connection(const void *o, const char *h, const char *p, uint32_t f)
+connection(const void *o, const char *h, const char *p, const char *ca, uint32_t f)
 {
 	UNUSED(o);
 	UNUSED(h);
 	UNUSED(p);
+	UNUSED(ca);
 	UNUSED(f);
 	return NULL;
 }

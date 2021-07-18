@@ -630,14 +630,15 @@ command(struct channel *c, char *buf)
 			int ret;
 			struct server *s;
 
-			const char *host     = str;
-			const char *port     = NULL;
-			const char *pass     = NULL;
-			const char *username = default_username;
-			const char *realname = default_realname;
-			const char *mode     = NULL;
-			const char *nicks    = default_nicks;
-			const char *chans    = NULL;
+			const char *host        = str;
+			const char *port        = NULL;
+			const char *pass        = NULL;
+			const char *username    = default_username;
+			const char *realname    = default_realname;
+			const char *mode        = NULL;
+			const char *nicks       = default_nicks;
+			const char *chans       = NULL;
+			const char *tls_cert_ca = NULL;
 			int ipv      = IO_IPV_UNSPEC;
 			int tls      = IO_TLS_ENABLED;
 			int tls_vrfy = IO_TLS_VRFY_REQUIRED;
@@ -702,6 +703,11 @@ command(struct channel *c, char *buf)
 						action(action_error, "connect: invalid option for '--tls-verify' '%s'", str);
 						return;
 					}
+				} else if (!strcmp(str, "--tls-cert-ca")) {
+					if (!(tls_cert_ca = irc_strsep(&buf))) {
+						action(action_error, "connect: '--tls-cert-ca' requires an argument");
+						return;
+					}
 				} else {
 					action(action_error, "connect: unknown option '%s'", str);
 					return;
@@ -731,7 +737,7 @@ command(struct channel *c, char *buf)
 				return;
 			}
 
-			s->connection = connection(s, host, port, (ipv | tls | tls_vrfy));
+			s->connection = connection(s, host, port, tls_cert_ca, (ipv | tls | tls_vrfy));
 
 			if ((ret = io_cx(s->connection)))
 				server_error(s, "failed to connect: %s", io_err(ret));

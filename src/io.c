@@ -105,6 +105,7 @@ struct connection
 	const void *obj;
 	const char *host;
 	const char *port;
+	const char *tls_cert_ca;
 	enum io_state {
 		IO_ST_INVALID,
 		IO_ST_DXED, /* Socket disconnected, passive */
@@ -164,7 +165,12 @@ const char *ca_cert_paths[] = {
 };
 
 struct connection*
-connection(const void *obj, const char *host, const char *port, uint32_t flags)
+connection(
+	const void *obj,
+	const char *host,
+	const char *port,
+	const char *tls_cert_ca,
+	uint32_t flags)
 {
 	struct connection *cx;
 
@@ -175,6 +181,7 @@ connection(const void *obj, const char *host, const char *port, uint32_t flags)
 	cx->flags = flags;
 	cx->host = strdup(host);
 	cx->port = strdup(port);
+	cx->tls_cert_ca = (tls_cert_ca ? strdup(tls_cert_ca) : NULL);
 	cx->st_cur = IO_ST_DXED;
 	cx->st_new = IO_ST_INVALID;
 	PT_CF(pthread_mutex_init(&(cx->mtx), NULL));
@@ -188,6 +195,7 @@ connection_free(struct connection *cx)
 	PT_CF(pthread_mutex_destroy(&(cx->mtx)));
 	free((void*)cx->host);
 	free((void*)cx->port);
+	free((void*)cx->tls_cert_ca);
 	free(cx);
 }
 
@@ -820,7 +828,14 @@ io_tls_establish(struct connection *cx)
 		goto err;
 	}
 
-	if (ca_cert_path && *ca_cert_path) {
+	if (cx->tls_cert_ca) {
+
+		if ((ret = mbedtls_x509_crt_parse_file(&(cx->tls_x509_crt), cx->tls_cert_ca)) < 0) {
+			io_error(cx, "  .. Failed to load ca cert: '%s': %s", cx->tls_cert_ca, io_tls_err(ret));
+			goto err;
+		}
+
+	} else if (ca_cert_path && *ca_cert_path) {
 
 		if ((ret = mbedtls_x509_crt_parse_file(&(cx->tls_x509_crt), ca_cert_path)) < 0) {
 			io_error(cx, "  .. Failed to load ca cert: '%s': %s", ca_cert_path, io_tls_err(ret));
