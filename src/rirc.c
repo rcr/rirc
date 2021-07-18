@@ -79,7 +79,7 @@ static const char *const rirc_help =
 "\n   --ipv4                   Connect to server using only ipv4 addresses"
 "\n   --ipv6                   Connect to server using only ipv6 addresses"
 "\n   --tls-disable            Set server TLS disabled"
-"\n   --tls-verify=<mode>      Set server TLS peer certificate verification mode"
+"\n   --tls-verify=MODE        Set server TLS peer certificate verification mode"
 "\n";
 
 static const char *const rirc_version =

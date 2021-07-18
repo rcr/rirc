@@ -37,16 +37,22 @@ Building rirc from source requires a c11 compiler, GNU gperf and GNU make.
  - https://www.gnu.org/software/gperf/
  - https://www.gnu.org/software/make/
 
+The build toolchain and install paths can be configured via standard
+environment variables, i.e.:
+```
+CC, CFLAGS, LDFLAGS, DESTDIR, PREFIX
+```
+
+Default install paths:
+```
+/usr/local/bin/rirc
+/usr/local/share/man/man1/rirc.1
+```
+
+Building, installing:
 ```
 make
 make install
-```
-
-The build toolchain and install paths can be configured via standard
-environment variables, i.e.:
-
-```
-CC, CFLAGS, LDFLAGS, DESTDIR, PREFIX
 ```
 
 ## Configuring:
@@ -76,7 +82,7 @@ Server connection options:
    --ipv4                   Connect to server using only ipv4 addresses
    --ipv6                   Connect to server using only ipv6 addresses
    --tls-disable            Set server TLS disabled
-   --tls-verify=<mode>      Set server TLS peer certificate verification mode
+   --tls-verify=MODE        Set server TLS peer certificate verification mode
 ```
 
 Commands:
