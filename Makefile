@@ -22,10 +22,10 @@ CFLAGS += -DNDEBUG
 
 CFLAGS_DEBUG += -O0 -g3 -Wall -Wextra -Werror
 
-LDFLAGS_RIRC := -lpthread
-
 LDFLAGS ?= -flto
-LDFLAGS += $(LDFLAGS_RIRC)
+LDFLAGS += -lpthread
+
+LDFLAGS_DEBUG += -lpthread
 
 SRC       := $(shell find $(PATH_SRC) -name '*.c' | sort)
 SRC_GPERF := $(patsubst %, %.out, $(shell find $(PATH_SRC) -name '*.gperf'))
@@ -38,11 +38,11 @@ OBJS_T += $(PATH_BUILD)/utils/tree.t # Header only file
 
 rirc: $(RIRC_LIBS) $(SRC_GPERF) $(OBJS_R)
 	@echo "$(CC) $(LDFLAGS) $@"
-	@$(CC) $(LDFLAGS) $(LDFLAGS_RIRC) -o $@ $(OBJS_R) $(RIRC_LIBS)
+	@$(CC) $(LDFLAGS) -o $@ $(OBJS_R) $(RIRC_LIBS)
 
 rirc.debug: $(RIRC_LIBS) $(SRC_GPERF) $(OBJS_D)
 	@echo "$(CC) $(LDFLAGS_DEBUG) $@"
-	@$(CC) $(LDFLAGS_DEBUG) $(LDFLAGS_RIRC) -o $@ $(OBJS_D) $(RIRC_LIBS)
+	@$(CC) $(LDFLAGS_DEBUG) -o $@ $(OBJS_D) $(RIRC_LIBS)
 
 $(PATH_BUILD)/%.o: $(PATH_SRC)/%.c $(CONFIG) | $(PATH_BUILD)
 	@echo "$(CC) $(CFLAGS) $<"
