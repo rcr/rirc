@@ -13,14 +13,15 @@ include lib/mbedtls.Makefile
 
 CONFIG := config.h
 
-CFLAGS ?= -O2 -flto
-CFLAGS += -DNDEBUG
-
-CFLAGS_DEBUG += -O0 -g3 -Wall -Wextra -Werror
-
 CLFAGS_RIRC += -std=c11 -I. -DVERSION=\"$(VERSION)\"
 CLFAGS_RIRC += -D_POSIX_C_SOURCE=200809L
 CLFAGS_RIRC += -D_DARWIN_C_SOURCE
+
+CFLAGS ?= -O2 -flto
+CFLAGS += -DNDEBUG
+
+CFLAGS_DEBUG ?=
+CFLAGS_DEBUG += -O0 -g3 -Wall -Wextra -Werror
 
 LDFLAGS_RIRC += -lpthread
 

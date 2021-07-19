@@ -9,7 +9,8 @@
 set -e
 
 export CC=clang
-export LDFLAGS="-fuse-ld=lld"
+export LDFLAGS="-flto -fuse-ld=lld"
+export LDFLAGS_DEBUG="-fuse-ld=lld"
 
 if [ -x "$(command -v entr)" ]; then
 	ENTR="entr -c"
