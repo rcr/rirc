@@ -3,7 +3,8 @@
 
 /* Default config values obtained at runtime */
 
-extern const char *ca_cert_path;
+extern const char *default_ca_file;
+extern const char *default_ca_path;
 extern const char *default_nicks;
 extern const char *default_username;
 extern const char *default_realname;

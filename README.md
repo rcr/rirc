@@ -82,9 +82,10 @@ Server connection options:
    --ipv4                   Connect to server using only ipv4 addresses
    --ipv6                   Connect to server using only ipv6 addresses
    --tls-disable            Set server TLS disabled
+   --tls-ca-file=PATH       Set server TLS CA cert file path
+   --tls-ca-path=PATH       Set server TLS CA cert directory path
+   --tls-cert=PATH          Set server TLS client cert file path
    --tls-verify=MODE        Set server TLS peer certificate verification mode
-   --tls-cert-ca=PATH       Set server TLS ca cert file path
-   --tls-cert-client=PATH   Set server TLS client cert file path
 ```
 
 Commands:

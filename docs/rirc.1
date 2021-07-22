@@ -52,6 +52,15 @@ Connect to \fIserver\fP using only ipv6 addresses
 .B --tls-disable
 Set \fIserver\fP TLS disabled, default port to 6667
 .TP
+.BI --tls-ca-file= path
+Set \fIserver\fP TLS CA cert file \fIpath\fP
+.TP
+.BI --tls-ca-path= path
+Set \fIserver\fP TLS CA cert directory \fIpath\fP
+.TP
+.BI --tls-cert= path
+Set \fIserver\fP TLS client cert file \fIpath\fP
+.TP
 .BI --tls-verify= mode
 Set \fIserver\fP TLS peer certificate verification \fImode\fP:
 .EX
@@ -59,12 +68,6 @@ Set \fIserver\fP TLS peer certificate verification \fImode\fP:
 \(bu \fIoptional\fP - cert is verified, handshake continues on error
 \(bu \fIrequired\fP - cert is verified, handshake is aborted on error (default)
 .EE
-.TP
-.BI --tls-cert-ca= path
-Set \fIserver\fP TLS ca cert file \fIpath\fP
-.TP
-.BI --tls-cert-client= path
-Set \fIserver\fP TLS client cert file \fIpath\fP
 .SH USAGE
 .TS
 l .

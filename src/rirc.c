@@ -25,10 +25,16 @@ static const char* rirc_opt_str(char);
 static const char* rirc_pw_name(void);
 static int rirc_parse_args(int, char**);
 
-#ifdef CA_CERT_PATH
-const char *ca_cert_path = CA_CERT_PATH;
+#ifdef CA_CERT_FILE
+const char *default_ca_file = CA_CERT_FILE;
 #else
-const char *ca_cert_path;
+const char *default_ca_file;
+#endif
+
+#ifdef CA_CERT_PATH
+const char *default_ca_path = CA_CERT_PATH;
+#else
+const char *default_ca_path;
 #endif
 
 #ifdef DEFAULT_NICKS
@@ -79,9 +85,10 @@ static const char *const rirc_help =
 "\n   --ipv4                   Connect to server using only ipv4 addresses"
 "\n   --ipv6                   Connect to server using only ipv6 addresses"
 "\n   --tls-disable            Set server TLS disabled"
+"\n   --tls-ca-file=PATH       Set server TLS CA cert file path"
+"\n   --tls-ca-path=PATH       Set server TLS CA cert directory path"
+"\n   --tls-cert=PATH          Set server TLS client cert file path"
 "\n   --tls-verify=MODE        Set server TLS peer certificate verification mode"
-"\n   --tls-cert-ca=PATH       Set server TLS ca cert file path"
-"\n   --tls-cert-client=PATH   Set server TLS client cert file path"
 "\n";
 
 static const char *const rirc_version =
@@ -103,12 +110,13 @@ rirc_opt_str(char c)
 		case 'u': return "-u/--username";
 		case 'r': return "-r/--realname";
 		case 'm': return "-m/--mode";
-		case '4': return "--ipv4";
-		case '6': return "--ipv6";
-		case 'x': return "--tls-disable";
-		case 'y': return "--tls-verify";
-		case 'z': return "--tls-cert-ca";
-		case '0': return "--tls-cert-client";
+		case '0': return "--ipv4";
+		case '1': return "--ipv6";
+		case '2': return "--tls-disable";
+		case '3': return "--tls-ca-file";
+		case '4': return "--tls-ca-path";
+		case '5': return "--tls-cert";
+		case '6': return "--tls-verify";
 		default:
 			fatal("unknown option flag '%c'", c);
 	}
@@ -145,8 +153,9 @@ rirc_parse_args(int argc, char **argv)
 		const char *mode;
 		const char *nicks;
 		const char *chans;
-		const char *tls_cert_ca;
-		const char *tls_cert_client;
+		const char *tls_ca_file;
+		const char *tls_ca_path;
+		const char *tls_cert;
 		int ipv;
 		int tls;
 		int tls_vrfy;
@@ -154,22 +163,23 @@ rirc_parse_args(int argc, char **argv)
 	} cli_servers[MAX_CLI_SERVERS];
 
 	struct option long_opts[] = {
-		{"server",          required_argument, 0, 's'},
-		{"port",            required_argument, 0, 'p'},
-		{"pass",            required_argument, 0, 'w'},
-		{"username",        required_argument, 0, 'u'},
-		{"realname",        required_argument, 0, 'r'},
-		{"mode",            required_argument, 0, 'm'},
-		{"nicks",           required_argument, 0, 'n'},
-		{"chans",           required_argument, 0, 'c'},
-		{"help",            no_argument,       0, 'h'},
-		{"version",         no_argument,       0, 'v'},
-		{"ipv4",            no_argument,       0, '4'},
-		{"ipv6",            no_argument,       0, '6'},
-		{"tls-disable",     no_argument,       0, 'x'},
-		{"tls-verify",      required_argument, 0, 'y'},
-		{"tls-cert-ca",     required_argument, 0, 'z'},
-		{"tls-cert-client", required_argument, 0, '0'},
+		{"server",      required_argument, 0, 's'},
+		{"port",        required_argument, 0, 'p'},
+		{"pass",        required_argument, 0, 'w'},
+		{"username",    required_argument, 0, 'u'},
+		{"realname",    required_argument, 0, 'r'},
+		{"mode",        required_argument, 0, 'm'},
+		{"nicks",       required_argument, 0, 'n'},
+		{"chans",       required_argument, 0, 'c'},
+		{"help",        no_argument,       0, 'h'},
+		{"version",     no_argument,       0, 'v'},
+		{"ipv4",        no_argument,       0, '0'},
+		{"ipv6",        no_argument,       0, '1'},
+		{"tls-disable", no_argument,       0, '2'},
+		{"tls-ca-file", required_argument, 0, '3'},
+		{"tls-ca-path", required_argument, 0, '4'},
+		{"tls-cert",    required_argument, 0, '5'},
+		{"tls-verify",  required_argument, 0, '6'},
 		{0, 0, 0, 0}
 	};
 
@@ -191,19 +201,20 @@ rirc_parse_args(int argc, char **argv)
 					return -1;
 				}
 
-				cli_servers[n_servers - 1].host            = optarg;
-				cli_servers[n_servers - 1].port            = NULL;
-				cli_servers[n_servers - 1].pass            = NULL;
-				cli_servers[n_servers - 1].username        = default_username;
-				cli_servers[n_servers - 1].realname        = default_realname;
-				cli_servers[n_servers - 1].mode            = NULL;
-				cli_servers[n_servers - 1].nicks           = default_nicks;
-				cli_servers[n_servers - 1].chans           = NULL;
-				cli_servers[n_servers - 1].tls_cert_ca     = NULL;
-				cli_servers[n_servers - 1].tls_cert_client = NULL;
-				cli_servers[n_servers - 1].ipv             = IO_IPV_UNSPEC;
-				cli_servers[n_servers - 1].tls             = IO_TLS_ENABLED;
-				cli_servers[n_servers - 1].tls_vrfy        = IO_TLS_VRFY_REQUIRED;
+				cli_servers[n_servers - 1].host        = optarg;
+				cli_servers[n_servers - 1].port        = NULL;
+				cli_servers[n_servers - 1].pass        = NULL;
+				cli_servers[n_servers - 1].username    = default_username;
+				cli_servers[n_servers - 1].realname    = default_realname;
+				cli_servers[n_servers - 1].mode        = NULL;
+				cli_servers[n_servers - 1].nicks       = default_nicks;
+				cli_servers[n_servers - 1].chans       = NULL;
+				cli_servers[n_servers - 1].tls_ca_file = NULL;
+				cli_servers[n_servers - 1].tls_ca_path = NULL;
+				cli_servers[n_servers - 1].tls_cert    = NULL;
+				cli_servers[n_servers - 1].ipv         = IO_IPV_UNSPEC;
+				cli_servers[n_servers - 1].tls         = IO_TLS_ENABLED;
+				cli_servers[n_servers - 1].tls_vrfy    = IO_TLS_VRFY_REQUIRED;
 				break;
 
 			#define CHECK_SERVER_OPTARG(OPT_C, REQ) \
@@ -251,22 +262,37 @@ rirc_parse_args(int argc, char **argv)
 				cli_servers[n_servers - 1].chans = optarg;
 				break;
 
-			case '4': /* Connect using ipv4 only */
+			case '0': /* Connect using ipv4 only */
 				CHECK_SERVER_OPTARG(opt_c, 0);
 				cli_servers[n_servers -1].ipv = IO_IPV_4;
 				break;
 
-			case '6': /* Connect using ipv6 only */
+			case '1': /* Connect using ipv6 only */
 				CHECK_SERVER_OPTARG(opt_c, 0);
 				cli_servers[n_servers -1].ipv = IO_IPV_6;
 				break;
 
-			case 'x': /* Set server TLS disabled */
+			case '2': /* Set server TLS disabled */
 				CHECK_SERVER_OPTARG(opt_c, 0);
 				cli_servers[n_servers -1].tls = IO_TLS_DISABLED;
 				break;
 
-			case 'y': /* Set server TLS peer certificate verification mode */
+			case '3': /* Set server TLS CA cert file path */
+				CHECK_SERVER_OPTARG(opt_c, 1);
+				cli_servers[n_servers - 1].tls_ca_file = optarg;
+				break;
+
+			case '4': /* Set server TLS CA cert directory path */
+				CHECK_SERVER_OPTARG(opt_c, 1);
+				cli_servers[n_servers - 1].tls_ca_path = optarg;
+				break;
+
+			case '5': /* Set server TLS client cert file path */
+				CHECK_SERVER_OPTARG(opt_c, 1);
+				cli_servers[n_servers - 1].tls_cert = optarg;
+				break;
+
+			case '6': /* Set server TLS peer certificate verification mode */
 				CHECK_SERVER_OPTARG(opt_c, 1);
 				if (!strcmp(optarg, "0") || !strcmp(optarg, "disabled")) {
 					cli_servers[n_servers -1].tls_vrfy = IO_TLS_VRFY_DISABLED;
@@ -283,15 +309,6 @@ rirc_parse_args(int argc, char **argv)
 				arg_error("invalid option for '--tls-verify' '%s'", optarg);
 				return -1;
 
-			case 'z': /* Set server TLS ca cert file path */
-				CHECK_SERVER_OPTARG(opt_c, 1);
-				cli_servers[n_servers - 1].tls_cert_ca = optarg;
-				break;
-
-			case '0': /* Set server TLS client cert file path */
-				CHECK_SERVER_OPTARG(opt_c, 1);
-				cli_servers[n_servers - 1].tls_cert_client = optarg;
-				break;
 
 			#undef CHECK_SERVER_OPTARG
 
@@ -324,11 +341,6 @@ rirc_parse_args(int argc, char **argv)
 
 	for (size_t i = 0; i < n_servers; i++) {
 
-		uint32_t flags =
-			cli_servers[i].ipv |
-			cli_servers[i].tls |
-			cli_servers[i].tls_vrfy;
-
 		if (cli_servers[i].port == NULL)
 			cli_servers[i].port = (cli_servers[i].tls == IO_TLS_ENABLED) ? "6697" : "6667";
 
@@ -345,9 +357,12 @@ rirc_parse_args(int argc, char **argv)
 			cli_servers[i].s,
 			cli_servers[i].host,
 			cli_servers[i].port,
-			cli_servers[i].tls_cert_ca,
-			cli_servers[i].tls_cert_client,
-			flags);
+			cli_servers[i].tls_ca_file,
+			cli_servers[i].tls_ca_path,
+			cli_servers[i].tls_cert,
+			(cli_servers[i].ipv |
+			 cli_servers[i].tls |
+			 cli_servers[i].tls_vrfy));
 
 		if (server_list_add(state_server_list(), cli_servers[i].s)) {
 			arg_error("duplicate server: %s:%s", cli_servers[i].host, cli_servers[i].port);

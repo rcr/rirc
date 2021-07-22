@@ -110,7 +110,11 @@
 
 /* [NETWORK] */
 
-/* Default CA certifate file path
+/* Default CA certificate file path
+ *   ("": a list of known paths is checked) */
+#define CA_CERT_FILE ""
+
+/* Default CA certificate directory path
  *   ("": a list of known paths is checked) */
 #define CA_CERT_PATH ""
 

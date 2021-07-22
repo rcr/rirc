@@ -241,18 +241,23 @@ test_command_connect(void)
 	assert_strcmp(current_channel()->name, "host-1");
 	INP_C(0x0A);
 
+	INP_COMMAND(":connect host --tls-ca-file");
+	assert_strcmp(action_message(), "connect: '--tls-ca-file' requires an argument");
+	assert_strcmp(current_channel()->name, "host-1");
+	INP_C(0x0A);
+
+	INP_COMMAND(":connect host --tls-ca-path");
+	assert_strcmp(action_message(), "connect: '--tls-ca-path' requires an argument");
+	assert_strcmp(current_channel()->name, "host-1");
+	INP_C(0x0A);
+
+	INP_COMMAND(":connect host --tls-cert");
+	assert_strcmp(action_message(), "connect: '--tls-cert' requires an argument");
+	assert_strcmp(current_channel()->name, "host-1");
+	INP_C(0x0A);
+
 	INP_COMMAND(":connect host --tls-verify");
 	assert_strcmp(action_message(), "connect: '--tls-verify' requires an argument");
-	assert_strcmp(current_channel()->name, "host-1");
-	INP_C(0x0A);
-
-	INP_COMMAND(":connect host --tls-cert-ca");
-	assert_strcmp(action_message(), "connect: '--tls-cert-ca' requires an argument");
-	assert_strcmp(current_channel()->name, "host-1");
-	INP_C(0x0A);
-
-	INP_COMMAND(":connect host --tls-cert-client");
-	assert_strcmp(action_message(), "connect: '--tls-cert-client' requires an argument");
 	assert_strcmp(current_channel()->name, "host-1");
 	INP_C(0x0A);
 
@@ -314,14 +319,15 @@ test_command_connect(void)
 		" --ipv4"
 		" --ipv6"
 		" --tls-disable"
+		" --tls-ca-file path"
+		" --tls-ca-path path"
+		" --tls-cert path"
 		" --tls-verify 0"
 		" --tls-verify 1"
 		" --tls-verify 2"
 		" --tls-verify disabled"
 		" --tls-verify optional"
 		" --tls-verify required"
-		" --tls-cert-ca path"
-		" --tls-cert-client path"
 	);
 
 	s = current_channel()->server;

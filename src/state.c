@@ -630,19 +630,20 @@ command(struct channel *c, char *buf)
 			int ret;
 			struct server *s;
 
-			const char *host            = str;
-			const char *port            = NULL;
-			const char *pass            = NULL;
-			const char *username        = default_username;
-			const char *realname        = default_realname;
-			const char *mode            = NULL;
-			const char *nicks           = default_nicks;
-			const char *chans           = NULL;
-			const char *tls_cert_ca     = NULL;
-			const char *tls_cert_client = NULL;
-			int ipv      = IO_IPV_UNSPEC;
-			int tls      = IO_TLS_ENABLED;
-			int tls_vrfy = IO_TLS_VRFY_REQUIRED;
+			const char *host        = str;
+			const char *port        = NULL;
+			const char *pass        = NULL;
+			const char *username    = default_username;
+			const char *realname    = default_realname;
+			const char *mode        = NULL;
+			const char *nicks       = default_nicks;
+			const char *chans       = NULL;
+			const char *tls_ca_file = NULL;
+			const char *tls_ca_path = NULL;
+			const char *tls_cert    = NULL;
+			int ipv                 = IO_IPV_UNSPEC;
+			int tls                 = IO_TLS_ENABLED;
+			int tls_vrfy            = IO_TLS_VRFY_REQUIRED;
 
 			while ((str = irc_strsep(&buf))) {
 
@@ -690,6 +691,21 @@ command(struct channel *c, char *buf)
 					ipv = IO_IPV_6;
 				} else if (!strcmp(str, "--tls-disable")) {
 					tls = IO_TLS_DISABLED;
+				} else if (!strcmp(str, "--tls-ca-file")) {
+					if (!(tls_ca_file = irc_strsep(&buf))) {
+						action(action_error, "connect: '--tls-ca-file' requires an argument");
+						return;
+					}
+				} else if (!strcmp(str, "--tls-ca-path")) {
+					if (!(tls_ca_path = irc_strsep(&buf))) {
+						action(action_error, "connect: '--tls-ca-path' requires an argument");
+						return;
+					}
+				} else if (!strcmp(str, "--tls-cert")) {
+					if (!(tls_cert = irc_strsep(&buf))) {
+						action(action_error, "connect: '--tls-cert' requires an argument");
+						return;
+					}
 				} else if (!strcmp(str, "--tls-verify")) {
 					if (!(str = irc_strsep(&buf))) {
 						action(action_error, "connect: '--tls-verify' requires an argument");
@@ -702,16 +718,6 @@ command(struct channel *c, char *buf)
 						tls_vrfy = IO_TLS_VRFY_REQUIRED;
 					} else {
 						action(action_error, "connect: invalid option for '--tls-verify' '%s'", str);
-						return;
-					}
-				} else if (!strcmp(str, "--tls-cert-ca")) {
-					if (!(tls_cert_ca = irc_strsep(&buf))) {
-						action(action_error, "connect: '--tls-cert-ca' requires an argument");
-						return;
-					}
-				} else if (!strcmp(str, "--tls-cert-client")) {
-					if (!(tls_cert_client = irc_strsep(&buf))) {
-						action(action_error, "connect: '--tls-cert-client' requires an argument");
 						return;
 					}
 				} else {
@@ -747,8 +753,9 @@ command(struct channel *c, char *buf)
 				s,
 				host,
 				port,
-				tls_cert_ca,
-				tls_cert_client,
+				tls_ca_file,
+				tls_ca_path,
+				tls_cert,
 				(ipv | tls | tls_vrfy));
 
 			if ((ret = io_cx(s->connection)))

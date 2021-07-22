@@ -105,8 +105,9 @@ struct connection
 	const void *obj;
 	const char *host;
 	const char *port;
-	const char *tls_cert_ca;
-	const char *tls_cert_client;
+	const char *tls_ca_file;
+	const char *tls_ca_path;
+	const char *tls_cert;
 	enum io_state {
 		IO_ST_INVALID,
 		IO_ST_DXED, /* Socket disconnected, passive */
@@ -158,7 +159,7 @@ static const char* io_tls_err(int);
 static int io_tls_establish(struct connection*);
 static int io_tls_x509_vrfy(struct connection*);
 
-const char *ca_cert_paths[] = {
+const char *default_ca_certs[] = {
 	"/etc/ssl/ca-bundle.pem",
 	"/etc/ssl/cert.pem",
 	"/etc/ssl/certs/ca-certificates.crt",
@@ -172,8 +173,9 @@ connection(
 	const void *obj,
 	const char *host,
 	const char *port,
-	const char *tls_cert_ca,
-	const char *tls_cert_client,
+	const char *tls_ca_file,
+	const char *tls_ca_path,
+	const char *tls_cert,
 	uint32_t flags)
 {
 	struct connection *cx;
@@ -185,8 +187,9 @@ connection(
 	cx->flags = flags;
 	cx->host = strdup(host);
 	cx->port = strdup(port);
-	cx->tls_cert_ca = (tls_cert_ca ? strdup(tls_cert_ca) : NULL);
-	cx->tls_cert_client = (tls_cert_client ? strdup(tls_cert_client) : NULL);
+	cx->tls_ca_file = (tls_ca_file ? strdup(tls_ca_file) : NULL);
+	cx->tls_ca_path = (tls_ca_path ? strdup(tls_ca_path) : NULL);
+	cx->tls_cert = (tls_cert ? strdup(tls_cert) : NULL);
 	cx->st_cur = IO_ST_DXED;
 	cx->st_new = IO_ST_INVALID;
 	PT_CF(pthread_mutex_init(&(cx->mtx), NULL));
@@ -200,8 +203,9 @@ connection_free(struct connection *cx)
 	PT_CF(pthread_mutex_destroy(&(cx->mtx)));
 	free((void*)cx->host);
 	free((void*)cx->port);
-	free((void*)cx->tls_cert_ca);
-	free((void*)cx->tls_cert_client);
+	free((void*)cx->tls_ca_file);
+	free((void*)cx->tls_ca_path);
+	free((void*)cx->tls_cert);
 	free(cx);
 }
 
@@ -841,53 +845,72 @@ io_tls_establish(struct connection *cx)
 		goto err;
 	}
 
-	if (cx->tls_cert_client) {
+	ret = -1;
 
-		if ((ret = mbedtls_x509_crt_parse_file(&(cx->tls_x509_crt_client), cx->tls_cert_client)) < 0) {
-			io_error(cx, "  .. Failed to load client cert: '%s': %s", cx->tls_cert_client, io_tls_err(ret));
+	if (ret < 0 && cx->tls_ca_file) {
+		if ((ret = mbedtls_x509_crt_parse_file(&(cx->tls_x509_crt_ca), cx->tls_ca_file)) < 0) {
+			io_error(cx, "  .. Failed to load ca cert file: '%s': %s", cx->tls_ca_file, io_tls_err(ret));
+			goto err;
+		}
+	}
+
+	if (ret < 0 && cx->tls_ca_path) {
+		if ((ret = mbedtls_x509_crt_parse_path(&(cx->tls_x509_crt_ca), cx->tls_ca_path)) < 0) {
+			io_error(cx, "  .. Failed to load ca cert path: '%s': %s", cx->tls_ca_path, io_tls_err(ret));
+			goto err;
+		}
+	}
+
+	if (ret < 0 && default_ca_file && *default_ca_file) {
+		if ((ret = mbedtls_x509_crt_parse_file(&(cx->tls_x509_crt_ca), default_ca_file)) < 0) {
+			io_error(cx, "  .. Failed to load ca cert file: '%s': %s", default_ca_file, io_tls_err(ret));
+			goto err;
+		}
+	}
+
+	if (ret < 0 && default_ca_path && *default_ca_path) {
+		if ((ret = mbedtls_x509_crt_parse_path(&(cx->tls_x509_crt_ca), default_ca_path)) < 0) {
+			io_error(cx, "  .. Failed to load ca cert path: '%s': %s", default_ca_path, io_tls_err(ret));
+			goto err;
+		}
+	}
+
+	if (ret < 0) {
+
+		size_t i;
+
+		for (i = 0; i < ARR_LEN(default_ca_certs); i++) {
+			if ((ret = mbedtls_x509_crt_parse_file(&(cx->tls_x509_crt_ca), default_ca_certs[i])) >= 0)
+				break;
+		}
+
+		if (i == ARR_LEN(default_ca_certs)) {
+			io_error(cx, "  .. Failed to load default ca certs: %s", io_tls_err(ret));
+			goto err;
+		}
+	}
+
+	if (cx->tls_cert) {
+
+		if ((ret = mbedtls_x509_crt_parse_file(&(cx->tls_x509_crt_client), cx->tls_cert)) < 0) {
+			io_error(cx, "  .. Failed to load client cert: '%s': %s", cx->tls_cert, io_tls_err(ret));
 			goto err;
 		}
 
 		if ((ret = mbedtls_pk_parse_keyfile(
 				&(cx->tls_pk_ctx),
-				cx->tls_cert_client,
+				cx->tls_cert,
 				NULL,
 				mbedtls_ctr_drbg_random,
 				&(cx->tls_ctr_drbg))))
 		{
-			io_error(cx, "  .. Failed to load client cert key: '%s': %s", cx->tls_cert_client, io_tls_err(ret));
+			io_error(cx, "  .. Failed to load client cert key: '%s': %s", cx->tls_cert, io_tls_err(ret));
 			goto err;
 		}
 
 		if ((ret = mbedtls_ssl_conf_own_cert(&(cx->tls_conf), &(cx->tls_x509_crt_client), &(cx->tls_pk_ctx)))) {
-			io_error(cx, "  .. Failed to configure client cert: '%s': %s", cx->tls_cert_client, io_tls_err(ret));
+			io_error(cx, "  .. Failed to configure client cert: '%s': %s", cx->tls_cert, io_tls_err(ret));
 			goto err;
-		}
-	}
-
-	if (cx->tls_cert_ca) {
-
-		if ((ret = mbedtls_x509_crt_parse_file(&(cx->tls_x509_crt_ca), cx->tls_cert_ca)) < 0) {
-			io_error(cx, "  .. Failed to load ca cert: '%s': %s", cx->tls_cert_ca, io_tls_err(ret));
-			goto err;
-		}
-
-	} else if (ca_cert_path && *ca_cert_path) {
-
-		if ((ret = mbedtls_x509_crt_parse_file(&(cx->tls_x509_crt_ca), ca_cert_path)) < 0) {
-			io_error(cx, "  .. Failed to load ca cert: '%s': %s", ca_cert_path, io_tls_err(ret));
-			goto err;
-		}
-
-	} else {
-
-		for (size_t i = 0; i < ARR_LEN(ca_cert_paths); i++) {
-			if ((ret = mbedtls_x509_crt_parse_file(&(cx->tls_x509_crt_ca), ca_cert_paths[i])) >= 0) {
-				break;
-			} else if (i == ARR_LEN(ca_cert_paths)) {
-				io_error(cx, "  .. Failed to load ca cert: %s", io_tls_err(ret));
-				goto err;
-			}
 		}
 	}
 
