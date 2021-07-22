@@ -90,6 +90,7 @@ struct connection* connection(
 	const char*, /* host */
 	const char*, /* port */
 	const char*, /* tls_cert_ca */
+	const char*, /* tls_cert_client */
 	uint32_t);   /* flags */
 
 void connection_free(struct connection*);

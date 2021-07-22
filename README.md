@@ -84,6 +84,7 @@ Server connection options:
    --tls-disable            Set server TLS disabled
    --tls-verify=MODE        Set server TLS peer certificate verification mode
    --tls-cert-ca=PATH       Set server TLS ca cert file path
+   --tls-cert-client=PATH   Set server TLS client cert file path
 ```
 
 Commands:
