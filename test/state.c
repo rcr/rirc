@@ -261,6 +261,21 @@ test_command_connect(void)
 	assert_strcmp(current_channel()->name, "host-1");
 	INP_C(0x0A);
 
+	INP_COMMAND(":connect host --sasl");
+	assert_strcmp(action_message(), "connect: '--sasl' requires an argument");
+	assert_strcmp(current_channel()->name, "host-1");
+	INP_C(0x0A);
+
+	INP_COMMAND(":connect host --sasl-user");
+	assert_strcmp(action_message(), "connect: '--sasl-user' requires an argument");
+	assert_strcmp(current_channel()->name, "host-1");
+	INP_C(0x0A);
+
+	INP_COMMAND(":connect host --sasl-pass");
+	assert_strcmp(action_message(), "connect: '--sasl-pass' requires an argument");
+	assert_strcmp(current_channel()->name, "host-1");
+	INP_C(0x0A);
+
 	/* Test invalid arguments */
 	INP_COMMAND(":connect host xyz");
 	assert_strcmp(action_message(), ":connect [hostname [options]]");
@@ -274,6 +289,11 @@ test_command_connect(void)
 
 	INP_COMMAND(":connect host --tls-verify xyz");
 	assert_strcmp(action_message(), "connect: invalid option for '--tls-verify' 'xyz'");
+	assert_strcmp(current_channel()->name, "host-1");
+	INP_C(0x0A);
+
+	INP_COMMAND(":connect host --sasl xyz");
+	assert_strcmp(action_message(), "connect: invalid option for '--sasl' 'xyz'");
 	assert_strcmp(current_channel()->name, "host-1");
 	INP_C(0x0A);
 
@@ -328,7 +348,12 @@ test_command_connect(void)
 		" --tls-verify disabled"
 		" --tls-verify optional"
 		" --tls-verify required"
+		" --sasl plain"
+		" --sasl-user sasl_user"
+		" --sasl-pass sasl_pass"
 	);
+
+	assert_strcmp(action_message(), NULL);
 
 	s = current_channel()->server;
 
@@ -341,6 +366,9 @@ test_command_connect(void)
 	assert_strcmp(s->nicks.set[0], "x0");
 	assert_strcmp(s->nicks.set[1], "y1");
 	assert_strcmp(s->nicks.set[2], "z2");
+	assert_eq(s->ircv3_sasl.method, IRCV3_SASL_METHOD_PLAIN);
+	assert_strcmp(s->ircv3_sasl.user, "sasl_user");
+	assert_strcmp(s->ircv3_sasl.pass, "sasl_pass");
 	assert_ptr_not_null(channel_list_get(&(s->clist), "#a1", s->casemapping));
 	assert_ptr_not_null(channel_list_get(&(s->clist), "b2", s->casemapping));
 	assert_ptr_not_null(channel_list_get(&(s->clist), "#c3", s->casemapping));

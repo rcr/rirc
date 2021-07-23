@@ -68,6 +68,19 @@ Set \fIserver\fP TLS peer certificate verification \fImode\fP:
 \(bu \fIoptional\fP - cert is verified, handshake continues on error
 \(bu \fIrequired\fP - cert is verified, handshake is aborted on error (default)
 .EE
+.SS Server authentication options
+.TP
+.BI --sasl= method
+Authenticate with SASL \fImethod\fP:
+.EX
+\(bu \fIplain\fP - requires \fI--sasl-user\fP and \fI--sasl-pass\fP
+.EE
+.TP
+.BI --sasl-user= user
+Authenticate with SASL \fIuser\fP
+.TP
+.BI --sasl-pass= pass
+Authenticate with SASL \fIpass\fP
 .SH USAGE
 .TS
 l .

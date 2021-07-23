@@ -213,6 +213,12 @@ test_server_set_nicks(void)
 }
 
 static void
+test_server_set_sasl(void)
+{
+	// TODO
+}
+
+static void
 test_parse_005(void)
 {
 	/* Test numeric 005 parsing  */
@@ -301,6 +307,7 @@ main(void)
 		TESTCASE(test_server_list),
 		TESTCASE(test_server_set_chans),
 		TESTCASE(test_server_set_nicks),
+		TESTCASE(test_server_set_sasl),
 		TESTCASE(test_parse_005)
 	};
 

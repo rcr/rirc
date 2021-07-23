@@ -89,6 +89,11 @@ static const char *const rirc_help =
 "\n   --tls-ca-path=PATH       Set server TLS CA cert directory path"
 "\n   --tls-cert=PATH          Set server TLS client cert file path"
 "\n   --tls-verify=MODE        Set server TLS peer certificate verification mode"
+"\n"
+"\nServer authentication options:"
+"\n   --sasl=METHOD            Authenticate with SASL method"
+"\n   --sasl-user=USER         Authenticate with SASL user"
+"\n   --sasl-pass=PASS         Authenticate with SASL pass"
 "\n";
 
 static const char *const rirc_version =
@@ -117,6 +122,9 @@ rirc_opt_str(char c)
 		case '4': return "--tls-ca-path";
 		case '5': return "--tls-cert";
 		case '6': return "--tls-verify";
+		case '7': return "--sasl";
+		case '8': return "--sasl-user";
+		case '9': return "--sasl-pass";
 		default:
 			fatal("unknown option flag '%c'", c);
 	}
@@ -156,6 +164,9 @@ rirc_parse_args(int argc, char **argv)
 		const char *tls_ca_file;
 		const char *tls_ca_path;
 		const char *tls_cert;
+		const char *sasl;
+		const char *sasl_user;
+		const char *sasl_pass;
 		int ipv;
 		int tls;
 		int tls_vrfy;
@@ -180,6 +191,9 @@ rirc_parse_args(int argc, char **argv)
 		{"tls-ca-path", required_argument, 0, '4'},
 		{"tls-cert",    required_argument, 0, '5'},
 		{"tls-verify",  required_argument, 0, '6'},
+		{"sasl",        required_argument, 0, '7'},
+		{"sasl-user",   required_argument, 0, '8'},
+		{"sasl-pass",   required_argument, 0, '9'},
 		{0, 0, 0, 0}
 	};
 
@@ -212,6 +226,9 @@ rirc_parse_args(int argc, char **argv)
 				cli_servers[n_servers - 1].tls_ca_file = NULL;
 				cli_servers[n_servers - 1].tls_ca_path = NULL;
 				cli_servers[n_servers - 1].tls_cert    = NULL;
+				cli_servers[n_servers - 1].sasl        = NULL;
+				cli_servers[n_servers - 1].sasl_user   = NULL;
+				cli_servers[n_servers - 1].sasl_pass   = NULL;
 				cli_servers[n_servers - 1].ipv         = IO_IPV_UNSPEC;
 				cli_servers[n_servers - 1].tls         = IO_TLS_ENABLED;
 				cli_servers[n_servers - 1].tls_vrfy    = IO_TLS_VRFY_REQUIRED;
@@ -309,6 +326,24 @@ rirc_parse_args(int argc, char **argv)
 				arg_error("invalid option for '--tls-verify' '%s'", optarg);
 				return -1;
 
+			case '7': /* Authenticate with SASL method */
+				CHECK_SERVER_OPTARG(opt_c, 1);
+				if (!strcmp(optarg, "PLAIN")) {
+					cli_servers[n_servers - 1].sasl = optarg;
+					break;
+				}
+				arg_error("invalid option for '--sasl' '%s'", optarg);
+				break;
+
+			case '8': /* Authenticate with SASL user */
+				CHECK_SERVER_OPTARG(opt_c, 1);
+				cli_servers[n_servers - 1].sasl_user = optarg;
+				break;
+
+			case '9': /* Authenticate with SASL pass */
+				CHECK_SERVER_OPTARG(opt_c, 1);
+				cli_servers[n_servers - 1].sasl_pass = optarg;
+				break;
 
 			#undef CHECK_SERVER_OPTARG
 
@@ -377,6 +412,14 @@ rirc_parse_args(int argc, char **argv)
 		if (cli_servers[i].chans && server_set_chans(cli_servers[i].s, cli_servers[i].chans)) {
 			arg_error("invalid %s: '%s'", rirc_opt_str('c'), cli_servers[i].chans);
 			return -1;
+		}
+
+		if (cli_servers[i].sasl) {
+			server_set_sasl(
+				cli_servers[i].s,
+				cli_servers[i].sasl,
+				cli_servers[i].sasl_user,
+				cli_servers[i].sasl_pass);
 		}
 
 		channel_set_current(cli_servers[i].s->channel);

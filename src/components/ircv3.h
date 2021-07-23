@@ -43,9 +43,27 @@ struct ircv3_caps
 	#undef X
 };
 
+struct ircv3_sasl
+{
+	enum {
+		IRCV3_SASL_METHOD_NONE,
+		IRCV3_SASL_METHOD_PLAIN,
+	} method;
+	enum {
+		IRCV3_SASL_STATE_NONE,
+		IRCV3_SASL_STATE_REQ_METHOD,
+		IRCV3_SASL_STATE_AUTHENTICATED,
+	} state;
+	const char *user;
+	const char *pass;
+};
+
 struct ircv3_cap* ircv3_cap_get(struct ircv3_caps*, const char*);
 
 void ircv3_caps(struct ircv3_caps*);
 void ircv3_caps_reset(struct ircv3_caps*);
+
+void ircv3_sasl(struct ircv3_sasl*);
+void ircv3_sasl_reset(struct ircv3_sasl*);
 
 #endif

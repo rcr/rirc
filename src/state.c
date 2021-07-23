@@ -641,6 +641,9 @@ command(struct channel *c, char *buf)
 			const char *tls_ca_file = NULL;
 			const char *tls_ca_path = NULL;
 			const char *tls_cert    = NULL;
+			const char *sasl        = NULL;
+			const char *sasl_user   = NULL;
+			const char *sasl_pass   = NULL;
 			int ipv                 = IO_IPV_UNSPEC;
 			int tls                 = IO_TLS_ENABLED;
 			int tls_vrfy            = IO_TLS_VRFY_REQUIRED;
@@ -720,6 +723,24 @@ command(struct channel *c, char *buf)
 						action(action_error, "connect: invalid option for '--tls-verify' '%s'", str);
 						return;
 					}
+				} else if (!strcmp(str, "--sasl")) {
+					if (!(sasl = irc_strsep(&buf))) {
+						action(action_error, "connect: '--sasl' requires an argument");
+						return;
+					} else if (strcasecmp(sasl, "PLAIN")) {
+						action(action_error, "connect: invalid option for '--sasl' '%s'", sasl);
+						return;
+					}
+				} else if (!strcmp(str, "--sasl-user")) {
+					if (!(sasl_user = irc_strsep(&buf))) {
+						action(action_error, "connect: '--sasl-user' requires an argument");
+						return;
+					}
+				} else if (!strcmp(str, "--sasl-pass")) {
+					if (!(sasl_pass = irc_strsep(&buf))) {
+						action(action_error, "connect: '--sasl-pass' requires an argument");
+						return;
+					}
 				} else {
 					action(action_error, "connect: unknown option '%s'", str);
 					return;
@@ -748,6 +769,9 @@ command(struct channel *c, char *buf)
 				server_free(s);
 				return;
 			}
+
+			if (sasl)
+				server_set_sasl(s, sasl, sasl_user, sasl_pass);
 
 			s->connection = connection(
 				s,

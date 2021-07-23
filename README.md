@@ -86,6 +86,11 @@ Server connection options:
    --tls-ca-path=PATH       Set server TLS CA cert directory path
    --tls-cert=PATH          Set server TLS client cert file path
    --tls-verify=MODE        Set server TLS peer certificate verification mode
+
+Server authentication options:
+   --sasl=METHOD            Authenticate with SASL method
+   --sasl-user=USER         Authenticate with SASL user
+   --sasl-pass=PASS         Authenticate with SASL pass
 ```
 
 Commands:

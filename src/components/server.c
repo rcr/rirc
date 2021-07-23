@@ -7,6 +7,7 @@
 #include <errno.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 
 #define HANDLED_005 \
 	X(CASEMAPPING)  \
@@ -52,6 +53,7 @@ server(
 	s->casemapping = CASEMAPPING_RFC1459;
 	s->mode_str.type = MODE_STR_USERMODE;
 	ircv3_caps(&(s->ircv3_caps));
+	ircv3_sasl(&(s->ircv3_sasl));
 	mode_cfg(&(s->mode_cfg), NULL, MODE_CFG_DEFAULTS);
 
 	s->channel = channel(host, CHANNEL_T_SERVER);
@@ -139,6 +141,7 @@ void
 server_reset(struct server *s)
 {
 	ircv3_caps_reset(&(s->ircv3_caps));
+	ircv3_sasl_reset(&(s->ircv3_sasl));
 	mode_reset(&(s->usermodes), &(s->mode_str));
 	s->ping = 0;
 	s->quitting = 0;
@@ -319,6 +322,20 @@ server_set_005(struct server *s, char *str)
 				debug("Setting numeric 005 %s: %s", opt.arg, opt.val);
 			}
 		}
+	}
+}
+
+void
+server_set_sasl(struct server *s, const char *method, const char *user, const char *pass)
+{
+	if (!strcasecmp(method, "PLAIN")) {
+
+		free((void *)s->ircv3_sasl.user);
+		free((void *)s->ircv3_sasl.pass);
+
+		s->ircv3_sasl.method = IRCV3_SASL_METHOD_PLAIN;
+		s->ircv3_sasl.user = (user ? strdup(user) : NULL);
+		s->ircv3_sasl.pass = (pass ? strdup(pass) : NULL);
 	}
 }
 

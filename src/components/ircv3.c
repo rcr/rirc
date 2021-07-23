@@ -42,3 +42,21 @@ ircv3_caps_reset(struct ircv3_caps *caps)
 	IRCV3_CAPS
 	#undef X
 }
+
+void
+ircv3_sasl(struct ircv3_sasl *sasl)
+{
+	memset(sasl, 0, sizeof(*sasl));
+
+	sasl->method = IRCV3_SASL_METHOD_NONE;
+	sasl->state  = IRCV3_SASL_STATE_NONE;
+}
+
+void
+ircv3_sasl_reset(struct ircv3_sasl *sasl)
+{
+	free((void *)sasl->user);
+	free((void *)sasl->pass);
+
+	ircv3_sasl(sasl);
+}
