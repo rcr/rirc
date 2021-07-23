@@ -26,6 +26,7 @@
 
 struct ircv3_cap
 {
+	const char *val;           /* cap key=val */
 	unsigned req          : 1; /* cap REQ sent */
 	unsigned req_auto     : 1; /* cap REQ sent automatically */
 	unsigned set          : 1; /* cap is unset/set */

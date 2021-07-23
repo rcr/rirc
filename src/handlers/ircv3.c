@@ -68,7 +68,8 @@ ircv3_recv_cap_LS(struct server *s, struct irc_message *m)
 	 * CAP <targ> LS [*] :[<cap_1> [...]]
 	 */
 
-	char *cap;
+	char *cap_key;
+	char *cap_val;
 	char *caps;
 	char *multiline;
 
@@ -94,14 +95,18 @@ ircv3_recv_cap_LS(struct server *s, struct irc_message *m)
 		return 0;
 	}
 
-	while ((cap = irc_strsep(&(caps)))) {
+	while ((cap_key = irc_strsep(&(caps)))) {
 
 		struct ircv3_cap *c;
 
-		if (!(c = ircv3_cap_get(&(s->ircv3_caps), cap)))
+		if ((cap_val = strchr(cap_key, '=')))
+			*cap_val++ = 0;
+
+		if (!(c = ircv3_cap_get(&(s->ircv3_caps), cap_key)))
 			continue;
 
 		c->supported = 1;
+		c->val = (cap_val ? strdup(cap_val) : NULL);
 
 		if (c->req_auto)
 			c->req = 1;
@@ -217,7 +222,8 @@ ircv3_recv_cap_ACK(struct server *s, struct irc_message *m)
 		c->req = 0;
 		c->set = !unset;
 
-		server_info(s, "capability change accepted: %s%s", (unset ? "-" : ""), cap);
+		server_info(s, "capability change accepted: %s%s%s%s",
+			(unset ? "-" : ""), cap, (c->val ? "=" : ""), (c->val ? c->val : ""));
 
 	} while ((cap = irc_strsep(&(caps))));
 

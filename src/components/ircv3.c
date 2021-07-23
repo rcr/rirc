@@ -1,5 +1,6 @@
 #include "src/components/ircv3.h"
 
+#include <stdlib.h>
 #include <string.h>
 
 struct ircv3_cap*
@@ -18,6 +19,7 @@ void
 ircv3_caps(struct ircv3_caps *caps)
 {
 	#define X(CAP, VAR, ATTRS) \
+	caps->VAR.val = NULL; \
 	caps->VAR.req = 0; \
 	caps->VAR.set = 0; \
 	caps->VAR.supported = 0; \
@@ -32,6 +34,8 @@ void
 ircv3_caps_reset(struct ircv3_caps *caps)
 {
 	#define X(CAP, VAR, ATTRS) \
+	free((void *)caps->VAR.val); \
+	caps->VAR.val = NULL; \
 	caps->VAR.req = 0; \
 	caps->VAR.set = 0; \
 	caps->VAR.supported = 0;

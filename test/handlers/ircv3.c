@@ -135,6 +135,20 @@ test_ircv3_CAP_LS(void)
 	assert_eq(s->ircv3_caps.cap_2.supported, 1);
 	assert_eq(s->ircv3_caps.cap_3.supported, 1);
 
+	/* test cap key=val */
+	mock_reset();
+	ircv3_caps_reset(&(s->ircv3_caps));
+	IRC_MESSAGE_PARSE("CAP * LS :cap-1=foo cap-3 cap-4=bar");
+	assert_eq(irc_recv(s, &m), 0);
+	assert_eq(mock_send_n, 1);
+	assert_strcmp(mock_send[0], "CAP REQ :cap-1 cap-3 cap-4");
+	assert_eq(s->ircv3_caps.cap_1.supported, 1);
+	assert_eq(s->ircv3_caps.cap_3.supported, 1);
+	assert_eq(s->ircv3_caps.cap_4.supported, 1);
+	assert_strcmp(s->ircv3_caps.cap_1.val, "foo");
+	assert_strcmp(s->ircv3_caps.cap_3.val, NULL);
+	assert_strcmp(s->ircv3_caps.cap_4.val, "bar");
+
 	/* test multiline */
 	mock_reset();
 	ircv3_caps_reset(&(s->ircv3_caps));
@@ -254,7 +268,23 @@ test_ircv3_CAP_ACK(void)
 	assert_eq(mock_line_n, 1);
 	assert_strcmp(mock_line[0], "CAP ACK: parameter is empty");
 
-	/* unregisterd, error */
+	/* test ack key=val */
+	mock_reset();
+	s->ircv3_caps.cap_1.req = 1;
+	s->ircv3_caps.cap_2.req = 1;
+	s->ircv3_caps.cap_3.req = 1;
+	s->ircv3_caps.cap_1.val = strdup("foo");
+	s->ircv3_caps.cap_3.val = strdup("bar");
+	IRC_MESSAGE_PARSE("CAP * ACK :cap-1 cap-2 cap-3");
+	assert_eq(irc_recv(s, &m), 0);
+	assert_eq(mock_send_n, 1);
+	assert_eq(mock_line_n, 3);
+	assert_strcmp(mock_line[0], "capability change accepted: cap-1=foo");
+	assert_strcmp(mock_line[1], "capability change accepted: cap-2");
+	assert_strcmp(mock_line[2], "capability change accepted: cap-3=bar");
+	assert_strcmp(mock_send[0], "CAP END");
+
+	/* test unregisterd, error */
 	mock_reset();
 	s->ircv3_caps.cap_1.set = 0;
 	s->ircv3_caps.cap_2.set = 0;
@@ -270,7 +300,7 @@ test_ircv3_CAP_ACK(void)
 	assert_strcmp(mock_line[3], "CAP ACK: 'cap-bbb' not supported");
 	assert_strcmp(mock_line[4], "CAP ACK: parameter errors");
 
-	/* unregistered, no error */
+	/* test unregistered, no error */
 	mock_reset();
 	s->ircv3_caps.cap_1.set = 0;
 	s->ircv3_caps.cap_2.set = 1;
@@ -293,7 +323,7 @@ test_ircv3_CAP_ACK(void)
 	assert_strcmp(mock_line[2], "capability change accepted: -cap-3");
 	assert_strcmp(mock_send[0], "CAP END");
 
-	/* registered, error */
+	/* test registered, error */
 	mock_reset();
 	s->registered = 1;
 	s->ircv3_caps.cap_1.set = 0;
@@ -314,7 +344,7 @@ test_ircv3_CAP_ACK(void)
 	assert_strcmp(mock_line[3], "CAP ACK: '-cap-4' was not requested");
 	assert_strcmp(mock_line[4], "CAP ACK: parameter errors");
 
-	/* registered, no error */
+	/* test registered, no error */
 	mock_reset();
 	s->registered = 1;
 	s->ircv3_caps.cap_1.set = 0;
