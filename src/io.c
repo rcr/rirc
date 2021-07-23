@@ -849,28 +849,28 @@ io_tls_establish(struct connection *cx)
 
 	if (ret < 0 && cx->tls_ca_file) {
 		if ((ret = mbedtls_x509_crt_parse_file(&(cx->tls_x509_crt_ca), cx->tls_ca_file)) < 0) {
-			io_error(cx, "  .. Failed to load ca cert file: '%s': %s", cx->tls_ca_file, io_tls_err(ret));
+			io_error(cx, " .. Failed to load ca cert file: '%s': %s", cx->tls_ca_file, io_tls_err(ret));
 			goto err;
 		}
 	}
 
 	if (ret < 0 && cx->tls_ca_path) {
 		if ((ret = mbedtls_x509_crt_parse_path(&(cx->tls_x509_crt_ca), cx->tls_ca_path)) < 0) {
-			io_error(cx, "  .. Failed to load ca cert path: '%s': %s", cx->tls_ca_path, io_tls_err(ret));
+			io_error(cx, " .. Failed to load ca cert path: '%s': %s", cx->tls_ca_path, io_tls_err(ret));
 			goto err;
 		}
 	}
 
 	if (ret < 0 && default_ca_file && *default_ca_file) {
 		if ((ret = mbedtls_x509_crt_parse_file(&(cx->tls_x509_crt_ca), default_ca_file)) < 0) {
-			io_error(cx, "  .. Failed to load ca cert file: '%s': %s", default_ca_file, io_tls_err(ret));
+			io_error(cx, " .. Failed to load ca cert file: '%s': %s", default_ca_file, io_tls_err(ret));
 			goto err;
 		}
 	}
 
 	if (ret < 0 && default_ca_path && *default_ca_path) {
 		if ((ret = mbedtls_x509_crt_parse_path(&(cx->tls_x509_crt_ca), default_ca_path)) < 0) {
-			io_error(cx, "  .. Failed to load ca cert path: '%s': %s", default_ca_path, io_tls_err(ret));
+			io_error(cx, " .. Failed to load ca cert path: '%s': %s", default_ca_path, io_tls_err(ret));
 			goto err;
 		}
 	}
@@ -885,7 +885,7 @@ io_tls_establish(struct connection *cx)
 		}
 
 		if (i == ARR_LEN(default_ca_certs)) {
-			io_error(cx, "  .. Failed to load default ca certs: %s", io_tls_err(ret));
+			io_error(cx, " .. Failed to load default ca certs: %s", io_tls_err(ret));
 			goto err;
 		}
 	}
@@ -893,7 +893,7 @@ io_tls_establish(struct connection *cx)
 	if (cx->tls_cert) {
 
 		if ((ret = mbedtls_x509_crt_parse_file(&(cx->tls_x509_crt_client), cx->tls_cert)) < 0) {
-			io_error(cx, "  .. Failed to load client cert: '%s': %s", cx->tls_cert, io_tls_err(ret));
+			io_error(cx, " .. Failed to load client cert: '%s': %s", cx->tls_cert, io_tls_err(ret));
 			goto err;
 		}
 
@@ -904,12 +904,12 @@ io_tls_establish(struct connection *cx)
 				mbedtls_ctr_drbg_random,
 				&(cx->tls_ctr_drbg))))
 		{
-			io_error(cx, "  .. Failed to load client cert key: '%s': %s", cx->tls_cert, io_tls_err(ret));
+			io_error(cx, " .. Failed to load client cert key: '%s': %s", cx->tls_cert, io_tls_err(ret));
 			goto err;
 		}
 
 		if ((ret = mbedtls_ssl_conf_own_cert(&(cx->tls_conf), &(cx->tls_x509_crt_client), &(cx->tls_pk_ctx)))) {
-			io_error(cx, "  .. Failed to configure client cert: '%s': %s", cx->tls_cert, io_tls_err(ret));
+			io_error(cx, " .. Failed to configure client cert: '%s': %s", cx->tls_cert, io_tls_err(ret));
 			goto err;
 		}
 	}
