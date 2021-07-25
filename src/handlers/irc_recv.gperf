@@ -15,9 +15,10 @@
 	X(privmsg) \
 	X(quit) \
 	X(topic) \
-	X(ircv3_cap) \
 	X(ircv3_account) \
+	X(ircv3_authenticate) \
 	X(ircv3_away) \
+	X(ircv3_cap) \
 	X(ircv3_chghost)
 
 #define X(cmd) static int recv_##cmd(struct server*, struct irc_message*);
@@ -44,21 +45,22 @@ struct recv_handler
 %define initializer-suffix ,(irc_recv_f)0
 struct recv_handler;
 %%
-ERROR,   recv_error
-INVITE,  recv_invite
-JOIN,    recv_join
-KICK,    recv_kick
-MODE,    recv_mode
-NICK,    recv_nick
-NOTICE,  recv_notice
-PART,    recv_part
-PING,    recv_ping
-PONG,    recv_pong
-PRIVMSG, recv_privmsg
-QUIT,    recv_quit
-TOPIC,   recv_topic
-CAP,     recv_ircv3_cap
-ACCOUNT, recv_ircv3_account
-AWAY,    recv_ircv3_away
-CHGHOST, recv_ircv3_chghost
+ERROR,        recv_error
+INVITE,       recv_invite
+JOIN,         recv_join
+KICK,         recv_kick
+MODE,         recv_mode
+NICK,         recv_nick
+NOTICE,       recv_notice
+PART,         recv_part
+PING,         recv_ping
+PONG,         recv_pong
+PRIVMSG,      recv_privmsg
+QUIT,         recv_quit
+TOPIC,        recv_topic
+ACCOUNT,      recv_ircv3_account
+AUTHENTICATE, recv_ircv3_authenticate
+AWAY,         recv_ircv3_away
+CAP,          recv_ircv3_cap
+CHGHOST,      recv_ircv3_chghost
 %%

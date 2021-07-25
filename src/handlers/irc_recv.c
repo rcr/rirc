@@ -210,6 +210,15 @@ static const irc_recv_f irc_numerics[] = {
 	[704] = irc_generic_info,   /* RPL_HELPSTART */
 	[705] = irc_generic_info,   /* RPL_HELP */
 	[706] = irc_generic_ignore, /* RPL_ENDOFHELP */
+	[900] = ircv3_numeric_900,  /* IRCv3 RPL_LOGGEDIN */
+	[901] = ircv3_numeric_901,  /* IRCv3 RPL_LOGGEDOUT */
+	[902] = ircv3_numeric_902,  /* IRCv3 ERR_NICKLOCKED */
+	[903] = ircv3_numeric_903,  /* IRCv3 RPL_SASLSUCCESS */
+	[904] = ircv3_numeric_904,  /* IRCv3 ERR_SASLFAIL */
+	[905] = ircv3_numeric_905,  /* IRCv3 ERR_SASLTOOLONG */
+	[906] = ircv3_numeric_906,  /* IRCv3 ERR_SASLABORTED */
+	[907] = ircv3_numeric_907,  /* IRCv3 ERR_SASLALREADY */
+	[908] = ircv3_numeric_908,  /* IRCv3 RPL_SASLMECHS */
 	[1000] = NULL               /* Out of range */
 };
 
@@ -1321,6 +1330,12 @@ static int
 recv_ircv3_cap(struct server *s, struct irc_message *m)
 {
 	return ircv3_recv_CAP(s, m);
+}
+
+static int
+recv_ircv3_authenticate(struct server *s, struct irc_message *m)
+{
+	return ircv3_recv_AUTHENTICATE(s, m);
 }
 
 static int

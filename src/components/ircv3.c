@@ -55,8 +55,5 @@ ircv3_sasl(struct ircv3_sasl *sasl)
 void
 ircv3_sasl_reset(struct ircv3_sasl *sasl)
 {
-	free((void *)sasl->user);
-	free((void *)sasl->pass);
-
-	ircv3_sasl(sasl);
+	sasl->state  = IRCV3_SASL_STATE_NONE;
 }

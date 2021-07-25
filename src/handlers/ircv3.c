@@ -3,6 +3,8 @@
 #include "src/io.h"
 #include "src/state.h"
 
+#include "mbedtls/base64.h"
+
 #include <string.h>
 
 #define failf(S, ...) \
@@ -31,6 +33,24 @@ IRCV3_RECV_HANDLERS
 
 static int ircv3_cap_req_count(struct ircv3_caps*);
 static int ircv3_cap_req_send(struct ircv3_caps*, struct server*);
+static int ircv3_registered(struct server*);
+static int ircv3_sasl_init(struct server*);
+
+static int ircv3_recv_AUTHENTICATE_PLAIN(struct server*, struct irc_message*);
+
+int
+ircv3_recv_AUTHENTICATE(struct server *s, struct irc_message *m)
+{
+	if (s->ircv3_sasl.method == IRCV3_SASL_METHOD_NONE)
+		failf(s, "AUTHENTICATE: no SASL method");
+
+	if (s->ircv3_sasl.method == IRCV3_SASL_METHOD_PLAIN)
+		return (ircv3_recv_AUTHENTICATE_PLAIN(s, m));
+
+	fatal("unknown SASL authentication method");
+
+	return 0;
+}
 
 int
 ircv3_recv_CAP(struct server *s, struct irc_message *m)
@@ -51,6 +71,198 @@ ircv3_recv_CAP(struct server *s, struct irc_message *m)
 	#undef X
 
 	failf(s, "CAP: unrecognized subcommand '%s'", cmnd);
+}
+
+int
+ircv3_numeric_900(struct server *s, struct irc_message *m)
+{
+	/* <nick>!<ident>@<host> <account> :You are now logged in as <user> */
+
+	char *account;
+	char *message;
+	char *nick;
+
+	if (!irc_message_param(m, &nick))
+		failf(s, "RPL_LOGGEDIN: missing nick");
+
+	if (!irc_message_param(m, &account))
+		failf(s, "RPL_LOGGEDIN: missing account");
+
+	irc_message_param(m, &message);
+
+	if (message && *message)
+		server_info(s, "SASL success: %s", message);
+	else
+		server_info(s, "SASL success: you are logged in as %s", account);
+
+	return 0;
+}
+
+int
+ircv3_numeric_901(struct server *s, struct irc_message *m)
+{
+	/* <nick>!<ident>@<host> :You are now logged out */
+
+	char *message;
+	char *nick;
+
+	if (!irc_message_param(m, &nick))
+		failf(s, "RPL_LOGGEDOUT: missing nick");
+
+	irc_message_param(m, &message);
+
+	if (message && *message)
+		server_info(s, "%s", message);
+	else
+		server_info(s, "You are now logged out");
+
+	return 0;
+}
+
+int
+ircv3_numeric_902(struct server *s, struct irc_message *m)
+{
+	/* :You must use a nick assigned to you */
+
+	char *message;
+
+	irc_message_param(m, &message);
+
+	if (message && *message)
+		server_error(s, "%s", message);
+	else
+		server_error(s, "You must use a nick assigned to you");
+
+	s->ircv3_sasl.state = IRCV3_SASL_STATE_NONE;
+
+	if (!s->registered)
+		io_dx(s->connection);
+
+	return 0;
+}
+
+int
+ircv3_numeric_903(struct server *s, struct irc_message *m)
+{
+	/* :SASL authentication successful */
+
+	UNUSED(m);
+
+	s->ircv3_sasl.state = IRCV3_SASL_STATE_AUTHENTICATED;
+
+	if (ircv3_registered(s))
+		sendf(s, "CAP END");
+
+	return 0;
+}
+
+int
+ircv3_numeric_904(struct server *s, struct irc_message *m)
+{
+	/* :SASL authentication failed */
+
+	char *message;
+
+	irc_message_param(m, &message);
+
+	if (message && *message)
+		server_error(s, "%s", message);
+	else
+		server_error(s, "SASL authentication failed");
+
+	s->ircv3_sasl.state = IRCV3_SASL_STATE_NONE;
+
+	if (!s->registered)
+		io_dx(s->connection);
+
+	return 0;
+}
+
+int
+ircv3_numeric_905(struct server *s, struct irc_message *m)
+{
+	/* :SASL message too long */
+
+	char *message;
+
+	irc_message_param(m, &message);
+
+	if (message && *message)
+		server_error(s, "%s", message);
+	else
+		server_error(s, "SASL message too long");
+
+	s->ircv3_sasl.state = IRCV3_SASL_STATE_NONE;
+
+	if (!s->registered)
+		io_dx(s->connection);
+
+	return 0;
+}
+
+int
+ircv3_numeric_906(struct server *s, struct irc_message *m)
+{
+	/* :SASL authentication aborted */
+
+	char *message;
+
+	irc_message_param(m, &message);
+
+	if (message && *message)
+		server_error(s, "%s", message);
+	else
+		server_error(s, "SASL authentication aborted");
+
+	s->ircv3_sasl.state = IRCV3_SASL_STATE_NONE;
+
+	if (!s->registered)
+		io_dx(s->connection);
+
+	return 0;
+}
+
+int
+ircv3_numeric_907(struct server *s, struct irc_message *m)
+{
+	/* :You have already authenticated using SASL */
+
+	char *message;
+
+	irc_message_param(m, &message);
+
+	if (message && *message)
+		server_error(s, "%s", message);
+	else
+		server_error(s, "You have already authenticated using SASL");
+
+	s->ircv3_sasl.state = IRCV3_SASL_STATE_NONE;
+
+	if (!s->registered)
+		io_dx(s->connection);
+
+	return 0;
+}
+
+int
+ircv3_numeric_908(struct server *s, struct irc_message *m)
+{
+	/* <mechanisms> :are available SASL mechanisms */
+
+	char *mechanisms;
+	char *message;
+
+	if (!irc_message_param(m, &mechanisms))
+		failf(s, "RPL_SASLMECHS: missing mechanisms");
+
+	irc_message_param(m, &message);
+
+	if (message && *message)
+		server_info(s, "%s %s", message);
+	else
+		server_info(s, "%s are available SASL mechanisms");
+
+	return 0;
 }
 
 static int
@@ -225,12 +437,15 @@ ircv3_recv_cap_ACK(struct server *s, struct irc_message *m)
 		server_info(s, "capability change accepted: %s%s%s%s",
 			(unset ? "-" : ""), cap, (c->val ? "=" : ""), (c->val ? c->val : ""));
 
+		if (!strcmp(cap, "sasl"))
+			ircv3_sasl_init(s);
+
 	} while ((cap = irc_strsep(&(caps))));
 
 	if (errors)
 		failf(s, "CAP ACK: parameter errors");
 
-	if (!s->registered && !ircv3_cap_req_count(&(s->ircv3_caps)))
+	if (ircv3_registered(s))
 		sendf(s, "CAP END");
 
 	return 0;
@@ -264,7 +479,7 @@ ircv3_recv_cap_NAK(struct server *s, struct irc_message *m)
 
 	} while ((cap = irc_strsep(&(caps))));
 
-	if (!s->registered && !ircv3_cap_req_count(&(s->ircv3_caps)))
+	if (ircv3_registered(s))
 		sendf(s, "CAP END");
 
 	return 0;
@@ -356,6 +571,47 @@ ircv3_recv_cap_NEW(struct server *s, struct irc_message *m)
 }
 
 static int
+ircv3_recv_AUTHENTICATE_PLAIN(struct server *s, struct irc_message *m)
+{
+	/* C: AUTHENTICATE PLAIN
+	 * S: +
+	 * C: AUTHENTICATE base64(<authzid><null><authcid><null><passwd>)
+	 */
+
+	/* (((4 * 300 / 3) + 3) & ~3) */
+	unsigned char resp_dec[300];
+	unsigned char resp_enc[400];
+	size_t len;
+
+	if (!s->ircv3_sasl.user || !*s->ircv3_sasl.user)
+		failf(s, "SASL method PLAIN requires a username");
+
+	if (!s->ircv3_sasl.pass || !*s->ircv3_sasl.pass)
+		failf(s, "SASL method PLAIN requires a password");
+
+	if (s->ircv3_sasl.state != IRCV3_SASL_STATE_REQ_METHOD)
+		failf(s, "Invalid SASL state for method PLAIN: %d", s->ircv3_sasl.state);
+
+	if (strcmp(m->params, "+"))
+		failf(s, "Invalid SASL response '%s'", m->params);
+
+	len = snprintf((char *)resp_dec, sizeof(resp_dec), "%s%c%s%c%s",
+		s->ircv3_sasl.user, 0,
+		s->ircv3_sasl.user, 0,
+		s->ircv3_sasl.pass);
+
+	if (len >= sizeof(resp_dec))
+		failf(s, "SASL decoded auth message too long");
+
+	if (mbedtls_base64_encode(resp_enc, sizeof(resp_enc), &len, resp_dec, len))
+		failf(s, "SASL encoded auth message too long");
+
+	sendf(s, "AUTHENTICATE %s", resp_enc);
+
+	return 0;
+}
+
+static int
 ircv3_cap_req_count(struct ircv3_caps *caps)
 {
 	#define X(CAP, VAR, ATTRS) + !!caps->VAR.req
@@ -385,6 +641,62 @@ ircv3_cap_req_send(struct ircv3_caps *caps, struct server *s)
 	))) {
 		failf(s, "Send fail: %s", io_err(ret));
 	}
+
+	return 0;
+}
+
+static int
+ircv3_registered(struct server *s)
+{
+	/* Previously registered or doesn't support IRCv3 */
+	if (s->registered)
+		return 0;
+
+	/* IRCv3 CAP negotiation in progress */
+	if (ircv3_cap_req_count(&(s->ircv3_caps)))
+		return 0;
+
+	/* IRCv3 SASL authentication in progress */
+	if (s->ircv3_sasl.state != IRCV3_SASL_STATE_NONE
+	 && s->ircv3_sasl.state != IRCV3_SASL_STATE_AUTHENTICATED)
+		return 0;
+
+	return 1;
+}
+
+static int
+ircv3_sasl_init(struct server *s)
+{
+	if (s->ircv3_sasl.method == IRCV3_SASL_METHOD_NONE)
+		return 0;
+
+	switch (s->ircv3_sasl.state) {
+
+		/* Start authentication process */
+		case IRCV3_SASL_STATE_NONE:
+			break;
+
+		/* Authentication in progress */
+		case IRCV3_SASL_STATE_REQ_METHOD:
+			return 0;
+
+		/* Previously authenticated */
+		case IRCV3_SASL_STATE_AUTHENTICATED:
+			return 0;
+
+		default:
+			fatal("unknown SASL state");
+	}
+
+	switch (s->ircv3_sasl.method) {
+		case IRCV3_SASL_METHOD_PLAIN:
+			sendf(s, "AUTHENTICATE PLAIN");
+			break;
+		default:
+			fatal("unknown SASL authentication method");
+	}
+
+	s->ircv3_sasl.state = IRCV3_SASL_STATE_REQ_METHOD;
 
 	return 0;
 }

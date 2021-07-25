@@ -58,7 +58,7 @@ $(PATH_BUILD)/%.t: $(PATH_TEST)/%.c $(SRC_GPERF) $(CONFIG) | $(PATH_BUILD)
 	@rm -f $(@:.t=.td)
 	@$(CPP) $(CFLAGS_DEBUG) $(CLFAGS_RIRC) -MM -MP -MT $@ -MF $(@:.t=.t.d) $<
 	@$(CC)  $(CFLAGS_DEBUG) $(CLFAGS_RIRC) -c -o $(@:.t=.t.o) $<
-	@$(CC)  $(CFLAGS_DEBUG) $(CLFAGS_RIRC) -o $@ $(@:.t=.t.o)
+	@$(CC)  $(CFLAGS_DEBUG) $(CLFAGS_RIRC) -o $@ $(@:.t=.t.o) $(RIRC_LIBS)
 	@./$@ || mv $@ $(@:.t=.td)
 
 $(PATH_BUILD):
