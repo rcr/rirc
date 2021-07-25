@@ -1329,13 +1329,23 @@ recv_topic(struct server *s, struct irc_message *m)
 static int
 recv_ircv3_cap(struct server *s, struct irc_message *m)
 {
-	return ircv3_recv_CAP(s, m);
+	int ret;
+
+	if ((ret = ircv3_recv_CAP(s, m)) && !s->registered)
+		io_dx(s->connection);
+
+	return ret;
 }
 
 static int
 recv_ircv3_authenticate(struct server *s, struct irc_message *m)
 {
-	return ircv3_recv_AUTHENTICATE(s, m);
+	int ret;
+
+	if ((ret = ircv3_recv_AUTHENTICATE(s, m)) && !s->registered)
+		io_dx(s->connection);
+
+	return ret;
 }
 
 static int
