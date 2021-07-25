@@ -426,8 +426,17 @@ io_state_cxed(struct connection *cx)
 {
 	int ret;
 
-	while ((ret = io_cx_read(cx, SEC_IN_MS(IO_PING_MIN))) > 0)
-		continue;
+	do {
+		enum io_state st;
+
+		PT_LK(&(cx->mtx));
+		st = cx->st_new;
+		PT_UL(&(cx->mtx));
+
+		if (st != IO_ST_INVALID)
+			return st;
+
+	} while ((ret = io_cx_read(cx, SEC_IN_MS(IO_PING_MIN))) > 0);
 
 	if (ret == MBEDTLS_ERR_SSL_TIMEOUT)
 		return IO_ST_PING;
