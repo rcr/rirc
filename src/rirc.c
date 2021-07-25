@@ -312,15 +312,15 @@ rirc_parse_args(int argc, char **argv)
 
 			case '6': /* Set server TLS peer certificate verification mode */
 				CHECK_SERVER_OPTARG(opt_c, 1);
-				if (!strcmp(optarg, "0") || !strcasecmp(optarg, "disabled")) {
+				if (!strcmp(optarg, "0") || !strcasecmp(optarg, "DISABLED")) {
 					cli_servers[n_servers -1].tls_vrfy = IO_TLS_VRFY_DISABLED;
 					break;
 				}
-				if (!strcmp(optarg, "1") || !strcasecmp(optarg, "optional")) {
+				if (!strcmp(optarg, "1") || !strcasecmp(optarg, "OPTIONAL")) {
 					cli_servers[n_servers -1].tls_vrfy = IO_TLS_VRFY_OPTIONAL;
 					break;
 				}
-				if (!strcmp(optarg, "2") || !strcasecmp(optarg, "required")) {
+				if (!strcmp(optarg, "2") || !strcasecmp(optarg, "REQUIRED")) {
 					cli_servers[n_servers -1].tls_vrfy = IO_TLS_VRFY_REQUIRED;
 					break;
 				}
@@ -329,7 +329,11 @@ rirc_parse_args(int argc, char **argv)
 
 			case '7': /* Authenticate with SASL method */
 				CHECK_SERVER_OPTARG(opt_c, 1);
-				if (!strcasecmp(optarg, "plain")) {
+				if (!strcasecmp(optarg, "EXTERNAL")) {
+					cli_servers[n_servers - 1].sasl = optarg;
+					break;
+				}
+				if (!strcasecmp(optarg, "PLAIN")) {
 					cli_servers[n_servers - 1].sasl = optarg;
 					break;
 				}

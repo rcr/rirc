@@ -48,6 +48,7 @@ struct ircv3_sasl
 {
 	enum {
 		IRCV3_SASL_METHOD_NONE,
+		IRCV3_SASL_METHOD_EXTERNAL,
 		IRCV3_SASL_METHOD_PLAIN,
 	} method;
 	enum {

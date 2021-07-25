@@ -36,6 +36,7 @@ static int ircv3_cap_req_send(struct ircv3_caps*, struct server*);
 static int ircv3_registered(struct server*);
 static int ircv3_sasl_init(struct server*);
 
+static int ircv3_recv_AUTHENTICATE_EXTERNAL(struct server*, struct irc_message*);
 static int ircv3_recv_AUTHENTICATE_PLAIN(struct server*, struct irc_message*);
 
 int
@@ -43,6 +44,9 @@ ircv3_recv_AUTHENTICATE(struct server *s, struct irc_message *m)
 {
 	if (s->ircv3_sasl.method == IRCV3_SASL_METHOD_NONE)
 		failf(s, "AUTHENTICATE: no SASL method");
+
+	if (s->ircv3_sasl.method == IRCV3_SASL_METHOD_EXTERNAL)
+		return (ircv3_recv_AUTHENTICATE_EXTERNAL(s, m));
 
 	if (s->ircv3_sasl.method == IRCV3_SASL_METHOD_PLAIN)
 		return (ircv3_recv_AUTHENTICATE_PLAIN(s, m));
@@ -571,6 +575,25 @@ ircv3_recv_cap_NEW(struct server *s, struct irc_message *m)
 }
 
 static int
+ircv3_recv_AUTHENTICATE_EXTERNAL(struct server *s, struct irc_message *m)
+{
+	/* C: AUTHENTICATE EXTERNAL
+	 * S: +
+	 * C: +
+	 */
+
+	if (s->ircv3_sasl.state != IRCV3_SASL_STATE_REQ_METHOD)
+		failf(s, "Invalid SASL state for method EXTERNAL: %d", s->ircv3_sasl.state);
+
+	if (strcmp(m->params, "+"))
+		failf(s, "Invalid SASL response for method EXTERNAL: '%s'", m->params);
+
+	sendf(s, "AUTHENTICATE +");
+
+	return 0;
+}
+
+static int
 ircv3_recv_AUTHENTICATE_PLAIN(struct server *s, struct irc_message *m)
 {
 	/* C: AUTHENTICATE PLAIN
@@ -593,7 +616,7 @@ ircv3_recv_AUTHENTICATE_PLAIN(struct server *s, struct irc_message *m)
 		failf(s, "Invalid SASL state for method PLAIN: %d", s->ircv3_sasl.state);
 
 	if (strcmp(m->params, "+"))
-		failf(s, "Invalid SASL response '%s'", m->params);
+		failf(s, "Invalid SASL response for method PLAIN: '%s'", m->params);
 
 	len = snprintf((char *)resp_dec, sizeof(resp_dec), "%s%c%s%c%s",
 		s->ircv3_sasl.user, 0,
@@ -689,6 +712,9 @@ ircv3_sasl_init(struct server *s)
 	}
 
 	switch (s->ircv3_sasl.method) {
+		case IRCV3_SASL_METHOD_EXTERNAL:
+			sendf(s, "AUTHENTICATE EXTERNAL");
+			break;
 		case IRCV3_SASL_METHOD_PLAIN:
 			sendf(s, "AUTHENTICATE PLAIN");
 			break;
