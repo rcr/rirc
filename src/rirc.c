@@ -11,6 +11,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include <unistd.h>
 
 #define MAX_CLI_SERVERS 64
@@ -311,15 +312,15 @@ rirc_parse_args(int argc, char **argv)
 
 			case '6': /* Set server TLS peer certificate verification mode */
 				CHECK_SERVER_OPTARG(opt_c, 1);
-				if (!strcmp(optarg, "0") || !strcmp(optarg, "disabled")) {
+				if (!strcmp(optarg, "0") || !strcasecmp(optarg, "disabled")) {
 					cli_servers[n_servers -1].tls_vrfy = IO_TLS_VRFY_DISABLED;
 					break;
 				}
-				if (!strcmp(optarg, "1") || !strcmp(optarg, "optional")) {
+				if (!strcmp(optarg, "1") || !strcasecmp(optarg, "optional")) {
 					cli_servers[n_servers -1].tls_vrfy = IO_TLS_VRFY_OPTIONAL;
 					break;
 				}
-				if (!strcmp(optarg, "2") || !strcmp(optarg, "required")) {
+				if (!strcmp(optarg, "2") || !strcasecmp(optarg, "required")) {
 					cli_servers[n_servers -1].tls_vrfy = IO_TLS_VRFY_REQUIRED;
 					break;
 				}
@@ -328,12 +329,12 @@ rirc_parse_args(int argc, char **argv)
 
 			case '7': /* Authenticate with SASL method */
 				CHECK_SERVER_OPTARG(opt_c, 1);
-				if (!strcmp(optarg, "PLAIN")) {
+				if (!strcasecmp(optarg, "plain")) {
 					cli_servers[n_servers - 1].sasl = optarg;
 					break;
 				}
 				arg_error("invalid option for '--sasl' '%s'", optarg);
-				break;
+				return -1;
 
 			case '8': /* Authenticate with SASL user */
 				CHECK_SERVER_OPTARG(opt_c, 1);

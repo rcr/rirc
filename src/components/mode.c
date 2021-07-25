@@ -334,7 +334,7 @@ mode_chanmode_prefix(struct mode *m, const struct mode_cfg *cfg, int flag)
 	 * All other prefixes are invalid.
 	 * Prefixes may override by precendece, but are silentyly ignored otherwise */
 
-	(void)(cfg);
+	UNUSED(cfg);
 
 	/* If 's' is set, all other settings are silently ignored */
 	if (m->prefix == MODE_CHANMODE_PREFIX_SECRET)
