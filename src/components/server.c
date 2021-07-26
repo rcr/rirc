@@ -326,19 +326,19 @@ server_set_005(struct server *s, char *str)
 }
 
 void
-server_set_sasl(struct server *s, const char *method, const char *user, const char *pass)
+server_set_sasl(struct server *s, const char *mech, const char *user, const char *pass)
 {
 	free((void *)s->ircv3_sasl.user);
 	free((void *)s->ircv3_sasl.pass);
 
-	if (!strcasecmp(method, "EXTERNAL")) {
-		s->ircv3_sasl.method = IRCV3_SASL_METHOD_EXTERNAL;
+	if (!strcasecmp(mech, "EXTERNAL")) {
+		s->ircv3_sasl.mech = IRCV3_SASL_MECH_EXTERNAL;
 		s->ircv3_sasl.user = NULL;
 		s->ircv3_sasl.pass = NULL;
 	}
 
-	if (!strcasecmp(method, "PLAIN")) {
-		s->ircv3_sasl.method = IRCV3_SASL_METHOD_PLAIN;
+	if (!strcasecmp(mech, "PLAIN")) {
+		s->ircv3_sasl.mech = IRCV3_SASL_MECH_PLAIN;
 		s->ircv3_sasl.user = (user ? strdup(user) : NULL);
 		s->ircv3_sasl.pass = (pass ? strdup(pass) : NULL);
 	}

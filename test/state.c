@@ -366,7 +366,7 @@ test_command_connect(void)
 	assert_strcmp(s->nicks.set[0], "x0");
 	assert_strcmp(s->nicks.set[1], "y1");
 	assert_strcmp(s->nicks.set[2], "z2");
-	assert_eq(s->ircv3_sasl.method, IRCV3_SASL_METHOD_PLAIN);
+	assert_eq(s->ircv3_sasl.mech, IRCV3_SASL_MECH_PLAIN);
 	assert_strcmp(s->ircv3_sasl.user, "sasl_user");
 	assert_strcmp(s->ircv3_sasl.pass, "sasl_pass");
 	assert_ptr_not_null(channel_list_get(&(s->clist), "#a1", s->casemapping));

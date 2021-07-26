@@ -88,7 +88,7 @@ Server connection options:
    --tls-verify=MODE        Set server TLS peer certificate verification mode
 
 Server authentication options:
-   --sasl=METHOD            Authenticate with SASL method
+   --sasl=MECHANISM         Authenticate with SASL mechanism
    --sasl-user=USER         Authenticate with SASL user
    --sasl-pass=PASS         Authenticate with SASL pass
 ```

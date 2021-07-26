@@ -9,7 +9,7 @@
 
 #define failf(S, ...) \
 	do { server_error((S), __VA_ARGS__); \
-	     return 1; \
+	     return -1; \
 	} while (0)
 
 #define sendf(S, ...) \
@@ -33,7 +33,7 @@ IRCV3_RECV_HANDLERS
 
 static int ircv3_cap_req_count(struct ircv3_caps*);
 static int ircv3_cap_req_send(struct ircv3_caps*, struct server*);
-static int ircv3_registered(struct server*);
+static int ircv3_cap_end(struct server*);
 static int ircv3_sasl_init(struct server*);
 
 static int ircv3_recv_AUTHENTICATE_EXTERNAL(struct server*, struct irc_message*);
@@ -42,16 +42,16 @@ static int ircv3_recv_AUTHENTICATE_PLAIN(struct server*, struct irc_message*);
 int
 ircv3_recv_AUTHENTICATE(struct server *s, struct irc_message *m)
 {
-	if (s->ircv3_sasl.method == IRCV3_SASL_METHOD_NONE)
-		failf(s, "AUTHENTICATE: no SASL method");
+	if (s->ircv3_sasl.mech == IRCV3_SASL_MECH_NONE)
+		failf(s, "AUTHENTICATE: no SASL mechanism");
 
-	if (s->ircv3_sasl.method == IRCV3_SASL_METHOD_EXTERNAL)
+	if (s->ircv3_sasl.mech == IRCV3_SASL_MECH_EXTERNAL)
 		return (ircv3_recv_AUTHENTICATE_EXTERNAL(s, m));
 
-	if (s->ircv3_sasl.method == IRCV3_SASL_METHOD_PLAIN)
+	if (s->ircv3_sasl.mech == IRCV3_SASL_MECH_PLAIN)
 		return (ircv3_recv_AUTHENTICATE_PLAIN(s, m));
 
-	fatal("unknown SASL authentication method");
+	fatal("unknown SASL authentication mechanism");
 
 	return 0;
 }
@@ -150,14 +150,18 @@ ircv3_numeric_903(struct server *s, struct irc_message *m)
 {
 	/* :SASL authentication successful */
 
-	UNUSED(m);
+	char *message;
+
+	irc_message_param(m, &message);
+
+	if (message && *message)
+		server_error(s, "%s", message);
+	else
+		server_error(s, "SASL authentication successful");
 
 	s->ircv3_sasl.state = IRCV3_SASL_STATE_AUTHENTICATED;
 
-	if (ircv3_registered(s))
-		sendf(s, "CAP END");
-
-	return 0;
+	return ircv3_cap_end(s);
 }
 
 int
@@ -262,9 +266,9 @@ ircv3_numeric_908(struct server *s, struct irc_message *m)
 	irc_message_param(m, &message);
 
 	if (message && *message)
-		server_info(s, "%s %s", message);
+		server_info(s, "%s %s", mechanisms, message);
 	else
-		server_info(s, "%s are available SASL mechanisms");
+		server_info(s, "%s are available SASL mechanisms", mechanisms);
 
 	return 0;
 }
@@ -449,10 +453,7 @@ ircv3_recv_cap_ACK(struct server *s, struct irc_message *m)
 	if (errors)
 		failf(s, "CAP ACK: parameter errors");
 
-	if (ircv3_registered(s))
-		sendf(s, "CAP END");
-
-	return 0;
+	return ircv3_cap_end(s);
 }
 
 static int
@@ -483,10 +484,7 @@ ircv3_recv_cap_NAK(struct server *s, struct irc_message *m)
 
 	} while ((cap = irc_strsep(&(caps))));
 
-	if (ircv3_registered(s))
-		sendf(s, "CAP END");
-
-	return 0;
+	return ircv3_cap_end(s);
 }
 
 static int
@@ -582,11 +580,11 @@ ircv3_recv_AUTHENTICATE_EXTERNAL(struct server *s, struct irc_message *m)
 	 * C: +
 	 */
 
-	if (s->ircv3_sasl.state != IRCV3_SASL_STATE_REQ_METHOD)
-		failf(s, "Invalid SASL state for method EXTERNAL: %d", s->ircv3_sasl.state);
+	if (s->ircv3_sasl.state != IRCV3_SASL_STATE_REQ_MECH)
+		failf(s, "Invalid SASL state for mechanism EXTERNAL: %d", s->ircv3_sasl.state);
 
 	if (strcmp(m->params, "+"))
-		failf(s, "Invalid SASL response for method EXTERNAL: '%s'", m->params);
+		failf(s, "Invalid SASL response for mechanism EXTERNAL: '%s'", m->params);
 
 	sendf(s, "AUTHENTICATE +");
 
@@ -607,16 +605,16 @@ ircv3_recv_AUTHENTICATE_PLAIN(struct server *s, struct irc_message *m)
 	size_t len;
 
 	if (!s->ircv3_sasl.user || !*s->ircv3_sasl.user)
-		failf(s, "SASL method PLAIN requires a username");
+		failf(s, "SASL mechanism PLAIN requires a username");
 
 	if (!s->ircv3_sasl.pass || !*s->ircv3_sasl.pass)
-		failf(s, "SASL method PLAIN requires a password");
+		failf(s, "SASL mechanism PLAIN requires a password");
 
-	if (s->ircv3_sasl.state != IRCV3_SASL_STATE_REQ_METHOD)
-		failf(s, "Invalid SASL state for method PLAIN: %d", s->ircv3_sasl.state);
+	if (s->ircv3_sasl.state != IRCV3_SASL_STATE_REQ_MECH)
+		failf(s, "Invalid SASL state for mechanism PLAIN: %d", s->ircv3_sasl.state);
 
 	if (strcmp(m->params, "+"))
-		failf(s, "Invalid SASL response for method PLAIN: '%s'", m->params);
+		failf(s, "Invalid SASL response for mechanism PLAIN: '%s'", m->params);
 
 	len = snprintf((char *)resp_dec, sizeof(resp_dec), "%s%c%s%c%s",
 		s->ircv3_sasl.user, 0,
@@ -669,7 +667,7 @@ ircv3_cap_req_send(struct ircv3_caps *caps, struct server *s)
 }
 
 static int
-ircv3_registered(struct server *s)
+ircv3_cap_end(struct server *s)
 {
 	/* Previously registered or doesn't support IRCv3 */
 	if (s->registered)
@@ -684,13 +682,15 @@ ircv3_registered(struct server *s)
 	 && s->ircv3_sasl.state != IRCV3_SASL_STATE_AUTHENTICATED)
 		return 0;
 
-	return 1;
+	sendf(s, "CAP END");
+	
+	return 0;
 }
 
 static int
 ircv3_sasl_init(struct server *s)
 {
-	if (s->ircv3_sasl.method == IRCV3_SASL_METHOD_NONE)
+	if (s->ircv3_sasl.mech == IRCV3_SASL_MECH_NONE)
 		return 0;
 
 	switch (s->ircv3_sasl.state) {
@@ -700,7 +700,7 @@ ircv3_sasl_init(struct server *s)
 			break;
 
 		/* Authentication in progress */
-		case IRCV3_SASL_STATE_REQ_METHOD:
+		case IRCV3_SASL_STATE_REQ_MECH:
 			return 0;
 
 		/* Previously authenticated */
@@ -711,18 +711,18 @@ ircv3_sasl_init(struct server *s)
 			fatal("unknown SASL state");
 	}
 
-	switch (s->ircv3_sasl.method) {
-		case IRCV3_SASL_METHOD_EXTERNAL:
+	switch (s->ircv3_sasl.mech) {
+		case IRCV3_SASL_MECH_EXTERNAL:
 			sendf(s, "AUTHENTICATE EXTERNAL");
 			break;
-		case IRCV3_SASL_METHOD_PLAIN:
+		case IRCV3_SASL_MECH_PLAIN:
 			sendf(s, "AUTHENTICATE PLAIN");
 			break;
 		default:
-			fatal("unknown SASL authentication method");
+			fatal("unknown SASL authentication mechanism");
 	}
 
-	s->ircv3_sasl.state = IRCV3_SASL_STATE_REQ_METHOD;
+	s->ircv3_sasl.state = IRCV3_SASL_STATE_REQ_MECH;
 
 	return 0;
 }

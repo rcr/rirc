@@ -48,8 +48,8 @@ ircv3_sasl(struct ircv3_sasl *sasl)
 {
 	memset(sasl, 0, sizeof(*sasl));
 
-	sasl->method = IRCV3_SASL_METHOD_NONE;
-	sasl->state  = IRCV3_SASL_STATE_NONE;
+	sasl->mech  = IRCV3_SASL_MECH_NONE;
+	sasl->state = IRCV3_SASL_STATE_NONE;
 }
 
 void

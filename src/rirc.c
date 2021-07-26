@@ -92,7 +92,7 @@ static const char *const rirc_help =
 "\n   --tls-verify=MODE        Set server TLS peer certificate verification mode"
 "\n"
 "\nServer authentication options:"
-"\n   --sasl=METHOD            Authenticate with SASL method"
+"\n   --sasl=MECHANISM         Authenticate with SASL mechanism"
 "\n   --sasl-user=USER         Authenticate with SASL user"
 "\n   --sasl-pass=PASS         Authenticate with SASL pass"
 "\n";
@@ -327,7 +327,7 @@ rirc_parse_args(int argc, char **argv)
 				arg_error("invalid option for '--tls-verify' '%s'", optarg);
 				return -1;
 
-			case '7': /* Authenticate with SASL method */
+			case '7': /* Authenticate with SASL mechanism */
 				CHECK_SERVER_OPTARG(opt_c, 1);
 				if (!strcasecmp(optarg, "EXTERNAL")) {
 					cli_servers[n_servers - 1].sasl = optarg;
