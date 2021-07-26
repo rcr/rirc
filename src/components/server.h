@@ -34,7 +34,6 @@ struct server
 	struct mode_cfg mode_cfg;
 	struct server *next;
 	struct server *prev;
-	struct user_list ignore;
 	unsigned ping;
 	unsigned connected  : 1;
 	unsigned quitting   : 1;

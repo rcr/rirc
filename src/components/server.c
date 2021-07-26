@@ -154,8 +154,6 @@ server_free(struct server *s)
 {
 	channel_list_free(&(s->clist));
 
-	user_list_free(&(s->ignore));
-
 	free((void *)s->host);
 	free((void *)s->port);
 	free((void *)s->pass);

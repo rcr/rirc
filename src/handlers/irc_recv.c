@@ -1112,9 +1112,6 @@ recv_notice(struct server *s, struct irc_message *m)
 	if (!irc_message_param(m, &message))
 		failf(s, "NOTICE: message is null");
 
-	if (user_list_get(&(s->ignore), s->casemapping, m->from, 0))
-		return 0;
-
 	if (IS_CTCP(message))
 		return ctcp_response(s, m->from, target, message);
 
@@ -1221,9 +1218,6 @@ recv_privmsg(struct server *s, struct irc_message *m)
 
 	if (!irc_message_param(m, &message))
 		failf(s, "PRIVMSG: message is null");
-
-	if (user_list_get(&(s->ignore), s->casemapping, m->from, 0))
-		return 0;
 
 	if (IS_CTCP(message))
 		return ctcp_request(s, m->from, target, message);
