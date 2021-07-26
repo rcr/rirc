@@ -19,6 +19,18 @@
 /* See: https://vt100.net/docs/vt100-ug/chapter3.html */
 #define CTRL(k) ((k) & 0x1f)
 
+#define COMMAND_HANDLERS \
+	X(clear) \
+	X(close) \
+	X(connect) \
+	X(disconnect) \
+	X(quit)
+
+#define X(CMD) \
+static void command_##CMD(struct channel*, char*);
+COMMAND_HANDLERS
+#undef X
+
 static void _newline(struct channel*, enum buffer_line_type, const char*, const char*, va_list);
 
 static int state_input_linef(struct channel*);
@@ -595,233 +607,277 @@ command(struct channel *c, char *buf)
 		return;
 
 	if (!strcasecmp(str, "clear")) {
-		if ((str = irc_strsep(&buf))) {
-			action(action_error, "clear: Unknown arg '%s'", str);
-			return;
-		}
-		state_channel_clear(0);
+		command_clear(c, buf);
 		return;
 	}
 
 	if (!strcasecmp(str, "close")) {
-		if ((str = irc_strsep(&buf))) {
-			action(action_error, "close: Unknown arg '%s'", str);
-			return;
-		}
-		state_channel_close(0);
+		command_close(c, buf);
 		return;
 	}
 
-	/* :connect [hostname [options]] */
 	if (!strcasecmp(str, "connect")) {
-
-		if (!(str = irc_strsep(&buf))) {
-
-			int err;
-
-			if (!c->server) {
-				action(action_error, "connect: This is not a server");
-			} else if ((err = io_cx(c->server->connection))) {
-				action(action_error, "connect: %s", io_err(err));
-			}
-
-		} else {
-
-			int ret;
-			struct server *s;
-
-			const char *host        = str;
-			const char *port        = NULL;
-			const char *pass        = NULL;
-			const char *username    = default_username;
-			const char *realname    = default_realname;
-			const char *mode        = NULL;
-			const char *nicks       = default_nicks;
-			const char *chans       = NULL;
-			const char *tls_ca_file = NULL;
-			const char *tls_ca_path = NULL;
-			const char *tls_cert    = NULL;
-			const char *sasl        = NULL;
-			const char *sasl_user   = NULL;
-			const char *sasl_pass   = NULL;
-			int ipv                 = IO_IPV_UNSPEC;
-			int tls                 = IO_TLS_ENABLED;
-			int tls_vrfy            = IO_TLS_VRFY_REQUIRED;
-
-			while ((str = irc_strsep(&buf))) {
-
-				if (*str != '-') {
-					action(action_error, ":connect [hostname [options]]");
-					return;
-				} else if (!strcmp(str, "-p") || !strcmp(str, "--port")) {
-					if (!(port = irc_strsep(&buf))) {
-						action(action_error, "connect: '-p/--port' requires an argument");
-						return;
-					}
-				} else if (!strcmp(str, "-w") || !strcmp(str, "--pass")) {
-					if (!(pass = irc_strsep(&buf))) {
-						action(action_error, "connect: '-w/--pass' requires an argument");
-						return;
-					}
-				} else if (!strcmp(str, "-u") || !strcmp(str, "--username")) {
-					if (!(username = irc_strsep(&buf))) {
-						action(action_error, "connect: '-u/--username' requires an argument");
-						return;
-					}
-				} else if (!strcmp(str, "-r") || !strcmp(str, "--realname")) {
-					if (!(realname = irc_strsep(&buf))) {
-						action(action_error, "connect: '-r/--realname' requires an argument");
-						return;
-					}
-				} else if (!strcmp(str, "-m") || !strcmp(str, "--mode")) {
-					if (!(mode = irc_strsep(&buf))) {
-						action(action_error, "connect: '-m/--mode' requires an argument");
-						return;
-					}
-				} else if (!strcmp(str, "-n") || !strcmp(str, "--nicks")) {
-					if (!(nicks = irc_strsep(&buf))) {
-						action(action_error, "connect: '-n/--nicks' requires an argument");
-						return;
-					}
-				} else if (!strcmp(str, "-c") || !strcmp(str, "--chans")) {
-					if (!(chans = irc_strsep(&buf))) {
-						action(action_error, "connect: '-c/--chans' requires an argument");
-						return;
-					}
-				} else if (!strcmp(str, "--ipv4")) {
-					ipv = IO_IPV_4;
-				} else if (!strcmp(str, "--ipv6")) {
-					ipv = IO_IPV_6;
-				} else if (!strcmp(str, "--tls-disable")) {
-					tls = IO_TLS_DISABLED;
-				} else if (!strcmp(str, "--tls-ca-file")) {
-					if (!(tls_ca_file = irc_strsep(&buf))) {
-						action(action_error, "connect: '--tls-ca-file' requires an argument");
-						return;
-					}
-				} else if (!strcmp(str, "--tls-ca-path")) {
-					if (!(tls_ca_path = irc_strsep(&buf))) {
-						action(action_error, "connect: '--tls-ca-path' requires an argument");
-						return;
-					}
-				} else if (!strcmp(str, "--tls-cert")) {
-					if (!(tls_cert = irc_strsep(&buf))) {
-						action(action_error, "connect: '--tls-cert' requires an argument");
-						return;
-					}
-				} else if (!strcmp(str, "--tls-verify")) {
-					if (!(str = irc_strsep(&buf))) {
-						action(action_error, "connect: '--tls-verify' requires an argument");
-						return;
-					} else if (!strcmp(str, "0") || !strcmp(str, "disabled")) {
-						tls_vrfy = IO_TLS_VRFY_DISABLED;
-					} else if (!strcmp(str, "1") || !strcmp(str, "optional")) {
-						tls_vrfy = IO_TLS_VRFY_OPTIONAL;
-					} else if (!strcmp(str, "2") || !strcmp(str, "required")) {
-						tls_vrfy = IO_TLS_VRFY_REQUIRED;
-					} else {
-						action(action_error, "connect: invalid option for '--tls-verify' '%s'", str);
-						return;
-					}
-				} else if (!strcmp(str, "--sasl")) {
-					if (!(sasl = irc_strsep(&buf))) {
-						action(action_error, "connect: '--sasl' requires an argument");
-						return;
-					} else if (strcasecmp(sasl, "PLAIN")) {
-						action(action_error, "connect: invalid option for '--sasl' '%s'", sasl);
-						return;
-					}
-				} else if (!strcmp(str, "--sasl-user")) {
-					if (!(sasl_user = irc_strsep(&buf))) {
-						action(action_error, "connect: '--sasl-user' requires an argument");
-						return;
-					}
-				} else if (!strcmp(str, "--sasl-pass")) {
-					if (!(sasl_pass = irc_strsep(&buf))) {
-						action(action_error, "connect: '--sasl-pass' requires an argument");
-						return;
-					}
-				} else {
-					action(action_error, "connect: unknown option '%s'", str);
-					return;
-				}
-			}
-
-			if (port == NULL)
-				port = (tls == IO_TLS_ENABLED) ? "6697" : "6667";
-
-			s = server(host, port, pass, username, realname, mode);
-
-			if (nicks && server_set_nicks(s, nicks)) {
-				action(action_error, "connect: invalid -n/--nicks: '%s'", nicks);
-				server_free(s);
-				return;
-			}
-
-			if (chans && server_set_chans(s, chans)) {
-				action(action_error, "connect: invalid -c/--chans: '%s'", chans);
-				server_free(s);
-				return;
-			}
-
-			if (server_list_add(state_server_list(), s)) {
-				action(action_error, "connect: duplicate server: %s:%s", host, port);
-				server_free(s);
-				return;
-			}
-
-			if (sasl)
-				server_set_sasl(s, sasl, sasl_user, sasl_pass);
-
-			s->connection = connection(
-				s,
-				host,
-				port,
-				tls_ca_file,
-				tls_ca_path,
-				tls_cert,
-				(ipv | tls | tls_vrfy));
-
-			if ((ret = io_cx(s->connection)))
-				server_error(s, "failed to connect: %s", io_err(ret));
-
-			channel_set_current(s->channel);
-		}
-
+		command_connect(c, buf);
 		return;
 	}
 
 	if (!strcasecmp(str, "disconnect")) {
-
-		int err;
-
-		if (!c->server) {
-			action(action_error, "disconnect: This is not a server");
-			return;
-		}
-
-		if ((str = irc_strsep(&buf))) {
-			action(action_error, "disconnect: Unknown arg '%s'", str);
-			return;
-		}
-
-		if ((err = io_dx(c->server->connection)))
-			action(action_error, "disconnect: %s", io_err(err));
-
+		command_disconnect(c, buf);
 		return;
 	}
 
 	if (!strcasecmp(str, "quit")) {
-		if ((str = irc_strsep(&buf))) {
-			action(action_error, "quit: Unknown arg '%s'", str);
-			return;
-		}
-
-		io_stop();
+		command_quit(c, buf);
 		return;
 	}
 
 	action(action_error, "Unknown command '%s'", str);
+}
+
+static void
+command_clear(struct channel *c, char *buf)
+{
+	UNUSED(c);
+
+	char *str;
+
+	if ((str = irc_strsep(&buf))) {
+		action(action_error, "clear: Unknown arg '%s'", str);
+		return;
+	}
+
+	state_channel_clear(0);
+}
+
+static void
+command_close(struct channel *c, char *buf)
+{
+	UNUSED(c);
+
+	char *str;
+
+	if ((str = irc_strsep(&buf))) {
+		action(action_error, "close: Unknown arg '%s'", str);
+		return;
+	}
+
+	state_channel_close(0);
+}
+
+static void
+command_connect(struct channel *c, char *buf)
+{
+	/* :connect [hostname [options]] */
+
+	char *str;
+
+	if (!(str = irc_strsep(&buf))) {
+
+		int err;
+
+		if (!c->server) {
+			action(action_error, "connect: This is not a server");
+		} else if ((err = io_cx(c->server->connection))) {
+			action(action_error, "connect: %s", io_err(err));
+		}
+
+	} else {
+
+		int ret;
+		struct server *s;
+
+		const char *host        = str;
+		const char *port        = NULL;
+		const char *pass        = NULL;
+		const char *username    = default_username;
+		const char *realname    = default_realname;
+		const char *mode        = NULL;
+		const char *nicks       = default_nicks;
+		const char *chans       = NULL;
+		const char *tls_ca_file = NULL;
+		const char *tls_ca_path = NULL;
+		const char *tls_cert    = NULL;
+		const char *sasl        = NULL;
+		const char *sasl_user   = NULL;
+		const char *sasl_pass   = NULL;
+		int ipv                 = IO_IPV_UNSPEC;
+		int tls                 = IO_TLS_ENABLED;
+		int tls_vrfy            = IO_TLS_VRFY_REQUIRED;
+
+		while ((str = irc_strsep(&buf))) {
+
+			if (*str != '-') {
+				action(action_error, ":connect [hostname [options]]");
+				return;
+			} else if (!strcmp(str, "-p") || !strcmp(str, "--port")) {
+				if (!(port = irc_strsep(&buf))) {
+					action(action_error, "connect: '-p/--port' requires an argument");
+					return;
+				}
+			} else if (!strcmp(str, "-w") || !strcmp(str, "--pass")) {
+				if (!(pass = irc_strsep(&buf))) {
+					action(action_error, "connect: '-w/--pass' requires an argument");
+					return;
+				}
+			} else if (!strcmp(str, "-u") || !strcmp(str, "--username")) {
+				if (!(username = irc_strsep(&buf))) {
+					action(action_error, "connect: '-u/--username' requires an argument");
+					return;
+				}
+			} else if (!strcmp(str, "-r") || !strcmp(str, "--realname")) {
+				if (!(realname = irc_strsep(&buf))) {
+					action(action_error, "connect: '-r/--realname' requires an argument");
+					return;
+				}
+			} else if (!strcmp(str, "-m") || !strcmp(str, "--mode")) {
+				if (!(mode = irc_strsep(&buf))) {
+					action(action_error, "connect: '-m/--mode' requires an argument");
+					return;
+				}
+			} else if (!strcmp(str, "-n") || !strcmp(str, "--nicks")) {
+				if (!(nicks = irc_strsep(&buf))) {
+					action(action_error, "connect: '-n/--nicks' requires an argument");
+					return;
+				}
+			} else if (!strcmp(str, "-c") || !strcmp(str, "--chans")) {
+				if (!(chans = irc_strsep(&buf))) {
+					action(action_error, "connect: '-c/--chans' requires an argument");
+					return;
+				}
+			} else if (!strcmp(str, "--ipv4")) {
+				ipv = IO_IPV_4;
+			} else if (!strcmp(str, "--ipv6")) {
+				ipv = IO_IPV_6;
+			} else if (!strcmp(str, "--tls-disable")) {
+				tls = IO_TLS_DISABLED;
+			} else if (!strcmp(str, "--tls-ca-file")) {
+				if (!(tls_ca_file = irc_strsep(&buf))) {
+					action(action_error, "connect: '--tls-ca-file' requires an argument");
+					return;
+				}
+			} else if (!strcmp(str, "--tls-ca-path")) {
+				if (!(tls_ca_path = irc_strsep(&buf))) {
+					action(action_error, "connect: '--tls-ca-path' requires an argument");
+					return;
+				}
+			} else if (!strcmp(str, "--tls-cert")) {
+				if (!(tls_cert = irc_strsep(&buf))) {
+					action(action_error, "connect: '--tls-cert' requires an argument");
+					return;
+				}
+			} else if (!strcmp(str, "--tls-verify")) {
+				if (!(str = irc_strsep(&buf))) {
+					action(action_error, "connect: '--tls-verify' requires an argument");
+					return;
+				} else if (!strcmp(str, "0") || !strcmp(str, "disabled")) {
+					tls_vrfy = IO_TLS_VRFY_DISABLED;
+				} else if (!strcmp(str, "1") || !strcmp(str, "optional")) {
+					tls_vrfy = IO_TLS_VRFY_OPTIONAL;
+				} else if (!strcmp(str, "2") || !strcmp(str, "required")) {
+					tls_vrfy = IO_TLS_VRFY_REQUIRED;
+				} else {
+					action(action_error, "connect: invalid option for '--tls-verify' '%s'", str);
+					return;
+				}
+			} else if (!strcmp(str, "--sasl")) {
+				if (!(sasl = irc_strsep(&buf))) {
+					action(action_error, "connect: '--sasl' requires an argument");
+					return;
+				} else if (strcasecmp(sasl, "PLAIN")) {
+					action(action_error, "connect: invalid option for '--sasl' '%s'", sasl);
+					return;
+				}
+			} else if (!strcmp(str, "--sasl-user")) {
+				if (!(sasl_user = irc_strsep(&buf))) {
+					action(action_error, "connect: '--sasl-user' requires an argument");
+					return;
+				}
+			} else if (!strcmp(str, "--sasl-pass")) {
+				if (!(sasl_pass = irc_strsep(&buf))) {
+					action(action_error, "connect: '--sasl-pass' requires an argument");
+					return;
+				}
+			} else {
+				action(action_error, "connect: unknown option '%s'", str);
+				return;
+			}
+		}
+
+		if (port == NULL)
+			port = (tls == IO_TLS_ENABLED) ? "6697" : "6667";
+
+		s = server(host, port, pass, username, realname, mode);
+
+		if (nicks && server_set_nicks(s, nicks)) {
+			action(action_error, "connect: invalid -n/--nicks: '%s'", nicks);
+			server_free(s);
+			return;
+		}
+
+		if (chans && server_set_chans(s, chans)) {
+			action(action_error, "connect: invalid -c/--chans: '%s'", chans);
+			server_free(s);
+			return;
+		}
+
+		if (server_list_add(state_server_list(), s)) {
+			action(action_error, "connect: duplicate server: %s:%s", host, port);
+			server_free(s);
+			return;
+		}
+
+		if (sasl)
+			server_set_sasl(s, sasl, sasl_user, sasl_pass);
+
+		s->connection = connection(
+			s,
+			host,
+			port,
+			tls_ca_file,
+			tls_ca_path,
+			tls_cert,
+			(ipv | tls | tls_vrfy));
+
+		if ((ret = io_cx(s->connection)))
+			server_error(s, "failed to connect: %s", io_err(ret));
+
+		channel_set_current(s->channel);
+	}
+}
+
+static void
+command_disconnect(struct channel *c, char *buf)
+{
+	char *str;
+	int err;
+
+	if (!c->server) {
+		action(action_error, "disconnect: This is not a server");
+		return;
+	}
+
+	if ((str = irc_strsep(&buf))) {
+		action(action_error, "disconnect: Unknown arg '%s'", str);
+		return;
+	}
+
+	if ((err = io_dx(c->server->connection)))
+		action(action_error, "disconnect: %s", io_err(err));
+}
+
+static void
+command_quit(struct channel *c, char *buf)
+{
+	UNUSED(c);
+
+	char *str;
+
+	if ((str = irc_strsep(&buf))) {
+		action(action_error, "quit: Unknown arg '%s'", str);
+		return;
+	}
+
+	io_stop();
 }
 
 static int
