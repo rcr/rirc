@@ -13,9 +13,9 @@ include lib/mbedtls.Makefile
 
 CONFIG := config.h
 
-CLFAGS_RIRC += -std=c11 -I. -DVERSION=\"$(VERSION)\"
-CLFAGS_RIRC += -D_POSIX_C_SOURCE=200809L
-CLFAGS_RIRC += -D_DARWIN_C_SOURCE
+CFLAGS_RIRC += -std=c11 -I. -DVERSION=\"$(VERSION)\"
+CFLAGS_RIRC += -D_POSIX_C_SOURCE=200809L
+CFLAGS_RIRC += -D_DARWIN_C_SOURCE
 
 CFLAGS ?= -O2 -flto
 CFLAGS += -DNDEBUG
@@ -46,20 +46,19 @@ rirc.debug: $(RIRC_LIBS) $(SRC_GPERF) $(OBJS_D)
 
 $(PATH_BUILD)/%.o: $(PATH_SRC)/%.c $(CONFIG) | $(PATH_BUILD)
 	@echo "$(CC) $(CFLAGS) $<"
-	@$(CPP) $(CFLAGS) $(CLFAGS_RIRC) -MM -MP -MT $@ -MF $(@:.o=.o.d) $<
-	@$(CC)  $(CFLAGS) $(CLFAGS_RIRC) -c -o $@ $<
+	@$(CPP) $(CFLAGS) $(CFLAGS_RIRC) -MM -MP -MT $@ -MF $(@:.o=.o.d) $<
+	@$(CC)  $(CFLAGS) $(CFLAGS_RIRC) -c -o $@ $<
 
 $(PATH_BUILD)/%.db.o: $(PATH_SRC)/%.c $(CONFIG) | $(PATH_BUILD)
 	@echo "$(CC) $(CFLAGS_DEBUG) $<"
-	@$(CPP) $(CFLAGS_DEBUG) $(CLFAGS_RIRC) -MM -MP -MT $@ -MF $(@:.o=.o.d) $<
-	@$(CC)  $(CFLAGS_DEBUG) $(CLFAGS_RIRC) -c -o $@ $<
+	@$(CPP) $(CFLAGS_DEBUG) $(CFLAGS_RIRC) -MM -MP -MT $@ -MF $(@:.o=.o.d) $<
+	@$(CC)  $(CFLAGS_DEBUG) $(CFLAGS_RIRC) -c -o $@ $<
 
-$(PATH_BUILD)/%.t: $(PATH_TEST)/%.c $(SRC_GPERF) $(CONFIG) | $(PATH_BUILD)
-	@rm -f $(@:.t=.td)
-	@$(CPP) $(CFLAGS_DEBUG) $(CLFAGS_RIRC) -MM -MP -MT $@ -MF $(@:.t=.t.d) $<
-	@$(CC)  $(CFLAGS_DEBUG) $(CLFAGS_RIRC) -c -o $(@:.t=.t.o) $<
-	@$(CC)  $(CFLAGS_DEBUG) $(CLFAGS_RIRC) -o $@ $(@:.t=.t.o) $(RIRC_LIBS)
-	@./$@ || mv $@ $(@:.t=.td)
+$(PATH_BUILD)/%.t: $(PATH_TEST)/%.c $(SRC_GPERF) $(CONFIG) | $(RIRC_LIBS) $(PATH_BUILD)
+	@$(CPP) $(CFLAGS_DEBUG) $(CFLAGS_RIRC) -MM -MP -MT $@ -MF $(@:.t=.t.d) $<
+	@$(CC)  $(CFLAGS_DEBUG) $(CFLAGS_RIRC) -c -o $(@:.t=.t.o) $<
+	@$(CC)  $(LDFLAGS_DEBUG) -o $@ $(@:.t=.t.o) $(RIRC_LIBS)
+	@{ rm -f $(@:.t=.td) && ./$@; } || mv $@ $(@:.t=.td)
 
 $(PATH_BUILD):
 	@mkdir -p $(patsubst $(PATH_SRC)%, $(PATH_BUILD)%, $(shell find $(PATH_SRC) -type d))
