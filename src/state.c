@@ -1055,7 +1055,7 @@ io_cb_read_soc(char *buf, size_t len, const void *cb_obj)
 				irc_recv(s, &m);
 
 			ci = 0;
-		} else if (ci < IRC_MESSAGE_LEN && (isprint(cc) || cc == 0x01)) {
+		} else if (ci < IRC_MESSAGE_LEN && cc && cc != '\n' && cc != '\r') {
 			s->read.buf[ci++] = cc;
 		}
 	}
