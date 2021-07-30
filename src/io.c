@@ -11,6 +11,10 @@
 #include "mbedtls/ssl.h"
 #include "mbedtls/x509_crt.h"
 
+#ifdef __FreeBSD__
+#define __BSD_VISIBLE 1
+#endif
+
 #include <arpa/inet.h>
 #include <errno.h>
 #include <netdb.h>
@@ -24,6 +28,12 @@
 #include <sys/ioctl.h>
 #include <termios.h>
 #include <unistd.h>
+
+#ifdef __FreeBSD__
+#include <netinet/in.h>
+#include <sys/socket.h>
+#include <sys/types.h>
+#endif
 
 /* RFC 2812, section 2.3 */
 #define IO_MESG_LEN 510
