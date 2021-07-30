@@ -155,9 +155,9 @@ ircv3_numeric_903(struct server *s, struct irc_message *m)
 	irc_message_param(m, &message);
 
 	if (message && *message)
-		server_error(s, "%s", message);
+		server_info(s, "%s", message);
 	else
-		server_error(s, "SASL authentication successful");
+		server_info(s, "SASL authentication successful");
 
 	s->ircv3_sasl.state = IRCV3_SASL_STATE_AUTHENTICATED;
 

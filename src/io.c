@@ -445,14 +445,14 @@ io_state_cxed(struct connection *cx)
 		case MBEDTLS_ERR_SSL_WANT_READ:
 			break;
 		case MBEDTLS_ERR_SSL_PEER_CLOSE_NOTIFY:
-			io_info(cx, "connection closed gracefully");
+			io_info(cx, "Connection closed gracefully");
 			break;
 		case MBEDTLS_ERR_NET_CONN_RESET:
 		case 0:
-			io_error(cx, "connection reset by peer");
+			io_error(cx, "Connection reset by peer");
 			break;
 		default:
-			io_error(cx, "connection error");
+			io_error(cx, "Connection error");
 			break;
 	}
 
@@ -490,14 +490,14 @@ io_state_ping(struct connection *cx)
 		case MBEDTLS_ERR_SSL_WANT_READ:
 			break;
 		case MBEDTLS_ERR_SSL_PEER_CLOSE_NOTIFY:
-			io_info(cx, "connection closed gracefully");
+			io_info(cx, "Connection closed gracefully");
 			break;
 		case MBEDTLS_ERR_NET_CONN_RESET:
 		case 0:
-			io_error(cx, "connection reset by peer");
+			io_error(cx, "Connection reset by peer");
 			break;
 		default:
-			io_error(cx, "connection error");
+			io_error(cx, "Connection error");
 			break;
 	}
 
@@ -858,28 +858,28 @@ io_tls_establish(struct connection *cx)
 
 	if (ret < 0 && cx->tls_ca_file) {
 		if ((ret = mbedtls_x509_crt_parse_file(&(cx->tls_x509_crt_ca), cx->tls_ca_file)) < 0) {
-			io_error(cx, " .. Failed to load ca cert file: '%s': %s", cx->tls_ca_file, io_tls_err(ret));
+			io_error(cx, " .. Failed to load CA cert file: '%s': %s", cx->tls_ca_file, io_tls_err(ret));
 			goto err;
 		}
 	}
 
 	if (ret < 0 && cx->tls_ca_path) {
 		if ((ret = mbedtls_x509_crt_parse_path(&(cx->tls_x509_crt_ca), cx->tls_ca_path)) < 0) {
-			io_error(cx, " .. Failed to load ca cert path: '%s': %s", cx->tls_ca_path, io_tls_err(ret));
+			io_error(cx, " .. Failed to load CA cert path: '%s': %s", cx->tls_ca_path, io_tls_err(ret));
 			goto err;
 		}
 	}
 
 	if (ret < 0 && default_ca_file && *default_ca_file) {
 		if ((ret = mbedtls_x509_crt_parse_file(&(cx->tls_x509_crt_ca), default_ca_file)) < 0) {
-			io_error(cx, " .. Failed to load ca cert file: '%s': %s", default_ca_file, io_tls_err(ret));
+			io_error(cx, " .. Failed to load CA cert file: '%s': %s", default_ca_file, io_tls_err(ret));
 			goto err;
 		}
 	}
 
 	if (ret < 0 && default_ca_path && *default_ca_path) {
 		if ((ret = mbedtls_x509_crt_parse_path(&(cx->tls_x509_crt_ca), default_ca_path)) < 0) {
-			io_error(cx, " .. Failed to load ca cert path: '%s': %s", default_ca_path, io_tls_err(ret));
+			io_error(cx, " .. Failed to load CA cert path: '%s': %s", default_ca_path, io_tls_err(ret));
 			goto err;
 		}
 	}
@@ -894,7 +894,7 @@ io_tls_establish(struct connection *cx)
 		}
 
 		if (i == ARR_LEN(default_ca_certs)) {
-			io_error(cx, " .. Failed to load default ca certs: %s", io_tls_err(ret));
+			io_error(cx, " .. Failed to load default CA certs: %s", io_tls_err(ret));
 			goto err;
 		}
 	}
@@ -979,8 +979,8 @@ io_tls_establish(struct connection *cx)
 	}
 
 	io_info(cx, " .. TLS connection established");
-	io_info(cx, " ..   - version:     %s", mbedtls_ssl_get_version(&(cx->tls_ctx)));
-	io_info(cx, " ..   - ciphersuite: %s", mbedtls_ssl_get_ciphersuite(&(cx->tls_ctx)));
+	io_info(cx, " .... Version:     %s", mbedtls_ssl_get_version(&(cx->tls_ctx)));
+	io_info(cx, " .... Ciphersuite: %s", mbedtls_ssl_get_ciphersuite(&(cx->tls_ctx)));
 
 	return 0;
 
