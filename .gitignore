@@ -1,6 +1,7 @@
 *.gperf.out
 *.out
 .cache
+bazel-*
 build
 config.h
 coverage
