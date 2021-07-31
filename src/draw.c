@@ -677,7 +677,11 @@ draw_status(struct channel *c)
 	if (c->type == CHANNEL_T_CHANNEL && c->joined) {
 		if (!drawf(&cols, STATUS_SEP_HORZ))
 			return;
-		if (!drawf(&cols, "[+%s %u]", c->chanmodes_str.str, c->users.count))
+		if (!drawf(&cols, "[%s%s%s%u]",
+				(*(c->chanmodes_str.str) ? "+" : ""),
+				(*(c->chanmodes_str.str) ? c->chanmodes_str.str : ""),
+				(*(c->chanmodes_str.str) ? " " : ""),
+				 c->users.count))
 			return;
 	}
 

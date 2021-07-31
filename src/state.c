@@ -1072,6 +1072,7 @@ io_cb_cxed(const void *cb_obj)
 	struct server *s = (struct server *)cb_obj;
 
 	int ret;
+
 	server_reset(s);
 	server_nicks_next(s);
 
@@ -1099,7 +1100,7 @@ io_cb_dxed(const void *cb_obj)
 	struct server *s = (struct server *)cb_obj;
 	struct channel *c = s->channel;
 
-	s->connected = 0;
+	server_reset(s);
 
 	do {
 		newlinef(c, 0, FROM_ERROR, " -- disconnected --");
@@ -1107,6 +1108,7 @@ io_cb_dxed(const void *cb_obj)
 		c = c->next;
 	} while (c != s->channel);
 
+	draw(DRAW_STATUS);
 	draw(DRAW_FLUSH);
 }
 

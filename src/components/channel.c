@@ -113,7 +113,6 @@ void
 channel_part(struct channel *c)
 {
 	channel_reset(c);
-	c->joined = 0;
 	c->parted = 1;
 }
 
@@ -122,4 +121,5 @@ channel_reset(struct channel *c)
 {
 	mode_reset(&(c->chanmodes), &(c->chanmodes_str));
 	user_list_free(&(c->users));
+	c->joined = 0;
 }
