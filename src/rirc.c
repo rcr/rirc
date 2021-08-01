@@ -66,35 +66,31 @@ static const char *const rirc_help =
 "\nrirc v"VERSION" ~ Richard C. Robbins <mail@rcr.io>"
 "\n"
 "\nUsage:"
-"\n  rirc [-hv] [-s server [...]]"
+"\n  rirc [-hv] [-s host [options] ...]"
 "\n"
 "\nInfo:"
 "\n  -h, --help      Print help message and exit"
 "\n  -v, --version   Print rirc version and exit"
 "\n"
-"\nServer options:"
-"\n  -s, --server=SERVER       Connect to SERVER"
-"\n  -p, --port=PORT           Connect to SERVER using PORT"
-"\n  -w, --pass=PASS           Connect to SERVER using PASS"
-"\n  -u, --username=USERNAME   Connect to SERVER using USERNAME"
-"\n  -r, --realname=REALNAME   Connect to SERVER using REALNAME"
-"\n  -m, --mode=MODE           Connect to SERVER with user MODE"
-"\n  -n, --nicks=NICKS         Comma separated list of nicks to use for SERVER"
-"\n  -c, --chans=CHANNELS      Comma separated list of channels to join for SERVER"
-"\n"
-"\nServer connection options:"
-"\n   --ipv4                   Connect to server using only ipv4 addresses"
-"\n   --ipv6                   Connect to server using only ipv6 addresses"
-"\n   --tls-disable            Set server TLS disabled"
-"\n   --tls-ca-file=PATH       Set server TLS CA cert file path"
-"\n   --tls-ca-path=PATH       Set server TLS CA cert directory path"
-"\n   --tls-cert=PATH          Set server TLS client cert file path"
-"\n   --tls-verify=MODE        Set server TLS peer certificate verification mode"
-"\n"
-"\nServer authentication options:"
-"\n   --sasl=MECHANISM         Authenticate with SASL mechanism"
-"\n   --sasl-user=USER         Authenticate with SASL user"
-"\n   --sasl-pass=PASS         Authenticate with SASL pass"
+"\nOptions:"
+"\n  -s, --server=HOST         Set connection hostname"
+"\n  -p, --port=PORT           Set connection port"
+"\n  -w, --pass=PASS           Set IRC password"
+"\n  -u, --username=USERNAME   Set IRC username"
+"\n  -r, --realname=REALNAME   Set IRC realname"
+"\n  -m, --mode=MODE           Set IRC user modes"
+"\n  -n, --nicks=NICKS         Set comma separated list of nicks to use"
+"\n  -c, --chans=CHANNELS      Set comma separated list of channels to join"
+"\n      --tls-cert=PATH       Set TLS client certificate file path"
+"\n      --tls-ca-file=PATH    Set TLS peer certificate file path"
+"\n      --tls-ca-path=PATH    Set TLS peer certificate directory path"
+"\n      --tls-verify=MODE     Set TLS peer certificate verification mode"
+"\n      --tls-disable         Set TLS disabled"
+"\n      --sasl=MECHANISM      Authenticate with SASL mechanism"
+"\n      --sasl-user=USER      Authenticate with SASL username"
+"\n      --sasl-pass=PASS      Authenticate with SASL password"
+"\n      --ipv4                Use IPv4 addresses only"
+"\n      --ipv6                Use IPv6 addresses only"
 "\n";
 
 static const char *const rirc_version =
@@ -111,21 +107,21 @@ rirc_opt_str(char c)
 		case 's': return "-s/--server";
 		case 'p': return "-p/--port";
 		case 'w': return "-w/--pass";
-		case 'n': return "-n/--nicks";
-		case 'c': return "-c/--chans";
 		case 'u': return "-u/--username";
 		case 'r': return "-r/--realname";
 		case 'm': return "-m/--mode";
-		case '0': return "--ipv4";
-		case '1': return "--ipv6";
-		case '2': return "--tls-disable";
-		case '3': return "--tls-ca-file";
-		case '4': return "--tls-ca-path";
-		case '5': return "--tls-cert";
-		case '6': return "--tls-verify";
-		case '7': return "--sasl";
-		case '8': return "--sasl-user";
-		case '9': return "--sasl-pass";
+		case 'n': return "-n/--nicks";
+		case 'c': return "-c/--chans";
+		case '0': return "--tls-cert";
+		case '1': return "--tls-ca-file";
+		case '2': return "--tls-ca-path";
+		case '3': return "--tls-verify";
+		case '4': return "--tls-disable";
+		case '5': return "--sasl";
+		case '6': return "--sasl-user";
+		case '7': return "--sasl-pass";
+		case '8': return "--ipv4";
+		case '9': return "--ipv6";
 		default:
 			fatal("unknown option flag '%c'", c);
 	}
@@ -185,16 +181,16 @@ rirc_parse_args(int argc, char **argv)
 		{"chans",       required_argument, 0, 'c'},
 		{"help",        no_argument,       0, 'h'},
 		{"version",     no_argument,       0, 'v'},
-		{"ipv4",        no_argument,       0, '0'},
-		{"ipv6",        no_argument,       0, '1'},
-		{"tls-disable", no_argument,       0, '2'},
-		{"tls-ca-file", required_argument, 0, '3'},
-		{"tls-ca-path", required_argument, 0, '4'},
-		{"tls-cert",    required_argument, 0, '5'},
-		{"tls-verify",  required_argument, 0, '6'},
-		{"sasl",        required_argument, 0, '7'},
-		{"sasl-user",   required_argument, 0, '8'},
-		{"sasl-pass",   required_argument, 0, '9'},
+		{"tls-cert",    required_argument, 0, '0'},
+		{"tls-ca-file", required_argument, 0, '1'},
+		{"tls-ca-path", required_argument, 0, '2'},
+		{"tls-verify",  required_argument, 0, '3'},
+		{"tls-disable", no_argument,       0, '4'},
+		{"sasl",        required_argument, 0, '5'},
+		{"sasl-user",   required_argument, 0, '6'},
+		{"sasl-pass",   required_argument, 0, '7'},
+		{"ipv4",        no_argument,       0, '8'},
+		{"ipv6",        no_argument,       0, '9'},
 		{0, 0, 0, 0}
 	};
 
@@ -245,72 +241,57 @@ rirc_parse_args(int argc, char **argv)
 					return -1; \
 				}
 
-			case 'p': /* Connect using port */
+			case 'p': /* Set connection port */
 				CHECK_SERVER_OPTARG(opt_c, 1);
 				cli_servers[n_servers - 1].port = optarg;
 				break;
 
-			case 'w': /* Connect using port */
+			case 'w': /* Set IRC password */
 				CHECK_SERVER_OPTARG(opt_c, 1);
 				cli_servers[n_servers - 1].pass = optarg;
 				break;
 
-			case 'u': /* Connect using username */
+			case 'u': /* Set IRC username */
 				CHECK_SERVER_OPTARG(opt_c, 1);
 				cli_servers[n_servers - 1].username = optarg;
 				break;
 
-			case 'r': /* Connect using realname */
+			case 'r': /* Set IRC realname */
 				CHECK_SERVER_OPTARG(opt_c, 1);
 				cli_servers[n_servers - 1].realname = optarg;
 				break;
 
-			case 'm': /* Connect with user mode */
+			case 'm': /* Set IRC user modes */
 				CHECK_SERVER_OPTARG(opt_c, 1);
 				cli_servers[n_servers - 1].mode = optarg;
 				break;
 
-			case 'n': /* Comma separated list of nicks to use */
+			case 'n': /* Set comma separated list of nicks to use */
 				CHECK_SERVER_OPTARG(opt_c, 1);
 				cli_servers[n_servers - 1].nicks = optarg;
 				break;
 
-			case 'c': /* Comma separated list of channels to join */
+			case 'c': /* Set comma separated list of channels to join */
 				CHECK_SERVER_OPTARG(opt_c, 1);
 				cli_servers[n_servers - 1].chans = optarg;
 				break;
 
-			case '0': /* Connect using ipv4 only */
-				CHECK_SERVER_OPTARG(opt_c, 0);
-				cli_servers[n_servers -1].ipv = IO_IPV_4;
-				break;
-
-			case '1': /* Connect using ipv6 only */
-				CHECK_SERVER_OPTARG(opt_c, 0);
-				cli_servers[n_servers -1].ipv = IO_IPV_6;
-				break;
-
-			case '2': /* Set server TLS disabled */
-				CHECK_SERVER_OPTARG(opt_c, 0);
-				cli_servers[n_servers -1].tls = IO_TLS_DISABLED;
-				break;
-
-			case '3': /* Set server TLS CA cert file path */
-				CHECK_SERVER_OPTARG(opt_c, 1);
-				cli_servers[n_servers - 1].tls_ca_file = optarg;
-				break;
-
-			case '4': /* Set server TLS CA cert directory path */
-				CHECK_SERVER_OPTARG(opt_c, 1);
-				cli_servers[n_servers - 1].tls_ca_path = optarg;
-				break;
-
-			case '5': /* Set server TLS client cert file path */
+			case '0': /* Set TLS client certificate file path */
 				CHECK_SERVER_OPTARG(opt_c, 1);
 				cli_servers[n_servers - 1].tls_cert = optarg;
 				break;
 
-			case '6': /* Set server TLS peer certificate verification mode */
+			case '1': /* Set TLS peer certificate file path */
+				CHECK_SERVER_OPTARG(opt_c, 1);
+				cli_servers[n_servers - 1].tls_ca_file = optarg;
+				break;
+
+			case '2': /* Set TLS peer certificate directory path */
+				CHECK_SERVER_OPTARG(opt_c, 1);
+				cli_servers[n_servers - 1].tls_ca_path = optarg;
+				break;
+
+			case '3': /* Set TLS peer certificate verification mode */
 				CHECK_SERVER_OPTARG(opt_c, 1);
 				if (!strcmp(optarg, "0") || !strcasecmp(optarg, "DISABLED")) {
 					cli_servers[n_servers -1].tls_vrfy = IO_TLS_VRFY_DISABLED;
@@ -327,7 +308,12 @@ rirc_parse_args(int argc, char **argv)
 				arg_error("invalid option for '--tls-verify' '%s'", optarg);
 				return -1;
 
-			case '7': /* Authenticate with SASL mechanism */
+			case '4': /* Set TLS disabled */
+				CHECK_SERVER_OPTARG(opt_c, 0);
+				cli_servers[n_servers -1].tls = IO_TLS_DISABLED;
+				break;
+
+			case '5': /* Authenticate with SASL mechanism */
 				CHECK_SERVER_OPTARG(opt_c, 1);
 				if (!strcasecmp(optarg, "EXTERNAL")) {
 					cli_servers[n_servers - 1].sasl = optarg;
@@ -340,14 +326,24 @@ rirc_parse_args(int argc, char **argv)
 				arg_error("invalid option for '--sasl' '%s'", optarg);
 				return -1;
 
-			case '8': /* Authenticate with SASL user */
+			case '6': /* Authenticate with SASL user */
 				CHECK_SERVER_OPTARG(opt_c, 1);
 				cli_servers[n_servers - 1].sasl_user = optarg;
 				break;
 
-			case '9': /* Authenticate with SASL pass */
+			case '7': /* Authenticate with SASL pass */
 				CHECK_SERVER_OPTARG(opt_c, 1);
 				cli_servers[n_servers - 1].sasl_pass = optarg;
+				break;
+
+			case '8': /* Use IPv4 only */
+				CHECK_SERVER_OPTARG(opt_c, 0);
+				cli_servers[n_servers -1].ipv = IO_IPV_4;
+				break;
+
+			case '9': /* Use IPv6 only */
+				CHECK_SERVER_OPTARG(opt_c, 0);
+				cli_servers[n_servers -1].ipv = IO_IPV_6;
 				break;
 
 			#undef CHECK_SERVER_OPTARG

@@ -744,12 +744,11 @@ command_connect(struct channel *c, char *args)
 					action(action_error, "connect: '-c/--chans' requires an argument");
 					return;
 				}
-			} else if (!strcmp(arg, "--ipv4")) {
-				ipv = IO_IPV_4;
-			} else if (!strcmp(arg, "--ipv6")) {
-				ipv = IO_IPV_6;
-			} else if (!strcmp(arg, "--tls-disable")) {
-				tls = IO_TLS_DISABLED;
+			} else if (!strcmp(arg, "--tls-cert")) {
+				if (!(tls_cert = irc_strsep(&args))) {
+					action(action_error, "connect: '--tls-cert' requires an argument");
+					return;
+				}
 			} else if (!strcmp(arg, "--tls-ca-file")) {
 				if (!(tls_ca_file = irc_strsep(&args))) {
 					action(action_error, "connect: '--tls-ca-file' requires an argument");
@@ -758,11 +757,6 @@ command_connect(struct channel *c, char *args)
 			} else if (!strcmp(arg, "--tls-ca-path")) {
 				if (!(tls_ca_path = irc_strsep(&args))) {
 					action(action_error, "connect: '--tls-ca-path' requires an argument");
-					return;
-				}
-			} else if (!strcmp(arg, "--tls-cert")) {
-				if (!(tls_cert = irc_strsep(&args))) {
-					action(action_error, "connect: '--tls-cert' requires an argument");
 					return;
 				}
 			} else if (!strcmp(arg, "--tls-verify")) {
@@ -779,6 +773,8 @@ command_connect(struct channel *c, char *args)
 					action(action_error, "connect: invalid option for '--tls-verify' '%s'", arg);
 					return;
 				}
+			} else if (!strcmp(arg, "--tls-disable")) {
+				tls = IO_TLS_DISABLED;
 			} else if (!strcmp(arg, "--sasl")) {
 				if (!(sasl = irc_strsep(&args))) {
 					action(action_error, "connect: '--sasl' requires an argument");
@@ -801,6 +797,10 @@ command_connect(struct channel *c, char *args)
 					action(action_error, "connect: '--sasl-pass' requires an argument");
 					return;
 				}
+			} else if (!strcmp(arg, "--ipv4")) {
+				ipv = IO_IPV_4;
+			} else if (!strcmp(arg, "--ipv6")) {
+				ipv = IO_IPV_6;
 			} else {
 				action(action_error, "connect: unknown option '%s'", arg);
 				return;
