@@ -1,15 +1,14 @@
 #include "src/handlers/irc_recv.h"
 
+#include "config.h"
 #include "src/components/server.h"
+#include "src/draw.h"
 #include "src/handlers/irc_ctcp.h"
 #include "src/handlers/irc_recv.gperf.out"
 #include "src/handlers/ircv3.h"
-#include "src/draw.h"
 #include "src/io.h"
 #include "src/state.h"
 #include "src/utils/utils.h"
-
-#include "config.h"
 
 #include <ctype.h>
 #include <errno.h>
@@ -323,7 +322,7 @@ irc_numeric_001(struct server *s, struct irc_message *m)
 	s->registered = 1;
 
 	if (irc_message_split(m, &params, &trailing))
-		newlinef(s->channel, 0, FROM_INFO, "%s", trailing);
+		server_info(s, "%s", trailing);
 
 	server_info(s, "You are known as %s", s->nick);
 
@@ -347,9 +346,9 @@ irc_numeric_004(struct server *s, struct irc_message *m)
 	const char *trailing;
 
 	if (irc_message_split(m, &params, &trailing))
-		newlinef(s->channel, 0, FROM_INFO, "%s ~ %s", params, trailing);
+		server_info(s, "%s ~ %s", params, trailing);
 	else
-		newlinef(s->channel, 0, FROM_INFO, "%s", params);
+		server_info(s, "%s", params);
 
 	server_set_004(s, m->params);
 
@@ -365,9 +364,9 @@ irc_numeric_005(struct server *s, struct irc_message *m)
 	const char *trailing;
 
 	if (irc_message_split(m, &params, &trailing))
-		newlinef(s->channel, 0, FROM_INFO, "%s ~ %s", params, trailing);
+		server_info(s, "%s ~ %s", params, trailing);
 	else
-		newlinef(s->channel, 0, FROM_INFO, "%s ~ are supported by this server", params);
+		server_info(s, "%s ~ are supported by this server", params);
 
 	server_set_005(s, m->params);
 
@@ -629,11 +628,11 @@ irc_numeric_433(struct server *s, struct irc_message *m)
 	if (!irc_message_param(m, &nick))
 		failf(s, "ERR_NICKNAMEINUSE: nick is null");
 
-	newlinef(s->channel, 0, FROM_ERROR, "Nick '%s' in use", nick);
+	server_error(s, "Nick '%s' in use", nick);
 
 	if (!strcmp(nick, s->nick)) {
 		server_nicks_next(s);
-		newlinef(s->channel, 0, FROM_ERROR, "Trying again with '%s'", s->nick);
+		server_error(s, "Trying again with '%s'", s->nick);
 		sendf(s, "NICK %s", s->nick);
 	}
 
@@ -707,7 +706,7 @@ recv_invite(struct server *s, struct irc_message *m)
 		failf(s, "INVITE: channel is null");
 
 	if (!strcmp(nick, s->nick)) {
-		newlinef(s->channel, 0, FROM_INFO, "%s invited you to %s", m->from, chan);
+		server_info(s, "%s invited you to %s", m->from, chan);
 		return 0;
 	}
 
@@ -1041,17 +1040,17 @@ recv_mode_usermodes(struct irc_message *m, const struct mode_cfg *cfg, struct se
 			mode_err = mode_usermode_set(usermodes, cfg, flag, mode_set);
 
 			if (mode_err == MODE_ERR_NONE)
-				newlinef(s->channel, 0, FROM_INFO, "%s%smode: %c%c",
+				server_info(s, "%s%smode: %c%c",
 						(m->from ? m->from : ""),
 						(m->from ? " set " : ""),
 						(mode_set == MODE_SET_ON ? '+' : '-'),
 						flag);
 
 			else if (mode_err == MODE_ERR_INVALID_SET)
-				newlinef(s->channel, 0, FROM_ERROR, "MODE: missing '+'/'-'");
+				server_error(s, "MODE: missing '+'/'-'");
 
 			else if (mode_err == MODE_ERR_INVALID_FLAG)
-				newlinef(s->channel, 0, FROM_ERROR, "MODE: invalid flag '%c'", flag);
+				server_error(s, "MODE: invalid flag '%c'", flag);
 		}
 	} while (irc_message_param(m, &modestring));
 

@@ -10,11 +10,11 @@
 #include "src/utils/utils.h"
 
 #include <ctype.h>
+#include <stdarg.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <strings.h>
-#include <stdarg.h>
-#include <stdio.h>
 
 /* See: https://vt100.net/docs/vt100-ug/chapter3.html */
 #define CTRL(k) ((k) & 0x1f)
@@ -1079,16 +1079,16 @@ io_cb_cxed(const void *cb_obj)
 	s->connected = 1;
 
 	if ((ret = io_sendf(s->connection, "CAP LS " IRCV3_CAP_VERSION)))
-		newlinef(s->channel, 0, FROM_ERROR, "sendf fail: %s", io_err(ret));
+		server_error(s, "sendf fail: %s", io_err(ret));
 
 	if (s->pass && (ret = io_sendf(s->connection, "PASS %s", s->pass)))
-		newlinef(s->channel, 0, FROM_ERROR, "sendf fail: %s", io_err(ret));
+		server_error(s, "sendf fail: %s", io_err(ret));
 
 	if ((ret = io_sendf(s->connection, "NICK %s", s->nick)))
-		newlinef(s->channel, 0, FROM_ERROR, "sendf fail: %s", io_err(ret));
+		server_error(s, "sendf fail: %s", io_err(ret));
 
 	if ((ret = io_sendf(s->connection, "USER %s 0 * :%s", s->username, s->realname)))
-		newlinef(s->channel, 0, FROM_ERROR, "sendf fail: %s", io_err(ret));
+		server_error(s, "sendf fail: %s", io_err(ret));
 
 	draw(DRAW_STATUS);
 	draw(DRAW_FLUSH);
@@ -1123,7 +1123,7 @@ io_cb_ping(const void *cb_obj, unsigned ping)
 	if (ping != IO_PING_MIN)
 		draw(DRAW_STATUS);
 	else if ((ret = io_sendf(s->connection, "PING :%s", s->host)))
-		newlinef(s->channel, 0, FROM_ERROR, "sendf fail: %s", io_err(ret));
+		server_error(s, "sendf fail: %s", io_err(ret));
 
 	draw(DRAW_FLUSH);
 }
