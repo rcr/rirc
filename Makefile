@@ -25,7 +25,7 @@ CFLAGS_DEBUG += -O0 -g3 -Wall -Wextra -Werror
 LDFLAGS ?= -flto
 LDFLAGS += -pthread
 
-LDFLAGS_DEBUG += -lpthread
+LDFLAGS_DEBUG += -pthread
 
 SRC       := $(shell find $(PATH_SRC) -name '*.c' | sort)
 SRC_GPERF := $(patsubst %, %.out, $(shell find $(PATH_SRC) -name '*.gperf'))
