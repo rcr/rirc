@@ -23,7 +23,7 @@ RIRC_CFLAGS += -D_POSIX_C_SOURCE=200809L
 RIRC_CFLAGS += -D_DARWIN_C_SOURCE
 
 LDFLAGS ?= -flto
-LDFLAGS += -lpthread
+LDFLAGS += -pthread
 
 SRC       := $(shell find $(PATH_SRC) -name '*.c' | sort)
 SRC_GPERF := $(patsubst %, %.out, $(shell find $(PATH_SRC) -name '*.gperf'))
