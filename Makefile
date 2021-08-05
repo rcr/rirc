@@ -23,7 +23,7 @@ CFLAGS += -DNDEBUG
 CFLAGS_DEBUG += -O0 -g3 -Wall -Wextra -Werror
 
 LDFLAGS ?= -flto
-LDFLAGS += -lpthread
+LDFLAGS += -pthread
 
 LDFLAGS_DEBUG += -lpthread
 
