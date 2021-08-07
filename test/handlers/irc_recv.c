@@ -228,7 +228,7 @@ test_irc_numeric_353(void)
 	assert_strcmp(mock_line[0], "RPL_NAMEREPLY: channel '#x' not found");
 
 	CHECK_RECV("353 me x #c1 :n1", 1, 1, 0);
-	assert_strcmp(mock_line[0], "RPL_NAMEREPLY: invalid channel flag: 'x'");
+	assert_strcmp(mock_line[0], "RPL_NAMEREPLY: invalid channel type: 'x'");
 
 	CHECK_RECV("353 me = #c1 :+@", 1, 1, 0);
 	assert_strcmp(mock_line[0], "RPL_NAMEREPLY: invalid nick: '+@'");
@@ -255,8 +255,8 @@ test_irc_numeric_353(void)
 	 || !(u3 = user_list_get(&(c1->users), CASEMAPPING_RFC1459, "n3", 0)))
 		test_abort("Failed to retrieve users");
 
-	assert_eq(u1->prfxmodes.lower, (flag_bit('o')));
-	assert_eq(u2->prfxmodes.lower, (flag_bit('v')));
+	assert_eq(u1->prfxmodes.lower, (mode_bit('o')));
+	assert_eq(u2->prfxmodes.lower, (mode_bit('v')));
 	assert_eq(u3->prfxmodes.lower, 0);
 
 	/* test multiple nicks, multiprefix enabled */
@@ -275,10 +275,10 @@ test_irc_numeric_353(void)
 	assert_eq(u2->prfxmodes.prefix, '+');
 	assert_eq(u3->prfxmodes.prefix, '@');
 	assert_eq(u4->prfxmodes.prefix, '@');
-	assert_eq(u1->prfxmodes.lower, (flag_bit('o')));
-	assert_eq(u2->prfxmodes.lower, (flag_bit('v')));
-	assert_eq(u3->prfxmodes.lower, (flag_bit('o') | flag_bit('v')));
-	assert_eq(u4->prfxmodes.lower, (flag_bit('o') | flag_bit('v')));
+	assert_eq(u1->prfxmodes.lower, (mode_bit('o')));
+	assert_eq(u2->prfxmodes.lower, (mode_bit('v')));
+	assert_eq(u3->prfxmodes.lower, (mode_bit('o') | mode_bit('v')));
+	assert_eq(u4->prfxmodes.lower, (mode_bit('o') | mode_bit('v')));
 }
 
 static void

@@ -525,16 +525,15 @@ irc_numeric_333(struct server *s, struct irc_message *m)
 static int
 irc_numeric_353(struct server *s, struct irc_message *m)
 {
-	/* 353 <nick> <type> <channel> 1*(<modes><nick>) */
+	/* <type> <channel> 1*(<modes><nick>) */
 
 	char *chan;
 	char *nick;
 	char *nicks;
-	char *prfx;
-	char *type;
+	char *prefix;
 	struct channel *c;
 
-	if (!irc_message_param(m, &type))
+	if (!irc_message_param(m, &prefix))
 		failf(s, "RPL_NAMEREPLY: type is null");
 
 	if (!irc_message_param(m, &chan))
@@ -546,10 +545,18 @@ irc_numeric_353(struct server *s, struct irc_message *m)
 	if ((c = channel_list_get(&s->clist, chan, s->casemapping)) == NULL)
 		failf(s, "RPL_NAMEREPLY: channel '%s' not found", chan);
 
-	if (mode_chanmode_prefix(&(c->chanmodes), &(s->mode_cfg), *type) != MODE_ERR_NONE)
-		failf(s, "RPL_NAMEREPLY: invalid channel flag: '%c'", *type);
+	if (*prefix != '@' && *prefix != '*' && *prefix != '=')
+		failf(s, "RPL_NAMEREPLY: invalid channel type: '%c'", *prefix);
 
-	while ((prfx = nick = irc_strsep(&nicks))) {
+	if (*prefix == '@')
+		(void) mode_chanmode_set(&(c->chanmodes), &(s->mode_cfg), 's', 1);
+
+	if (*prefix == '*')
+		(void) mode_chanmode_set(&(c->chanmodes), &(s->mode_cfg), 'p', 1);
+
+	c->chanmodes.prefix = *prefix;
+
+	while ((prefix = nick = irc_strsep(&nicks))) {
 
 		struct mode m = MODE_EMPTY;
 
@@ -557,7 +564,7 @@ irc_numeric_353(struct server *s, struct irc_message *m)
 			nick++;
 
 		if (*nick == 0)
-			failf(s, "RPL_NAMEREPLY: invalid nick: '%s'", prfx);
+			failf(s, "RPL_NAMEREPLY: invalid nick: '%s'", prefix);
 
 		if (user_list_add(&(c->users), s->casemapping, nick, m) == USER_ERR_DUPLICATE)
 			failf(s, "RPL_NAMEREPLY: duplicate nick: '%s'", nick);
@@ -883,7 +890,6 @@ recv_mode_chanmodes(struct irc_message *m, const struct mode_cfg *cfg, struct se
 	char *modestring;
 	char *modearg;
 	enum mode_err mode_err;
-	enum mode_set mode_set;
 	struct mode *chanmodes = &(c->chanmodes);
 	struct user *user;
 
@@ -895,36 +901,41 @@ recv_mode_chanmodes(struct irc_message *m, const struct mode_cfg *cfg, struct se
 	}
 
 	do {
-		mode_set = MODE_SET_INVALID;
+		int set = -1;
 		mode_err = MODE_ERR_NONE;
 
 		while ((flag = *modestring++)) {
 
-			if (flag == '+') {
-				mode_set = MODE_SET_ON;
+			if (flag == '-') {
+				set = 0;
 				continue;
 			}
 
-			if (flag == '-') {
-				mode_set = MODE_SET_OFF;
+			if (flag == '+') {
+				set = 1;
+				continue;
+			}
+
+			if (set == -1) {
+				newlinef(c, 0, FROM_ERROR, "MODE: missing '+'/'-'");
 				continue;
 			}
 
 			modearg = NULL;
 
-			switch (chanmode_type(cfg, mode_set, flag)) {
+			switch (mode_type(cfg, flag, set)) {
 
 				/* Doesn't consume an argument */
 				case MODE_FLAG_CHANMODE:
 
-					mode_err = mode_chanmode_set(chanmodes, cfg, flag, mode_set);
+					mode_err = mode_chanmode_set(chanmodes, cfg, flag, set);
 
 					if (mode_err == MODE_ERR_NONE) {
 						newlinef(c, 0, FROM_INFO, "%s%s%s mode: %c%c",
 								(m->from ? m->from : ""),
 								(m->from ? " set " : ""),
 								c->name,
-								(mode_set == MODE_SET_ON ? '+' : '-'),
+								(set ? '+' : '-'),
 								flag);
 					}
 					break;
@@ -937,14 +948,14 @@ recv_mode_chanmodes(struct irc_message *m, const struct mode_cfg *cfg, struct se
 						continue;
 					}
 
-					mode_err = mode_chanmode_set(chanmodes, cfg, flag, mode_set);
+					mode_err = mode_chanmode_set(chanmodes, cfg, flag, set);
 
 					if (mode_err == MODE_ERR_NONE) {
 						newlinef(c, 0, FROM_INFO, "%s%s%s mode: %c%c %s",
 								(m->from ? m->from : ""),
 								(m->from ? " set " : ""),
 								c->name,
-								(mode_set == MODE_SET_ON ? '+' : '-'),
+								(set ? '+' : '-'),
 								flag,
 								modearg);
 					}
@@ -963,43 +974,25 @@ recv_mode_chanmodes(struct irc_message *m, const struct mode_cfg *cfg, struct se
 						continue;
 					}
 
-					mode_prfxmode_set(&(user->prfxmodes), cfg, flag, mode_set);
+					mode_prfxmode_set(&(user->prfxmodes), cfg, flag, set);
 
 					if (mode_err == MODE_ERR_NONE) {
 						newlinef(c, 0, FROM_INFO, "%s%suser %s mode: %c%c",
 								(m->from ? m->from : ""),
 								(m->from ? " set " : ""),
 								modearg,
-								(mode_set == MODE_SET_ON ? '+' : '-'),
+								(set ? '+' : '-'),
 								flag);
 					}
 					break;
 
-				case MODE_FLAG_INVALID_SET:
-					mode_err = MODE_ERR_INVALID_SET;
-					break;
-
 				case MODE_FLAG_INVALID_FLAG:
-					mode_err = MODE_ERR_INVALID_FLAG;
+					newlinef(c, 0, FROM_ERROR, "MODE: invalid flag '%c'", flag);
 					break;
 
 				default:
 					newlinef(c, 0, FROM_ERROR, "MODE: unhandled error, flag '%c'", flag);
 					continue;
-			}
-
-			switch (mode_err) {
-
-				case MODE_ERR_INVALID_FLAG:
-					newlinef(c, 0, FROM_ERROR, "MODE: invalid flag '%c'", flag);
-					break;
-
-				case MODE_ERR_INVALID_SET:
-					newlinef(c, 0, FROM_ERROR, "MODE: missing '+'/'-'");
-					break;
-
-				default:
-					break;
 			}
 		}
 	} while (irc_message_param(m, &modestring));
@@ -1016,38 +1009,39 @@ recv_mode_usermodes(struct irc_message *m, const struct mode_cfg *cfg, struct se
 	char flag;
 	char *modestring;
 	enum mode_err mode_err;
-	enum mode_set mode_set;
 	struct mode *usermodes = &(s->usermodes);
 
 	if (!irc_message_param(m, &modestring))
 		failf(s, "MODE: modestring is null");
 
 	do {
-		mode_set = MODE_SET_INVALID;
+		int set = -1;
 
 		while ((flag = *modestring++)) {
 
-			if (flag == '+') {
-				mode_set = MODE_SET_ON;
-				continue;
-			}
-
 			if (flag == '-') {
-				mode_set = MODE_SET_OFF;
+				set = 0;
 				continue;
 			}
 
-			mode_err = mode_usermode_set(usermodes, cfg, flag, mode_set);
+			if (flag == '+') {
+				set = 1;
+				continue;
+			}
+
+			if (set == -1) {
+				server_error(s, "MODE: missing '+'/'-'");
+				continue;
+			}
+
+			mode_err = mode_usermode_set(usermodes, cfg, flag, set);
 
 			if (mode_err == MODE_ERR_NONE)
 				server_info(s, "%s%smode: %c%c",
 						(m->from ? m->from : ""),
 						(m->from ? " set " : ""),
-						(mode_set == MODE_SET_ON ? '+' : '-'),
+						(set ? '+' : '-'),
 						flag);
-
-			else if (mode_err == MODE_ERR_INVALID_SET)
-				server_error(s, "MODE: missing '+'/'-'");
 
 			else if (mode_err == MODE_ERR_INVALID_FLAG)
 				server_error(s, "MODE: invalid flag '%c'", flag);

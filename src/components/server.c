@@ -12,7 +12,6 @@
 #define HANDLED_005 \
 	X(CASEMAPPING)  \
 	X(CHANMODES)    \
-	X(MODES)        \
 	X(PREFIX)
 
 struct opt
@@ -451,12 +450,6 @@ static int
 server_set_CHANMODES(struct server *s, char *val)
 {
 	return mode_cfg(&(s->mode_cfg), val, MODE_CFG_SUBTYPES) != MODE_ERR_NONE;
-}
-
-static int
-server_set_MODES(struct server *s, char *val)
-{
-	return mode_cfg(&(s->mode_cfg), val, MODE_CFG_MODES) != MODE_ERR_NONE;
 }
 
 static int
