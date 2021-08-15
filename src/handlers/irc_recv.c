@@ -560,7 +560,7 @@ irc_numeric_353(struct server *s, struct irc_message *m)
 
 		struct mode m = MODE_EMPTY;
 
-		while (mode_prfxmode_prefix(&m, &(s->mode_cfg), *nick) == MODE_ERR_NONE)
+		while (mode_prfxmode_set(&m, &(s->mode_cfg), *nick, 1) == MODE_ERR_NONE)
 			nick++;
 
 		if (*nick == 0)

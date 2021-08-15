@@ -101,42 +101,12 @@ test_mode_chanmode_set(void)
 }
 
 static void
-test_mode_prfxmode_prefix(void)
-{
-	/* Test setting prfxmode by prefix */
-
-	struct mode m = MODE_EMPTY;
-	struct mode_str str = { .type = MODE_STR_PRFXMODE };
-
-	struct mode_cfg cfg = {
-		.PREFIX = {
-			.F = "abc",
-			.T = "123"
-		}
-	};
-
-	mode_cfg_chanmodes(&cfg, "abc");
-
-	/* Test setting invalid prfxmode prefix */
-	assert_eq(mode_prfxmode_prefix(&m, &cfg, 0),   MODE_ERR_INVALID_PREFIX);
-	assert_eq(mode_prfxmode_prefix(&m, &cfg, '0'), MODE_ERR_INVALID_PREFIX);
-	assert_eq(mode_prfxmode_prefix(&m, &cfg, '4'), MODE_ERR_INVALID_PREFIX);
-
-	/* Test setting valid prfxmode prefix */
-	assert_eq(mode_prfxmode_prefix(&m, &cfg, '2'), MODE_ERR_NONE);
-	assert_eq(mode_prfxmode_prefix(&m, &cfg, '3'), MODE_ERR_NONE);
-
-	assert_strcmp(mode_str(&m, &str), "bc");
-	assert_eq(m.prefix, '2');
-}
-
-static void
 test_mode_prfxmode_set(void)
 {
 	/* Test setting/unsetting prfxmode flag and prefix */
 
 	struct mode m = MODE_EMPTY;
-
+	struct mode_str str = { .type = MODE_STR_PRFXMODE };
 	struct mode_cfg cfg = {
 		.PREFIX = {
 			.F = "abc",
@@ -150,6 +120,12 @@ test_mode_prfxmode_set(void)
 	assert_eq(mode_prfxmode_set(&m, &cfg, 'd', 1), MODE_ERR_INVALID_FLAG);
 	assert_eq(m.prefix, 0);
 	assert_eq(mode_prfxmode_set(&m, &cfg, 'd', 0), MODE_ERR_INVALID_FLAG);
+	assert_eq(m.prefix, 0);
+
+	/* Test setting/unsetting invalid prfxmode prefix */
+	assert_eq(mode_prfxmode_set(&m, &cfg, '4', 1), MODE_ERR_INVALID_FLAG);
+	assert_eq(m.prefix, 0);
+	assert_eq(mode_prfxmode_set(&m, &cfg, '4', 0), MODE_ERR_INVALID_FLAG);
 	assert_eq(m.prefix, 0);
 
 	/* Test setting valid flags respects PREFIX precedence */
@@ -167,6 +143,14 @@ test_mode_prfxmode_set(void)
 	assert_eq(m.prefix, '3');
 	assert_eq(mode_prfxmode_set(&m, &cfg, 'c', 0), MODE_ERR_NONE);
 	assert_eq(m.prefix, 0);
+
+	/* Test setting valid prefixes */
+	assert_eq(mode_prfxmode_set(&m, &cfg, '2', 1), MODE_ERR_NONE);
+	assert_eq(m.prefix, '2');
+	assert_eq(mode_prfxmode_set(&m, &cfg, '3', 1), MODE_ERR_NONE);
+	assert_eq(m.prefix, '2');
+
+	assert_strcmp(mode_str(&m, &str), "bc");
 }
 
 static void
@@ -406,7 +390,6 @@ main(void)
 		TESTCASE(test_mode_bit),
 		TESTCASE(test_mode_str),
 		TESTCASE(test_mode_chanmode_set),
-		TESTCASE(test_mode_prfxmode_prefix),
 		TESTCASE(test_mode_prfxmode_set),
 		TESTCASE(test_mode_usermode_set),
 		TESTCASE(test_mode_cfg_usermodes),

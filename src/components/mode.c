@@ -145,15 +145,23 @@ mode_chanmode_set(struct mode *m, const struct mode_cfg *cfg, int flag, int set)
 enum mode_err
 mode_prfxmode_set(struct mode *m, const struct mode_cfg *cfg, int flag, int set)
 {
-	/* Set/unset prfxmode flags and mode prefix */
-
-	if (!strchr(cfg->PREFIX.F, flag))
-		return MODE_ERR_INVALID_FLAG;
+	/* Set/unset prfxmode flag or prefix */
 
 	const char *f = cfg->PREFIX.F;
 	const char *t = cfg->PREFIX.T;
 
-	mode_set(m, flag, set);
+	while (*f && *t && *f != flag && *t != flag) {
+		f++;
+		t++;
+	}
+
+	if (!*f || !*t)
+		return MODE_ERR_INVALID_FLAG;
+
+	mode_set(m, *f, set);
+
+	f = cfg->PREFIX.F;
+	t = cfg->PREFIX.T;
 
 	while (*f) {
 
@@ -178,42 +186,6 @@ mode_usermode_set(struct mode *m, const struct mode_cfg *cfg, int flag, int set)
 		return MODE_ERR_INVALID_FLAG;
 
 	mode_set(m, flag, set);
-
-	return MODE_ERR_NONE;
-}
-
-enum mode_err
-mode_prfxmode_prefix(struct mode *m, const struct mode_cfg *cfg, int flag)
-{
-	/* Set prfxmode flag and prefix given the prefix character, e.g.: 
-	 *
-	 * - if "ov" maps to "@+", then:
-	 *   - prfxmode_prefix(cfg, mode, '@')   sets mode flag 'o'
-	 *   - prfxmode_prefix(cfg, mode, '+')   sets mode flag 'v'
-	 */
-
-	const char *f = cfg->PREFIX.F;
-	const char *t = cfg->PREFIX.T;
-
-	while (*t && *t != flag) {
-		f++;
-		t++;
-	}
-
-	if (*t == 0)
-		return MODE_ERR_INVALID_PREFIX;
-
-	mode_set(m, *f, 1);
-
-	f = cfg->PREFIX.F,
-	t = cfg->PREFIX.T;
-
-	while (!mode_isset(m, *f)) {
-		f++;
-		t++;
-	}
-
-	m->prefix = *t;
 
 	return MODE_ERR_NONE;
 }
