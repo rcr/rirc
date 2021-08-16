@@ -210,8 +210,6 @@ _newline(struct channel *c, enum buffer_line_type type, const char *from, const 
 		}
 	}
 
-	// TODO: preformat the time string here
-
 	buffer_newline(
 		&(c->buffer),
 		type,

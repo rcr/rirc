@@ -191,7 +191,7 @@ mode_usermode_set(struct mode *m, const struct mode_cfg *cfg, int flag, int set)
 }
 
 const char*
-mode_str(const struct mode *m, struct mode_str *m_str)
+mode_str(const struct mode *m, struct mode_str *m_str, enum mode_str_type type)
 {
 	/* Write the mode bits to a mode string */
 
@@ -200,13 +200,11 @@ mode_str(const struct mode *m, struct mode_str *m_str)
 	uint32_t lower = m->lower;
 	uint32_t upper = m->upper;
 
-	switch (m_str->type) {
+	switch (type) {
 		case MODE_STR_CHANMODE:
 		case MODE_STR_USERMODE:
 		case MODE_STR_PRFXMODE:
 			break;
-		case MODE_STR_UNSET:
-			fatal("mode_str type not set");
 		default:
 			fatal("mode_str type unknown");
 	}
@@ -222,22 +220,6 @@ mode_str(const struct mode *m, struct mode_str *m_str)
 	*str = 0;
 
 	return m_str->str;
-}
-
-void
-mode_reset(struct mode *m, struct mode_str *s)
-{
-	/* Set mode and mode_str to initial state */
-
-	if (!m || !s)
-		fatal("mode or mode_str is null");
-
-	enum mode_str_type type = s->type;
-
-	memset(m, 0, sizeof(*m));
-	memset(s, 0, sizeof(*s));
-
-	s->type = type;
 }
 
 static enum mode_err
@@ -422,31 +404,25 @@ error:
 enum mode_type
 mode_type(const struct mode_cfg *cfg, int flag, int set)
 {
-	/* Return the chanmode flag type specified by config
-	 *
-	 *   A = Always has a parameter.
-	 *   B = Always has a parameter.
-	 *   C = Only has a parameter when set.
-	 *   D = Never has a parameter.
-	 */
+	/* Chanmode PREFIX */
+	if (strchr(cfg->PREFIX.F, flag))
+		return MODE_FLAG_PREFIX;
 
-	if (mode_isset(&(cfg->chanmodes), flag)) {
+	/* Chanmode subtype A, Always has a parameter. */
+	if (mode_isset(&(cfg->CHANMODES.A), flag))
+		return MODE_FLAG_CHANMODE_PARAM;
 
-		if (strchr(cfg->PREFIX.F, flag))
-			return MODE_FLAG_PREFIX;
+	/* Chanmode subtype B, Always has a parameter. */
+	if (mode_isset(&(cfg->CHANMODES.B), flag))
+		return MODE_FLAG_CHANMODE_PARAM;
 
-		if (mode_isset(&(cfg->CHANMODES.A), flag))
-			return MODE_FLAG_CHANMODE_PARAM;
+	/* Chanmode subtype C, Only has a parameter when set. */
+	if (mode_isset(&(cfg->CHANMODES.C), flag))
+		return (set ? MODE_FLAG_CHANMODE_PARAM : MODE_FLAG_CHANMODE);
 
-		if (mode_isset(&(cfg->CHANMODES.B), flag))
-			return MODE_FLAG_CHANMODE_PARAM;
-
-		if (mode_isset(&(cfg->CHANMODES.C), flag))
-			return (set ? MODE_FLAG_CHANMODE_PARAM : MODE_FLAG_CHANMODE);
-
-		if (mode_isset(&(cfg->CHANMODES.D), flag))
-			return MODE_FLAG_CHANMODE;
-	}
+	/* Chanmode subtype D, Never has a parameter. */
+	if (mode_isset(&(cfg->CHANMODES.D), flag))
+		return MODE_FLAG_CHANMODE;
 
 	return MODE_FLAG_INVALID_FLAG;
 }

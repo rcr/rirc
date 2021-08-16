@@ -28,35 +28,26 @@ test_mode_str(void)
 	struct mode m = MODE_EMPTY;
 	struct mode_str str;
 
-	memset(&str, 0, sizeof(struct mode_str));
-
-	/* mode_str type not set */
-	assert_fatal(mode_str(&m, &str));
-
-	str.type = -1;
-
 	/* mode_str type unknown */
-	assert_fatal(mode_str(&m, &str));
-
-	str.type = MODE_STR_USERMODE;
+	assert_fatal(mode_str(&m, &str, -1));
 
 	/* Test no mode */
-	assert_strcmp(mode_str(&m, &str), "");
+	assert_strcmp(mode_str(&m, &str, MODE_STR_USERMODE), "");
 
 	m.lower = UINT32_MAX;
 	m.upper = 0;
 
-	assert_strcmp(mode_str(&m, &str), ALL_LOWERS);
+	assert_strcmp(mode_str(&m, &str, MODE_STR_USERMODE), ALL_LOWERS);
 
 	m.lower = 0;
 	m.upper = UINT32_MAX;
 
-	assert_strcmp(mode_str(&m, &str), ALL_UPPERS);
+	assert_strcmp(mode_str(&m, &str, MODE_STR_USERMODE), ALL_UPPERS);
 
 	m.lower = UINT32_MAX;
 	m.upper = UINT32_MAX;
 
-	assert_strcmp(mode_str(&m, &str), ALL_LOWERS ALL_UPPERS);
+	assert_strcmp(mode_str(&m, &str, MODE_STR_USERMODE), ALL_LOWERS ALL_UPPERS);
 }
 
 static void
@@ -66,38 +57,38 @@ test_mode_chanmode_set(void)
 
 	struct mode m = MODE_EMPTY;
 	struct mode_cfg cfg;
-	struct mode_str str = { .type = MODE_STR_CHANMODE };
+	struct mode_str str;
 
 	mode_cfg_chanmodes(&cfg, "abcdefghijsp");
 	mode_cfg_subtypes(&cfg, "abc,def,ghi,jsp");
 
 	/* Test setting/unsetting invalid chanmode flag */
 	assert_eq(mode_chanmode_set(&m, &cfg, 'z', 1), MODE_ERR_INVALID_FLAG);
-	assert_strcmp(mode_str(&m, &str), "");
+	assert_strcmp(mode_str(&m, &str, MODE_STR_CHANMODE), "");
 
 	assert_eq(mode_chanmode_set(&m, &cfg, 'z', 0), MODE_ERR_INVALID_FLAG);
-	assert_strcmp(mode_str(&m, &str), "");
+	assert_strcmp(mode_str(&m, &str, MODE_STR_CHANMODE), "");
 
 	/* Test valid CHANMODE subtype A doesn't set flag */
 	assert_eq(mode_chanmode_set(&m, &cfg, 'a', 1), MODE_ERR_NONE);
-	assert_strcmp(mode_str(&m, &str), "");
+	assert_strcmp(mode_str(&m, &str, MODE_STR_CHANMODE), "");
 
 	/* Test valid CHANMODE subtypes B,C,D set flags */
 	assert_eq(mode_chanmode_set(&m, &cfg, 'd', 1), MODE_ERR_NONE);
-	assert_strcmp(mode_str(&m, &str), "d");
+	assert_strcmp(mode_str(&m, &str, MODE_STR_CHANMODE), "d");
 
 	assert_eq(mode_chanmode_set(&m, &cfg, 'e', 1), MODE_ERR_NONE);
-	assert_strcmp(mode_str(&m, &str), "de");
+	assert_strcmp(mode_str(&m, &str, MODE_STR_CHANMODE), "de");
 
 	assert_eq(mode_chanmode_set(&m, &cfg, 'j', 1), MODE_ERR_NONE);
-	assert_strcmp(mode_str(&m, &str), "dej");
+	assert_strcmp(mode_str(&m, &str, MODE_STR_CHANMODE), "dej");
 
 	/* test unsetting flags */
 	assert_eq(mode_chanmode_set(&m, &cfg, 's', 0), MODE_ERR_NONE);
 	assert_eq(mode_chanmode_set(&m, &cfg, 'j', 0), MODE_ERR_NONE);
 	assert_eq(mode_chanmode_set(&m, &cfg, 'e', 0), MODE_ERR_NONE);
 	assert_eq(mode_chanmode_set(&m, &cfg, 'd', 0), MODE_ERR_NONE);
-	assert_strcmp(mode_str(&m, &str), "");
+	assert_strcmp(mode_str(&m, &str, MODE_STR_CHANMODE), "");
 }
 
 static void
@@ -106,13 +97,13 @@ test_mode_prfxmode_set(void)
 	/* Test setting/unsetting prfxmode flag and prefix */
 
 	struct mode m = MODE_EMPTY;
-	struct mode_str str = { .type = MODE_STR_PRFXMODE };
 	struct mode_cfg cfg = {
 		.PREFIX = {
 			.F = "abc",
 			.T = "123"
 		}
 	};
+	struct mode_str str;
 
 	mode_cfg_chanmodes(&cfg, "abc");
 
@@ -150,7 +141,7 @@ test_mode_prfxmode_set(void)
 	assert_eq(mode_prfxmode_set(&m, &cfg, '3', 1), MODE_ERR_NONE);
 	assert_eq(m.prefix, '2');
 
-	assert_strcmp(mode_str(&m, &str), "bc");
+	assert_strcmp(mode_str(&m, &str, MODE_STR_PRFXMODE), "bc");
 }
 
 static void
@@ -159,8 +150,8 @@ test_mode_usermode_set(void)
 	/* Test setting/unsetting usermode flag and mode string */
 
 	struct mode m = MODE_EMPTY;
-	struct mode_str str = { .type = MODE_STR_USERMODE };
 	struct mode_cfg cfg;
+	struct mode_str str;
 
 	mode_cfg_usermodes(&cfg, "azAZ");
 
@@ -170,11 +161,11 @@ test_mode_usermode_set(void)
 	/* Test setting valid flags */
 	assert_eq(mode_usermode_set(&m, &cfg, 'a', 1), MODE_ERR_NONE);
 	assert_eq(mode_usermode_set(&m, &cfg, 'Z', 1), MODE_ERR_NONE);
-	assert_strcmp(mode_str(&m, &str), "aZ");
+	assert_strcmp(mode_str(&m, &str, MODE_STR_USERMODE), "aZ");
 
 	assert_eq(mode_usermode_set(&m, &cfg, 'z', 1), MODE_ERR_NONE);
 	assert_eq(mode_usermode_set(&m, &cfg, 'A', 1), MODE_ERR_NONE);
-	assert_strcmp(mode_str(&m, &str), "azAZ");
+	assert_strcmp(mode_str(&m, &str, MODE_STR_USERMODE), "azAZ");
 
 	/* Test unsetting invalid usermode flag */
 	assert_eq(mode_usermode_set(&m, &cfg, 'c', 0), MODE_ERR_INVALID_FLAG);
@@ -182,11 +173,11 @@ test_mode_usermode_set(void)
 	/* Test unsetting valid flags */
 	assert_eq(mode_usermode_set(&m, &cfg, 'z', 0), MODE_ERR_NONE);
 	assert_eq(mode_usermode_set(&m, &cfg, 'Z', 0), MODE_ERR_NONE);
-	assert_strcmp(mode_str(&m, &str), "aA");
+	assert_strcmp(mode_str(&m, &str, MODE_STR_USERMODE), "aA");
 
 	assert_eq(mode_usermode_set(&m, &cfg, 'a', 0), MODE_ERR_NONE);
 	assert_eq(mode_usermode_set(&m, &cfg, 'A', 0), MODE_ERR_NONE);
-	assert_strcmp(mode_str(&m, &str), "");
+	assert_strcmp(mode_str(&m, &str, MODE_STR_USERMODE), "");
 }
 
 static void
@@ -195,23 +186,23 @@ test_mode_cfg_usermodes(void)
 	/* Test configuring server usermodes */
 
 	struct mode_cfg cfg;
-	struct mode_str str = { .type = MODE_STR_USERMODE };
+	struct mode_str str;
 
 	/* Test empty string */
 	assert_eq(mode_cfg_usermodes(&cfg, ""), MODE_ERR_NONE);
-	assert_strcmp(mode_str(&(cfg.usermodes), &str), "");
+	assert_strcmp(mode_str(&(cfg.usermodes), &str, MODE_STR_USERMODE), "");
 
 	/* Test invalid flags */
 	assert_eq(mode_cfg_usermodes(&cfg, "$abc1!xyz."), MODE_ERR_NONE);
-	assert_strcmp(mode_str(&(cfg.usermodes), &str), "abcxyz");
+	assert_strcmp(mode_str(&(cfg.usermodes), &str, MODE_STR_USERMODE), "abcxyz");
 
 	/* Test duplicate flags */
 	assert_eq(mode_cfg_usermodes(&cfg, "aaabbc"), MODE_ERR_NONE);
-	assert_strcmp(mode_str(&(cfg.usermodes), &str), "abc");
+	assert_strcmp(mode_str(&(cfg.usermodes), &str, MODE_STR_USERMODE), "abc");
 
 	/* Test valid string */
 	assert_eq(mode_cfg_usermodes(&cfg, ALL_LOWERS ALL_UPPERS), MODE_ERR_NONE);
-	assert_strcmp(mode_str(&(cfg.usermodes), &str), ALL_LOWERS ALL_UPPERS);
+	assert_strcmp(mode_str(&(cfg.usermodes), &str, MODE_STR_USERMODE), ALL_LOWERS ALL_UPPERS);
 }
 
 static void
@@ -220,23 +211,23 @@ test_mode_cfg_chanmodes(void)
 	/* Test configuring server chanmodes */
 
 	struct mode_cfg cfg;
-	struct mode_str str = { .type = MODE_STR_USERMODE };
+	struct mode_str str;
 
 	/* Test empty string */
 	assert_eq(mode_cfg_chanmodes(&cfg, ""), MODE_ERR_NONE);
-	assert_strcmp(mode_str(&(cfg.chanmodes), &str), "");
+	assert_strcmp(mode_str(&(cfg.chanmodes), &str, MODE_STR_USERMODE), "");
 
 	/* Test invalid flags */
 	assert_eq(mode_cfg_chanmodes(&cfg, "$abc1!xyz."), MODE_ERR_NONE);
-	assert_strcmp(mode_str(&(cfg.chanmodes), &str), "abcxyz");
+	assert_strcmp(mode_str(&(cfg.chanmodes), &str, MODE_STR_USERMODE), "abcxyz");
 
 	/* Test duplicate flags */
 	assert_eq(mode_cfg_chanmodes(&cfg, "aaabbc"), MODE_ERR_NONE);
-	assert_strcmp(mode_str(&(cfg.chanmodes), &str), "abc");
+	assert_strcmp(mode_str(&(cfg.chanmodes), &str, MODE_STR_USERMODE), "abc");
 
 	/* Test valid string */
 	assert_eq(mode_cfg_chanmodes(&cfg, ALL_LOWERS ALL_UPPERS), MODE_ERR_NONE);
-	assert_strcmp(mode_str(&(cfg.chanmodes), &str), ALL_LOWERS ALL_UPPERS);
+	assert_strcmp(mode_str(&(cfg.chanmodes), &str, MODE_STR_USERMODE), ALL_LOWERS ALL_UPPERS);
 }
 
 static void
@@ -245,13 +236,13 @@ test_mode_cfg_subtypes(void)
 	/* Test configuring CHANMODE subtypes */
 
 	struct mode_cfg cfg;
-	struct mode_str str = { .type = MODE_STR_USERMODE };
+	struct mode_str str;
 
 #define CHECK(_A, _B, _C, _D) \
-	assert_strcmp(mode_str(&(cfg.CHANMODES.A), &str), (_A)); \
-	assert_strcmp(mode_str(&(cfg.CHANMODES.B), &str), (_B)); \
-	assert_strcmp(mode_str(&(cfg.CHANMODES.C), &str), (_C)); \
-	assert_strcmp(mode_str(&(cfg.CHANMODES.D), &str), (_D));
+	assert_strcmp(mode_str(&(cfg.CHANMODES.A), &str, MODE_STR_USERMODE), (_A)); \
+	assert_strcmp(mode_str(&(cfg.CHANMODES.B), &str, MODE_STR_USERMODE), (_B)); \
+	assert_strcmp(mode_str(&(cfg.CHANMODES.C), &str, MODE_STR_USERMODE), (_C)); \
+	assert_strcmp(mode_str(&(cfg.CHANMODES.D), &str, MODE_STR_USERMODE), (_D));
 
 	/* Test empty string */
 	assert_eq(mode_cfg_subtypes(&cfg, ""), MODE_ERR_NONE);

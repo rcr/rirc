@@ -997,7 +997,7 @@ recv_mode_chanmodes(struct irc_message *m, const struct mode_cfg *cfg, struct se
 		}
 	} while (irc_message_param(m, &modestring));
 
-	mode_str(&(c->chanmodes), &(c->chanmodes_str));
+	mode_str(&(c->chanmodes), &(c->chanmodes_str), MODE_STR_CHANMODE);
 	draw(DRAW_STATUS);
 
 	return 0;
@@ -1048,7 +1048,7 @@ recv_mode_usermodes(struct irc_message *m, const struct mode_cfg *cfg, struct se
 		}
 	} while (irc_message_param(m, &modestring));
 
-	mode_str(usermodes, &(s->mode_str));
+	mode_str(usermodes, &(s->mode_str), MODE_STR_USERMODE);
 	draw(DRAW_STATUS);
 
 	return 0;

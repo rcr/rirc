@@ -50,7 +50,6 @@ server(
 	s->mode = (mode ? strdup(mode) : NULL);
 
 	s->casemapping = CASEMAPPING_RFC1459;
-	s->mode_str.type = MODE_STR_USERMODE;
 	ircv3_caps(&(s->ircv3_caps));
 	ircv3_sasl(&(s->ircv3_sasl));
 	mode_cfg(&(s->mode_cfg), NULL, MODE_CFG_DEFAULTS);
@@ -141,7 +140,8 @@ server_reset(struct server *s)
 {
 	ircv3_caps_reset(&(s->ircv3_caps));
 	ircv3_sasl_reset(&(s->ircv3_sasl));
-	mode_reset(&(s->usermodes), &(s->mode_str));
+	memset(&(s->usermodes), 0, sizeof(s->usermodes));
+	memset(&(s->mode_str), 0, sizeof(s->mode_str));
 	s->ping = 0;
 	s->quitting = 0;
 	s->registered = 0;
