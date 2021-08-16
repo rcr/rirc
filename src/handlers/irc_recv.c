@@ -872,7 +872,7 @@ recv_mode(struct server *s, struct irc_message *m)
 	struct channel *c;
 
 	if (!irc_message_param(m, &targ))
-		failf(s, "NICK: new nick is null");
+		failf(s, "MODE: target nick is null");
 
 	if (!strcmp(targ, s->nick))
 		return recv_mode_usermodes(m, &(s->mode_cfg), s);
@@ -892,8 +892,6 @@ recv_mode_chanmodes(struct irc_message *m, const struct mode_cfg *cfg, struct se
 	enum mode_err mode_err;
 	struct mode *chanmodes = &(c->chanmodes);
 	struct user *user;
-
-	// TODO: mode string segfaults if args out of order
 
 	if (!irc_message_param(m, &modestring)) {
 		newlinef(c, 0, FROM_ERROR, "MODE: modestring is null");

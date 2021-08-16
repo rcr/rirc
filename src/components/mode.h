@@ -104,12 +104,10 @@ struct mode_str
 };
 
 const char* mode_str(const struct mode*, struct mode_str*, enum mode_str_type);
-
 enum mode_err mode_cfg(struct mode_cfg*, const char*, enum mode_cfg_type);
 enum mode_err mode_chanmode_set(struct mode*, const struct mode_cfg*, int, int);
 enum mode_err mode_prfxmode_set(struct mode*, const struct mode_cfg*, int, int);
 enum mode_err mode_usermode_set(struct mode*, const struct mode_cfg*, int, int);
-
 enum mode_type mode_type(const struct mode_cfg*, int, int);
 
 #endif
