@@ -576,15 +576,20 @@ static int
 ircv3_recv_AUTHENTICATE_EXTERNAL(struct server *s, struct irc_message *m)
 {
 	/* C: AUTHENTICATE EXTERNAL
-	 * S: +
-	 * C: +
+	 * S: AUTHENTICATE +
+	 * C: AUTHENTICATE +
 	 */
+
+	char *resp;
 
 	if (s->ircv3_sasl.state != IRCV3_SASL_STATE_REQ_MECH)
 		failf(s, "Invalid SASL state for mechanism EXTERNAL: %d", s->ircv3_sasl.state);
 
-	if (strcmp(m->params, "+"))
-		failf(s, "Invalid SASL response for mechanism EXTERNAL: '%s'", m->params);
+	if (!irc_message_param(m, &resp))
+		failf(s, "Invalid SASL response for mechanism EXTERNAL: response is null");
+
+	if (strcmp(resp, "+"))
+		failf(s, "Invalid SASL response for mechanism EXTERNAL: '%s'", resp);
 
 	sendf(s, "AUTHENTICATE +");
 
@@ -595,11 +600,12 @@ static int
 ircv3_recv_AUTHENTICATE_PLAIN(struct server *s, struct irc_message *m)
 {
 	/* C: AUTHENTICATE PLAIN
-	 * S: +
+	 * S: AUTHENTICATE +
 	 * C: AUTHENTICATE base64(<authzid><null><authcid><null><passwd>)
 	 */
 
 	/* (((4 * 300 / 3) + 3) & ~3) */
+	char *resp;
 	unsigned char resp_dec[300];
 	unsigned char resp_enc[400];
 	size_t len;
@@ -613,8 +619,11 @@ ircv3_recv_AUTHENTICATE_PLAIN(struct server *s, struct irc_message *m)
 	if (s->ircv3_sasl.state != IRCV3_SASL_STATE_REQ_MECH)
 		failf(s, "Invalid SASL state for mechanism PLAIN: %d", s->ircv3_sasl.state);
 
-	if (strcmp(m->params, "+"))
-		failf(s, "Invalid SASL response for mechanism PLAIN: '%s'", m->params);
+	if (!irc_message_param(m, &resp))
+		failf(s, "Invalid SASL response for mechanism PLAIN: response is null");
+
+	if (strcmp(resp, "+"))
+		failf(s, "Invalid SASL response for mechanism PLAIN: '%s'", resp);
 
 	len = snprintf((char *)resp_dec, sizeof(resp_dec), "%s%c%s%c%s",
 		s->ircv3_sasl.user, 0,

@@ -612,16 +612,22 @@ test_ircv3_recv_AUTHENTICATE_EXTERNAL(void)
 	assert_eq(mock_line_n, 1);
 	assert_strcmp(mock_send[0], "AUTHENTICATE EXTERNAL");
 
-	IRC_MESSAGE_PARSE("AUTHENTICATE *");
+	IRC_MESSAGE_PARSE("AUTHENTICATE");
 	assert_eq(irc_recv(s, &m), -1);
 	assert_eq(mock_send_n, 1);
 	assert_eq(mock_line_n, 2);
-	assert_strcmp(mock_line[1], "Invalid SASL response for mechanism EXTERNAL: '*'");
+	assert_strcmp(mock_line[1], "Invalid SASL response for mechanism EXTERNAL: response is null");
+
+	IRC_MESSAGE_PARSE("AUTHENTICATE *");
+	assert_eq(irc_recv(s, &m), -1);
+	assert_eq(mock_send_n, 1);
+	assert_eq(mock_line_n, 3);
+	assert_strcmp(mock_line[2], "Invalid SASL response for mechanism EXTERNAL: '*'");
 
 	IRC_MESSAGE_PARSE("AUTHENTICATE +");
 	assert_eq(irc_recv(s, &m), 0);
 	assert_eq(mock_send_n, 2);
-	assert_eq(mock_line_n, 2);
+	assert_eq(mock_line_n, 3);
 	assert_strcmp(mock_send[1], "AUTHENTICATE +");
 }
 
@@ -657,16 +663,22 @@ test_ircv3_recv_AUTHENTICATE_PLAIN(void)
 	assert_eq(mock_line_n, 3);
 	assert_strcmp(mock_send[0], "AUTHENTICATE PLAIN");
 
-	IRC_MESSAGE_PARSE("AUTHENTICATE *");
+	IRC_MESSAGE_PARSE("AUTHENTICATE");
 	assert_eq(irc_recv(s, &m), -1);
 	assert_eq(mock_send_n, 1);
 	assert_eq(mock_line_n, 4);
-	assert_strcmp(mock_line[3], "Invalid SASL response for mechanism PLAIN: '*'");
+	assert_strcmp(mock_line[3], "Invalid SASL response for mechanism PLAIN: response is null");
+
+	IRC_MESSAGE_PARSE("AUTHENTICATE *");
+	assert_eq(irc_recv(s, &m), -1);
+	assert_eq(mock_send_n, 1);
+	assert_eq(mock_line_n, 5);
+	assert_strcmp(mock_line[4], "Invalid SASL response for mechanism PLAIN: '*'");
 
 	IRC_MESSAGE_PARSE("AUTHENTICATE +");
 	assert_eq(irc_recv(s, &m), 0);
 	assert_eq(mock_send_n, 2);
-	assert_eq(mock_line_n, 4);
+	assert_eq(mock_line_n, 5);
 	assert_strcmp(mock_send[1], "AUTHENTICATE dXNlcgB1c2VyAHBhc3M=");
 
 	char user1[150] = {0};
@@ -680,16 +692,16 @@ test_ircv3_recv_AUTHENTICATE_PLAIN(void)
 	IRC_MESSAGE_PARSE("AUTHENTICATE +");
 	assert_eq(irc_recv(s, &m), -1);
 	assert_eq(mock_send_n, 2);
-	assert_eq(mock_line_n, 5);
-	assert_strcmp(mock_line[4], "SASL decoded auth message too long");
+	assert_eq(mock_line_n, 6);
+	assert_strcmp(mock_line[5], "SASL decoded auth message too long");
 
 	server_set_sasl(s, "plain", user2, "pass");
 
 	IRC_MESSAGE_PARSE("AUTHENTICATE +");
 	assert_eq(irc_recv(s, &m), -1);
 	assert_eq(mock_send_n, 2);
-	assert_eq(mock_line_n, 6);
-	assert_strcmp(mock_line[5], "SASL encoded auth message too long");
+	assert_eq(mock_line_n, 7);
+	assert_strcmp(mock_line[6], "SASL encoded auth message too long");
 }
 
 static void
