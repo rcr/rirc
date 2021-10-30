@@ -17,6 +17,7 @@ struct server
 	const char *username;
 	const char *realname;
 	const char *nick;
+	const char *mode;
 	enum casemapping casemapping;
 	struct {
 		size_t next;
@@ -27,12 +28,12 @@ struct server
 	struct channel *channel;
 	struct channel_list clist;
 	struct ircv3_caps ircv3_caps;
+	struct ircv3_sasl ircv3_sasl;
 	struct mode usermodes;
 	struct mode_str mode_str;
 	struct mode_cfg mode_cfg;
 	struct server *next;
 	struct server *prev;
-	struct user_list ignore;
 	unsigned ping;
 	unsigned connected  : 1;
 	unsigned quitting   : 1;
@@ -58,7 +59,8 @@ struct server* server(
 	const char*,  /* port */
 	const char*,  /* pass */
 	const char*,  /* username */
-	const char*); /* realname */
+	const char*,  /* realname */
+	const char*); /* mode */
 
 struct server* server_list_add(struct server_list*, struct server*);
 struct server* server_list_del(struct server_list*, struct server*);
@@ -68,6 +70,7 @@ int server_set_chans(struct server*, const char*);
 int server_set_nicks(struct server*, const char*);
 void server_set_004(struct server*, char*);
 void server_set_005(struct server*, char*);
+void server_set_sasl(struct server*, const char*, const char*, const char*);
 
 void server_nick_set(struct server*, const char*);
 void server_nicks_next(struct server*);

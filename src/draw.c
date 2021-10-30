@@ -438,8 +438,19 @@ print_text:
 			draw_attr_bg(text_bg);
 			draw_attr_fg(text_fg);
 
-			for (unsigned i = 0; i < (text_p2 - text_p1); i++)
-				draw_char(text_p1[i]);
+			for (unsigned i = 0; i < (text_p2 - text_p1); i++) {
+				switch (text_p1[i]) {
+					case 0x02:
+					case 0x03:
+					case 0x0F:
+					case 0x16:
+					case 0x1D:
+					case 0x1F:
+						break;
+					default:
+						draw_char(text_p1[i]);
+				}
+			}
 
 			draw_attr_reset();
 		}
@@ -677,7 +688,11 @@ draw_status(struct channel *c)
 	if (c->type == CHANNEL_T_CHANNEL && c->joined) {
 		if (!drawf(&cols, STATUS_SEP_HORZ))
 			return;
-		if (!drawf(&cols, "[+%s %u]", c->chanmodes_str.str, c->users.count))
+		if (!drawf(&cols, "[%s%s%s%u]",
+				(*(c->chanmodes_str.str) ? "+" : ""),
+				(*(c->chanmodes_str.str) ? c->chanmodes_str.str : ""),
+				(*(c->chanmodes_str.str) ? " " : ""),
+				 c->users.count))
 			return;
 	}
 
@@ -739,7 +754,6 @@ drawf(unsigned *cols_p, const char *fmt, ...)
 	 *  %a -- attribute reset
 	 *  %b -- set background colour attribute
 	 *  %f -- set foreground colour attribute
-	 *  %c -- output char
 	 *  %d -- output signed integer
 	 *  %u -- output unsigned integer
 	 *  %s -- output string
@@ -767,10 +781,6 @@ drawf(unsigned *cols_p, const char *fmt, ...)
 				case 'f':
 					draw_attr_fg(va_arg(arg, int));
 					break;
-				case 'c':
-					draw_char(va_arg(arg, int));
-					cols--;
-					break;
 				case 'd':
 					(void) snprintf(buf, sizeof(buf), "%d", va_arg(arg, int));
 					cols -= (unsigned) printf("%.*s", cols, buf);
@@ -786,7 +796,6 @@ drawf(unsigned *cols_p, const char *fmt, ...)
 						} while (UTF8_CONT(*str));
 					}
 					break;
-				case '%':
 				default:
 					fatal("unknown drawf format character '%c'", c);
 			}

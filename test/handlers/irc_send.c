@@ -465,7 +465,7 @@ test_send_ircv3_cap_list(void)
 static int
 test_init(void)
 {
-	s = server("h1", "p1", NULL, "u1", "r1");
+	s = server("h1", "p1", NULL, "u1", "r1", NULL);
 
 	c_serv = s->channel;
 

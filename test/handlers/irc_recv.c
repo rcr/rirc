@@ -44,8 +44,6 @@ static struct server *s;
 static void
 test_irc_generic(void)
 {
-	server_reset(s);
-
 	#define CHECK_IRC_GENERIC(M, C, F, RET, LINE_N) \
 	do { \
 		mock_reset_io(); \
@@ -92,8 +90,6 @@ test_irc_generic(void)
 static void
 test_irc_generic_error(void)
 {
-	server_reset(s);
-
 	char m1[] = "COMMAND arg1 arg2 :trailing arg";
 
 	mock_reset_io();
@@ -108,8 +104,6 @@ test_irc_generic_error(void)
 static void
 test_irc_generic_ignore(void)
 {
-	server_reset(s);
-
 	char m1[] = "COMMAND arg1 arg2 :trailing arg";
 
 	mock_reset_io();
@@ -123,8 +117,6 @@ test_irc_generic_ignore(void)
 static void
 test_irc_generic_info(void)
 {
-	server_reset(s);
-
 	char m1[] = "COMMAND arg1 arg2 :trailing arg";
 
 	mock_reset_io();
@@ -139,8 +131,6 @@ test_irc_generic_info(void)
 static void
 test_irc_generic_unknown(void)
 {
-	server_reset(s);
-
 	char m1[] = "COMMAND arg1 arg2 :trailing arg";
 
 	mock_reset_io();
@@ -153,6 +143,66 @@ test_irc_generic_unknown(void)
 }
 
 static void
+test_irc_numeric_001(void)
+{
+	/* 001 :<Welcome message> */
+
+	/* test registered */
+	mock_reset_io();
+	mock_reset_state();
+
+	assert_eq(s->registered, 0);
+
+	CHECK_RECV("001 me", 0, 1, 3);
+	assert_strcmp(mock_chan[0], "host");
+	assert_strcmp(mock_line[0], "You are known as me");
+	assert_strcmp(mock_send[0], "JOIN #c1");
+	assert_strcmp(mock_send[1], "JOIN #c2");
+	assert_strcmp(mock_send[2], "JOIN #c3");
+
+	assert_eq(s->registered, 1);
+
+	/* test welcome message */
+	mock_reset_io();
+	mock_reset_state();
+
+	CHECK_RECV("001 me :welcome message", 0, 2, 3);
+	assert_strcmp(mock_chan[0], "host");
+	assert_strcmp(mock_line[0], "welcome message");
+	assert_strcmp(mock_line[1], "You are known as me");
+	assert_strcmp(mock_send[0], "JOIN #c1");
+	assert_strcmp(mock_send[1], "JOIN #c2");
+	assert_strcmp(mock_send[2], "JOIN #c3");
+
+	/* test user modes */
+	mock_reset_io();
+	mock_reset_state();
+
+	s->mode = strdup("abc");
+
+	CHECK_RECV("001 me", 0, 1, 4);
+	assert_strcmp(mock_chan[0], "host");
+	assert_strcmp(mock_line[0], "You are known as me");
+	assert_strcmp(mock_send[0], "MODE me +abc");
+	assert_strcmp(mock_send[1], "JOIN #c1");
+	assert_strcmp(mock_send[2], "JOIN #c2");
+	assert_strcmp(mock_send[3], "JOIN #c3");
+
+	/* test parted channels aren't auto joined */
+	mock_reset_io();
+	mock_reset_state();
+
+	c2->parted = 1;
+
+	CHECK_RECV("001 me", 0, 1, 3);
+	assert_strcmp(mock_chan[0], "host");
+	assert_strcmp(mock_line[0], "You are known as me");
+	assert_strcmp(mock_send[0], "MODE me +abc");
+	assert_strcmp(mock_send[1], "JOIN #c1");
+	assert_strcmp(mock_send[2], "JOIN #c3");
+}
+
+static void
 test_irc_numeric_353(void)
 {
 	/* 353 <nick> <type> <channel> 1*(<modes><nick>) */
@@ -161,9 +211,6 @@ test_irc_numeric_353(void)
 	struct user *u2;
 	struct user *u3;
 	struct user *u4;
-
-	channel_reset(c1);
-	server_reset(s);
 
 	/* test errors */
 	CHECK_RECV("353 me", 1, 1, 0);
@@ -181,7 +228,7 @@ test_irc_numeric_353(void)
 	assert_strcmp(mock_line[0], "RPL_NAMEREPLY: channel '#x' not found");
 
 	CHECK_RECV("353 me x #c1 :n1", 1, 1, 0);
-	assert_strcmp(mock_line[0], "RPL_NAMEREPLY: invalid channel flag: 'x'");
+	assert_strcmp(mock_line[0], "RPL_NAMEREPLY: invalid channel type: 'x'");
 
 	CHECK_RECV("353 me = #c1 :+@", 1, 1, 0);
 	assert_strcmp(mock_line[0], "RPL_NAMEREPLY: invalid nick: '+@'");
@@ -208,8 +255,8 @@ test_irc_numeric_353(void)
 	 || !(u3 = user_list_get(&(c1->users), CASEMAPPING_RFC1459, "n3", 0)))
 		test_abort("Failed to retrieve users");
 
-	assert_eq(u1->prfxmodes.lower, (flag_bit('o')));
-	assert_eq(u2->prfxmodes.lower, (flag_bit('v')));
+	assert_eq(u1->prfxmodes.lower, (mode_bit('o')));
+	assert_eq(u2->prfxmodes.lower, (mode_bit('v')));
 	assert_eq(u3->prfxmodes.lower, 0);
 
 	/* test multiple nicks, multiprefix enabled */
@@ -228,18 +275,16 @@ test_irc_numeric_353(void)
 	assert_eq(u2->prfxmodes.prefix, '+');
 	assert_eq(u3->prfxmodes.prefix, '@');
 	assert_eq(u4->prfxmodes.prefix, '@');
-	assert_eq(u1->prfxmodes.lower, (flag_bit('o')));
-	assert_eq(u2->prfxmodes.lower, (flag_bit('v')));
-	assert_eq(u3->prfxmodes.lower, (flag_bit('o') | flag_bit('v')));
-	assert_eq(u4->prfxmodes.lower, (flag_bit('o') | flag_bit('v')));
+	assert_eq(u1->prfxmodes.lower, (mode_bit('o')));
+	assert_eq(u2->prfxmodes.lower, (mode_bit('v')));
+	assert_eq(u3->prfxmodes.lower, (mode_bit('o') | mode_bit('v')));
+	assert_eq(u4->prfxmodes.lower, (mode_bit('o') | mode_bit('v')));
 }
 
 static void
 test_irc_numeric_401(void)
 {
 	/* <nick> :No such nick/channel */
-
-	server_reset(s);
 
 	/* test errors */
 	CHECK_RECV("401 me", 1, 1, 0);
@@ -277,8 +322,6 @@ test_irc_numeric_403(void)
 {
 	/* <chan> :No such channel */
 
-	server_reset(s);
-
 	/* test errors */
 	CHECK_RECV("403 me", 1, 1, 0);
 	assert_strcmp(mock_chan[0], "host");
@@ -313,8 +356,6 @@ test_irc_numeric_403(void)
 static void
 test_recv(void)
 {
-	server_reset(s);
-
 	/* test unhandled command type */
 	CHECK_RECV("UNHANDLED", 0, 1, 0);
 	assert_strcmp(mock_chan[0], "host");
@@ -325,8 +366,6 @@ static void
 test_recv_error(void)
 {
 	/* ERROR :<message> */
-
-	server_reset(s);
 
 	CHECK_RECV("ERROR", 1, 1, 0);
 	assert_strcmp(mock_chan[0], "host");
@@ -348,9 +387,6 @@ static void
 test_recv_invite(void)
 {
 	/* :nick!user@host INVITE <nick> <channel> */
-
-	channel_reset(c1);
-	server_reset(s);
 
 	CHECK_RECV("INVITE nick channel", 1, 1, 0);
 	assert_strcmp(mock_chan[0], "host");
@@ -379,10 +415,6 @@ test_recv_join(void)
 {
 	/* :nick!user@host JOIN <channel>
 	 * :nick!user@host JOIN <channel> <account> :<realname> */
-
-	channel_reset(c1);
-	channel_reset(c2);
-	server_reset(s);
 
 	assert_eq(user_list_add(&(c1->users), CASEMAPPING_RFC1459, "nick1", MODE_EMPTY), USER_ERR_NONE);
 	assert_eq(user_list_add(&(c2->users), CASEMAPPING_RFC1459, "nick1", MODE_EMPTY), USER_ERR_NONE);
@@ -442,15 +474,6 @@ static void
 test_recv_kick(void)
 {
 	/* :nick!user@host KICK <channel> <user> [:message] */
-
-	channel_reset(c1);
-	channel_reset(c2);
-	channel_reset(c3);
-	server_reset(s);
-
-	c1->parted = 0;
-	c2->parted = 0;
-	c3->parted = 0;
 
 	assert_eq(user_list_add(&(c1->users), CASEMAPPING_RFC1459, "nick1", MODE_EMPTY), USER_ERR_NONE);
 	assert_eq(user_list_add(&(c1->users), CASEMAPPING_RFC1459, "nick2", MODE_EMPTY), USER_ERR_NONE);
@@ -527,11 +550,6 @@ test_recv_nick(void)
 {
 	/* :nick!user@host NICK <nick> */
 
-	channel_reset(c1);
-	channel_reset(c2);
-	channel_reset(c3);
-	server_reset(s);
-
 	assert_eq(user_list_add(&(c1->users), CASEMAPPING_RFC1459, "nick1", MODE_EMPTY), USER_ERR_NONE);
 	assert_eq(user_list_add(&(c1->users), CASEMAPPING_RFC1459, "nick2", MODE_EMPTY), USER_ERR_NONE);
 	assert_eq(user_list_add(&(c3->users), CASEMAPPING_RFC1459, "nick1", MODE_EMPTY), USER_ERR_NONE);
@@ -585,8 +603,6 @@ test_recv_notice(void)
 static void
 test_recv_numeric(void)
 {
-	server_reset(s);
-
 	CHECK_RECV(":hostname 0 * arg :trailing arg", 1, 1, 0);
 	assert_strcmp(mock_line[0], "NUMERIC: '0' invalid");
 
@@ -624,15 +640,6 @@ static void
 test_recv_part(void)
 {
 	/* :nick!user@host PART <channel> [:message] */
-
-	channel_reset(c1);
-	channel_reset(c2);
-	channel_reset(c3);
-	server_reset(s);
-
-	c1->parted = 0;
-	c2->parted = 0;
-	c3->parted = 0;
 
 	assert_eq(user_list_add(&(c1->users), CASEMAPPING_RFC1459, "nick1", MODE_EMPTY), USER_ERR_NONE);
 	assert_eq(user_list_add(&(c1->users), CASEMAPPING_RFC1459, "nick2", MODE_EMPTY), USER_ERR_NONE);
@@ -703,8 +710,6 @@ test_recv_ping(void)
 {
 	/* PING <server> */
 
-	server_reset(s);
-
 	CHECK_RECV("PING", 1, 1, 0);
 	assert_strcmp(mock_chan[0], "host");
 	assert_strcmp(mock_line[0], "PING: server is null");
@@ -717,8 +722,6 @@ static void
 test_recv_pong(void)
 {
 	/* PONG <server> [<server2>] */
-
-	server_reset(s);
 
 	CHECK_RECV("PONG", 0, 0, 0);
 	CHECK_RECV("PONG s1", 0, 0, 0);
@@ -735,11 +738,6 @@ static void
 test_recv_quit(void)
 {
 	/* :nick!user@host QUIT [:message] */
-
-	channel_reset(c1);
-	channel_reset(c2);
-	channel_reset(c3);
-	server_reset(s);
 
 	assert_eq(user_list_add(&(c1->users), CASEMAPPING_RFC1459, "nick1", MODE_EMPTY), USER_ERR_NONE);
 	assert_eq(user_list_add(&(c1->users), CASEMAPPING_RFC1459, "nick2", MODE_EMPTY), USER_ERR_NONE);
@@ -794,9 +792,6 @@ test_recv_topic(void)
 {
 	/* :nick!user@host TOPIC <channel> [:topic] */
 
-	channel_reset(c1);
-	server_reset(s);
-
 	CHECK_RECV("TOPIC #c1 message", 1, 1, 0);
 	assert_strcmp(mock_chan[0], "host");
 	assert_strcmp(mock_line[0], "TOPIC: sender's nick is null");
@@ -832,8 +827,6 @@ test_recv_ircv3_cap(void)
 {
 	/* Full IRCv3 CAP coverage in test/handlers/ircv3.c */
 
-	server_reset(s);
-
 	s->registered = 1;
 
 	CHECK_RECV("CAP * LS :cap-1 cap-2 cap-3", 0, 1, 0);
@@ -845,11 +838,6 @@ static void
 test_recv_ircv3_account(void)
 {
 	/* :nick!user@host ACCOUNT <account> */
-
-	channel_reset(c1);
-	channel_reset(c2);
-	channel_reset(c3);
-	server_reset(s);
 
 	assert_eq(user_list_add(&(c1->users), CASEMAPPING_RFC1459, "nick1", MODE_EMPTY), USER_ERR_NONE);
 	assert_eq(user_list_add(&(c1->users), CASEMAPPING_RFC1459, "nick2", MODE_EMPTY), USER_ERR_NONE);
@@ -892,11 +880,6 @@ test_recv_ircv3_away(void)
 {
 	/* :nick!user@host AWAY [:message] */
 
-	channel_reset(c1);
-	channel_reset(c2);
-	channel_reset(c3);
-	server_reset(s);
-
 	assert_eq(user_list_add(&(c1->users), CASEMAPPING_RFC1459, "nick1", MODE_EMPTY), USER_ERR_NONE);
 	assert_eq(user_list_add(&(c1->users), CASEMAPPING_RFC1459, "nick2", MODE_EMPTY), USER_ERR_NONE);
 	assert_eq(user_list_add(&(c3->users), CASEMAPPING_RFC1459, "nick1", MODE_EMPTY), USER_ERR_NONE);
@@ -935,11 +918,6 @@ test_recv_ircv3_chghost(void)
 {
 	/* :nick!user@host CHGHOST new_user new_host */
 
-	channel_reset(c1);
-	channel_reset(c2);
-	channel_reset(c3);
-	server_reset(s);
-
 	assert_eq(user_list_add(&(c1->users), CASEMAPPING_RFC1459, "nick1", MODE_EMPTY), USER_ERR_NONE);
 	assert_eq(user_list_add(&(c1->users), CASEMAPPING_RFC1459, "nick2", MODE_EMPTY), USER_ERR_NONE);
 	assert_eq(user_list_add(&(c3->users), CASEMAPPING_RFC1459, "nick1", MODE_EMPTY), USER_ERR_NONE);
@@ -975,7 +953,7 @@ test_recv_ircv3_chghost(void)
 static int
 test_init(void)
 {
-	s = server("host", "port", NULL, "user", "real");
+	s = server("host", "port", NULL, "user", "real", NULL);
 
 	c1 = channel("#c1", CHANNEL_T_CHANNEL);
 	c2 = channel("#c2", CHANNEL_T_CHANNEL);
@@ -1018,6 +996,7 @@ main(void)
 		TESTCASE(test_irc_generic_ignore),
 		TESTCASE(test_irc_generic_info),
 		TESTCASE(test_irc_generic_unknown),
+		TESTCASE(test_irc_numeric_001),
 		TESTCASE(test_irc_numeric_353),
 		TESTCASE(test_irc_numeric_401),
 		TESTCASE(test_irc_numeric_403),

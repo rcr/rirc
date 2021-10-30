@@ -1,0 +1,48 @@
+      _
+ _ __(_)_ __ ___
+| '__| | '__/ __|
+| |  | | | | (__
+|_|  |_|_|  \___|
+=================
+
+A minimalistic IRC client written in C.
+
+
+Configure
+---------
+
+Configure compile time defaults by editing `config.h`.
+To generate a default config file:
+
+    $ make config.h
+
+
+Install
+-------
+
+    $ make
+    $ make install
+
+Building rirc requires a c11 compiler, GNU gperf and GNU make.
+
+    - https://www.gnu.org/software/gperf/
+    - https://www.gnu.org/software/make/
+
+The build toolchain and install paths can be configured via
+standard environment variables, i.e.:
+
+    $CC, $CFLAGS, $LDFLAGS, $DESTDIR, $PREFIX
+
+The default install paths are:
+
+    /usr/local/bin/rirc
+    /usr/local/share/man/man1/rirc.1
+
+
+Documentation
+-------------
+
+See `rirc --help` or `man rirc` for a summary of usage. For
+complete documentation, refer to:
+
+    https://rcr.io/rirc/

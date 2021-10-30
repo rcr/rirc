@@ -6,13 +6,14 @@ CDIR="coverage"
 
 export CC=gcc
 export CFLAGS_DEBUG="-fprofile-arcs -ftest-coverage -fprofile-abs-path"
+export LDFLAGS_DEBUG="-fprofile-arcs"
 
 export MAKEFLAGS="-e -j $(nproc)"
 
-rm -rf $CDIR && mkdir -p $CDIR
-
 make clean
 make check
+
+rm -rf $CDIR && mkdir -p $CDIR
 
 GCNO=$(find build -name '*.t.gcno')
 

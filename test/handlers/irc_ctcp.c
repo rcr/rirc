@@ -483,7 +483,7 @@ test_recv_ctcp_response_version(void)
 static int
 test_init(void)
 {
-	s = server("h1", "p1", NULL, "u1", "r1");
+	s = server("h1", "p1", NULL, "u1", "r1", NULL);
 
 	c_chan = channel("chan", CHANNEL_T_CHANNEL);
 	c_priv = channel("nick", CHANNEL_T_PRIVMSG);

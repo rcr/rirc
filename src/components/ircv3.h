@@ -13,7 +13,8 @@
 	X("chghost",        chghost,        IRCV3_CAP_AUTO) \
 	X("extended-join",  extended_join,  IRCV3_CAP_AUTO) \
 	X("invite-notify",  invite_notify,  IRCV3_CAP_AUTO) \
-	X("multi-prefix",   multi_prefix,   IRCV3_CAP_AUTO)
+	X("multi-prefix",   multi_prefix,   IRCV3_CAP_AUTO) \
+	X("sasl",           sasl,           IRCV3_CAP_AUTO)
 
 /* Extended by testcases */
 #ifndef IRCV3_CAPS_TEST
@@ -26,6 +27,7 @@
 
 struct ircv3_cap
 {
+	const char *val;           /* cap key=val */
 	unsigned req          : 1; /* cap REQ sent */
 	unsigned req_auto     : 1; /* cap REQ sent automatically */
 	unsigned set          : 1; /* cap is unset/set */
@@ -42,9 +44,28 @@ struct ircv3_caps
 	#undef X
 };
 
+struct ircv3_sasl
+{
+	enum {
+		IRCV3_SASL_MECH_NONE,
+		IRCV3_SASL_MECH_EXTERNAL,
+		IRCV3_SASL_MECH_PLAIN,
+	} mech;
+	enum {
+		IRCV3_SASL_STATE_NONE,
+		IRCV3_SASL_STATE_REQ_MECH,
+		IRCV3_SASL_STATE_AUTHENTICATED,
+	} state;
+	const char *user;
+	const char *pass;
+};
+
 struct ircv3_cap* ircv3_cap_get(struct ircv3_caps*, const char*);
 
 void ircv3_caps(struct ircv3_caps*);
 void ircv3_caps_reset(struct ircv3_caps*);
+
+void ircv3_sasl(struct ircv3_sasl*);
+void ircv3_sasl_reset(struct ircv3_sasl*);
 
 #endif

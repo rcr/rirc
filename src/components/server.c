@@ -7,11 +7,11 @@
 #include <errno.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 
 #define HANDLED_005 \
 	X(CASEMAPPING)  \
 	X(CHANMODES)    \
-	X(MODES)        \
 	X(PREFIX)
 
 struct opt
@@ -28,21 +28,30 @@ HANDLED_005
 #undef X
 
 struct server*
-server(const char *host, const char *port, const char *pass, const char *user, const char *real)
+server(
+	const char *host,
+	const char *port,
+	const char *pass,
+	const char *username,
+	const char *realname,
+	const char *mode)
 {
 	struct server *s;
 
 	if ((s = calloc(1, sizeof(*s))) == NULL)
 		fatal("calloc: %s", strerror(errno));
 
-	s->host = strdup(host);
-	s->port = strdup(port);
-	s->pass = pass ? strdup(pass) : NULL;
-	s->username = strdup(user);
-	s->realname = strdup(real);
+	s->host     = strdup(host);
+	s->port     = strdup(port);
+	s->username = strdup(username);
+	s->realname = strdup(realname);
+
+	s->pass = (pass ? strdup(pass) : NULL);
+	s->mode = (mode ? strdup(mode) : NULL);
+
 	s->casemapping = CASEMAPPING_RFC1459;
-	s->mode_str.type = MODE_STR_USERMODE;
 	ircv3_caps(&(s->ircv3_caps));
+	ircv3_sasl(&(s->ircv3_sasl));
 	mode_cfg(&(s->mode_cfg), NULL, MODE_CFG_DEFAULTS);
 
 	s->channel = channel(host, CHANNEL_T_SERVER);
@@ -130,7 +139,9 @@ void
 server_reset(struct server *s)
 {
 	ircv3_caps_reset(&(s->ircv3_caps));
-	mode_reset(&(s->usermodes), &(s->mode_str));
+	ircv3_sasl_reset(&(s->ircv3_sasl));
+	memset(&(s->usermodes), 0, sizeof(s->usermodes));
+	memset(&(s->mode_str), 0, sizeof(s->mode_str));
 	s->ping = 0;
 	s->quitting = 0;
 	s->registered = 0;
@@ -142,16 +153,17 @@ server_free(struct server *s)
 {
 	channel_list_free(&(s->clist));
 
-	user_list_free(&(s->ignore));
-
 	free((void *)s->host);
 	free((void *)s->port);
 	free((void *)s->pass);
 	free((void *)s->username);
 	free((void *)s->realname);
+	free((void *)s->mode);
 	free((void *)s->nick);
 	free((void *)s->nicks.base);
 	free((void *)s->nicks.set);
+	free((void *)s->ircv3_sasl.user);
+	free((void *)s->ircv3_sasl.pass);
 	free(s);
 }
 
@@ -312,6 +324,25 @@ server_set_005(struct server *s, char *str)
 	}
 }
 
+void
+server_set_sasl(struct server *s, const char *mech, const char *user, const char *pass)
+{
+	free((void *)s->ircv3_sasl.user);
+	free((void *)s->ircv3_sasl.pass);
+
+	if (!strcasecmp(mech, "EXTERNAL")) {
+		s->ircv3_sasl.mech = IRCV3_SASL_MECH_EXTERNAL;
+		s->ircv3_sasl.user = NULL;
+		s->ircv3_sasl.pass = NULL;
+	}
+
+	if (!strcasecmp(mech, "PLAIN")) {
+		s->ircv3_sasl.mech = IRCV3_SASL_MECH_PLAIN;
+		s->ircv3_sasl.user = (user ? strdup(user) : NULL);
+		s->ircv3_sasl.pass = (pass ? strdup(pass) : NULL);
+	}
+}
+
 static int
 server_cmp(const struct server *s, const char *host, const char *port)
 {
@@ -421,12 +452,6 @@ static int
 server_set_CHANMODES(struct server *s, char *val)
 {
 	return mode_cfg(&(s->mode_cfg), val, MODE_CFG_SUBTYPES) != MODE_ERR_NONE;
-}
-
-static int
-server_set_MODES(struct server *s, char *val)
-{
-	return mode_cfg(&(s->mode_cfg), val, MODE_CFG_MODES) != MODE_ERR_NONE;
 }
 
 static int
