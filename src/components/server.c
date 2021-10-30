@@ -162,6 +162,8 @@ server_free(struct server *s)
 	free((void *)s->nick);
 	free((void *)s->nicks.base);
 	free((void *)s->nicks.set);
+	free((void *)s->ircv3_sasl.user);
+	free((void *)s->ircv3_sasl.pass);
 	free(s);
 }
 
