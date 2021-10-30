@@ -1,4 +1,4 @@
-VERSION := 0.1.5
+VERSION := 0.1.6
 
 PREFIX   ?= /usr/local
 PATH_BIN := $(DESTDIR)$(PREFIX)/bin
