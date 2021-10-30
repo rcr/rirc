@@ -16,7 +16,6 @@ channel(const char *name, enum channel_type type)
 	if ((c = calloc(1, sizeof(*c) + len + 1)) == NULL)
 		fatal("calloc: %s", strerror(errno));
 
-	c->chanmodes_str.type = MODE_STR_CHANMODE;
 	c->name_len = len;
 	c->name = memcpy(c->_, name, len + 1);
 	c->type = type;
@@ -113,13 +112,14 @@ void
 channel_part(struct channel *c)
 {
 	channel_reset(c);
-	c->joined = 0;
 	c->parted = 1;
 }
 
 void
 channel_reset(struct channel *c)
 {
-	mode_reset(&(c->chanmodes), &(c->chanmodes_str));
+	memset(&(c->chanmodes), 0, sizeof(c->chanmodes));
+	memset(&(c->chanmodes_str), 0, sizeof(c->chanmodes_str));
 	user_list_free(&(c->users));
+	c->joined = 0;
 }

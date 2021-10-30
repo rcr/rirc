@@ -40,6 +40,8 @@ test_ircv3_caps_reset(void)
 {
 	struct ircv3_caps caps;
 
+	ircv3_caps(&caps);
+
 	caps.cap_3.req = 1;
 	caps.cap_3.req_auto = 1;
 	caps.cap_3.set = 1;

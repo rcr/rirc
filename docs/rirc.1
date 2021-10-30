@@ -1,126 +1,136 @@
 '\" t
 .TH RIRC 1 rirc\-VERSION
 .SH NAME
-rirc \- a minimalistic irc client written in C
+rirc \- a minimalistic internet relay chat client
 .SH SYNOPSIS
 \fBrirc\fR [ \fB-hv\fR ] [ \fB-s\fR \fIserver\fR [ \fB...\fR ]]
-.SH DESCRIPTION
-.PP
-rirc is a lightweight Internet Relay Chat client.
-.PP
-Connections are TLS enabled over port 6697 by default.
 .SH OPTIONS
-.TP 5
+.TP 4
 .B "-h, --help"
 Print help message and exit
 .TP
 .B "-v, --version"
 Print rirc version and exit
-.SS Server options
-.TP 5
+.TP
 .BI "-s, --server=" server
-Connect to \fIserver\fP
+Set connection \fIhostname\fP
 .TP
 .BI "-p, --port=" port
-Connect to \fIserver\fP using \fIport\fP
+Set connection \fIport\fP
 .TP
 .BI "-w, --pass=" pass
-Connect to \fIserver\fP using \fIpass\fP
+Set IRC \fIpassword\fP
 .TP
 .BI "-u, --username=" username
-Connect to \fIserver\fP using \fIusername\fP
+Set IRC \fIusername\fP
 .TP
 .BI "-r, --realname=" realname
-Connect to \fIserver\fP using \fIrealname\fP
+Set IRC \fIrealname\fP
+.TP
+.BI "-m, --mode=" modes
+Set IRC user \fImodes\fP
 .TP
 .BI "-n, --nicks=" nicks
-Comma separated list of \fInicks\fP to use for \fIserver\fP
+Set comma separated list of \fInicks\fP to use
 .TP
 .BI "-c, --chans=" chans
-Comma separated list of \fIchannels\fP to join for \fIserver\fP
-.SS Server connection options
-.TP 5
-.B --ipv4
-Connect to \fIserver\fP using only ipv4 addresses
+Set comma separated list of \fIchannels\fP to join
 .TP
-.B --ipv6
-Connect to \fIserver\fP using only ipv6 addresses
+.BI --tls-cert= path
+Set TLS client certificate file \fIpath\fP
 .TP
-.B --tls-disable
-Set \fIserver\fP TLS disabled, default port to 6667
+.BI --tls-ca-file= path
+Set TLS peer certificate file \fIpath\fP
+.TP
+.BI --tls-ca-path= path
+Set TLS peer certificate directory \fIpath\fP
 .TP
 .BI --tls-verify= mode
-Set \fIserver\fP TLS peer certificate verification \fImode\fP:
+Set TLS peer certificate verification \fImode\fP:
 .EX
 \(bu \fIdisabled\fP - cert is not verified
 \(bu \fIoptional\fP - cert is verified, handshake continues on error
 \(bu \fIrequired\fP - cert is verified, handshake is aborted on error (default)
 .EE
+.TP
+.B --tls-disable
+Set TLS disabled
+.TP
+.BI --sasl= mechanism
+Authenticate with SASL \fImechanism\fP:
+.EX
+\(bu \fIexternal\fP - requires \fI--tls-cert\fP
+\(bu \fIplain\fP    - requires \fI--sasl-user\fP and \fI--sasl-pass\fP
+.EE
+.TP
+.BI --sasl-user= user
+Authenticate with SASL \fIusername\fP
+.TP
+.BI --sasl-pass= pass
+Authenticate with SASL \fIpassword\fP
+.TP
+.B --ipv4
+Use IPv4 addresses only
+.TP
+.B --ipv6
+Use IPv6 addresses only
 .SH USAGE
-.TS
-l .
-rirc is controlled by a combination of key bindings and commands, where:
+rirc is controlled by a combination of keys and commands, where:
   <arg> denotes required arguments
   [arg] denotes optional arguments
-.TE
-
-.TS
-.tab(;);
-lb l .
-Keys:
-  ^N;go to next channel
-  ^P;go to previous channel
-  ^C;cancel current input/action
-  ^L;clear current channel
-  ^X;close current channel
-  ^U;scroll current buffer up
-  ^D;scroll current buffer down
-  <left>;input cursor back
-  <right>;input cursor forward
-  <up>;input history back
-  <down>;input history forward
-.TE
-
-.TS
-l .
-Commands beginning with ':' are interpreted as rirc commands
-and control the local client, e.g.:
-.TE
-
-.TS
-.tab(;);
-lb l .
+.TP
 Commands:
-  :clear;
-  :close;
-  :connect;
-  :disconnect;
-  :quit;
-.TE
-
-.TS
-l .
-Commands beginning with '/' are interpreted as IRC commands
-and will be sent to the current server, e.g.:
-.TE
-
-.TS
-.tab(;);
-lb l .
+ \fB:clear\fP
+ \fB:close\fP
+ \fB:connect\fP [hostname] [options]
+ \fB:disconnect\fP
+ \fB:quit\fP
+.TP
+Keys:
+ \fB^N\fP   Go to next buffer
+ \fB^P\fP   Go to previous buffer
+ \fB^L\fP   Clear current buffer
+ \fB^X\fP   Close current buffer
+ \fB^U\fP   Scroll current buffer back
+ \fB^D\fP   Scroll current buffer forward
+ \fB^C\fP   Cancel current input/action
+ \fB ←\fP   Input cursor back
+ \fB →\fP   Input cursor forward
+ \fB ↑\fP   Input history back
+ \fB ↓\fP   Input history forward
+.TP
 IRC commands:
-  /join;[target, [targets...]]
-  /me;<message>
-  /nick;[nick]
-  /part;[target [targets...]] [part message]
-  /privmsg;<target> <message>
-  /quit;[quit message]
-  /raw;<message>
-.TE
-.SH AUTHORS
-.MT mail@rcr.io
-Richard 'rcr' Robbins
-.ME .
+ \fB/away\fP [away message]
+ \fB/join\fP [target, [targets...]]
+ \fB/kick\fP <channel> <nick>
+ \fB/mode\fP <target> <modes>
+ \fB/nick\fP <nick>
+ \fB/notice\fP <target> <message>
+ \fB/part\fP [target] [message]
+ \fB/privmsg\fP <target> <message>
+ \fB/quit\fP [message]
+ \fB/topic\fP [topic]
+ \fB/topic-unset\fP
+ \fB/whois\fP <target>
+.TP
+CTCP commands
+ \fB/ctcp-action\fP <target> <message>
+ \fB/ctcp-clientinfo\fP [target]
+ \fB/ctcp-finger\fP [target]
+ \fB/ctcp-ping\fP [target]
+ \fB/ctcp-source\fP [target]
+ \fB/ctcp-time\fP [target]
+ \fB/ctcp-userinfo\fP [target]
+ \fB/ctcp-version\fP [target]
+.TP
+IRCv3 commands
+ \fB/cap-ls\fP
+ \fB/cap-list\fP
 .SH SEE ALSO
 .UR https://rcr.io/rirc/
 Additional documentation
 .UE .
+.SH AUTHORS
+.MT mail@rcr.io
+Richard 'rcr' Robbins
+.ME .

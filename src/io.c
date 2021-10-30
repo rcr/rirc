@@ -105,6 +105,9 @@ struct connection
 	const void *obj;
 	const char *host;
 	const char *port;
+	const char *tls_ca_file;
+	const char *tls_ca_path;
+	const char *tls_cert;
 	enum io_state {
 		IO_ST_INVALID,
 		IO_ST_DXED, /* Socket disconnected, passive */
@@ -114,9 +117,14 @@ struct connection
 		IO_ST_PING, /* Socket connected, network state in question */
 	} st_cur, /* current thread state */
 	  st_new; /* new thread state */
+	mbedtls_ctr_drbg_context tls_ctr_drbg;
+	mbedtls_entropy_context tls_entropy;
 	mbedtls_net_context net_ctx;
-	mbedtls_ssl_config  tls_conf;
+	mbedtls_pk_context tls_pk_ctx;
+	mbedtls_ssl_config tls_conf;
 	mbedtls_ssl_context tls_ctx;
+	mbedtls_x509_crt tls_x509_crt_ca;
+	mbedtls_x509_crt tls_x509_crt_client;
 	pthread_mutex_t mtx;
 	pthread_t tid;
 	uint32_t flags;
@@ -138,9 +146,6 @@ static void io_tty_winsize(void);
 static void* io_thread(void*);
 
 static int io_running;
-static mbedtls_ctr_drbg_context tls_ctr_drbg;
-static mbedtls_entropy_context  tls_entropy;
-static mbedtls_x509_crt         tls_x509_crt;
 static pthread_mutex_t io_cb_mutex = PTHREAD_MUTEX_INITIALIZER;
 static struct termios term;
 static volatile sig_atomic_t flag_sigwinch_cb; /* sigwinch callback */
@@ -153,10 +158,8 @@ static void io_net_close(int);
 static const char* io_tls_err(int);
 static int io_tls_establish(struct connection*);
 static int io_tls_x509_vrfy(struct connection*);
-static void io_tls_init(void);
-static void io_tls_term(void);
 
-const char *ca_cert_paths[] = {
+const char *default_ca_certs[] = {
 	"/etc/ssl/ca-bundle.pem",
 	"/etc/ssl/cert.pem",
 	"/etc/ssl/certs/ca-certificates.crt",
@@ -166,7 +169,14 @@ const char *ca_cert_paths[] = {
 };
 
 struct connection*
-connection(const void *obj, const char *host, const char *port, uint32_t flags)
+connection(
+	const void *obj,
+	const char *host,
+	const char *port,
+	const char *tls_ca_file,
+	const char *tls_ca_path,
+	const char *tls_cert,
+	uint32_t flags)
 {
 	struct connection *cx;
 
@@ -177,6 +187,9 @@ connection(const void *obj, const char *host, const char *port, uint32_t flags)
 	cx->flags = flags;
 	cx->host = strdup(host);
 	cx->port = strdup(port);
+	cx->tls_ca_file = (tls_ca_file ? strdup(tls_ca_file) : NULL);
+	cx->tls_ca_path = (tls_ca_path ? strdup(tls_ca_path) : NULL);
+	cx->tls_cert = (tls_cert ? strdup(tls_cert) : NULL);
 	cx->st_cur = IO_ST_DXED;
 	cx->st_new = IO_ST_INVALID;
 	PT_CF(pthread_mutex_init(&(cx->mtx), NULL));
@@ -190,6 +203,9 @@ connection_free(struct connection *cx)
 	PT_CF(pthread_mutex_destroy(&(cx->mtx)));
 	free((void*)cx->host);
 	free((void*)cx->port);
+	free((void*)cx->tls_ca_file);
+	free((void*)cx->tls_ca_path);
+	free((void*)cx->tls_cert);
 	free(cx);
 }
 
@@ -309,7 +325,6 @@ io_init(void)
 {
 	io_sig_init();
 	io_tty_init();
-	io_tls_init();
 }
 
 void
@@ -411,8 +426,17 @@ io_state_cxed(struct connection *cx)
 {
 	int ret;
 
-	while ((ret = io_cx_read(cx, SEC_IN_MS(IO_PING_MIN))) > 0)
-		continue;
+	do {
+		enum io_state st;
+
+		PT_LK(&(cx->mtx));
+		st = cx->st_new;
+		PT_UL(&(cx->mtx));
+
+		if (st != IO_ST_INVALID)
+			return st;
+
+	} while ((ret = io_cx_read(cx, SEC_IN_MS(IO_PING_MIN))) > 0);
 
 	if (ret == MBEDTLS_ERR_SSL_TIMEOUT)
 		return IO_ST_PING;
@@ -421,22 +445,28 @@ io_state_cxed(struct connection *cx)
 		case MBEDTLS_ERR_SSL_WANT_READ:
 			break;
 		case MBEDTLS_ERR_SSL_PEER_CLOSE_NOTIFY:
-			io_info(cx, "connection closed gracefully");
+			io_info(cx, "Connection closed gracefully");
 			break;
 		case MBEDTLS_ERR_NET_CONN_RESET:
 		case 0:
-			io_error(cx, "connection reset by peer");
+			io_error(cx, "Connection reset by peer");
 			break;
 		default:
-			io_error(cx, "connection error");
+			io_error(cx, "Connection error");
 			break;
 	}
 
 	mbedtls_net_free(&(cx->net_ctx));
 
 	if (cx->flags & IO_TLS_ENABLED) {
+		mbedtls_ctr_drbg_free(&(cx->tls_ctr_drbg));
+		mbedtls_entropy_free(&(cx->tls_entropy));
+		mbedtls_pk_free(&(cx->tls_pk_ctx));
 		mbedtls_ssl_config_free(&(cx->tls_conf));
 		mbedtls_ssl_free(&(cx->tls_ctx));
+		mbedtls_x509_crt_free(&(cx->tls_x509_crt_ca));
+		mbedtls_x509_crt_free(&(cx->tls_x509_crt_client));
+
 	}
 
 	return IO_ST_CXNG;
@@ -460,22 +490,27 @@ io_state_ping(struct connection *cx)
 		case MBEDTLS_ERR_SSL_WANT_READ:
 			break;
 		case MBEDTLS_ERR_SSL_PEER_CLOSE_NOTIFY:
-			io_info(cx, "connection closed gracefully");
+			io_info(cx, "Connection closed gracefully");
 			break;
 		case MBEDTLS_ERR_NET_CONN_RESET:
 		case 0:
-			io_error(cx, "connection reset by peer");
+			io_error(cx, "Connection reset by peer");
 			break;
 		default:
-			io_error(cx, "connection error");
+			io_error(cx, "Connection error");
 			break;
 	}
 
 	mbedtls_net_free(&(cx->net_ctx));
 
 	if (cx->flags & IO_TLS_ENABLED) {
+		mbedtls_ctr_drbg_free(&(cx->tls_ctr_drbg));
+		mbedtls_entropy_free(&(cx->tls_entropy));
+		mbedtls_pk_free(&(cx->tls_pk_ctx));
 		mbedtls_ssl_config_free(&(cx->tls_conf));
 		mbedtls_ssl_free(&(cx->tls_ctx));
+		mbedtls_x509_crt_free(&(cx->tls_x509_crt_ca));
+		mbedtls_x509_crt_free(&(cx->tls_x509_crt_client));
 	}
 
 	return IO_ST_CXNG;
@@ -776,12 +811,19 @@ io_strerror(char *buf, size_t buflen)
 static int
 io_tls_establish(struct connection *cx)
 {
+	const unsigned char pers[] = "rirc-drbg-seed";
+
 	int ret;
 
 	io_info(cx, " .. Establishing TLS connection");
 
+	mbedtls_ctr_drbg_init(&(cx->tls_ctr_drbg));
+	mbedtls_entropy_init(&(cx->tls_entropy));
+	mbedtls_pk_init(&(cx->tls_pk_ctx));
 	mbedtls_ssl_init(&(cx->tls_ctx));
 	mbedtls_ssl_config_init(&(cx->tls_conf));
+	mbedtls_x509_crt_init(&(cx->tls_x509_crt_ca));
+	mbedtls_x509_crt_init(&(cx->tls_x509_crt_client));
 
 	if ((ret = mbedtls_ssl_config_defaults(
 			&(cx->tls_conf),
@@ -802,12 +844,91 @@ io_tls_establish(struct connection *cx)
 			MBEDTLS_SSL_MAJOR_VERSION_3,
 			MBEDTLS_SSL_MINOR_VERSION_3);
 
-	mbedtls_ssl_conf_rng(&(cx->tls_conf), mbedtls_ctr_drbg_random, &tls_ctr_drbg);
+	if ((ret = mbedtls_ctr_drbg_seed(
+			&(cx->tls_ctr_drbg),
+			mbedtls_entropy_func,
+			&(cx->tls_entropy),
+			pers,
+			sizeof(pers)))) {
+		io_error(cx, " .. %s ", io_tls_err(ret));
+		goto err;
+	}
+
+	ret = -1;
+
+	if (ret < 0 && cx->tls_ca_file) {
+		if ((ret = mbedtls_x509_crt_parse_file(&(cx->tls_x509_crt_ca), cx->tls_ca_file)) < 0) {
+			io_error(cx, " .. Failed to load CA cert file: '%s': %s", cx->tls_ca_file, io_tls_err(ret));
+			goto err;
+		}
+	}
+
+	if (ret < 0 && cx->tls_ca_path) {
+		if ((ret = mbedtls_x509_crt_parse_path(&(cx->tls_x509_crt_ca), cx->tls_ca_path)) < 0) {
+			io_error(cx, " .. Failed to load CA cert path: '%s': %s", cx->tls_ca_path, io_tls_err(ret));
+			goto err;
+		}
+	}
+
+	if (ret < 0 && default_ca_file && *default_ca_file) {
+		if ((ret = mbedtls_x509_crt_parse_file(&(cx->tls_x509_crt_ca), default_ca_file)) < 0) {
+			io_error(cx, " .. Failed to load CA cert file: '%s': %s", default_ca_file, io_tls_err(ret));
+			goto err;
+		}
+	}
+
+	if (ret < 0 && default_ca_path && *default_ca_path) {
+		if ((ret = mbedtls_x509_crt_parse_path(&(cx->tls_x509_crt_ca), default_ca_path)) < 0) {
+			io_error(cx, " .. Failed to load CA cert path: '%s': %s", default_ca_path, io_tls_err(ret));
+			goto err;
+		}
+	}
+
+	if (ret < 0) {
+
+		size_t i;
+
+		for (i = 0; i < ARR_LEN(default_ca_certs); i++) {
+			if ((ret = mbedtls_x509_crt_parse_file(&(cx->tls_x509_crt_ca), default_ca_certs[i])) >= 0)
+				break;
+		}
+
+		if (i == ARR_LEN(default_ca_certs)) {
+			io_error(cx, " .. Failed to load default CA certs: %s", io_tls_err(ret));
+			goto err;
+		}
+	}
+
+	if (cx->tls_cert) {
+
+		if ((ret = mbedtls_x509_crt_parse_file(&(cx->tls_x509_crt_client), cx->tls_cert)) < 0) {
+			io_error(cx, " .. Failed to load client cert: '%s': %s", cx->tls_cert, io_tls_err(ret));
+			goto err;
+		}
+
+		if ((ret = mbedtls_pk_parse_keyfile(
+				&(cx->tls_pk_ctx),
+				cx->tls_cert,
+				NULL,
+				mbedtls_ctr_drbg_random,
+				&(cx->tls_ctr_drbg))))
+		{
+			io_error(cx, " .. Failed to load client cert key: '%s': %s", cx->tls_cert, io_tls_err(ret));
+			goto err;
+		}
+
+		if ((ret = mbedtls_ssl_conf_own_cert(&(cx->tls_conf), &(cx->tls_x509_crt_client), &(cx->tls_pk_ctx)))) {
+			io_error(cx, " .. Failed to configure client cert: '%s': %s", cx->tls_cert, io_tls_err(ret));
+			goto err;
+		}
+	}
+
+	mbedtls_ssl_conf_rng(&(cx->tls_conf), mbedtls_ctr_drbg_random, &(cx->tls_ctr_drbg));
 
 	if (cx->flags & IO_TLS_VRFY_DISABLED) {
 		mbedtls_ssl_conf_authmode(&(cx->tls_conf), MBEDTLS_SSL_VERIFY_NONE);
 	} else {
-		mbedtls_ssl_conf_ca_chain(&(cx->tls_conf), &tls_x509_crt, NULL);
+		mbedtls_ssl_conf_ca_chain(&(cx->tls_conf), &(cx->tls_x509_crt_ca), NULL);
 
 		if (cx->flags & IO_TLS_VRFY_OPTIONAL)
 			mbedtls_ssl_conf_authmode(&(cx->tls_conf), MBEDTLS_SSL_VERIFY_OPTIONAL);
@@ -858,8 +979,8 @@ io_tls_establish(struct connection *cx)
 	}
 
 	io_info(cx, " .. TLS connection established");
-	io_info(cx, " ..   - version:     %s", mbedtls_ssl_get_version(&(cx->tls_ctx)));
-	io_info(cx, " ..   - ciphersuite: %s", mbedtls_ssl_get_ciphersuite(&(cx->tls_ctx)));
+	io_info(cx, " .... Version:     %s", mbedtls_ssl_get_version(&(cx->tls_ctx)));
+	io_info(cx, " .... Ciphersuite: %s", mbedtls_ssl_get_ciphersuite(&(cx->tls_ctx)));
 
 	return 0;
 
@@ -867,8 +988,13 @@ err:
 
 	io_error(cx, " .. TLS connection failure");
 
+	mbedtls_ctr_drbg_free(&(cx->tls_ctr_drbg));
+	mbedtls_entropy_free(&(cx->tls_entropy));
+	mbedtls_pk_free(&(cx->tls_pk_ctx));
 	mbedtls_ssl_config_free(&(cx->tls_conf));
 	mbedtls_ssl_free(&(cx->tls_ctx));
+	mbedtls_x509_crt_free(&(cx->tls_x509_crt_ca));
+	mbedtls_x509_crt_free(&(cx->tls_x509_crt_client));
 	mbedtls_net_free(&(cx->net_ctx));
 
 	return -1;
@@ -913,52 +1039,4 @@ io_tls_err(int err)
 		return str;
 
 	return "Unknown error";
-}
-
-static void
-io_tls_init(void)
-{
-	const unsigned char pers[] = "rirc-drbg-seed";
-	int ret;
-
-	mbedtls_ctr_drbg_init(&tls_ctr_drbg);
-	mbedtls_entropy_init(&tls_entropy);
-	mbedtls_x509_crt_init(&tls_x509_crt);
-
-	if (atexit(io_tls_term))
-		fatal("atexit");
-
-	if ((ret = mbedtls_ctr_drbg_seed(
-			&tls_ctr_drbg,
-			mbedtls_entropy_func,
-			&tls_entropy,
-			pers,
-			sizeof(pers)))) {
-		fatal("mbedtls_ctr_drbg_seed: %s", io_tls_err(ret));
-	}
-
-	if (ca_cert_path && *ca_cert_path) {
-
-		if ((ret = mbedtls_x509_crt_parse_file(&tls_x509_crt, ca_cert_path)) < 0)
-			fatal("mbedtls_x509_crt_parse_file: '%s': %s", ca_cert_path, io_tls_err(ret));
-
-	} else {
-
-		for (size_t i = 0; i < ARR_LEN(ca_cert_paths); i++) {
-			if ((ret = mbedtls_x509_crt_parse_file(&tls_x509_crt, ca_cert_paths[i])) >= 0)
-				return;
-		}
-
-		fatal("Failed to load ca cert: %s", io_tls_err(ret));
-	}
-}
-
-static void
-io_tls_term(void)
-{
-	/* Exit handler, must return normally */
-
-	mbedtls_ctr_drbg_free(&tls_ctr_drbg);
-	mbedtls_entropy_free(&tls_entropy);
-	mbedtls_x509_crt_free(&tls_x509_crt);
 }

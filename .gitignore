@@ -1,11 +1,5 @@
-*.gcda
-*.gcno
-*.gcov
 *.gperf.out
-*.o
 *.out
-*.t
-*.td
 .cache
 build
 config.h

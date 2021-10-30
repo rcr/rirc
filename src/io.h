@@ -89,6 +89,9 @@ struct connection* connection(
 	const void*, /* callback object */
 	const char*, /* host */
 	const char*, /* port */
+	const char*, /* tls_ca_file */
+	const char*, /* tls_ca_path */
+	const char*, /* tls_cert */
 	uint32_t);   /* flags */
 
 void connection_free(struct connection*);

@@ -1,4 +1,4 @@
-VERSION := 0.1.5
+VERSION := 0.1.6
 
 PREFIX   ?= /usr/local
 PATH_BIN := $(DESTDIR)$(PREFIX)/bin
@@ -13,17 +13,19 @@ include lib/mbedtls.Makefile
 
 CONFIG := config.h
 
+CFLAGS_RIRC += -std=c11 -I. -DVERSION=\"$(VERSION)\"
+CFLAGS_RIRC += -D_POSIX_C_SOURCE=200809L
+CFLAGS_RIRC += -D_DARWIN_C_SOURCE
+
 CFLAGS ?= -O2 -flto
 CFLAGS += -DNDEBUG
 
 CFLAGS_DEBUG += -O0 -g3 -Wall -Wextra -Werror
 
-RIRC_CFLAGS += -std=c11 -I. -DVERSION=\"$(VERSION)\"
-RIRC_CFLAGS += -D_POSIX_C_SOURCE=200809L
-RIRC_CFLAGS += -D_DARWIN_C_SOURCE
-
 LDFLAGS ?= -flto
-LDFLAGS += -lpthread
+LDFLAGS += -pthread
+
+LDFLAGS_DEBUG += -pthread
 
 SRC       := $(shell find $(PATH_SRC) -name '*.c' | sort)
 SRC_GPERF := $(patsubst %, %.out, $(shell find $(PATH_SRC) -name '*.gperf'))
@@ -39,25 +41,24 @@ rirc: $(RIRC_LIBS) $(SRC_GPERF) $(OBJS_R)
 	@$(CC) $(LDFLAGS) -o $@ $(OBJS_R) $(RIRC_LIBS)
 
 rirc.debug: $(RIRC_LIBS) $(SRC_GPERF) $(OBJS_D)
-	@echo "$(CC) $(LDFLAGS) $@"
-	@$(CC) $(LDFLAGS) -o $@ $(OBJS_D) $(RIRC_LIBS)
+	@echo "$(CC) $(LDFLAGS_DEBUG) $@"
+	@$(CC) $(LDFLAGS_DEBUG) -o $@ $(OBJS_D) $(RIRC_LIBS)
 
 $(PATH_BUILD)/%.o: $(PATH_SRC)/%.c $(CONFIG) | $(PATH_BUILD)
 	@echo "$(CC) $(CFLAGS) $<"
-	@$(CPP) $(CFLAGS) $(RIRC_CFLAGS) -MM -MP -MT $@ -MF $(@:.o=.o.d) $<
-	@$(CC)  $(CFLAGS) $(RIRC_CFLAGS) -c -o $@ $<
+	@$(CPP) $(CFLAGS) $(CFLAGS_RIRC) -MM -MP -MT $@ -MF $(@:.o=.o.d) $<
+	@$(CC)  $(CFLAGS) $(CFLAGS_RIRC) -c -o $@ $<
 
 $(PATH_BUILD)/%.db.o: $(PATH_SRC)/%.c $(CONFIG) | $(PATH_BUILD)
 	@echo "$(CC) $(CFLAGS_DEBUG) $<"
-	@$(CPP) $(CFLAGS_DEBUG) $(RIRC_CFLAGS) -MM -MP -MT $@ -MF $(@:.o=.o.d) $<
-	@$(CC)  $(CFLAGS_DEBUG) $(RIRC_CFLAGS) -c -o $@ $<
+	@$(CPP) $(CFLAGS_DEBUG) $(CFLAGS_RIRC) -MM -MP -MT $@ -MF $(@:.o=.o.d) $<
+	@$(CC)  $(CFLAGS_DEBUG) $(CFLAGS_RIRC) -c -o $@ $<
 
-$(PATH_BUILD)/%.t: $(PATH_TEST)/%.c $(SRC_GPERF) $(CONFIG) | $(PATH_BUILD)
-	@rm -f $(@:.t=.td)
-	@$(CPP) $(CFLAGS_DEBUG) $(RIRC_CFLAGS) -MM -MP -MT $@ -MF $(@:.t=.t.d) $<
-	@$(CC)  $(CFLAGS_DEBUG) $(RIRC_CFLAGS) -c -o $(@:.t=.t.o) $<
-	@$(CC)  $(CFLAGS_DEBUG) $(RIRC_CFLAGS) -o $@ $(@:.t=.t.o)
-	@./$@ || mv $@ $(@:.t=.td)
+$(PATH_BUILD)/%.t: $(PATH_TEST)/%.c $(SRC_GPERF) $(CONFIG) | $(RIRC_LIBS) $(PATH_BUILD)
+	@$(CPP) $(CFLAGS_DEBUG) $(CFLAGS_RIRC) -MM -MP -MT $@ -MF $(@:.t=.t.d) $<
+	@$(CC)  $(CFLAGS_DEBUG) $(CFLAGS_RIRC) -c -o $(@:.t=.t.o) $<
+	@$(CC)  $(LDFLAGS_DEBUG) -o $@ $(@:.t=.t.o) $(RIRC_LIBS)
+	@{ rm -f $(@:.t=.td) && ./$@; } || mv $@ $(@:.t=.td)
 
 $(PATH_BUILD):
 	@mkdir -p $(patsubst $(PATH_SRC)%, $(PATH_BUILD)%, $(shell find $(PATH_SRC) -type d))

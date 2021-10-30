@@ -10,14 +10,26 @@
 #include "src/utils/utils.h"
 
 #include <ctype.h>
+#include <stdarg.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <strings.h>
-#include <stdarg.h>
-#include <stdio.h>
 
 /* See: https://vt100.net/docs/vt100-ug/chapter3.html */
 #define CTRL(k) ((k) & 0x1f)
+
+#define COMMAND_HANDLERS \
+	X(clear) \
+	X(close) \
+	X(connect) \
+	X(disconnect) \
+	X(quit)
+
+#define X(CMD) \
+static void command_##CMD(struct channel*, char*);
+COMMAND_HANDLERS
+#undef X
 
 static void _newline(struct channel*, enum buffer_line_type, const char*, const char*, va_list);
 
@@ -197,8 +209,6 @@ _newline(struct channel *c, enum buffer_line_type type, const char *from, const 
 			from_len = strlen(from);
 		}
 	}
-
-	// TODO: preformat the time string here
 
 	buffer_newline(
 		&(c->buffer),
@@ -587,78 +597,289 @@ state_complete(char *str, uint16_t len, uint16_t max, int first)
 }
 
 static void
-command(struct channel *c, char *buf)
+command(struct channel *c, char *args)
 {
 	const char *arg;
-	const char *cmd;
-	int err;
 
-	if (!(cmd = irc_strsep(&buf)))
+	if (!(arg = irc_strsep(&args)))
 		return;
 
-	if (!strcasecmp(cmd, "clear")) {
-		if ((arg = irc_strsep(&buf))) {
-			action(action_error, "clear: Unknown arg '%s'", arg);
-			return;
-		}
-		state_channel_clear(0);
+	if (!strcasecmp(arg, "clear")) {
+		command_clear(c, args);
 		return;
 	}
 
-	if (!strcasecmp(cmd, "close")) {
-		if ((arg = irc_strsep(&buf))) {
-			action(action_error, "close: Unknown arg '%s'", arg);
-			return;
-		}
-		state_channel_close(0);
+	if (!strcasecmp(arg, "close")) {
+		command_close(c, args);
 		return;
 	}
 
-	if (!strcasecmp(cmd, "connect")) {
+	if (!strcasecmp(arg, "connect")) {
+		command_connect(c, args);
+		return;
+	}
+
+	if (!strcasecmp(arg, "disconnect")) {
+		command_disconnect(c, args);
+		return;
+	}
+
+	if (!strcasecmp(arg, "quit")) {
+		command_quit(c, args);
+		return;
+	}
+
+	action(action_error, "Unknown command '%s'", arg);
+}
+
+static void
+command_clear(struct channel *c, char *args)
+{
+	UNUSED(c);
+
+	char *arg;
+
+	if ((arg = irc_strsep(&args))) {
+		action(action_error, "clear: Unknown arg '%s'", arg);
+		return;
+	}
+
+	state_channel_clear(0);
+}
+
+static void
+command_close(struct channel *c, char *args)
+{
+	UNUSED(c);
+
+	char *arg;
+
+	if ((arg = irc_strsep(&args))) {
+		action(action_error, "close: Unknown arg '%s'", arg);
+		return;
+	}
+
+	state_channel_close(0);
+}
+
+static void
+command_connect(struct channel *c, char *args)
+{
+	/* :connect [hostname [options]] */
+
+	char *arg;
+
+	if (!(arg = irc_strsep(&args))) {
+
+		int err;
+
 		if (!c->server) {
 			action(action_error, "connect: This is not a server");
-			return;
-		}
-
-		if ((arg = irc_strsep(&buf))) {
-			action(action_error, "connect: Unknown arg '%s'", arg);
-			return;
-		}
-
-		if ((err = io_cx(c->server->connection)))
+		} else if ((err = io_cx(c->server->connection))) {
 			action(action_error, "connect: %s", io_err(err));
+		}
 
-		return;
-	}
+	} else {
 
-	if (!strcasecmp(cmd, "disconnect")) {
-		if (!c->server) {
-			action(action_error, "disconnect: This is not a server");
+		int ret;
+		struct server *s;
+
+		const char *host        = arg;
+		const char *port        = NULL;
+		const char *pass        = NULL;
+		const char *username    = default_username;
+		const char *realname    = default_realname;
+		const char *mode        = NULL;
+		const char *nicks       = default_nicks;
+		const char *chans       = NULL;
+		const char *tls_ca_file = NULL;
+		const char *tls_ca_path = NULL;
+		const char *tls_cert    = NULL;
+		const char *sasl        = NULL;
+		const char *sasl_user   = NULL;
+		const char *sasl_pass   = NULL;
+		int ipv                 = IO_IPV_UNSPEC;
+		int tls                 = IO_TLS_ENABLED;
+		int tls_vrfy            = IO_TLS_VRFY_REQUIRED;
+
+		while ((arg = irc_strsep(&args))) {
+
+			if (*arg != '-') {
+				action(action_error, ":connect [hostname [options]]");
+				return;
+			} else if (!strcmp(arg, "-p") || !strcmp(arg, "--port")) {
+				if (!(port = irc_strsep(&args))) {
+					action(action_error, "connect: '-p/--port' requires an argument");
+					return;
+				}
+			} else if (!strcmp(arg, "-w") || !strcmp(arg, "--pass")) {
+				if (!(pass = irc_strsep(&args))) {
+					action(action_error, "connect: '-w/--pass' requires an argument");
+					return;
+				}
+			} else if (!strcmp(arg, "-u") || !strcmp(arg, "--username")) {
+				if (!(username = irc_strsep(&args))) {
+					action(action_error, "connect: '-u/--username' requires an argument");
+					return;
+				}
+			} else if (!strcmp(arg, "-r") || !strcmp(arg, "--realname")) {
+				if (!(realname = irc_strsep(&args))) {
+					action(action_error, "connect: '-r/--realname' requires an argument");
+					return;
+				}
+			} else if (!strcmp(arg, "-m") || !strcmp(arg, "--mode")) {
+				if (!(mode = irc_strsep(&args))) {
+					action(action_error, "connect: '-m/--mode' requires an argument");
+					return;
+				}
+			} else if (!strcmp(arg, "-n") || !strcmp(arg, "--nicks")) {
+				if (!(nicks = irc_strsep(&args))) {
+					action(action_error, "connect: '-n/--nicks' requires an argument");
+					return;
+				}
+			} else if (!strcmp(arg, "-c") || !strcmp(arg, "--chans")) {
+				if (!(chans = irc_strsep(&args))) {
+					action(action_error, "connect: '-c/--chans' requires an argument");
+					return;
+				}
+			} else if (!strcmp(arg, "--tls-cert")) {
+				if (!(tls_cert = irc_strsep(&args))) {
+					action(action_error, "connect: '--tls-cert' requires an argument");
+					return;
+				}
+			} else if (!strcmp(arg, "--tls-ca-file")) {
+				if (!(tls_ca_file = irc_strsep(&args))) {
+					action(action_error, "connect: '--tls-ca-file' requires an argument");
+					return;
+				}
+			} else if (!strcmp(arg, "--tls-ca-path")) {
+				if (!(tls_ca_path = irc_strsep(&args))) {
+					action(action_error, "connect: '--tls-ca-path' requires an argument");
+					return;
+				}
+			} else if (!strcmp(arg, "--tls-verify")) {
+				if (!(arg = irc_strsep(&args))) {
+					action(action_error, "connect: '--tls-verify' requires an argument");
+					return;
+				} else if (!strcmp(arg, "0") || !strcasecmp(arg, "disabled")) {
+					tls_vrfy = IO_TLS_VRFY_DISABLED;
+				} else if (!strcmp(arg, "1") || !strcasecmp(arg, "optional")) {
+					tls_vrfy = IO_TLS_VRFY_OPTIONAL;
+				} else if (!strcmp(arg, "2") || !strcasecmp(arg, "required")) {
+					tls_vrfy = IO_TLS_VRFY_REQUIRED;
+				} else {
+					action(action_error, "connect: invalid option for '--tls-verify' '%s'", arg);
+					return;
+				}
+			} else if (!strcmp(arg, "--tls-disable")) {
+				tls = IO_TLS_DISABLED;
+			} else if (!strcmp(arg, "--sasl")) {
+				if (!(sasl = irc_strsep(&args))) {
+					action(action_error, "connect: '--sasl' requires an argument");
+					return;
+				} else if (!strcasecmp(sasl, "EXTERNAL")) {
+					;
+				} else if (!strcasecmp(sasl, "PLAIN")) {
+					;
+				} else {
+					action(action_error, "connect: invalid option for '--sasl' '%s'", sasl);
+					return;
+				}
+			} else if (!strcmp(arg, "--sasl-user")) {
+				if (!(sasl_user = irc_strsep(&args))) {
+					action(action_error, "connect: '--sasl-user' requires an argument");
+					return;
+				}
+			} else if (!strcmp(arg, "--sasl-pass")) {
+				if (!(sasl_pass = irc_strsep(&args))) {
+					action(action_error, "connect: '--sasl-pass' requires an argument");
+					return;
+				}
+			} else if (!strcmp(arg, "--ipv4")) {
+				ipv = IO_IPV_4;
+			} else if (!strcmp(arg, "--ipv6")) {
+				ipv = IO_IPV_6;
+			} else {
+				action(action_error, "connect: unknown option '%s'", arg);
+				return;
+			}
+		}
+
+		if (port == NULL)
+			port = (tls == IO_TLS_ENABLED) ? "6697" : "6667";
+
+		s = server(host, port, pass, username, realname, mode);
+
+		if (nicks && server_set_nicks(s, nicks)) {
+			action(action_error, "connect: invalid -n/--nicks: '%s'", nicks);
+			server_free(s);
 			return;
 		}
 
-		if ((arg = irc_strsep(&buf))) {
-			action(action_error, "disconnect: Unknown arg '%s'", arg);
+		if (chans && server_set_chans(s, chans)) {
+			action(action_error, "connect: invalid -c/--chans: '%s'", chans);
+			server_free(s);
 			return;
 		}
 
-		if ((err = io_dx(c->server->connection)))
-			action(action_error, "disconnect: %s", io_err(err));
-
-		return;
-	}
-
-	if (!strcasecmp(cmd, "quit")) {
-		if ((arg = irc_strsep(&buf))) {
-			action(action_error, "quit: Unknown arg '%s'", arg);
+		if (server_list_add(state_server_list(), s)) {
+			action(action_error, "connect: duplicate server: %s:%s", host, port);
+			server_free(s);
 			return;
 		}
 
-		io_stop();
+		if (sasl)
+			server_set_sasl(s, sasl, sasl_user, sasl_pass);
+
+		s->connection = connection(
+			s,
+			host,
+			port,
+			tls_ca_file,
+			tls_ca_path,
+			tls_cert,
+			(ipv | tls | tls_vrfy));
+
+		if ((ret = io_cx(s->connection)))
+			server_error(s, "failed to connect: %s", io_err(ret));
+
+		channel_set_current(s->channel);
+	}
+}
+
+static void
+command_disconnect(struct channel *c, char *args)
+{
+	char *arg;
+	int err;
+
+	if (!c->server) {
+		action(action_error, "disconnect: This is not a server");
 		return;
 	}
 
-	action(action_error, "Unknown command '%s'", cmd);
+	if ((arg = irc_strsep(&args))) {
+		action(action_error, "disconnect: Unknown arg '%s'", arg);
+		return;
+	}
+
+	if ((err = io_dx(c->server->connection)))
+		action(action_error, "disconnect: %s", io_err(err));
+}
+
+static void
+command_quit(struct channel *c, char *args)
+{
+	UNUSED(c);
+
+	char *arg;
+
+	if ((arg = irc_strsep(&args))) {
+		action(action_error, "quit: Unknown arg '%s'", arg);
+		return;
+	}
+
+	io_stop();
 }
 
 static int
@@ -832,7 +1053,7 @@ io_cb_read_soc(char *buf, size_t len, const void *cb_obj)
 				irc_recv(s, &m);
 
 			ci = 0;
-		} else if (ci < IRC_MESSAGE_LEN && (isprint(cc) || cc == 0x01)) {
+		} else if (ci < IRC_MESSAGE_LEN && cc && cc != '\n' && cc != '\r') {
 			s->read.buf[ci++] = cc;
 		}
 	}
@@ -849,22 +1070,23 @@ io_cb_cxed(const void *cb_obj)
 	struct server *s = (struct server *)cb_obj;
 
 	int ret;
+
 	server_reset(s);
 	server_nicks_next(s);
 
 	s->connected = 1;
 
 	if ((ret = io_sendf(s->connection, "CAP LS " IRCV3_CAP_VERSION)))
-		newlinef(s->channel, 0, FROM_ERROR, "sendf fail: %s", io_err(ret));
+		server_error(s, "sendf fail: %s", io_err(ret));
 
 	if (s->pass && (ret = io_sendf(s->connection, "PASS %s", s->pass)))
-		newlinef(s->channel, 0, FROM_ERROR, "sendf fail: %s", io_err(ret));
+		server_error(s, "sendf fail: %s", io_err(ret));
 
 	if ((ret = io_sendf(s->connection, "NICK %s", s->nick)))
-		newlinef(s->channel, 0, FROM_ERROR, "sendf fail: %s", io_err(ret));
+		server_error(s, "sendf fail: %s", io_err(ret));
 
-	if ((ret = io_sendf(s->connection, "USER %s 8 * :%s", s->username, s->realname)))
-		newlinef(s->channel, 0, FROM_ERROR, "sendf fail: %s", io_err(ret));
+	if ((ret = io_sendf(s->connection, "USER %s 0 * :%s", s->username, s->realname)))
+		server_error(s, "sendf fail: %s", io_err(ret));
 
 	draw(DRAW_STATUS);
 	draw(DRAW_FLUSH);
@@ -876,7 +1098,7 @@ io_cb_dxed(const void *cb_obj)
 	struct server *s = (struct server *)cb_obj;
 	struct channel *c = s->channel;
 
-	s->connected = 0;
+	server_reset(s);
 
 	do {
 		newlinef(c, 0, FROM_ERROR, " -- disconnected --");
@@ -884,6 +1106,7 @@ io_cb_dxed(const void *cb_obj)
 		c = c->next;
 	} while (c != s->channel);
 
+	draw(DRAW_STATUS);
 	draw(DRAW_FLUSH);
 }
 
@@ -898,7 +1121,7 @@ io_cb_ping(const void *cb_obj, unsigned ping)
 	if (ping != IO_PING_MIN)
 		draw(DRAW_STATUS);
 	else if ((ret = io_sendf(s->connection, "PING :%s", s->host)))
-		newlinef(s->channel, 0, FROM_ERROR, "sendf fail: %s", io_err(ret));
+		server_error(s, "sendf fail: %s", io_err(ret));
 
 	draw(DRAW_FLUSH);
 }
