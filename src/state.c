@@ -31,7 +31,7 @@ static void command_##CMD(struct channel*, char*);
 COMMAND_HANDLERS
 #undef X
 
-static void _newline(struct channel*, enum buffer_line_type, const char*, const char*, va_list);
+static void newlinev(struct channel*, enum buffer_line_type, const char*, const char*, va_list);
 
 static int state_input_linef(struct channel*);
 static int state_input_ctrlch(const char*, size_t);
@@ -166,17 +166,15 @@ state_rows(void)
 void
 newlinef(struct channel *c, enum buffer_line_type type, const char *from, const char *fmt, ...)
 {
-	/* Formating wrapper for _newline */
-
 	va_list ap;
 
 	va_start(ap, fmt);
-	_newline(c, type, from, fmt, ap);
+	newlinev(c, type, from, fmt, ap);
 	va_end(ap);
 }
 
 static void
-_newline(struct channel *c, enum buffer_line_type type, const char *from, const char *fmt, va_list ap)
+newlinev(struct channel *c, enum buffer_line_type type, const char *from, const char *fmt, va_list ap)
 {
 	char buf[TEXT_LENGTH_MAX];
 	char prefix = 0;
@@ -1142,7 +1140,7 @@ io_cb_info(const void *cb_obj, const char *fmt, ...)
 	va_list ap;
 	va_start(ap, fmt);
 
-	_newline(((struct server *)cb_obj)->channel, 0, FROM_INFO, fmt, ap);
+	newlinev(((struct server *)cb_obj)->channel, 0, FROM_INFO, fmt, ap);
 
 	va_end(ap);
 
@@ -1155,7 +1153,7 @@ io_cb_error(const void *cb_obj, const char *fmt, ...)
 	va_list ap;
 	va_start(ap, fmt);
 
-	_newline(((struct server *)cb_obj)->channel, 0, FROM_ERROR, fmt, ap);
+	newlinev(((struct server *)cb_obj)->channel, 0, FROM_ERROR, fmt, ap);
 
 	va_end(ap);
 
