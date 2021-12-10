@@ -647,13 +647,13 @@ static void
 draw_status(struct channel *c)
 {
 	/* server buffer:
-	 *  -[+usermodes]-(ping)-(scrollback)
+	 *  -[nick +usermodes]-(ping)-(scrollback)
 	 *
 	 * privmsg buffer:
-	 *  -[+usermodes]-[privmsg]-(ping)-(scrollback)
+	 *  -[nick +usermodes]-[privmsg]-(ping)-(scrollback)
 	 *
 	 * channel buffer:
-	 *  -[+usermodes]-[+chanmodes chancount]-(ping)-(scrollback)
+	 *  -[nick +usermodes]-[+chanmodes chancount]-(ping)-(scrollback)
 	 */
 
 	#define STATUS_SEP_HORZ \
@@ -668,15 +668,18 @@ draw_status(struct channel *c)
 
 	draw_cursor_pos(rows - 1, 1);
 
-	/* -[usermodes] */
-	if (c->server && *(c->server->mode_str.str)) {
+	/* -[nick +usermodes] */
+	if (c->server && c->server->registered) {
 		if (!drawf(&cols, STATUS_SEP_HORZ))
 			return;
-		if (!drawf(&cols, "[+%s]", c->server->mode_str.str))
+		if (!drawf(&cols, "[%s%s%s]",
+				c->server->nick,
+				(*(c->server->mode_str.str) ? " +" : ""),
+				(*(c->server->mode_str.str) ? c->server->mode_str.str : "")))
 			return;
 	}
 
-	/* -[priv] */
+	/* -[privmsg] */
 	if (c->type == CHANNEL_T_PRIVMSG) {
 		if (!drawf(&cols, STATUS_SEP_HORZ))
 			return;
@@ -684,7 +687,7 @@ draw_status(struct channel *c)
 			return;
 	}
 
-	/* -[chanmodes chancount] */
+	/* -[+chanmodes chancount] */
 	if (c->type == CHANNEL_T_CHANNEL && c->joined) {
 		if (!drawf(&cols, STATUS_SEP_HORZ))
 			return;
