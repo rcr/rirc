@@ -331,7 +331,10 @@ irc_numeric_001(struct server *s, struct irc_message *m)
 
 	do {
 		if (c->type == CHANNEL_T_CHANNEL && !c->parted)
-			sendf(s, "JOIN %s", c->name);
+			sendf(s, "JOIN %s%s%s",
+				c->name,
+				(!c->key ? "" : " "),
+				(!c->key ? "" : c->key));
 	} while ((c = c->next) != s->channel);
 
 	return 0;
@@ -394,6 +397,8 @@ irc_numeric_324(struct server *s, struct irc_message *m)
 
 	if ((c = channel_list_get(&s->clist, chan, s->casemapping)) == NULL)
 		failf(s, "RPL_CHANNELMODEIS: channel '%s' not found", chan);
+
+	channel_key_del(c);
 
 	return recv_mode_chanmodes(m, &(s->mode_cfg), s, c);
 }
@@ -944,6 +949,13 @@ recv_mode_chanmodes(struct irc_message *m, const struct mode_cfg *cfg, struct se
 					if (!irc_message_param(m, &modearg)) {
 						newlinef(c, 0, FROM_ERROR, "MODE: flag '%c' expected argument", flag);
 						continue;
+					}
+
+					if (flag == 'k') {
+						if (set)
+							channel_key_add(c, modearg);
+						else
+							channel_key_del(c);
 					}
 
 					mode_err = mode_chanmode_set(chanmodes, cfg, flag, set);

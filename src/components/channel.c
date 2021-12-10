@@ -31,6 +31,7 @@ channel_free(struct channel *c)
 {
 	input_free(&c->input);
 	user_list_free(&(c->users));
+	free((void *)c->key);
 	free(c);
 }
 
@@ -47,6 +48,20 @@ channel_list_free(struct channel_list *cl)
 		c1 = c2->next;
 		channel_free(c2);
 	} while (c1 != cl->head);
+}
+
+void
+channel_key_add(struct channel *c, const char *key)
+{
+	free((void *)c->key);
+	c->key = strdup(key);
+}
+
+void
+channel_key_del(struct channel *c)
+{
+	free((void *)c->key);
+	c->key = NULL;
 }
 
 void

@@ -29,6 +29,7 @@ enum channel_type
 struct channel
 {
 	const char *name;
+	const char *key;
 	enum activity activity;
 	enum channel_type type;
 	size_t name_len;
@@ -55,6 +56,8 @@ struct channel_list
 struct channel* channel(const char*, enum channel_type);
 struct channel* channel_list_get(struct channel_list*, const char*, enum casemapping);
 void channel_free(struct channel*);
+void channel_key_add(struct channel*, const char*);
+void channel_key_del(struct channel*);
 void channel_list_add(struct channel_list*, struct channel*);
 void channel_list_del(struct channel_list*, struct channel*);
 void channel_list_free(struct channel_list*);

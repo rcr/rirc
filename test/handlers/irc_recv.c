@@ -174,6 +174,24 @@ test_irc_numeric_001(void)
 	assert_strcmp(mock_send[1], "JOIN #c2");
 	assert_strcmp(mock_send[2], "JOIN #c3");
 
+	/* test channel keys */
+	mock_reset_io();
+	mock_reset_state();
+
+	channel_key_add(c1, "foo");
+	channel_key_add(c3, "bar");
+
+	CHECK_RECV("001 me :welcome message", 0, 2, 3);
+	assert_strcmp(mock_chan[0], "host");
+	assert_strcmp(mock_line[0], "welcome message");
+	assert_strcmp(mock_line[1], "You are known as me");
+	assert_strcmp(mock_send[0], "JOIN #c1 foo");
+	assert_strcmp(mock_send[1], "JOIN #c2");
+	assert_strcmp(mock_send[2], "JOIN #c3 bar");
+
+	channel_key_del(c1);
+	channel_key_del(c3);
+
 	/* test user modes */
 	mock_reset_io();
 	mock_reset_state();
@@ -439,12 +457,14 @@ test_recv_join(void)
 	assert_strcmp(mock_chan[0], "#c1");
 	assert_strcmp(mock_line[0], "nick2!user@host has joined");
 
+	/* test IRCv3 extended-join disabled */
 	s->ircv3_caps.extended_join.set = 0;
 
 	CHECK_RECV(":nick3!user@host JOIN #c1 account :real name", 0, 1, 0);
 	assert_strcmp(mock_chan[0], "#c1");
 	assert_strcmp(mock_line[0], "nick3!user@host has joined");
 
+	/* test IRCv3 extended-join enabled */
 	s->ircv3_caps.extended_join.set = 1;
 
 	CHECK_RECV(":nick4!user@host JOIN #c1", 1, 1, 0);
@@ -463,6 +483,7 @@ test_recv_join(void)
 
 	CHECK_RECV(":nick2!user@host JOIN #c2", 0, 0, 0);
 
+	/* test user joining new channel */
 	CHECK_RECV(":me!user@host JOIN #new", 0, 1, 1);
 	assert_strcmp(mock_chan[0], "#new");
 	assert_strcmp(mock_line[0], "Joined #new");
@@ -630,7 +651,7 @@ test_recv_numeric(void)
 	CHECK_RECV(":hostname 001 test", 1, 1, 0);
 	assert_strcmp(mock_line[0], "NUMERIC: target 'test' is invalid");
 
-	/* Test numeric unhandled */
+	/* test numeric unhandled */
 	CHECK_RECV(":hostname 666 me arg1 arg2 :trailing arg", 0, 1, 0);
 	assert_strcmp(mock_line[0], "[666] [arg1 arg2] ~ trailing arg");
 	assert_ptr_null(irc_numerics[666]);
