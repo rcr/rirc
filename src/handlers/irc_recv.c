@@ -1075,6 +1075,7 @@ recv_nick(struct server *s, struct irc_message *m)
 	if (!strcmp(m->from, s->nick)) {
 		server_nick_set(s, nick);
 		newlinef(s->channel, BUFFER_LINE_NICK, FROM_INFO, "Your nick is now '%s'", nick);
+		draw(DRAW_STATUS);
 	}
 
 	do {
