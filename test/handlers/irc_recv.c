@@ -434,8 +434,8 @@ test_recv_join(void)
 	/* :nick!user@host JOIN <channel>
 	 * :nick!user@host JOIN <channel> <account> :<realname> */
 
-	assert_eq(user_list_add(&(c1->users), CASEMAPPING_RFC1459, "nick1", MODE_EMPTY), USER_ERR_NONE);
-	assert_eq(user_list_add(&(c2->users), CASEMAPPING_RFC1459, "nick1", MODE_EMPTY), USER_ERR_NONE);
+	assert_eq(user_list_add(&(c1->users), CASEMAPPING_RFC1459, "nick1", (struct mode){0}), USER_ERR_NONE);
+	assert_eq(user_list_add(&(c2->users), CASEMAPPING_RFC1459, "nick1", (struct mode){0}), USER_ERR_NONE);
 
 	threshold_join = 0;
 
@@ -496,9 +496,9 @@ test_recv_kick(void)
 {
 	/* :nick!user@host KICK <channel> <user> [:message] */
 
-	assert_eq(user_list_add(&(c1->users), CASEMAPPING_RFC1459, "nick1", MODE_EMPTY), USER_ERR_NONE);
-	assert_eq(user_list_add(&(c1->users), CASEMAPPING_RFC1459, "nick2", MODE_EMPTY), USER_ERR_NONE);
-	assert_eq(user_list_add(&(c1->users), CASEMAPPING_RFC1459, "nick3", MODE_EMPTY), USER_ERR_NONE);
+	assert_eq(user_list_add(&(c1->users), CASEMAPPING_RFC1459, "nick1", (struct mode){0}), USER_ERR_NONE);
+	assert_eq(user_list_add(&(c1->users), CASEMAPPING_RFC1459, "nick2", (struct mode){0}), USER_ERR_NONE);
+	assert_eq(user_list_add(&(c1->users), CASEMAPPING_RFC1459, "nick3", (struct mode){0}), USER_ERR_NONE);
 
 	CHECK_RECV("KICK #c1", 1, 1, 0);
 	assert_strcmp(mock_chan[0], "host");
@@ -571,10 +571,10 @@ test_recv_nick(void)
 {
 	/* :nick!user@host NICK <nick> */
 
-	assert_eq(user_list_add(&(c1->users), CASEMAPPING_RFC1459, "nick1", MODE_EMPTY), USER_ERR_NONE);
-	assert_eq(user_list_add(&(c1->users), CASEMAPPING_RFC1459, "nick2", MODE_EMPTY), USER_ERR_NONE);
-	assert_eq(user_list_add(&(c3->users), CASEMAPPING_RFC1459, "nick1", MODE_EMPTY), USER_ERR_NONE);
-	assert_eq(user_list_add(&(c3->users), CASEMAPPING_RFC1459, "nick2", MODE_EMPTY), USER_ERR_NONE);
+	assert_eq(user_list_add(&(c1->users), CASEMAPPING_RFC1459, "nick1", (struct mode){0}), USER_ERR_NONE);
+	assert_eq(user_list_add(&(c1->users), CASEMAPPING_RFC1459, "nick2", (struct mode){0}), USER_ERR_NONE);
+	assert_eq(user_list_add(&(c3->users), CASEMAPPING_RFC1459, "nick1", (struct mode){0}), USER_ERR_NONE);
+	assert_eq(user_list_add(&(c3->users), CASEMAPPING_RFC1459, "nick2", (struct mode){0}), USER_ERR_NONE);
 
 	CHECK_RECV("NICK new_nick", 1, 1, 0);
 	assert_strcmp(mock_chan[0], "host");
@@ -606,7 +606,7 @@ test_recv_nick(void)
 	assert_strcmp(mock_line[0], "Your nick is now 'new_me'");
 
 	/* user can change own nick case */
-	assert_eq(user_list_add(&(c1->users), CASEMAPPING_RFC1459, "abc{}|^", MODE_EMPTY), USER_ERR_NONE);
+	assert_eq(user_list_add(&(c1->users), CASEMAPPING_RFC1459, "abc{}|^", (struct mode){0}), USER_ERR_NONE);
 
 	CHECK_RECV(":abc{}|^!user@host NICK AbC{]|~", 0, 1, 0);
 	assert_strcmp(mock_chan[0], "#c1");
@@ -662,11 +662,11 @@ test_recv_part(void)
 {
 	/* :nick!user@host PART <channel> [:message] */
 
-	assert_eq(user_list_add(&(c1->users), CASEMAPPING_RFC1459, "nick1", MODE_EMPTY), USER_ERR_NONE);
-	assert_eq(user_list_add(&(c1->users), CASEMAPPING_RFC1459, "nick2", MODE_EMPTY), USER_ERR_NONE);
-	assert_eq(user_list_add(&(c1->users), CASEMAPPING_RFC1459, "nick3", MODE_EMPTY), USER_ERR_NONE);
-	assert_eq(user_list_add(&(c1->users), CASEMAPPING_RFC1459, "nick4", MODE_EMPTY), USER_ERR_NONE);
-	assert_eq(user_list_add(&(c1->users), CASEMAPPING_RFC1459, "nick5", MODE_EMPTY), USER_ERR_NONE);
+	assert_eq(user_list_add(&(c1->users), CASEMAPPING_RFC1459, "nick1", (struct mode){0}), USER_ERR_NONE);
+	assert_eq(user_list_add(&(c1->users), CASEMAPPING_RFC1459, "nick2", (struct mode){0}), USER_ERR_NONE);
+	assert_eq(user_list_add(&(c1->users), CASEMAPPING_RFC1459, "nick3", (struct mode){0}), USER_ERR_NONE);
+	assert_eq(user_list_add(&(c1->users), CASEMAPPING_RFC1459, "nick4", (struct mode){0}), USER_ERR_NONE);
+	assert_eq(user_list_add(&(c1->users), CASEMAPPING_RFC1459, "nick5", (struct mode){0}), USER_ERR_NONE);
 
 	threshold_part = 0;
 
@@ -760,14 +760,14 @@ test_recv_quit(void)
 {
 	/* :nick!user@host QUIT [:message] */
 
-	assert_eq(user_list_add(&(c1->users), CASEMAPPING_RFC1459, "nick1", MODE_EMPTY), USER_ERR_NONE);
-	assert_eq(user_list_add(&(c1->users), CASEMAPPING_RFC1459, "nick2", MODE_EMPTY), USER_ERR_NONE);
-	assert_eq(user_list_add(&(c1->users), CASEMAPPING_RFC1459, "nick3", MODE_EMPTY), USER_ERR_NONE);
-	assert_eq(user_list_add(&(c1->users), CASEMAPPING_RFC1459, "nick4", MODE_EMPTY), USER_ERR_NONE);
-	assert_eq(user_list_add(&(c1->users), CASEMAPPING_RFC1459, "nick5", MODE_EMPTY), USER_ERR_NONE);
+	assert_eq(user_list_add(&(c1->users), CASEMAPPING_RFC1459, "nick1", (struct mode){0}), USER_ERR_NONE);
+	assert_eq(user_list_add(&(c1->users), CASEMAPPING_RFC1459, "nick2", (struct mode){0}), USER_ERR_NONE);
+	assert_eq(user_list_add(&(c1->users), CASEMAPPING_RFC1459, "nick3", (struct mode){0}), USER_ERR_NONE);
+	assert_eq(user_list_add(&(c1->users), CASEMAPPING_RFC1459, "nick4", (struct mode){0}), USER_ERR_NONE);
+	assert_eq(user_list_add(&(c1->users), CASEMAPPING_RFC1459, "nick5", (struct mode){0}), USER_ERR_NONE);
 
-	assert_eq(user_list_add(&(c3->users), CASEMAPPING_RFC1459, "nick1", MODE_EMPTY), USER_ERR_NONE);
-	assert_eq(user_list_add(&(c3->users), CASEMAPPING_RFC1459, "nick2", MODE_EMPTY), USER_ERR_NONE);
+	assert_eq(user_list_add(&(c3->users), CASEMAPPING_RFC1459, "nick1", (struct mode){0}), USER_ERR_NONE);
+	assert_eq(user_list_add(&(c3->users), CASEMAPPING_RFC1459, "nick2", (struct mode){0}), USER_ERR_NONE);
 
 	threshold_quit = 0;
 
@@ -860,9 +860,9 @@ test_recv_ircv3_account(void)
 {
 	/* :nick!user@host ACCOUNT <account> */
 
-	assert_eq(user_list_add(&(c1->users), CASEMAPPING_RFC1459, "nick1", MODE_EMPTY), USER_ERR_NONE);
-	assert_eq(user_list_add(&(c1->users), CASEMAPPING_RFC1459, "nick2", MODE_EMPTY), USER_ERR_NONE);
-	assert_eq(user_list_add(&(c3->users), CASEMAPPING_RFC1459, "nick1", MODE_EMPTY), USER_ERR_NONE);
+	assert_eq(user_list_add(&(c1->users), CASEMAPPING_RFC1459, "nick1", (struct mode){0}), USER_ERR_NONE);
+	assert_eq(user_list_add(&(c1->users), CASEMAPPING_RFC1459, "nick2", (struct mode){0}), USER_ERR_NONE);
+	assert_eq(user_list_add(&(c3->users), CASEMAPPING_RFC1459, "nick1", (struct mode){0}), USER_ERR_NONE);
 
 	threshold_account = 0;
 
@@ -901,9 +901,9 @@ test_recv_ircv3_away(void)
 {
 	/* :nick!user@host AWAY [:message] */
 
-	assert_eq(user_list_add(&(c1->users), CASEMAPPING_RFC1459, "nick1", MODE_EMPTY), USER_ERR_NONE);
-	assert_eq(user_list_add(&(c1->users), CASEMAPPING_RFC1459, "nick2", MODE_EMPTY), USER_ERR_NONE);
-	assert_eq(user_list_add(&(c3->users), CASEMAPPING_RFC1459, "nick1", MODE_EMPTY), USER_ERR_NONE);
+	assert_eq(user_list_add(&(c1->users), CASEMAPPING_RFC1459, "nick1", (struct mode){0}), USER_ERR_NONE);
+	assert_eq(user_list_add(&(c1->users), CASEMAPPING_RFC1459, "nick2", (struct mode){0}), USER_ERR_NONE);
+	assert_eq(user_list_add(&(c3->users), CASEMAPPING_RFC1459, "nick1", (struct mode){0}), USER_ERR_NONE);
 
 	threshold_away = 0;
 
@@ -939,9 +939,9 @@ test_recv_ircv3_chghost(void)
 {
 	/* :nick!user@host CHGHOST new_user new_host */
 
-	assert_eq(user_list_add(&(c1->users), CASEMAPPING_RFC1459, "nick1", MODE_EMPTY), USER_ERR_NONE);
-	assert_eq(user_list_add(&(c1->users), CASEMAPPING_RFC1459, "nick2", MODE_EMPTY), USER_ERR_NONE);
-	assert_eq(user_list_add(&(c3->users), CASEMAPPING_RFC1459, "nick1", MODE_EMPTY), USER_ERR_NONE);
+	assert_eq(user_list_add(&(c1->users), CASEMAPPING_RFC1459, "nick1", (struct mode){0}), USER_ERR_NONE);
+	assert_eq(user_list_add(&(c1->users), CASEMAPPING_RFC1459, "nick2", (struct mode){0}), USER_ERR_NONE);
+	assert_eq(user_list_add(&(c3->users), CASEMAPPING_RFC1459, "nick1", (struct mode){0}), USER_ERR_NONE);
 
 	threshold_chghost = 0;
 

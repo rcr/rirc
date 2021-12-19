@@ -37,17 +37,7 @@
 #include <stdint.h>
 
 /* [azAZ] */
-#define MODE_STR_LEN 26 * 2
-
-#define MODE_EMPTY (struct mode) { 0 }
-
-enum mode_err
-{
-	MODE_ERR_INVALID_CONFIG = -3,
-	MODE_ERR_INVALID_PREFIX = -2,
-	MODE_ERR_INVALID_FLAG   = -1,
-	MODE_ERR_NONE
-};
+#define MODE_STR_LEN ((26 * 2) + 1)
 
 enum mode_type
 {
@@ -64,13 +54,6 @@ enum mode_cfg_type
 	MODE_CFG_USERMODES, /* Set numeric 004 usermodes string */
 	MODE_CFG_SUBTYPES,  /* Set numeric 005 CHANMODES subtypes */
 	MODE_CFG_PREFIX,    /* Set numeric 005 PREFIX */
-};
-
-enum mode_str_type
-{
-	MODE_STR_CHANMODE,
-	MODE_STR_USERMODE,
-	MODE_STR_PRFXMODE,
 };
 
 struct mode
@@ -93,21 +76,23 @@ struct mode_cfg
 	} CHANMODES;
 	struct
 	{
-		char F[MODE_STR_LEN + 1]; /* prfxmode mapping `from` */
-		char T[MODE_STR_LEN + 1]; /* prfxmode mapping `to`  */
+		char F[MODE_STR_LEN]; /* prfxmode mapping `from` */
+		char T[MODE_STR_LEN]; /* prfxmode mapping `to`  */
 	} PREFIX;
 };
 
 struct mode_str
 {
-	char str[MODE_STR_LEN + 1];
+	char str[MODE_STR_LEN];
 };
 
-const char* mode_str(const struct mode*, struct mode_str*, enum mode_str_type);
-enum mode_err mode_cfg(struct mode_cfg*, const char*, enum mode_cfg_type);
-enum mode_err mode_chanmode_set(struct mode*, const struct mode_cfg*, int, int);
-enum mode_err mode_prfxmode_set(struct mode*, const struct mode_cfg*, int, int);
-enum mode_err mode_usermode_set(struct mode*, const struct mode_cfg*, int, int);
+const char* mode_str(const struct mode*, struct mode_str*);
+
 enum mode_type mode_type(const struct mode_cfg*, int, int);
+
+int mode_cfg(struct mode_cfg*, const char*, enum mode_cfg_type);
+int mode_chanmode_set(struct mode*, const struct mode_cfg*, int, int);
+int mode_prfxmode_set(struct mode*, const struct mode_cfg*, int, int);
+int mode_usermode_set(struct mode*, const struct mode_cfg*, int, int);
 
 #endif

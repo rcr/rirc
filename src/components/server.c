@@ -281,14 +281,14 @@ server_set_004(struct server *s, char *str)
 		server_error(s, "invalid numeric 004: chan_modes is null");
 
 	if (user_modes) {
-		if (mode_cfg(&(s->mode_cfg), user_modes, MODE_CFG_USERMODES) == MODE_ERR_NONE)
+		if (!mode_cfg(&(s->mode_cfg), user_modes, MODE_CFG_USERMODES))
 			debug("Setting numeric 004 user_modes: %s", user_modes);
 		else
 			server_error(s, "invalid numeric 004 user_modes: %s", user_modes);
 	}
 
 	if (chan_modes) {
-		if (mode_cfg(&(s->mode_cfg), chan_modes, MODE_CFG_CHANMODES) == MODE_ERR_NONE)
+		if (!mode_cfg(&(s->mode_cfg), chan_modes, MODE_CFG_CHANMODES))
 			debug("Setting numeric 004 chan_modes: %s", chan_modes);
 		else
 			server_error(s, "invalid numeric 004 chan_modes: %s", chan_modes);
@@ -445,19 +445,19 @@ server_set_CASEMAPPING(struct server *s, char *val)
 		return 0;
 	}
 
-	return 1;
+	return -1;
 }
 
 static int
 server_set_CHANMODES(struct server *s, char *val)
 {
-	return mode_cfg(&(s->mode_cfg), val, MODE_CFG_SUBTYPES) != MODE_ERR_NONE;
+	return mode_cfg(&(s->mode_cfg), val, MODE_CFG_SUBTYPES);
 }
 
 static int
 server_set_PREFIX(struct server *s, char *val)
 {
-	return mode_cfg(&(s->mode_cfg), val, MODE_CFG_PREFIX) != MODE_ERR_NONE;
+	return mode_cfg(&(s->mode_cfg), val, MODE_CFG_PREFIX);
 }
 
 void

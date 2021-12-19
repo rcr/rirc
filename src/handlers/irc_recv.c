@@ -563,9 +563,9 @@ irc_numeric_353(struct server *s, struct irc_message *m)
 
 	while ((prefix = nick = irc_strsep(&nicks))) {
 
-		struct mode m = MODE_EMPTY;
+		struct mode m = {0};
 
-		while (mode_prfxmode_set(&m, &(s->mode_cfg), *nick, 1) == MODE_ERR_NONE)
+		while (!mode_prfxmode_set(&m, &(s->mode_cfg), *nick, 1))
 			nick++;
 
 		if (*nick == 0)
@@ -764,7 +764,7 @@ recv_join(struct server *s, struct irc_message *m)
 	if ((c = channel_list_get(&s->clist, chan, s->casemapping)) == NULL)
 		failf(s, "JOIN: channel '%s' not found", chan);
 
-	if (user_list_add(&(c->users), s->casemapping, m->from, MODE_EMPTY) == USER_ERR_DUPLICATE)
+	if (user_list_add(&(c->users), s->casemapping, m->from, (struct mode){0}) == USER_ERR_DUPLICATE)
 		failf(s, "JOIN: user '%s' already on channel '%s'", m->from, chan);
 
 	if (!threshold_join || threshold_join > c->users.count) {
@@ -894,7 +894,6 @@ recv_mode_chanmodes(struct irc_message *m, const struct mode_cfg *cfg, struct se
 	char flag;
 	char *modestring;
 	char *modearg;
-	enum mode_err mode_err;
 	struct mode *chanmodes = &(c->chanmodes);
 	struct user *user;
 
@@ -905,7 +904,6 @@ recv_mode_chanmodes(struct irc_message *m, const struct mode_cfg *cfg, struct se
 
 	do {
 		int set = -1;
-		mode_err = MODE_ERR_NONE;
 
 		while ((flag = *modestring++)) {
 
@@ -931,9 +929,9 @@ recv_mode_chanmodes(struct irc_message *m, const struct mode_cfg *cfg, struct se
 				/* Doesn't consume an argument */
 				case MODE_FLAG_CHANMODE:
 
-					mode_err = mode_chanmode_set(chanmodes, cfg, flag, set);
-
-					if (mode_err == MODE_ERR_NONE) {
+					if (mode_chanmode_set(chanmodes, cfg, flag, set)) {
+						server_error(s, "MODE: invalid flag '%c'", flag);
+					} else {
 						newlinef(c, 0, FROM_INFO, "%s%s%s mode: %c%c",
 								(m->from ? m->from : ""),
 								(m->from ? " set " : ""),
@@ -958,9 +956,9 @@ recv_mode_chanmodes(struct irc_message *m, const struct mode_cfg *cfg, struct se
 							channel_key_del(c);
 					}
 
-					mode_err = mode_chanmode_set(chanmodes, cfg, flag, set);
-
-					if (mode_err == MODE_ERR_NONE) {
+					if (mode_chanmode_set(chanmodes, cfg, flag, set)) {
+						server_error(s, "MODE: invalid flag '%c'", flag);
+					} else {
 						newlinef(c, 0, FROM_INFO, "%s%s%s mode: %c%c %s",
 								(m->from ? m->from : ""),
 								(m->from ? " set " : ""),
@@ -984,9 +982,9 @@ recv_mode_chanmodes(struct irc_message *m, const struct mode_cfg *cfg, struct se
 						continue;
 					}
 
-					mode_prfxmode_set(&(user->prfxmodes), cfg, flag, set);
-
-					if (mode_err == MODE_ERR_NONE) {
+					if (mode_prfxmode_set(&(user->prfxmodes), cfg, flag, set)) {
+						server_error(s, "MODE: invalid flag '%c'", flag);
+					} else {
 						newlinef(c, 0, FROM_INFO, "%s%suser %s mode: %c%c",
 								(m->from ? m->from : ""),
 								(m->from ? " set " : ""),
@@ -1007,7 +1005,7 @@ recv_mode_chanmodes(struct irc_message *m, const struct mode_cfg *cfg, struct se
 		}
 	} while (irc_message_param(m, &modestring));
 
-	mode_str(&(c->chanmodes), &(c->chanmodes_str), MODE_STR_CHANMODE);
+	mode_str(&(c->chanmodes), &(c->chanmodes_str));
 	draw(DRAW_STATUS);
 
 	return 0;
@@ -1016,15 +1014,13 @@ recv_mode_chanmodes(struct irc_message *m, const struct mode_cfg *cfg, struct se
 static int
 recv_mode_usermodes(struct irc_message *m, const struct mode_cfg *cfg, struct server *s)
 {
-	char flag;
 	char *modestring;
-	enum mode_err mode_err;
-	struct mode *usermodes = &(s->usermodes);
 
 	if (!irc_message_param(m, &modestring))
 		failf(s, "MODE: modestring is null");
 
 	do {
+		char flag;
 		int set = -1;
 
 		while ((flag = *modestring++)) {
@@ -1044,21 +1040,19 @@ recv_mode_usermodes(struct irc_message *m, const struct mode_cfg *cfg, struct se
 				continue;
 			}
 
-			mode_err = mode_usermode_set(usermodes, cfg, flag, set);
-
-			if (mode_err == MODE_ERR_NONE)
+			if (mode_usermode_set(&(s->usermodes), cfg, flag, set)) {
+				server_error(s, "MODE: invalid flag '%c'", flag);
+			} else {
 				server_info(s, "%s%smode: %c%c",
 						(m->from ? m->from : ""),
 						(m->from ? " set " : ""),
 						(set ? '+' : '-'),
 						flag);
-
-			else if (mode_err == MODE_ERR_INVALID_FLAG)
-				server_error(s, "MODE: invalid flag '%c'", flag);
+			}
 		}
 	} while (irc_message_param(m, &modestring));
 
-	mode_str(usermodes, &(s->mode_str), MODE_STR_USERMODE);
+	mode_str(&(s->usermodes), &(s->mode_str));
 	draw(DRAW_STATUS);
 
 	return 0;
