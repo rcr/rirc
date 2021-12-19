@@ -389,7 +389,7 @@ error:
 
 	free(dup);
 
-	return MODE_ERR_INVALID_CONFIG;
+	return -1;
 }
 
 enum mode_type
