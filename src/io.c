@@ -612,7 +612,7 @@ io_cx_read(struct connection *cx, uint32_t timeout)
 	struct pollfd fd[1];
 	unsigned char buf[1024];
 
-	fd[0].fd = cx->net_ctx.MBEDTLS_PRIVATE(fd);
+	fd[0].fd = cx->net_ctx.fd;
 	fd[0].events = POLLIN;
 
 	while ((ret = poll(fd, 1, timeout)) < 0 && errno == EAGAIN)
@@ -785,7 +785,7 @@ io_net_connect(struct connection *cx)
 err:
 	freeaddrinfo(res);
 
-	return (cx->net_ctx.MBEDTLS_PRIVATE(fd) = ret);
+	return (cx->net_ctx.fd = ret);
 }
 
 static void
