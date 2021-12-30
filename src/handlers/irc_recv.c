@@ -563,15 +563,15 @@ irc_numeric_353(struct server *s, struct irc_message *m)
 
 	while ((prefix = nick = irc_strsep(&nicks))) {
 
-		struct mode m = {0};
+		struct mode prfxmode = {0};
 
-		while (!mode_prfxmode_set(&m, &(s->mode_cfg), *nick, 1))
+		while (!mode_prfxmode_set(&prfxmode, &(s->mode_cfg), *nick, 1))
 			nick++;
 
 		if (*nick == 0)
 			failf(s, "RPL_NAMEREPLY: invalid nick: '%s'", prefix);
 
-		if (user_list_add(&(c->users), s->casemapping, nick, m) == USER_ERR_DUPLICATE)
+		if (user_list_add(&(c->users), s->casemapping, nick, prfxmode) == USER_ERR_DUPLICATE)
 			failf(s, "RPL_NAMEREPLY: duplicate nick: '%s'", nick);
 	}
 

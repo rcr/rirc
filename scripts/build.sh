@@ -9,6 +9,7 @@
 set -e
 
 export CC=clang
+export CFLAGS_DEBUG="-Wshadow"
 export LDFLAGS="-flto -fuse-ld=lld"
 export LDFLAGS_DEBUG="-fuse-ld=lld"
 
