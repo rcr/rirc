@@ -196,7 +196,7 @@ newlinev(struct channel *c, enum buffer_line_type type, const char *from, const 
 
 		const struct user *u = NULL;
 
-		if (type == BUFFER_LINE_CHAT) {
+		if (type == BUFFER_LINE_CHAT || type == BUFFER_LINE_PINGED) {
 			u = user_list_get(&(c->users), c->server->casemapping, from, 0);
 		}
 
