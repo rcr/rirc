@@ -547,24 +547,27 @@ draw_nav(struct channel *c)
 	draw_cursor_pos(1, 1);
 	draw_clear_line();
 
-	static struct channel *frame_prev,
-	                      *frame_next;
+	static struct channel *frame_prev;
+	static struct channel *frame_next;
 
-	struct channel *c_first = channel_get_first(),
-	               *c_last = channel_get_last(),
-	               *tmp;
+	struct channel *c_first = channel_get_first();
+	struct channel *c_last = channel_get_last();
+	struct channel *tmp;
+	struct channel *tmp_next = c;
+	struct channel *tmp_prev = c;
 
 	unsigned cols = state_cols();
-
-	c->activity = ACTIVITY_DEFAULT;
 
 	/* By default assume drawing starts towards the next channel */
 	int nextward = 1;
 
-	size_t len, total_len = 0;
+	size_t len;
+	size_t len_total = 0;
+
+	c->activity = ACTIVITY_DEFAULT;
 
 	/* Bump the channel frames, if applicable */
-	if ((total_len = (c->name_len + 2)) >= state_cols())
+	if ((len_total = (c->name_len + 2)) >= state_cols())
 		return;
 	else if (c == frame_prev && frame_prev != c_first)
 		frame_prev = channel_get_prev(frame_prev);
@@ -572,22 +575,27 @@ draw_nav(struct channel *c)
 		frame_next = channel_get_next(frame_next);
 
 	/* Calculate the new frames */
-	struct channel *tmp_prev = c, *tmp_next = c;
-
 	for (;;) {
 
 		if (tmp_prev == c_first || tmp_prev == frame_prev) {
 
-			/* Pad out nextward */
-
+			/* Pad from the next-most frame towards the last channel */
 			tmp = channel_get_next(tmp_next);
 			len = tmp->name_len;
 
-			while ((total_len += (len + 2)) < state_cols() && tmp != c_first) {
-
+			while ((len_total += (len + 2)) < state_cols() && tmp != c_first) {
 				tmp_next = tmp;
-
 				tmp = channel_get_next(tmp);
+				len = tmp->name_len;
+			}
+
+			/* Pad from the prev-most frame towards the first channel */
+			tmp = channel_get_prev(tmp_prev);
+			len = tmp->name_len;
+
+			while ((len_total += (len + 2)) < state_cols() && tmp != c_last) {
+				tmp_prev = tmp;
+				tmp = channel_get_prev(tmp);
 				len = tmp->name_len;
 			}
 
@@ -596,16 +604,23 @@ draw_nav(struct channel *c)
 
 		if (tmp_next == c_last || tmp_next == frame_next) {
 
-			/* Pad out prevward */
-
+			/* Pad from the prev-most frame towards the first channel */
 			tmp = channel_get_prev(tmp_prev);
 			len = tmp->name_len;
 
-			while ((total_len += (len + 2)) < state_cols() && tmp != c_last) {
-
+			while ((len_total += (len + 2)) < state_cols() && tmp != c_last) {
 				tmp_prev = tmp;
-
 				tmp = channel_get_prev(tmp);
+				len = tmp->name_len;
+			}
+
+			/* Pad from the next-most frame towards the last channel */
+			tmp = channel_get_next(tmp_next);
+			len = tmp->name_len;
+
+			while ((len_total += (len + 2)) < state_cols() && tmp != c_first) {
+				tmp_next = tmp;
+				tmp = channel_get_next(tmp);
 				len = tmp->name_len;
 			}
 
@@ -616,7 +631,7 @@ draw_nav(struct channel *c)
 		len = tmp->name_len;
 
 		/* Next channel doesn't fit */
-		if ((total_len += (len + 2)) >= state_cols())
+		if ((len_total += (len + 2)) >= state_cols())
 			break;
 
 		if (nextward)
