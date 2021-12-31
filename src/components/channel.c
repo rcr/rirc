@@ -54,7 +54,7 @@ void
 channel_key_add(struct channel *c, const char *key)
 {
 	free((void *)c->key);
-	c->key = strdup(key);
+	c->key = irc_strdup(key);
 }
 
 void

@@ -185,11 +185,11 @@ connection(
 
 	cx->obj = obj;
 	cx->flags = flags;
-	cx->host = strdup(host);
-	cx->port = strdup(port);
-	cx->tls_ca_file = (tls_ca_file ? strdup(tls_ca_file) : NULL);
-	cx->tls_ca_path = (tls_ca_path ? strdup(tls_ca_path) : NULL);
-	cx->tls_cert = (tls_cert ? strdup(tls_cert) : NULL);
+	cx->host = irc_strdup(host);
+	cx->port = irc_strdup(port);
+	cx->tls_ca_file = (tls_ca_file ? irc_strdup(tls_ca_file) : NULL);
+	cx->tls_ca_path = (tls_ca_path ? irc_strdup(tls_ca_path) : NULL);
+	cx->tls_cert = (tls_cert ? irc_strdup(tls_cert) : NULL);
 	cx->st_cur = IO_ST_DXED;
 	cx->st_new = IO_ST_INVALID;
 	PT_CF(pthread_mutex_init(&(cx->mtx), NULL));

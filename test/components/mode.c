@@ -1,5 +1,6 @@
 #include "test/test.h"
 #include "src/components/mode.c"
+#include "src/utils/utils.c"
 
 #define ALL_LOWERS "abcdefghijklmnopqrstuvwxyz"
 #define ALL_UPPERS "ABCDEFGHIJKLMNOPQRSTUVWXYZ"

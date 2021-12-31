@@ -338,7 +338,7 @@ mode_cfg_prefix(struct mode_cfg *cfg, const char *str)
 
 	char *cfg_f = cfg->PREFIX.F;
 	char *cfg_t = cfg->PREFIX.T;
-	char *dup = strdup(str);
+	char *dup = irc_strdup(str);
 	char *str_f;
 	char *str_t;
 

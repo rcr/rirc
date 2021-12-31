@@ -151,7 +151,7 @@ irc_send_privmsg(struct server *s, struct channel *c, char *m)
 	if (!m || !*m)
 		failf(c, "Usage: /privmsg <target> <message>");
 
-	p2 = dup = strdup(target);
+	p2 = dup = irc_strdup(target);
 
 	do {
 		struct channel *c_target;

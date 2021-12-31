@@ -69,6 +69,7 @@ int irc_isnick(const char*);
 int irc_pinged(enum casemapping, const char*, const char*);
 int irc_strcmp(enum casemapping, const char*, const char*);
 int irc_strncmp(enum casemapping, const char*, const char*, size_t);
+char* irc_strdup(const char*);
 char* irc_strsep(char**);
 char* irc_strtrim(char**);
 char* irc_strwrap(unsigned, char**, char*);

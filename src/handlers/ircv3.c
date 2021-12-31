@@ -326,7 +326,7 @@ ircv3_recv_cap_LS(struct server *s, struct irc_message *m)
 			continue;
 
 		c->supported = 1;
-		c->val = (cap_val ? strdup(cap_val) : NULL);
+		c->val = (cap_val ? irc_strdup(cap_val) : NULL);
 
 		if (c->req_auto)
 			c->req = 1;

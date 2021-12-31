@@ -286,6 +286,17 @@ irc_message_split(struct irc_message *m, const char **params, const char **trail
 }
 
 char*
+irc_strdup(const char *str)
+{
+	char *ret;
+
+	if (!(ret = strdup(str)))
+		fatal("strdup");
+
+	return ret;
+}
+
+char*
 irc_strsep(char **str)
 {
 	char *p;
