@@ -258,11 +258,19 @@ test_irc_numeric_353(void)
 	if (user_list_get(&(c1->users), s->casemapping, "n1", 0) == NULL)
 		test_fail("Failed to retrieve user n1");
 
+	/* test single nick with prefix */
 	channel_reset(c1);
 	CHECK_RECV("353 me = #c1 :@n1", 0, 0, 0);
 
 	if (user_list_get(&(c1->users), s->casemapping, "n1", 0) == NULL)
 		test_fail("Failed to retrieve user n1");
+
+	/* test single nickwith prefix, contains mode characters */
+	channel_reset(c1);
+	CHECK_RECV("353 me = #c1 @v", 0, 0, 0);
+
+	if (user_list_get(&(c1->users), s->casemapping, "v", 0) == NULL)
+		test_fail("Failed to retrieve user v");
 
 	/* test multiple nicks */
 	channel_reset(c1);

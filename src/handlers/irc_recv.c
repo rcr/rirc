@@ -565,8 +565,8 @@ irc_numeric_353(struct server *s, struct irc_message *m)
 
 		struct mode prfxmode = {0};
 
-		while (!mode_prfxmode_set(&prfxmode, &(s->mode_cfg), *nick, 1))
-			nick++;
+		while (*nick && strchr(s->mode_cfg.PREFIX.T, *nick))
+			(void) mode_prfxmode_set(&prfxmode, &(s->mode_cfg), *nick++, 1);
 
 		if (*nick == 0)
 			failf(s, "RPL_NAMEREPLY: invalid nick: '%s'", prefix);
