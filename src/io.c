@@ -1003,7 +1003,7 @@ err:
 static int
 io_tls_x509_vrfy(struct connection *cx)
 {
-	char *s, *p;
+	char *p;
 	char buf[1024];
 	uint32_t ret;
 
@@ -1016,9 +1016,13 @@ io_tls_x509_vrfy(struct connection *cx)
 	if (mbedtls_x509_crt_verify_info(buf, sizeof(buf), "", ret) < 0)
 		return -1;
 
-	for (s = buf; s && *s; s = p) {
+	p = buf;
 
-		if ((p = strchr(buf, '\n')))
+	while (p && *p) {
+
+		const char *s = p;
+
+		if ((p = strchr(p, '\n')))
 			*p++ = 0;
 
 		io_error(cx, " .... %s", s);
