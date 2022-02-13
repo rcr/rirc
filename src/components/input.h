@@ -18,13 +18,17 @@
 
 /* 410 max characters for input should be sufficient given
  * rfc2812 maximum length of 50 characters for channel names,
- * plus 50 characters for additional message formatting */
+ * plus 50 characters for additional message formatting.
+ *
+ * Precluded in tests */
 #ifndef INPUT_LEN_MAX
 #define INPUT_LEN_MAX 410
 #endif
 
 /* Number of history lines to keep for input. For proper
- * ring buffer masking this must be a power of 2 */
+ * ring buffer masking this must be a power of 2.
+ *
+ * Precluded in tests */
 #ifndef INPUT_HIST_MAX
 #define INPUT_HIST_MAX 16
 #endif
@@ -39,10 +43,9 @@ typedef uint16_t (*f_completion_cb)(
 
 struct input
 {
-	char text[INPUT_LEN_MAX];
+	char buf[INPUT_LEN_MAX];
 	struct {
 		char *ptrs[INPUT_HIST_MAX];
-		char *save;
 		uint16_t current; /* Ring buffer current entry */
 		uint16_t head;    /* Ring buffer head */
 		uint16_t tail;    /* Ring buffer tail */
