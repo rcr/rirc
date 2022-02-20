@@ -602,30 +602,13 @@ command(struct channel *c, char *args)
 	if (!(arg = irc_strsep(&args)))
 		return;
 
-	if (!strcasecmp(arg, "clear")) {
-		command_clear(c, args);
-		return;
+	#define X(CMD) \
+	if (!strcasecmp(arg, #CMD)) { \
+		command_##CMD(c, args);   \
+		return;                   \
 	}
-
-	if (!strcasecmp(arg, "close")) {
-		command_close(c, args);
-		return;
-	}
-
-	if (!strcasecmp(arg, "connect")) {
-		command_connect(c, args);
-		return;
-	}
-
-	if (!strcasecmp(arg, "disconnect")) {
-		command_disconnect(c, args);
-		return;
-	}
-
-	if (!strcasecmp(arg, "quit")) {
-		command_quit(c, args);
-		return;
-	}
+	COMMAND_HANDLERS
+	#undef X
 
 	action(action_error, "Unknown command '%s'", arg);
 }
