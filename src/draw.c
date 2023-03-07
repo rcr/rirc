@@ -534,6 +534,10 @@ draw_buffer(struct buffer *b, struct coords coords)
 	}
 
 	b->buffer_i_bot = (buffer_i - 1);
+
+	/* lock the scrollback index to the tail */
+	if (b->buffer_i_top == b->tail && b->buffer_i_bot != (b->head - 1))
+		b->scrollback = b->buffer_i_bot;
 }
 
 static void
