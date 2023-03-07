@@ -9,7 +9,6 @@
 #define INPUT_MASK(X) ((X) & (INPUT_HIST_MAX - 1))
 
 #if INPUT_MASK(INPUT_HIST_MAX)
-/* Required for proper masking when indexing */
 #error INPUT_HIST_MAX must be a power of 2
 #endif
 

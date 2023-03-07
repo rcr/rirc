@@ -1,6 +1,5 @@
 #include "src/components/buffer.h"
 
-#include "config.h"
 #include "src/utils/utils.h"
 
 #include <string.h>
@@ -8,48 +7,10 @@
 #define BUFFER_MASK(X) ((X) & (BUFFER_LINES_MAX - 1))
 
 #if BUFFER_MASK(BUFFER_LINES_MAX)
-/* Required for proper masking when indexing */
 #error BUFFER_LINES_MAX must be a power of 2
 #endif
 
-static inline unsigned buffer_full(struct buffer*);
-static inline unsigned buffer_size(struct buffer*);
-
 static struct buffer_line* buffer_push(struct buffer*);
-
-static inline unsigned
-buffer_full(struct buffer *b)
-{
-	return buffer_size(b) == BUFFER_LINES_MAX;
-}
-
-static inline unsigned
-buffer_size(struct buffer *b)
-{
-	return b->head - b->tail;
-}
-
-static struct buffer_line*
-buffer_push(struct buffer *b)
-{
-	/* Return a new buffer_line pushed to a buffer, ensure that:
-	 *  - scrollback stays between [tail, head)
-	 *  - tail increments when the buffer is full */
-
-	if (buffer_line(b, b->scrollback) == buffer_head(b))
-		b->scrollback = b->head;
-
-	if (buffer_full(b)) {
-
-		/* scrollback locked to tail */
-		if (b->scrollback == b->tail)
-			b->scrollback++;
-
-		b->tail++;
-	}
-
-	return &b->buffer_lines[BUFFER_MASK(b->head++)];
-}
 
 struct buffer_line*
 buffer_head(struct buffer *b)
@@ -97,30 +58,6 @@ buffer_line(struct buffer *b, unsigned i)
 		fatal("invalid index: %d", i);
 
 	return &b->buffer_lines[BUFFER_MASK(i)];
-}
-
-unsigned
-buffer_line_rows(struct buffer_line *line, unsigned w)
-{
-	/* Return the number of times a buffer line will wrap within w columns */
-
-	char *p;
-
-	if (w == 0)
-		fatal("width is zero");
-
-	/* Empty lines are considered to occupy a row */
-	if (!*line->text)
-		return line->cached.rows = 1;
-
-	if (line->cached.w != w) {
-		line->cached.w = w;
-
-		for (p = line->text, line->cached.rows = 0; *p; line->cached.rows++)
-			irc_strwrap(w, &p, line->text + line->text_len);
-	}
-
-	return line->cached.rows;
 }
 
 void
@@ -172,17 +109,6 @@ buffer_newline(
 	}
 }
 
-unsigned
-buffer_scrollback_status(struct buffer *b)
-{
-	/* Return the buffer scrollback status as a number between [0, 100] */
-
-	if (buffer_line(b, b->scrollback) == buffer_head(b))
-		return 0;
-
-	return (100 * (float)(b->head - b->scrollback) / (float)(buffer_size(b)));
-}
-
 void
 buffer(struct buffer *b)
 {
@@ -191,30 +117,31 @@ buffer(struct buffer *b)
 	memset(b, 0, sizeof(*b));
 }
 
-void
-buffer_line_split(
-	struct buffer_line *line,
-	unsigned *head_w,
-	unsigned *text_w,
-	unsigned cols,
-	unsigned pad)
+unsigned
+buffer_size(struct buffer *b)
 {
-	unsigned _head_w = sizeof(" HH:MM  ");
+	/* Return number of lines in ring buffer  */
 
-	if (BUFFER_PADDING)
-		_head_w += pad;
-	else
-		_head_w += line->from_len;
+	return b->head - b->tail;
+}
 
-	/* If header won't fit, split in half */
-	if (_head_w >= cols)
-		_head_w = cols / 2;
+static struct buffer_line*
+buffer_push(struct buffer *b)
+{
+	/* Return a new `struct buffer_line *` pushed to a buffer */
 
-	_head_w -= 1;
+	/* lock scrollback to head */
+	if (buffer_line(b, b->scrollback) == buffer_head(b))
+		b->scrollback = b->head;
 
-	if (head_w)
-		*head_w = _head_w;
+	/* lock scrollback to tail */
+	if (buffer_size(b) == BUFFER_LINES_MAX) {
 
-	if (text_w)
-		*text_w = cols - _head_w;
+		if (b->scrollback == b->tail)
+			b->scrollback++;
+
+		b->tail++;
+	}
+
+	return &(b->buffer_lines[BUFFER_MASK(b->head++)]);
 }

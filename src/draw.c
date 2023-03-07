@@ -62,11 +62,13 @@ static struct
 {
 	union {
 		struct {
-			unsigned separators : 1;
-			unsigned buffer     : 1;
-			unsigned input      : 1;
-			unsigned nav        : 1;
-			unsigned status     : 1;
+			unsigned separators  : 1;
+			unsigned buffer      : 1;
+			unsigned buffer_back : 1;
+			unsigned buffer_forw : 1;
+			unsigned input       : 1;
+			unsigned nav         : 1;
+			unsigned status      : 1;
 		};
 		unsigned all;
 	} bits;
@@ -77,9 +79,14 @@ static struct coords coords(unsigned, unsigned, unsigned, unsigned);
 static unsigned nick_col(char*);
 static unsigned drawf(unsigned*, const char*, ...);
 
+static unsigned draw_buffer_line_rows(struct buffer_line*, unsigned);
+static const char* draw_buffer_scrollback_status(struct buffer*, char*, size_t);
 static void draw_bits(void);
 static void draw_buffer(struct buffer*, struct coords);
 static void draw_buffer_line(struct buffer_line*, struct coords, unsigned, unsigned, unsigned, unsigned);
+static void draw_buffer_line_split(struct buffer_line*, unsigned*, unsigned*, unsigned, unsigned);
+static void draw_buffer_scroll_back(void);
+static void draw_buffer_scroll_forw(void);
 static void draw_input(struct input*, struct coords);
 static void draw_nav(struct channel*);
 static void draw_separators(void);
@@ -131,6 +138,14 @@ draw(enum draw_bit bit)
 		case DRAW_BUFFER:
 			draw_state.bits.buffer = 1;
 			break;
+		case DRAW_BUFFER_BACK:
+			draw_state.bits.buffer_back = 1;
+			draw_state.bits.buffer_forw = 0;
+			break;
+		case DRAW_BUFFER_FORW:
+			draw_state.bits.buffer_forw = 1;
+			draw_state.bits.buffer_back = 0;
+			break;
 		case DRAW_INPUT:
 			draw_state.bits.input = 1;
 			break;
@@ -177,6 +192,16 @@ draw_bits(void)
 		goto flush;
 	}
 
+	/* handle state altering draw functions before drawing components */
+
+	if (draw_state.bits.buffer_back)
+		draw_buffer_scroll_back();
+
+	if (draw_state.bits.buffer_forw)
+		draw_buffer_scroll_forw();
+
+	/* draw components */
+
 	if (draw_state.bits.separators) {
 		draw_attr_reset();
 		draw_separators();
@@ -208,6 +233,178 @@ flush:
 	draw_cursor_pos_restore();
 
 	fflush(stdout);
+}
+
+static unsigned
+draw_buffer_line_rows(struct buffer_line *line, unsigned w)
+{
+	/* Return the number of times a buffer line will wrap within w columns */
+
+	char *p;
+
+	if (w == 0)
+		fatal("width is zero");
+
+	/* Empty lines are considered to occupy a row */
+	if (!*line->text)
+		return line->cached.rows = 1;
+
+	if (line->cached.w != w) {
+		line->cached.w = w;
+
+		for (p = line->text, line->cached.rows = 0; *p; line->cached.rows++)
+			irc_strwrap(w, &p, line->text + line->text_len);
+	}
+
+	return line->cached.rows;
+}
+
+static const char*
+draw_buffer_scrollback_status(struct buffer *b, char *buf, size_t n)
+{
+	/* Format scrollback status to buffer as unsigned value [0, 100]
+	 *
+	 * Calculated as perentage of lines 'below' the currently drawn buffer
+	 * lines over the total of currently undrawn buffer lines, i.e.:
+	 *
+	 *  tail  +----------+
+	 *        |    n2    |
+	 *        +----------+ buffer_i_top
+	 *        |          |
+	 *  drawn |          |
+	 *        |          |
+	 *        +----------+ buffer_i_bot
+	 *        |    n1    |
+	 *  head  +----------+
+	 */
+
+	if (buffer_line(b, b->scrollback) == buffer_head(b))
+		return NULL;
+
+	float n1 = (b->head - b->buffer_i_bot) - 1;
+	float n2 = (b->buffer_i_top - b->tail);
+
+	if (!n1 && !n2)
+		return NULL;
+
+	(void) snprintf(buf, n, "%u", (unsigned)(100 * (n1 / (n1 + n2))));
+
+	return buf;
+}
+
+static void
+draw_buffer_line_split(
+	struct buffer_line *line,
+	unsigned *head_w,
+	unsigned *text_w,
+	unsigned cols,
+	unsigned pad)
+{
+	unsigned _head_w = sizeof(" HH:MM  ");
+
+	if (BUFFER_PADDING)
+		_head_w += pad;
+	else
+		_head_w += line->from_len;
+
+	/* If header won't fit, split in half */
+	if (_head_w >= cols)
+		_head_w = cols / 2;
+
+	_head_w -= 1;
+
+	if (head_w)
+		*head_w = _head_w;
+
+	if (text_w)
+		*text_w = cols - _head_w;
+}
+
+static void
+draw_buffer_scroll_back(void)
+{
+	/* Scroll the current buffer back one page */
+
+	struct buffer *b = &(current_channel()->buffer);
+
+	unsigned buffer_i = b->scrollback;
+	unsigned count = 0;
+	unsigned text_w = 0;
+	unsigned cols = state_cols();
+	unsigned rows = state_rows() - 4;
+
+	struct buffer_line *line = buffer_line(b, buffer_i);
+
+	/* Skip redraw */
+	if (line == buffer_tail(b))
+		return;
+
+	/* Find top line */
+	for (;;) {
+
+		draw_buffer_line_split(line, NULL, &text_w, cols, b->pad);
+
+		count += draw_buffer_line_rows(line, text_w);
+
+		if (count >= rows)
+			break;
+
+		if (line == buffer_tail(b))
+			return;
+
+		line = buffer_line(b, --buffer_i);
+	}
+
+	b->scrollback = buffer_i;
+
+	/* Top line in view draws in full; scroll back one additional line */
+	if (count == rows && line != buffer_tail(b))
+		b->scrollback--;
+
+	draw(DRAW_BUFFER);
+	draw(DRAW_STATUS);
+}
+
+static void
+draw_buffer_scroll_forw(void)
+{
+	/* Scroll the current buffer forward one page */
+
+	struct buffer *b = &(current_channel()->buffer);
+
+	unsigned count = 0;
+	unsigned text_w = 0;
+	unsigned cols = state_cols();
+	unsigned rows = state_rows() - 4;
+
+	struct buffer_line *line = buffer_line(b, b->scrollback);
+
+	/* Skip redraw */
+	if (line == buffer_head(b))
+		return;
+
+	/* Find top line */
+	for (;;) {
+
+		draw_buffer_line_split(line, NULL, &text_w, cols, b->pad);
+
+		count += draw_buffer_line_rows(line, text_w);
+
+		if (line == buffer_head(b))
+			break;
+
+		if (count >= rows)
+			break;
+
+		line = buffer_line(b, ++b->scrollback);
+	}
+
+	/* Bottom line in view draws in full; scroll forward one additional line */
+	if (count == rows && line != buffer_head(b))
+		b->scrollback++;
+
+	draw(DRAW_BUFFER);
+	draw(DRAW_STATUS);
 }
 
 static void
@@ -273,9 +470,9 @@ draw_buffer(struct buffer *b, struct coords coords)
 	/* Find top line */
 	for (;;) {
 
-		buffer_line_split(line, NULL, &text_w, col_total, b->pad);
+		draw_buffer_line_split(line, NULL, &text_w, col_total, b->pad);
 
-		row_count += buffer_line_rows(line, text_w);
+		row_count += draw_buffer_line_rows(line, text_w);
 
 		if (line == tail)
 			break;
@@ -286,10 +483,12 @@ draw_buffer(struct buffer *b, struct coords coords)
 		line = buffer_line(b, --buffer_i);
 	}
 
+	b->buffer_i_top = buffer_i;
+
 	/* Handle impartial top line print */
 	if (row_count > row_total) {
 
-		buffer_line_split(line, &head_w, &text_w, col_total, b->pad);
+		draw_buffer_line_split(line, &head_w, &text_w, col_total, b->pad);
 
 		draw_buffer_line(
 			line,
@@ -300,10 +499,12 @@ draw_buffer(struct buffer *b, struct coords coords)
 			BUFFER_PADDING ? (b->pad - line->from_len) : 0
 		);
 
-		coords.r1 += buffer_line_rows(line, text_w) - (row_count - row_total);
+		coords.r1 += draw_buffer_line_rows(line, text_w) - (row_count - row_total);
 
-		if (line == head)
+		if (line == head) {
+			b->buffer_i_bot = buffer_i;
 			return;
+		}
 
 		line = buffer_line(b, ++buffer_i);
 	}
@@ -311,7 +512,7 @@ draw_buffer(struct buffer *b, struct coords coords)
 	/* Draw all remaining lines */
 	while (coords.r1 <= coords.rN) {
 
-		buffer_line_split(line, &head_w, &text_w, col_total, b->pad);
+		draw_buffer_line_split(line, &head_w, &text_w, col_total, b->pad);
 
 		draw_buffer_line(
 			line,
@@ -322,13 +523,17 @@ draw_buffer(struct buffer *b, struct coords coords)
 			BUFFER_PADDING ? (b->pad - line->from_len) : 0
 		);
 
-		coords.r1 += buffer_line_rows(line, text_w);
+		coords.r1 += draw_buffer_line_rows(line, text_w);
 
-		if (line == head)
+		if (line == head) {
+			b->buffer_i_bot = buffer_i;
 			return;
+		}
 
 		line = buffer_line(b, ++buffer_i);
 	}
+
+	b->buffer_i_bot = (buffer_i - 1);
 }
 
 static void
@@ -676,7 +881,7 @@ draw_status(struct channel *c)
 
 	unsigned cols = state_cols();
 	unsigned rows = state_rows();
-	unsigned scrollback;
+	char scrollback[4];
 
 	if (!cols || !(rows > 1))
 		return;
@@ -723,10 +928,10 @@ draw_status(struct channel *c)
 	}
 
 	/* -(scrollback) */
-	if ((scrollback = buffer_scrollback_status(&c->buffer))) {
+	if ((draw_buffer_scrollback_status(&c->buffer, scrollback, sizeof(scrollback)))) {
 		if (!drawf(&cols, STATUS_SEP_HORZ))
 			return;
-		if (!drawf(&cols, "(%u%s)", scrollback, "%"))
+		if (!drawf(&cols, "(%s%s)", scrollback, "%"))
 			return;
 	}
 

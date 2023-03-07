@@ -37,6 +37,9 @@ static int state_input_linef(struct channel*);
 static int state_input_ctrlch(const char*, size_t);
 static int state_input_action(const char*, size_t);
 
+static void buffer_scrollback_back(void);
+static void buffer_scrollback_forw(void);
+
 static uint16_t state_complete(char*, uint16_t, uint16_t, int);
 static uint16_t state_complete_list(char*, uint16_t, uint16_t, const char**);
 static uint16_t state_complete_user(char*, uint16_t, uint16_t, int);
@@ -377,93 +380,16 @@ state_channel_close(int action_confirm)
 	}
 }
 
-//TODO:
-//improvement: don't set the scrollback if the buffer tail is in view
-void
-buffer_scrollback_back(struct channel *c)
+static void
+buffer_scrollback_back(void)
 {
-	/* Scroll a buffer back one page */
-
-	struct buffer *b = &c->buffer;
-
-	unsigned buffer_i = b->scrollback,
-	         count = 0,
-	         text_w = 0,
-	         cols = state_tty_cols,
-	         rows = state_tty_rows - 4;
-
-	struct buffer_line *line = buffer_line(b, buffer_i);
-
-	/* Skip redraw */
-	if (line == buffer_tail(b))
-		return;
-
-	/* Find top line */
-	for (;;) {
-
-		buffer_line_split(line, NULL, &text_w, cols, b->pad);
-
-		count += buffer_line_rows(line, text_w);
-
-		if (count >= rows)
-			break;
-
-		if (line == buffer_tail(b))
-			return;
-
-		line = buffer_line(b, --buffer_i);
-	}
-
-	b->scrollback = buffer_i;
-
-	/* Top line in view draws in full; scroll back one additional line */
-	if (count == rows && line != buffer_tail(b))
-		b->scrollback--;
-
-	draw(DRAW_BUFFER);
-	draw(DRAW_STATUS);
+	draw(DRAW_BUFFER_BACK);
 }
 
-void
-buffer_scrollback_forw(struct channel *c)
+static void
+buffer_scrollback_forw(void)
 {
-	/* Scroll a buffer forward one page */
-
-	unsigned count = 0,
-	         text_w = 0,
-	         cols = state_tty_cols,
-	         rows = state_tty_rows - 4;
-
-	struct buffer *b = &c->buffer;
-
-	struct buffer_line *line = buffer_line(b, b->scrollback);
-
-	/* Skip redraw */
-	if (line == buffer_head(b))
-		return;
-
-	/* Find top line */
-	for (;;) {
-
-		buffer_line_split(line, NULL, &text_w, cols, b->pad);
-
-		count += buffer_line_rows(line, text_w);
-
-		if (line == buffer_head(b))
-			break;
-
-		if (count >= rows)
-			break;
-
-		line = buffer_line(b, ++b->scrollback);
-	}
-
-	/* Bottom line in view draws in full; scroll forward one additional line */
-	if (count == rows && line != buffer_head(b))
-		b->scrollback++;
-
-	draw(DRAW_BUFFER);
-	draw(DRAW_STATUS);
+	draw(DRAW_BUFFER_FORW);
 }
 
 struct channel*
@@ -898,11 +824,11 @@ state_input_ctrlch(const char *c, size_t len)
 
 		/* page up */
 		else if (!strncmp(c, "[5~", len - 1))
-			buffer_scrollback_back(current_channel());
+			buffer_scrollback_back();
 
 		/* page down */
 		else if (!strncmp(c, "[6~", len - 1))
-			buffer_scrollback_forw(current_channel());
+			buffer_scrollback_forw();
 
 	} else switch (*c) {
 
@@ -943,12 +869,12 @@ state_input_ctrlch(const char *c, size_t len)
 
 		case CTRL('u'):
 			/* Scoll buffer up */
-			buffer_scrollback_back(current_channel());
+			buffer_scrollback_back();
 			break;
 
 		case CTRL('d'):
 			/* Scoll buffer down */
-			buffer_scrollback_forw(current_channel());
+			buffer_scrollback_forw();
 			break;
 	}
 

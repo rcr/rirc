@@ -213,38 +213,13 @@ test_buffer_scrollback(void)
 
 	/* Buffer scrollback stays locked to the buffer tail when incrementing */
 	b.head = b.tail + BUFFER_LINES_MAX;
-	assert_true(buffer_full(&b));
+	assert_true(buffer_size(&b) == BUFFER_LINES_MAX);
 
 	t__buffer_newline(&b, "e");
 	assert_strcmp(buffer_line(&b, b.scrollback)->text, "b");
 
 	t__buffer_newline(&b, "f");
 	assert_strcmp(buffer_line(&b, b.scrollback)->text, "c");
-}
-
-static void
-test_buffer_scrollback_status(void)
-{
-	/* Test retrieving buffer scrollback status */
-
-	struct buffer b;
-
-	buffer(&b);
-
-	b.head = (BUFFER_LINES_MAX / 2) - 1;
-	b.tail = UINT_MAX - (BUFFER_LINES_MAX / 2);
-	b.scrollback = b.tail;
-
-	assert_true(buffer_full(&b));
-
-	b.scrollback = b.tail;
-	assert_ueq((buffer_scrollback_status(&b)), 100);
-
-	b.scrollback = b.tail + (BUFFER_LINES_MAX / 2);
-	assert_ueq((buffer_scrollback_status(&b)), 50);
-
-	b.scrollback = b.head - 1;
-	assert_ueq((buffer_scrollback_status(&b)), 0);
 }
 
 static void
@@ -320,46 +295,6 @@ test_buffer_line_overlength(void)
 
 	assert_eq(b.buffer_lines[2].text[0], 'c');
 	assert_eq(b.buffer_lines[2].text[TEXT_LENGTH_MAX / 2 - 1], 'C');
-}
-
-static void
-test_buffer_line_rows(void)
-{
-	/* Test calculating the number of rows a buffer line occupies */
-
-	struct buffer b;
-
-	buffer(&b);
-
-	t__buffer_newline(&b, "aa bb cc");
-
-	/* 1 column: 6 rows. word wrap skips whitespace prefix in line continuations:
-	 * a
-	 * a
-	 * b
-	 * b
-	 * c
-	 * c
-	 * */
-	assert_eq(buffer_line_rows(buffer_head(&b), 1), 6);
-
-	/* 4 columns: 3 rows:
-	 * 'aa b' -> wraps to
-	 *   'aa'
-	 *   'bb c'
-	 * 'bb c' -> wraps to
-	 *   'bb'
-	 *   'cc'
-	 * */
-	assert_eq(buffer_line_rows(buffer_head(&b), 4), 3);
-
-	/* Greater columns than length should always return one row */
-	assert_eq(buffer_line_rows(buffer_head(&b), buffer_head(&b)->text_len + 1), 1);
-
-	/* Test empty line should return at least 1 row */
-	t__buffer_newline(&b, "");
-
-	assert_eq(buffer_line_rows(buffer_head(&b), 1), 1);
 }
 
 static void
@@ -442,10 +377,8 @@ main(void)
 		TESTCASE(test_buffer_tail),
 		TESTCASE(test_buffer_line),
 		TESTCASE(test_buffer_scrollback),
-		TESTCASE(test_buffer_scrollback_status),
 		TESTCASE(test_buffer_index_overflow),
 		TESTCASE(test_buffer_line_overlength),
-		TESTCASE(test_buffer_line_rows),
 		TESTCASE(test_buffer_newline_prefix),
 	};
 
