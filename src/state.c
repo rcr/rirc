@@ -402,6 +402,7 @@ static void
 buffer_scrollback_back(void)
 {
 	draw(DRAW_BUFFER_BACK);
+	draw(DRAW_BUFFER);
 	draw(DRAW_STATUS);
 }
 
@@ -409,6 +410,7 @@ static void
 buffer_scrollback_forw(void)
 {
 	draw(DRAW_BUFFER_FORW);
+	draw(DRAW_BUFFER);
 	draw(DRAW_STATUS);
 }
 

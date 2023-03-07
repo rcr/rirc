@@ -360,9 +360,6 @@ draw_buffer_scroll_back(void)
 	/* Top line in view draws in full; scroll back one additional line */
 	if (count == rows && line != buffer_tail(b))
 		b->scrollback--;
-
-	draw(DRAW_BUFFER);
-	draw(DRAW_STATUS);
 }
 
 static void
@@ -402,9 +399,6 @@ draw_buffer_scroll_forw(void)
 	/* Bottom line in view draws in full; scroll forward one additional line */
 	if (count == rows && line != buffer_head(b))
 		b->scrollback++;
-
-	draw(DRAW_BUFFER);
-	draw(DRAW_STATUS);
 }
 
 static void
