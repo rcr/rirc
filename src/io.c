@@ -812,7 +812,6 @@ static int
 io_tls_establish(struct connection *cx)
 {
 	const unsigned char pers[] = "rirc-drbg-seed";
-
 	int ret;
 
 	io_info(cx, " .. Establishing TLS connection");
@@ -834,15 +833,8 @@ io_tls_establish(struct connection *cx)
 		goto err;
 	}
 
-	mbedtls_ssl_conf_max_version(
-			&(cx->tls_conf),
-			MBEDTLS_SSL_MAJOR_VERSION_3,
-			MBEDTLS_SSL_MINOR_VERSION_3);
-
-	mbedtls_ssl_conf_min_version(
-			&(cx->tls_conf),
-			MBEDTLS_SSL_MAJOR_VERSION_3,
-			MBEDTLS_SSL_MINOR_VERSION_3);
+	mbedtls_ssl_conf_min_tls_version(&(cx->tls_conf), MBEDTLS_SSL_VERSION_TLS1_2);
+	mbedtls_ssl_conf_max_tls_version(&(cx->tls_conf), MBEDTLS_SSL_VERSION_TLS1_3);
 
 	if ((ret = mbedtls_ctr_drbg_seed(
 			&(cx->tls_ctr_drbg),
@@ -978,7 +970,18 @@ io_tls_establish(struct connection *cx)
 		goto err;
 	}
 
-	io_info(cx, " .. TLS connection established");
+	switch (mbedtls_ssl_get_version_number(&(cx->tls_ctx))) {
+		case MBEDTLS_SSL_VERSION_TLS1_2:
+			io_info(cx, " .. TLS 1.2 connection established");
+			break;
+		case MBEDTLS_SSL_VERSION_TLS1_3:
+			io_info(cx, " .. TLS 1.3 connection established");
+			break;
+		default:
+			io_info(cx, " .. TLS (?) connection established");
+			break;
+	}
+
 	io_info(cx, " .... Version:     %s", mbedtls_ssl_get_version(&(cx->tls_ctx)));
 	io_info(cx, " .... Ciphersuite: %s", mbedtls_ssl_get_ciphersuite(&(cx->tls_ctx)));
 
