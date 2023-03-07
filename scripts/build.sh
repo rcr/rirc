@@ -2,9 +2,9 @@
 
 # Development build script.
 #
-#  Usage:
+#  Usage, e.g.:
 #
-#   $ ./scripts/build.sh [make targets]
+#   $ ./scripts/build.sh 'check rirc.debug; gdb ./rirc.debug'
 
 set -e
 
@@ -13,17 +13,17 @@ export CFLAGS_DEBUG="-Wshadow"
 export LDFLAGS="-flto -fuse-ld=lld"
 export LDFLAGS_DEBUG="-fuse-ld=lld"
 
-if [ -x "$(command -v entr)" ]; then
-	ENTR="entr -c"
-fi
+make clean
 
 if [ -x "$(command -v bear)" ]; then
+	make build
 	BEAR="bear --append --output ./build/compile_commands.json --"
 fi
 
-make clean
-make build
-
-find -name '*.c' \
-  -o -name '*.h' \
-  -o -name Makefile | grep -v './lib/' | $ENTR $BEAR make -j $(nproc) "$@"
+if [ -x "$(command -v entr)" ]; then
+	find -name '*.c' \
+	  -o -name '*.h' \
+	  -o -name Makefile | grep -v './lib/' | entr -cs "$BEAR make -j $(nproc) $*"
+else
+	eval "$BEAR make -j $(nproc) $*"
+fi
