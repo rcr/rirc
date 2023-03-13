@@ -541,119 +541,6 @@ test_irc_strtrim(void)
 	assert_strcmp(mesg4, "");
 }
 
-static void
-test_irc_strwrap(void)
-{
-	char *ret, *seg1, *seg2, *end, str[256] = {0};
-
-#define CHECK_IRC_STRWRAP(S, SS, L1, L2)  \
-	strncpy(str, (S), sizeof(str) - 1); \
-	end = str + strlen(str); \
-	seg1 = seg2 = str; \
-	ret = irc_strwrap(strlen(SS), &seg2, end); \
-	*ret = 0; \
-	assert_strcmp(seg1, (L1)); \
-	assert_strcmp(seg2, (L2));
-
-	/* Test fits */
-	CHECK_IRC_STRWRAP(
-		"test1 test2 test3",
-		"test1 test2 test3",
-		"test1 test2 test3",
-		"");
-
-	CHECK_IRC_STRWRAP(
-		"test1 test2 test3",
-		"test1 test2 test3xxxxx",
-		"test1 test2 test3",
-		"");
-
-	/* Test wrap on word */
-	CHECK_IRC_STRWRAP(
-		"test1 test2 test3",
-		"test1 t",
-		"test1",
-		"test2 test3");
-
-	CHECK_IRC_STRWRAP(
-		"test1 test2 test3",
-		"test1 test",
-		"test1",
-		"test2 test3");
-
-	CHECK_IRC_STRWRAP(
-		"test1 test2 test3",
-		"test1 test2",
-		"test1 test2",
-		"test3");
-
-	/* Test wrap on whitespace */
-	CHECK_IRC_STRWRAP(
-		"test1 test2 test3",
-		"test1 test2 ",
-		"test1 test2",
-		"test3");
-
-	CHECK_IRC_STRWRAP(
-		"test1 test2   test3",
-		"test1 test2",
-		"test1 test2",
-		"test3");
-
-	CHECK_IRC_STRWRAP(
-		"test1 test2   test3",
-		"test1 test2 ",
-		"test1 test2",
-		"test3");
-
-	CHECK_IRC_STRWRAP(
-		"test1 test2   test3",
-		"test1 test2   ",
-		"test1 test2",
-		"test3");
-
-	/* Test edge case: single space */
-	CHECK_IRC_STRWRAP(
-		" ",
-		"   ",
-		" ",
-		"");
-
-	/* Test edge case: empty string*/
-	CHECK_IRC_STRWRAP(
-		"",
-		"   ",
-		"",
-		"");
-
-#undef CHECK_IRC_STRWRAP
-
-	if (seg1 != seg2 || seg2 != end)
-		test_fail("seg1 should be advanced to end of string");
-
-	/* Test edge case: nowhere to wrap */
-	char m1[] = "test1test2 test3";
-	char m2[] = "test1";
-
-	end = m1 + strlen(m1);
-	seg1 = seg2 = m1;
-	ret = irc_strwrap(strlen(m2), &seg2, end);
-	*ret = '!';
-	assert_strcmp(seg1, "test1!est2 test3");
-	assert_strcmp(seg2, "!est2 test3");
-
-	/* Test edge case: whitespace prefix */
-	char m3[] = " testing";
-	char m4[] = "   ";
-
-	end = m3 + strlen(m3);
-	seg1 = seg2 = m3;
-	ret = irc_strwrap(strlen(m4), &seg2, end);
-	*ret = '!';
-	assert_strcmp(seg1, " te!ting");
-	assert_strcmp(seg2, "!ting");
-}
-
 int
 main(void)
 {
@@ -668,7 +555,6 @@ main(void)
 		TESTCASE(test_irc_strncmp),
 		TESTCASE(test_irc_strsep),
 		TESTCASE(test_irc_strtrim),
-		TESTCASE(test_irc_strwrap),
 		TESTCASE(test_irc_toupper)
 	};
 

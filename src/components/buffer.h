@@ -38,8 +38,8 @@ struct buffer_line
 	time_t time;
 	struct {
 		unsigned colour; /* Cached colour of `from` text */
-		unsigned rows;   /* Cached number of rows occupied when wrapping on w columns */
-		unsigned w;      /* Cached width for rows */
+		unsigned cols;   /* Cached columns */
+		unsigned rows;   /* Cached rows when wrapping on `cols` columns */
 		unsigned initialized : 1;
 	} cached;
 };

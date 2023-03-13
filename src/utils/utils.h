@@ -72,7 +72,6 @@ int irc_strncmp(enum casemapping, const char*, const char*, size_t);
 char* irc_strdup(const char*);
 char* irc_strsep(char**);
 char* irc_strtrim(char**);
-char* irc_strwrap(unsigned, char**, char*);
 
 int irc_message_param(struct irc_message*, char**);
 int irc_message_parse(struct irc_message*, char*);

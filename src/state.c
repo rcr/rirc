@@ -224,6 +224,7 @@ newlinev(struct channel *c, enum buffer_line_type type, const char *from, const 
 
 	if (c == current_channel()) {
 		draw(DRAW_BUFFER);
+		draw(DRAW_STATUS);
 	} else {
 		c->activity = MAX(c->activity, ACTIVITY_ACTIVE);
 		draw(DRAW_NAV);

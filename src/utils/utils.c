@@ -337,66 +337,6 @@ irc_strtrim(char **str)
 	return *p ? p : NULL;
 }
 
-char*
-irc_strwrap(unsigned n, char **str, char *end)
-{
-	/* Greedy word wrap algorithm.
-	 *
-	 * Given a string bounded by [start, end), return a pointer to the character one
-	 * past the maximum printable character for this string segment and advance the string
-	 * pointer to the next printable character or the null terminator.
-	 *
-	 * For example, with 7 text columns and the string "wrap     testing":
-	 *
-	 *     word_wrap(7, &str, str + strlen(str));
-	 *
-	 *              split here
-	 *                  |
-	 *                  v
-	 *            .......
-	 *           "wrap     testing"
-	 *                ^    ^
-	 *     returns ___|    |___ str
-	 *
-	 * A subsequent call to wrap on the remainder, "testing", yields the case
-	 * where the whole string fits and str is advanced to the end and returned.
-	 *
-	 * The caller should check that (str != end) before subsequent calls
-	 */
-
-	char *ret, *tmp;
-
-	if (n < 1)
-		fatal("insufficient columns: %d", n);
-
-	/* All fits */
-	if ((end - *str) <= n)
-		return (*str = end);
-
-	/* Find last occuring ' ' character */
-	ret = (*str + n);
-
-	while (ret > *str && *ret != ' ')
-		ret--;
-
-	/* Nowhere to wrap */
-	if (ret == *str)
-		return (*str = ret + n);
-
-	/* Discard whitespace between wraps */
-	tmp = ret;
-
-	while (ret > *str && *(ret - 1) == ' ')
-		ret--;
-
-	while (*tmp == ' ')
-		tmp++;
-
-	*str = tmp;
-
-	return ret;
-}
-
 static inline int
 irc_ischanchar(char c, int first)
 {

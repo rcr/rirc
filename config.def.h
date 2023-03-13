@@ -57,7 +57,6 @@
 
 /* Separator characters */
 #define SEP_HORZ "─"
-#define SEP_VERT "~"
 
 /* Separator colours */
 #define SEP_FG 239

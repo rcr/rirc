@@ -37,6 +37,30 @@
 
 #define UTF8_CONT(C) (((unsigned char)(C) & 0xC0) == 0x80)
 
+#define ATTR_CODE_BOLD      0x02
+#define ATTR_CODE_COLOUR    0x03
+#define ATTR_CODE_ITALIC    0x1D
+#define ATTR_CODE_MONOSPACE 0x11
+#define ATTR_CODE_RESET     0x0F
+#define ATTR_CODE_REVERSE   0x16
+#define ATTR_CODE_STRIKE    0x1E
+#define ATTR_CODE_UNDERLINE 0x1F
+
+/* https://modern.ircdocs.horse/formatting.html#colors
+ * https://modern.ircdocs.horse/formatting.html#colors-16-98 */
+static int irc_to_ansi_colour[] = {
+	15,  0,   4,   2,   9,   1,   5,   3,   11,  10,
+	6,   14,  12,  13,  8,   7,   52,  94,  100, 58,
+	22,  29,  23,  24,  17,  54,  53,  89,  88,  130,
+	142, 64,  28,  35,  30,  25,  18,  91,  90,  125,
+	124, 166, 184, 106, 34,  49,  37,  33,  19,  129,
+	127, 161, 196, 208, 226, 154, 46,  86,  51,  75,
+	21,  171, 201, 198, 203, 215, 227, 191, 83,  122,
+	87,  111, 63,  177, 207, 205, 217, 223, 229, 193,
+	157, 158, 159, 153, 147, 183, 219, 212, 16,  233,
+	235, 237, 239, 241, 244, 247, 250, 254, 231, -1,
+};
+
 /* Terminal coordinate row/column boundaries (inclusive)
  * for objects being drawn. The origin for terminal
  * coordinates is in the top left, indexed from 1
@@ -64,8 +88,6 @@ static struct
 		struct {
 			unsigned separators  : 1;
 			unsigned buffer      : 1;
-			unsigned buffer_back : 1;
-			unsigned buffer_forw : 1;
 			unsigned input       : 1;
 			unsigned nav         : 1;
 			unsigned status      : 1;
@@ -73,14 +95,17 @@ static struct
 		unsigned all;
 	} bits;
 	unsigned bell : 1;
+	unsigned scroll_buffer_back : 1;
+	unsigned scroll_buffer_forw : 1;
 } draw_state;
 
 static struct coords coords(unsigned, unsigned, unsigned, unsigned);
 static unsigned nick_col(char*);
 static unsigned drawf(unsigned*, const char*, ...);
 
-static unsigned draw_buffer_line_rows(struct buffer_line*, unsigned);
 static const char* draw_buffer_scrollback_status(struct buffer*, char*, size_t);
+static size_t draw_buffer_wrap(const char*, size_t, size_t);
+static unsigned draw_buffer_line_rows(struct buffer_line*, unsigned);
 static void draw_bits(void);
 static void draw_buffer(struct buffer*, struct coords);
 static void draw_buffer_line(struct buffer_line*, struct coords, unsigned, unsigned, unsigned, unsigned);
@@ -92,6 +117,7 @@ static void draw_nav(struct channel*);
 static void draw_separators(void);
 static void draw_status(struct channel*);
 
+static size_t draw_attr_len(const char *str);
 static void draw_attr_bg(int);
 static void draw_attr_fg(int);
 static void draw_attr_reset(void);
@@ -101,12 +127,12 @@ static void draw_clear_line(void);
 static void draw_cursor_pos(int, int);
 static void draw_cursor_pos_restore(void);
 static void draw_cursor_pos_save(void);
+static unsigned draw_irc_colour(const char *code, int *fg, int *bg);
 
 static int actv_colours[ACTIVITY_T_SIZE] = ACTIVITY_COLOURS
 static int bg_last = -1;
 static int fg_last = -1;
 static int nick_colours[] = NICK_COLOURS
-
 static int drawing;
 
 void
@@ -130,6 +156,8 @@ draw(enum draw_bit bit)
 		case DRAW_FLUSH:
 			draw_bits();
 			draw_state.bits.all = 0;
+			draw_state.scroll_buffer_back = 0;
+			draw_state.scroll_buffer_forw = 0;
 			draw_state.bell = 0;
 			break;
 		case DRAW_BELL:
@@ -139,12 +167,12 @@ draw(enum draw_bit bit)
 			draw_state.bits.buffer = 1;
 			break;
 		case DRAW_BUFFER_BACK:
-			draw_state.bits.buffer_back = 1;
-			draw_state.bits.buffer_forw = 0;
+			draw_state.scroll_buffer_back = 1;
+			draw_state.scroll_buffer_forw = 0;
 			break;
 		case DRAW_BUFFER_FORW:
-			draw_state.bits.buffer_forw = 1;
-			draw_state.bits.buffer_back = 0;
+			draw_state.scroll_buffer_forw = 1;
+			draw_state.scroll_buffer_back = 0;
 			break;
 		case DRAW_INPUT:
 			draw_state.bits.input = 1;
@@ -194,10 +222,10 @@ draw_bits(void)
 
 	/* handle state altering draw functions before drawing components */
 
-	if (draw_state.bits.buffer_back)
+	if (draw_state.scroll_buffer_back)
 		draw_buffer_scroll_back();
 
-	if (draw_state.bits.buffer_forw)
+	if (draw_state.scroll_buffer_forw)
 		draw_buffer_scroll_forw();
 
 	/* draw components */
@@ -235,30 +263,6 @@ flush:
 	fflush(stdout);
 }
 
-static unsigned
-draw_buffer_line_rows(struct buffer_line *line, unsigned w)
-{
-	/* Return the number of times a buffer line will wrap within w columns */
-
-	char *p;
-
-	if (w == 0)
-		fatal("width is zero");
-
-	/* Empty lines are considered to occupy a row */
-	if (!*line->text)
-		return line->cached.rows = 1;
-
-	if (line->cached.w != w) {
-		line->cached.w = w;
-
-		for (p = line->text, line->cached.rows = 0; *p; line->cached.rows++)
-			irc_strwrap(w, &p, line->text + line->text_len);
-	}
-
-	return line->cached.rows;
-}
-
 static const char*
 draw_buffer_scrollback_status(struct buffer *b, char *buf, size_t n)
 {
@@ -292,113 +296,81 @@ draw_buffer_scrollback_status(struct buffer *b, char *buf, size_t n)
 	return buf;
 }
 
-static void
-draw_buffer_line_split(
-	struct buffer_line *line,
-	unsigned *head_w,
-	unsigned *text_w,
-	unsigned cols,
-	unsigned pad)
+static size_t
+draw_buffer_wrap(const char *str, size_t len, size_t cols)
 {
-	unsigned _head_w = sizeof(" HH:MM  ");
+	size_t i = 0;
+	size_t ret;
+	size_t w = 0;
 
-	if (BUFFER_PADDING)
-		_head_w += pad;
-	else
-		_head_w += line->from_len;
+	if (!cols)
+		return 0;
 
-	/* If header won't fit, split in half */
-	if (_head_w >= cols)
-		_head_w = cols / 2;
+	if (len <= cols)
+		return len;
 
-	_head_w -= 1;
+	while ((ret = draw_attr_len((str + i))))
+		i += ret;
 
-	if (head_w)
-		*head_w = _head_w;
+	while (cols && str[i]) {
 
-	if (text_w)
-		*text_w = cols - _head_w;
-}
+		if (str[i] == ' ') {
+			while (cols && str[i]) {
+				if ((ret = draw_attr_len((str + i))))
+					i += ret;
+				else if (str[i] == ' ')
+					i++, cols--;
+				else if (str[i] != ' ')
+					break;
+			}
+		} else {
+			while (cols && str[i]) {
+				if ((ret = draw_attr_len((str + i))))
+					i += ret;
+				else if (str[i] != ' ')
+					i++, cols--;
+				else if (str[i] == ' ')
+					break;
+			}
+		}
 
-static void
-draw_buffer_scroll_back(void)
-{
-	/* Scroll the current buffer back one page */
-
-	struct buffer *b = &(current_channel()->buffer);
-
-	unsigned buffer_i = b->scrollback;
-	unsigned count = 0;
-	unsigned text_w = 0;
-	unsigned cols = state_cols();
-	unsigned rows = state_rows() - 4;
-
-	struct buffer_line *line = buffer_line(b, buffer_i);
-
-	/* Skip redraw */
-	if (line == buffer_tail(b))
-		return;
-
-	/* Find top line */
-	for (;;) {
-
-		draw_buffer_line_split(line, NULL, &text_w, cols, b->pad);
-
-		count += draw_buffer_line_rows(line, text_w);
-
-		if (count >= rows)
-			break;
-
-		if (line == buffer_tail(b))
-			return;
-
-		line = buffer_line(b, --buffer_i);
+		if (cols && str[i] && str[i] != ' ')
+			w = i;
 	}
 
-	b->scrollback = buffer_i;
-
-	/* Top line in view draws in full; scroll back one additional line */
-	if (count == rows && line != buffer_tail(b))
-		b->scrollback--;
+	return ((str[i] && w) ? w : i);
 }
 
-static void
-draw_buffer_scroll_forw(void)
+static unsigned
+draw_buffer_line_rows(struct buffer_line *line, unsigned cols)
 {
-	/* Scroll the current buffer forward one page */
+	/* Return the number of times a buffer line will wrap within `cols` columns */
 
-	struct buffer *b = &(current_channel()->buffer);
+	if (cols == 0)
+		fatal("cols is zero");
 
-	unsigned count = 0;
-	unsigned text_w = 0;
-	unsigned cols = state_cols();
-	unsigned rows = state_rows() - 4;
+	/* Empty lines are considered to occupy a row */
+	if (!*line->text)
+		return line->cached.rows = 1;
 
-	struct buffer_line *line = buffer_line(b, b->scrollback);
+	if (line->cached.cols != cols) {
 
-	/* Skip redraw */
-	if (line == buffer_head(b))
-		return;
+		line->cached.cols = cols;
+		line->cached.rows = 0;
 
-	/* Find top line */
-	for (;;) {
+		const char *p = line->text;
+		size_t len = line->text_len;
+		size_t ret;
 
-		draw_buffer_line_split(line, NULL, &text_w, cols, b->pad);
-
-		count += draw_buffer_line_rows(line, text_w);
-
-		if (line == buffer_head(b))
-			break;
-
-		if (count >= rows)
-			break;
-
-		line = buffer_line(b, ++b->scrollback);
+		while (len) {
+			ret = draw_buffer_wrap(p, len, cols);
+			len -= ret;
+			p += ret;
+			line->cached.rows++;
+		}
 	}
 
-	/* Bottom line in view draws in full; scroll forward one additional line */
-	if (count == rows && line != buffer_head(b))
-		b->scrollback++;
+	return line->cached.rows;
 }
 
 static void
@@ -440,12 +412,12 @@ draw_buffer(struct buffer *b, struct coords coords)
 	 */
 
 	unsigned buffer_i = b->scrollback;
-	unsigned col_total = coords.cN - coords.c1 + 1;
+	unsigned cols_head;
+	unsigned cols_text;
+	unsigned cols_total = coords.cN - coords.c1 + 1;
 	unsigned row;
 	unsigned row_count = 0;
 	unsigned row_total = coords.rN - coords.r1 + 1;
-	unsigned head_w;
-	unsigned text_w;
 
 	/* Clear the buffer area */
 	for (row = coords.r1; row <= coords.rN; row++) {
@@ -464,9 +436,9 @@ draw_buffer(struct buffer *b, struct coords coords)
 	/* Find top line */
 	for (;;) {
 
-		draw_buffer_line_split(line, NULL, &text_w, col_total, b->pad);
+		draw_buffer_line_split(line, NULL, &cols_text, cols_total, b->pad);
 
-		row_count += draw_buffer_line_rows(line, text_w);
+		row_count += draw_buffer_line_rows(line, cols_text);
 
 		if (line == tail)
 			break;
@@ -482,18 +454,18 @@ draw_buffer(struct buffer *b, struct coords coords)
 	/* Handle impartial top line print */
 	if (row_count > row_total) {
 
-		draw_buffer_line_split(line, &head_w, &text_w, col_total, b->pad);
+		draw_buffer_line_split(line, &cols_head, &cols_text, cols_total, b->pad);
 
 		draw_buffer_line(
 			line,
 			coords,
-			head_w,
-			text_w,
+			cols_head,
+			cols_text,
 			row_count - row_total,
 			BUFFER_PADDING ? (b->pad - line->from_len) : 0
 		);
 
-		coords.r1 += draw_buffer_line_rows(line, text_w) - (row_count - row_total);
+		coords.r1 += draw_buffer_line_rows(line, cols_text) - (row_count - row_total);
 
 		if (line == head) {
 			b->buffer_i_bot = buffer_i;
@@ -506,18 +478,18 @@ draw_buffer(struct buffer *b, struct coords coords)
 	/* Draw all remaining lines */
 	while (coords.r1 <= coords.rN) {
 
-		draw_buffer_line_split(line, &head_w, &text_w, col_total, b->pad);
+		draw_buffer_line_split(line, &cols_head, &cols_text, cols_total, b->pad);
 
 		draw_buffer_line(
 			line,
 			coords,
-			head_w,
-			text_w,
+			cols_head,
+			cols_text,
 			0,
 			BUFFER_PADDING ? (b->pad - line->from_len) : 0
 		);
 
-		coords.r1 += draw_buffer_line_rows(line, text_w);
+		coords.r1 += draw_buffer_line_rows(line, cols_text);
 
 		if (line == head) {
 			b->buffer_i_bot = buffer_i;
@@ -528,26 +500,23 @@ draw_buffer(struct buffer *b, struct coords coords)
 	}
 
 	b->buffer_i_bot = (buffer_i - 1);
-
-	/* lock the scrollback index to the tail */
-	if (b->buffer_i_top == b->tail && b->buffer_i_bot != (b->head - 1))
-		b->scrollback = b->buffer_i_bot;
 }
 
 static void
 draw_buffer_line(
 		struct buffer_line *line,
 		struct coords coords,
-		unsigned head_w,
-		unsigned text_w,
+		unsigned cols_head,
+		unsigned cols_text,
 		unsigned skip,
 		unsigned pad)
 {
 	char *p1 = line->text;
-	char *p2 = line->text + line->text_len;
-
+	size_t ret;
 	unsigned head_col = coords.c1;
-	unsigned text_col = coords.c1 + head_w;
+	unsigned text_bg = BUFFER_TEXT_BG;
+	unsigned text_col = coords.c1 + cols_head;
+	unsigned text_fg = BUFFER_TEXT_FG;
 
 	if (!line->cached.initialized) {
 		/* Initialize static cached properties of drawn lines */
@@ -555,15 +524,13 @@ draw_buffer_line(
 		line->cached.initialized = 1;
 	}
 
-	if (skip == 0) {
-
-		/* Print the line header */
+	if (!skip) {
 
 		char buf_h[3] = {0};
 		char buf_m[3] = {0};
 		int from_bg;
 		int from_fg;
-		unsigned head_cols = head_w;
+		unsigned head_cols = cols_head;
 
 		struct tm *tm = localtime(&line->time);
 
@@ -599,20 +566,19 @@ draw_buffer_line(
 				break;
 		}
 
-		if (!drawf(&head_cols, "%b%f%s%a ",
+		if (!drawf(&head_cols, "%b%f%s%a %b%f~%a ",
 				from_bg,
 				from_fg,
-				line->from))
+				line->from,
+				BUFFER_LINE_HEADER_BG,
+				BUFFER_LINE_HEADER_FG))
 			goto print_text;
 	}
 
 print_text:
 
 	while (skip--)
-		irc_strwrap(text_w, &p1, p2);
-
-	unsigned text_bg = BUFFER_TEXT_BG;
-	unsigned text_fg = BUFFER_TEXT_FG;
+		p1 += draw_buffer_wrap(p1, (line->text_len - (p1 - line->text)), cols_text);
 
 	if (strlen(QUOTE_LEADER) && line->type == BUFFER_LINE_CHAT) {
 		if (!strncmp(line->text, QUOTE_LEADER, strlen(QUOTE_LEADER))) {
@@ -622,37 +588,25 @@ print_text:
 	}
 
 	do {
-		unsigned text_cols = text_w;
+		unsigned text_cols = cols_text;
 
 		draw_cursor_pos(coords.r1, text_col);
 
-		if (!drawf(&text_cols, "%b%f%s%a ",
-				BUFFER_LINE_HEADER_BG,
-				BUFFER_LINE_HEADER_FG,
-				SEP_VERT)) {
-			coords.r1++;
-			continue;
-		}
-
 		if (*p1) {
-			const char *text_p1 = p1;
-			const char *text_p2 = irc_strwrap(text_cols, &p1, p2);
+
+			ret = draw_buffer_wrap(p1, strlen(p1), text_cols);
 
 			draw_attr_bg(text_bg);
 			draw_attr_fg(text_fg);
 
-			for (unsigned i = 0; i < (text_p2 - text_p1); i++) {
-				switch (text_p1[i]) {
-					case 0x02:
-					case 0x03:
-					case 0x0F:
-					case 0x16:
-					case 0x1D:
-					case 0x1F:
-						break;
-					default:
-						draw_char(text_p1[i]);
-				}
+			while (ret--) {
+
+				size_t attr_len;
+
+				while ((attr_len = draw_attr_len(p1)))
+					p1 += attr_len;
+
+				draw_char(*p1++);
 			}
 
 			draw_attr_reset();
@@ -661,6 +615,117 @@ print_text:
 		coords.r1++;
 
 	} while (*p1 && coords.r1 <= coords.rN);
+}
+
+static void
+draw_buffer_line_split(
+	struct buffer_line *line,
+	unsigned *cols_head,
+	unsigned *cols_text,
+	unsigned cols,
+	unsigned pad)
+{
+	unsigned _cols_head = sizeof(" HH:MM  ~ ");
+
+	if (BUFFER_PADDING)
+		_cols_head += pad;
+	else
+		_cols_head += line->from_len;
+
+	/* If header won't fit, split in half */
+	if (_cols_head >= cols)
+		_cols_head = cols / 2;
+
+	_cols_head -= 1;
+
+	if (cols_head)
+		*cols_head = _cols_head;
+
+	if (cols_text)
+		*cols_text = cols - _cols_head;
+}
+
+static void
+draw_buffer_scroll_back(void)
+{
+	/* Scroll the current buffer back one page */
+
+	struct buffer *b = &(current_channel()->buffer);
+
+	unsigned buffer_i = b->scrollback;
+	unsigned count = 0;
+	unsigned cols_text = 0;
+	unsigned cols = state_cols();
+	unsigned rows = state_rows() - 4;
+
+	struct buffer_line *line = buffer_line(b, buffer_i);
+
+	/* Skip redraw */
+	if (line == buffer_tail(b))
+		return;
+
+	/* Find top line */
+	for (;;) {
+
+		draw_buffer_line_split(line, NULL, &cols_text, cols, b->pad);
+
+		count += draw_buffer_line_rows(line, cols_text);
+
+		if (count >= rows)
+			break;
+
+		if (line == buffer_tail(b))
+			return;
+
+		line = buffer_line(b, --buffer_i);
+	}
+
+	b->scrollback = buffer_i;
+
+	if (count == rows && line != buffer_tail(b))
+		b->scrollback--;
+}
+
+static void
+draw_buffer_scroll_forw(void)
+{
+	/* Scroll the current buffer forward one page */
+
+	struct buffer *b = &(current_channel()->buffer);
+
+	unsigned count = 0;
+	unsigned cols_text = 0;
+	unsigned cols = state_cols();
+	unsigned rows = state_rows() - 4;
+
+	if (b->buffer_i_top == b->tail && b->buffer_i_bot != (b->head - 1))
+		b->scrollback = b->buffer_i_bot;
+
+	struct buffer_line *line = buffer_line(b, b->scrollback);
+
+	/* Skip redraw */
+	if (line == buffer_head(b))
+		return;
+
+	/* Find top line */
+	for (;;) {
+
+		draw_buffer_line_split(line, NULL, &cols_text, cols, b->pad);
+
+		count += draw_buffer_line_rows(line, cols_text);
+
+		if (line == buffer_head(b))
+			break;
+
+		if (count >= rows)
+			break;
+
+		line = buffer_line(b, ++b->scrollback);
+	}
+
+	/* Bottom line in view draws in full; scroll forward one additional line */
+	if (count == rows && line != buffer_head(b))
+		b->scrollback++;
 }
 
 static void
@@ -1033,6 +1098,25 @@ drawf(unsigned *cols_p, const char *fmt, ...)
 	return (*cols_p = cols);
 }
 
+static size_t
+draw_attr_len(const char *str)
+{
+	switch (*str) {
+		case ATTR_CODE_COLOUR:
+			return draw_irc_colour(str, NULL, NULL);
+		case ATTR_CODE_BOLD:
+		case ATTR_CODE_ITALIC:
+		case ATTR_CODE_MONOSPACE:
+		case ATTR_CODE_RESET:
+		case ATTR_CODE_REVERSE:
+		case ATTR_CODE_STRIKE:
+		case ATTR_CODE_UNDERLINE:
+			return 1;
+		default:
+			return 0;
+	}
+}
+
 static void
 draw_attr_bg(int bg)
 {
@@ -1098,13 +1182,65 @@ draw_cursor_pos(int row, int col)
 }
 
 static void
+draw_cursor_pos_restore(void)
+{
+	printf(CURSOR_POS_RESTORE);
+}
+
+static void
 draw_cursor_pos_save(void)
 {
 	printf(CURSOR_POS_SAVE);
 }
 
-static void
-draw_cursor_pos_restore(void)
+static unsigned
+draw_irc_colour(const char *code, int *fg, int *bg)
 {
-	printf(CURSOR_POS_RESTORE);
+	char c;
+	int comma = 0;
+	int digits_bg = 0;
+	int digits_fg = 0;
+	int parsed_fg = 0;
+	int parsed_bg = 0;
+
+	if (*code++ != 0x03)
+		return 0;
+
+	while ((c = *code++)) {
+
+		if (isdigit(c)) {
+			if (comma) {
+				if (digits_bg >= 2)
+					break;
+				digits_bg++;
+				parsed_bg *= 10;
+				parsed_bg += (c - '0');
+			} else {
+				if (digits_fg >= 2)
+					break;
+				digits_fg++;
+				parsed_fg *= 10;
+				parsed_fg += (c - '0');
+			}
+		} else if (c == ',') {
+			if (comma++)
+				break;
+		} else {
+			break;
+		}
+	}
+
+	if (fg && !digits_fg && !digits_bg)
+		*fg = -1;
+
+	if (bg && !digits_fg && !digits_bg)
+		*bg = -1;
+
+	if (fg && digits_fg)
+		*fg = irc_to_ansi_colour[parsed_fg];
+
+	if (bg && digits_bg)
+		*bg = irc_to_ansi_colour[parsed_bg];
+
+	return (1 + digits_fg + digits_bg + (comma && digits_bg));
 }

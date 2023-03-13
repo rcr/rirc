@@ -97,16 +97,6 @@ buffer_newline(
 
 	if (line->from_len > b->pad)
 		b->pad = line->from_len;
-
-	if (text_len > TEXT_LENGTH_MAX) {
-		buffer_newline(b,
-				type,
-				from_str,
-				text_str + TEXT_LENGTH_MAX,
-				from_len,
-				text_len - TEXT_LENGTH_MAX,
-				prefix);
-	}
 }
 
 void

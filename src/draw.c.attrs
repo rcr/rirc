@@ -1,0 +1,97 @@
+#if 0
+
+static void draw_attr(struct draw_attrs*);
+static void draw_attr_set_bg(struct draw_attrs*, int);
+static void draw_attr_set_fg(struct draw_attrs*, int);
+static void draw_attr_toggle_bold(struct draw_attrs*);
+static void draw_attr_toggle_italic(struct draw_attrs*);
+static void draw_attr_toggle_reverse(struct draw_attrs*);
+static void draw_attr_toggle_strike(struct draw_attrs*);
+static void draw_attr_toggle_underline(struct draw_attrs*);
+
+struct draw_attrs
+{
+	int bg;
+	int fg;
+	unsigned bold      : 1;
+	unsigned italic    : 1;
+	unsigned reverse   : 1;
+	unsigned strike    : 1;
+	unsigned underline : 1;
+};
+
+static void
+draw_attr(struct draw_attrs *draw_attrs)
+{
+	#define ATTR_BG ";48;5;"
+	#define ATTR_FG ";38;5;"
+
+	char bg[sizeof(ATTR_BG) + 4];
+	char fg[sizeof(ATTR_FG) + 4];
+
+	if (draw_attrs->bg >= 0 && draw_attrs->bg <= 255)
+		(void) snprintf(bg, sizeof(bg), ATTR_BG "%d", draw_attrs->bg);
+
+	if (draw_attrs->fg >= 0 && draw_attrs->fg <= 255)
+		(void) snprintf(fg, sizeof(fg), ATTR_FG "%d", draw_attrs->fg);
+
+	printf(CSI "0%s%s%s%s%s%s%sm",
+		((draw_attrs->bg >= 0 && draw_attrs->bg <= 255) ? bg : ""),
+		((draw_attrs->fg >= 0 && draw_attrs->fg <= 255) ? fg : ""),
+		(draw_attrs->bold      ? ";1" : ""),
+		(draw_attrs->italic    ? ";3" : ""),
+		(draw_attrs->reverse   ? ";7" : ""),
+		(draw_attrs->strike    ? ";9" : ""),
+		(draw_attrs->underline ? ";4" : ""));
+}
+
+static void
+draw_attr_set_bg(struct draw_attrs *draw_attrs, int bg)
+{
+	draw_attrs->bg = bg;
+	draw_attr(draw_attrs);
+}
+
+static void
+draw_attr_set_fg(struct draw_attrs *draw_attrs, int fg)
+{
+	draw_attrs->fg = fg;
+	draw_attr(draw_attrs);
+}
+
+static void
+draw_attr_toggle_bold(struct draw_attrs *draw_attrs)
+{
+	draw_attrs->bold = !draw_attrs->bold;
+	draw_attr(draw_attrs);
+}
+
+static void
+draw_attr_toggle_italic(struct draw_attrs *draw_attrs)
+{
+	draw_attrs->italic = !draw_attrs->italic;
+	draw_attr(draw_attrs);
+}
+
+static void
+draw_attr_toggle_reverse(struct draw_attrs *draw_attrs)
+{
+	draw_attrs->reverse = !draw_attrs->reverse;
+	draw_attr(draw_attrs);
+}
+
+static void
+draw_attr_toggle_strike(struct draw_attrs *draw_attrs)
+{
+	draw_attrs->strike = !draw_attrs->strike;
+	draw_attr(draw_attrs);
+}
+
+static void
+draw_attr_toggle_underline(struct draw_attrs *draw_attrs)
+{
+	draw_attrs->underline = !draw_attrs->underline;
+	draw_attr(draw_attrs);
+}
+
+#endif
