@@ -1,6 +1,7 @@
 *.gperf.out
 *.out
 .cache
+TODO
 build
 config.h
 coverage
