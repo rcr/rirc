@@ -13,7 +13,6 @@ MBEDTLS_LIBS := \
 	$(MBEDTLS_SRC)/library/libmbedcrypto.a
 
 $(MBEDTLS_LIBS): $(MBEDTLS_CFG) $(MBEDTLS_SRC)
-	@$(MAKE) --silent -C $(MBEDTLS_SRC) clean
 	@$(MAKE) --silent -C $(MBEDTLS_SRC) CFLAGS="$(CFLAGS) -DMBEDTLS_CONFIG_FILE='<$(MBEDTLS_CFG)>'" lib
 
 $(MBEDTLS_SRC): $(MBEDTLS_TAR)

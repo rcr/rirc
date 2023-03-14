@@ -1,3 +1,8 @@
+/* Enable SSL debug output:
+ *
+ * #define MBEDTLS_DEBUG_C
+ */
+
 #define MBEDTLS_CONFIG_VERSION 0x03000000
 
 /* Enabled ciphersuites, in order of preference.
