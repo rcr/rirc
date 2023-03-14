@@ -868,7 +868,7 @@ io_tls_establish(struct connection *cx)
 	}
 
 	mbedtls_ssl_conf_min_tls_version(&(cx->tls_conf), MBEDTLS_SSL_VERSION_TLS1_2);
-	mbedtls_ssl_conf_max_tls_version(&(cx->tls_conf), MBEDTLS_SSL_VERSION_TLS1_3);
+	mbedtls_ssl_conf_max_tls_version(&(cx->tls_conf), MBEDTLS_SSL_VERSION_TLS1_2);
 
 	if ((ret = mbedtls_ctr_drbg_seed(
 			&(cx->tls_ctr_drbg),
