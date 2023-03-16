@@ -57,7 +57,7 @@ uninstall:
 	rm -f $(PATH_MAN)/rirc.1
 
 clean:
-	@rm -f rirc rirc.1 $(MBEDTLS) $(OBJ)
+	@rm -f rirc $(MBEDTLS) $(OBJ)
 
 .c.o:
 	$(CC) -c $(CFLAGS) $(MBEDTLS_CFLAGS) -std=c11 -I. -D_POSIX_C_SOURCE=200809L -DVERSION=$(VERSION) $< -o $@
