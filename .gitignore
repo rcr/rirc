@@ -7,7 +7,6 @@ config.h
 coverage
 lib/mbedtls-*
 rirc
-rirc.1
 rirc.debug
 rirc.debug.address
 rirc.debug.thread

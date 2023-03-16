@@ -2,3 +2,6 @@
 .gitattributes export-ignore
 .gitignore     export-ignore
 Makefile.dev   export-ignore
+scripts        export-ignore
+test           export-ignore
+docs           export-ignore

@@ -44,7 +44,7 @@ rirc: config.h mbedtls $(OBJ)
 	$(CC) $(LDFLAGS) -pthread $(OBJ) $(MBEDTLS) -o $@
 
 install: all
-	@sed "s/VERSION/$(VERSION)/g" < docs/rirc.1 > rirc.1
+	@sed -i "s/VERSION/$(VERSION)/g" rirc.1
 	mkdir -p $(PATH_BIN)
 	mkdir -p $(PATH_MAN)
 	cp -f rirc   $(PATH_BIN)
