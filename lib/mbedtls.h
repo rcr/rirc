@@ -1,9 +1,8 @@
-/* Enable SSL debug output:
- *
- * #define MBEDTLS_DEBUG_C
- */
-
 #define MBEDTLS_CONFIG_VERSION 0x03000000
+
+#ifndef NDEBUG
+#define MBEDTLS_DEBUG_C
+#endif
 
 /* Enabled ciphersuites, in order of preference.
  *   - Only ECHDE key exchanges, AEAD ciphers

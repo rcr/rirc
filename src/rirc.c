@@ -63,7 +63,7 @@ const char *runtime_name = "rirc";
 #endif
 
 static const char *const rirc_help =
-"\nrirc v"VERSION" ~ Richard C. Robbins <mail@rcr.io>"
+"\nrirc v" STR(VERSION) " ~ Richard C. Robbins <mail@rcr.io>"
 "\n"
 "\nUsage:"
 "\n  rirc [-hv] [-s host [options] ...]"
@@ -95,9 +95,9 @@ static const char *const rirc_help =
 
 static const char *const rirc_version =
 #ifndef NDEBUG
-"rirc v"VERSION" (debug build)";
+"rirc v" STR(VERSION)" (debug build)";
 #else
-"rirc v"VERSION;
+"rirc v" STR(VERSION);
 #endif
 
 static const char*

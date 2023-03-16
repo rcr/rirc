@@ -3,7 +3,6 @@ image: freebsd/latest
 packages:
   - curl
   - gmake
-  - gperf
 
 sources:
   - https://git.sr.ht/~rcr/rirc
@@ -11,10 +10,10 @@ sources:
 tasks:
   - build: |
       cd rirc
-      gmake all
+      gmake
   - check: |
       cd rirc
-      gmake check
+      gmake -f Makefile.dev check
 
 triggers:
   - action: email

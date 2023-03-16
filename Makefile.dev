@@ -1,0 +1,49 @@
+include Makefile
+
+CFLAGS  = -O0 -g3
+LDFLAGS =
+
+PATH_BUILD = build
+PATH_SRC   = src
+PATH_TEST  = test
+
+SRC_GPERF = \
+	src/handlers/irc_ctcp.gperf.out \
+	src/handlers/irc_recv.gperf.out \
+	src/handlers/irc_send.gperf.out \
+
+gperf: $(SRC_GPERF)
+
+%.gperf.out: %.gperf
+	gperf --output-file=$@ $<
+
+OBJ_D := $(patsubst $(PATH_SRC)/%.c, $(PATH_BUILD)/%.o, $(SRC))
+OBJ_T := $(patsubst $(PATH_SRC)/%.c, $(PATH_BUILD)/%.t, $(SRC))
+OBJ_T += $(PATH_BUILD)/utils/tree.t
+
+$(PATH_BUILD)/%.o: $(PATH_SRC)/%.c | config.h $(PATH_BUILD)
+	@echo "$(CC) $(CFLAGS) $<"
+	@$(CPP) $(CFLAGS) $(MBEDTLS_CFLAGS) -std=c11 -I. -D_POSIX_C_SOURCE=200809L -DVERSION=$(VERSION) -MM -MP -MT $@ -MF $(@:.o=.o.d) $<
+	@$(CC)  $(CFLAGS) $(MBEDTLS_CFLAGS) -std=c11 -I. -D_POSIX_C_SOURCE=200809L -DVERSION=$(VERSION) -c -o $@ $<
+
+$(PATH_BUILD)/%.t: $(PATH_TEST)/%.c | config.h $(PATH_BUILD)
+	@$(CPP) $(CFLAGS) $(MBEDTLS_CFLAGS) -std=c11 -I. -D_POSIX_C_SOURCE=200809L -DVERSION=$(VERSION) -MM -MP -MT $@ -MF $(@:.t=.t.d) $<
+	@$(CC)  $(CFLAGS) $(MBEDTLS_CFLAGS) -std=c11 -I. -D_POSIX_C_SOURCE=200809L -DVERSION=$(VERSION) -c -o $(@:.t=.t.o) $<
+	@$(CC)  $(LDFLAGS) -o $@ $(@:.t=.t.o) $(MBEDTLS)
+	@{ rm -f $(@:.t=.td) && ./$@; } || mv $@ $(@:.t=.td)
+
+rirc.debug: config.h mbedtls $(OBJ_D)
+	$(CC) -o $@ $(LDFLAGS) -pthread $(OBJ_D) $(MBEDTLS)
+
+check: $(OBJ_T)
+	@[ ! "$$(find $(PATH_BUILD) -name '*.td' -print -quit)" ] && echo OK
+
+$(PATH_BUILD):
+	@mkdir -p $(patsubst src%, build%, $(shell find src -type d))
+
+clean-dev: clean
+	@rm -rf $(MBEDTLS_SRC)
+	@rm -rfv rirc.debug $(PATH_BUILD)
+
+-include $(OBJ_D:.o=.o.d)
+-include $(OBJ_T:.t=.t.d)

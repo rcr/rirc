@@ -1,15 +1,12 @@
 #include "src/io.h"
 
 #include "config.h"
-#include "lib/mbedtls.h"
 #include "src/rirc.h"
 #include "src/utils/utils.h"
 
-/* enable in lib/mbedtls.h */
-#ifdef MBEDTLS_DEBUG_C
+#ifndef NDEBUG
 #include "mbedtls/debug.h"
 #endif
-
 #include "mbedtls/ctr_drbg.h"
 #include "mbedtls/entropy.h"
 #include "mbedtls/error.h"
@@ -164,7 +161,7 @@ static void io_net_close(int);
 static const char* io_tls_err(int);
 static int io_tls_establish(struct connection*);
 static int io_tls_x509_vrfy(struct connection*);
-#ifdef MBEDTLS_DEBUG_C
+#ifndef NDEBUG
 static void io_tls_debug(void*, int, const char*, int, const char*);
 #endif
 
@@ -817,7 +814,7 @@ io_strerror(char *buf, size_t buflen)
 	return buf;
 }
 
-#ifdef MBEDTLS_DEBUG_C
+#ifndef NDEBUG
 static void
 io_tls_debug(void *ctx, int level, const char *file, int line, const char *msg)
 {
@@ -846,13 +843,14 @@ io_tls_establish(struct connection *cx)
 	mbedtls_x509_crt_init(&(cx->tls_x509_crt_ca));
 	mbedtls_x509_crt_init(&(cx->tls_x509_crt_client));
 
-#ifdef MBEDTLS_DEBUG_C
+#ifndef NDEBUG
 	/* mbedtls debug levels:
 	 *  - 0 No debug
 	 *  - 1 Error
 	 *  - 2 State change
 	 *  - 3 Informational
 	 *  - 4 Verbose */
+
 	mbedtls_debug_set_threshold(1);
 
 	mbedtls_ssl_conf_dbg(&(cx->tls_conf), io_tls_debug, NULL);
@@ -933,11 +931,11 @@ io_tls_establish(struct connection *cx)
 		}
 
 		if ((ret = mbedtls_pk_parse_keyfile(
-				&(cx->tls_pk_ctx),
-				cx->tls_cert,
-				NULL,
-				mbedtls_ctr_drbg_random,
-				&(cx->tls_ctr_drbg))))
+			&(cx->tls_pk_ctx),
+			cx->tls_cert,
+			NULL,
+			mbedtls_ctr_drbg_random,
+			&(cx->tls_ctr_drbg))))
 		{
 			io_error(cx, " .. Failed to load client cert key: '%s': %s", cx->tls_cert, io_tls_err(ret));
 			goto err;

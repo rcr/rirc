@@ -27,8 +27,8 @@
 #define FILTER_THRESHOLD_CHGHOST 0
 
 /* Message sent for PART and QUIT by default */
-#define DEFAULT_QUIT_MESG "rirc v" VERSION
-#define DEFAULT_PART_MESG "rirc v" VERSION
+#define DEFAULT_QUIT_MESG "rirc v" STR(VERSION)
+#define DEFAULT_PART_MESG "rirc v" STR(VERSION)
 
 /* Buffer colours */
 #define BUFFER_LINE_HEADER_FG         239
