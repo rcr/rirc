@@ -4,26 +4,24 @@
 #
 #  Usage, e.g.:
 #
-#   $ ./scripts/build.sh 'check rirc.debug; gdb ./rirc.debug'
+#   $ ./scripts/build.sh 'mbedtls rirc.debug check; gdb ./rirc.debug'
 
 set -e
+set -u
 
-export CC=clang
-export CFLAGS_DEBUG="-Wshadow"
-export LDFLAGS="-flto -fuse-ld=lld"
-export LDFLAGS_DEBUG="-fuse-ld=lld"
+export MAKEFLAGS="-f Makefile.dev -j $(nproc)"
 
-make clean
+make clean-dev
+make mbedtls
 
 if [ -x "$(command -v bear)" ]; then
-	make build
-	BEAR="bear --append --output ./build/compile_commands.json --"
+	BEAR="bear --append --"
 fi
 
 if [ -x "$(command -v entr)" ]; then
 	find -name '*.c' \
 	  -o -name '*.h' \
-	  -o -name Makefile | grep -v './lib/' | entr -cs "$BEAR make -j $(nproc) $*"
+	  -o -name 'Makefile.*' | grep -v './lib/' | entr -cs "$BEAR make $*"
 else
 	eval "$BEAR make -j $(nproc) $*"
 fi

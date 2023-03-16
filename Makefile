@@ -41,7 +41,7 @@ options:
 	@echo "LDFLAGS = $(LDFLAGS)"
 
 rirc: config.h mbedtls $(OBJ)
-	$(CC) -o $@ $(LDFLAGS) -pthread $(OBJ) $(MBEDTLS)
+	$(CC) $(LDFLAGS) -pthread $(OBJ) $(MBEDTLS) -o $@
 
 install: all
 	@sed "s/VERSION/$(VERSION)/g" < docs/rirc.1 > rirc.1
