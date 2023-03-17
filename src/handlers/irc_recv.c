@@ -57,6 +57,7 @@ static unsigned threshold_account = FILTER_THRESHOLD_ACCOUNT;
 static unsigned threshold_away    = FILTER_THRESHOLD_AWAY;
 static unsigned threshold_chghost = FILTER_THRESHOLD_CHGHOST;
 static unsigned threshold_join    = FILTER_THRESHOLD_JOIN;
+static unsigned threshold_nick    = FILTER_THRESHOLD_NICK;
 static unsigned threshold_part    = FILTER_THRESHOLD_PART;
 static unsigned threshold_quit    = FILTER_THRESHOLD_QUIT;
 
@@ -1080,6 +1081,9 @@ recv_nick(struct server *s, struct irc_message *m)
 
 	do {
 		enum user_err ret;
+
+		if (threshold_nick && threshold_nick <= c->users.count)
+			continue;
 
 		if ((ret = user_list_rpl(&(c->users), s->casemapping, m->from, nick)) == USER_ERR_NONE)
 			newlinef(c, BUFFER_LINE_NICK, FROM_INFO, "%s  >>  %s", m->from, nick);

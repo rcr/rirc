@@ -621,6 +621,13 @@ test_recv_nick(void)
 	assert_strcmp(mock_line[0], "abc{}|^  >>  AbC{]|~");
 
 	server_nick_set(s, "me");
+
+	/* test NICK message threshold */
+	threshold_nick = 0;
+	CHECK_RECV(":nick2!user@host NICK nick3", 0, 2, 0);
+
+	threshold_nick = 1;
+	CHECK_RECV(":nick3!user@host NICK nick2", 0, 0, 0);
 }
 
 static void

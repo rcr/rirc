@@ -21,6 +21,7 @@
  *   (0: no filtering) */
 #define FILTER_THRESHOLD_JOIN    0
 #define FILTER_THRESHOLD_PART    0
+#define FILTER_THRESHOLD_NICK    0
 #define FILTER_THRESHOLD_QUIT    0
 #define FILTER_THRESHOLD_ACCOUNT 0
 #define FILTER_THRESHOLD_AWAY    0
