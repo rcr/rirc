@@ -909,6 +909,11 @@ state_input_ctrlch(const char *c, size_t len)
 			/* Cancel current input */
 			return input_reset(&(current_channel()->input));
 
+#ifndef NDEBUG
+		case CTRL('q'):
+			exit(EXIT_SUCCESS);
+#endif
+
 		case CTRL('l'):
 			/* Clear current channel */
 			state_channel_clear(1);
