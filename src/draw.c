@@ -16,11 +16,6 @@
 /* Control sequence initiator */
 #define CSI "\x1b["
 
-#define ATTR_BG(X)         CSI "48;5;"#X"m"
-#define ATTR_FG(X)         CSI "38;5;"#X"m"
-#define ATTR_RESET         CSI "0m"
-#define ATTR_RESET_BG      CSI "49m"
-#define ATTR_RESET_FG      CSI "39m"
 #define CLEAR_FULL         CSI "2J"
 #define CLEAR_LINE         CSI "2K"
 #define CURSOR_POS(X, Y)   CSI #X";"#Y"H"
@@ -45,6 +40,8 @@
 #define ATTR_CODE_REVERSE   0x16
 #define ATTR_CODE_STRIKE    0x1E
 #define ATTR_CODE_UNDERLINE 0x1F
+
+#define DRAW_ATTRS_EMPTY { .bg = -1, .fg = -1, .flush = 1 }
 
 /* https://modern.ircdocs.horse/formatting.html#colors
  * https://modern.ircdocs.horse/formatting.html#colors-16-98 */
@@ -82,6 +79,18 @@ struct coords
 	unsigned rN;
 };
 
+struct draw_attrs
+{
+	int bg;
+	int fg;
+	unsigned bold      : 1;
+	unsigned italic    : 1;
+	unsigned reverse   : 1;
+	unsigned strike    : 1;
+	unsigned underline : 1;
+	unsigned flush     : 1;
+};
+
 static struct
 {
 	union {
@@ -101,7 +110,7 @@ static struct
 
 static struct coords coords(unsigned, unsigned, unsigned, unsigned);
 static unsigned nick_col(char*);
-static unsigned drawf(unsigned*, const char*, ...);
+static unsigned drawf(struct draw_attrs*, unsigned*, const char*, ...);
 
 static const char* draw_buffer_scrollback_status(struct buffer*, char*, size_t);
 static size_t draw_buffer_wrap(const char*, size_t, size_t);
@@ -117,21 +126,26 @@ static void draw_nav(struct channel*);
 static void draw_separators(void);
 static void draw_status(struct channel*);
 
-static size_t draw_attr_len(const char *str);
-static void draw_attr_bg(int);
-static void draw_attr_fg(int);
-static void draw_attr_reset(void);
-static void draw_char(int);
+static void draw_char(struct draw_attrs*, int);
 static void draw_clear_full(void);
 static void draw_clear_line(void);
 static void draw_cursor_pos(int, int);
 static void draw_cursor_pos_restore(void);
 static void draw_cursor_pos_save(void);
-static unsigned draw_irc_colour(const char *code, int *fg, int *bg);
+static unsigned draw_parse_irc_colour(const char *code, int *fg, int *bg);
+
+static size_t draw_attr_len(const char *str);
+static void draw_attrs(struct draw_attrs*, int);
+static void draw_attr_reset(struct draw_attrs*);
+static void draw_attr_set_bg(struct draw_attrs*, int);
+static void draw_attr_set_fg(struct draw_attrs*, int);
+static void draw_attr_toggle_bold(struct draw_attrs*);
+static void draw_attr_toggle_italic(struct draw_attrs*);
+static void draw_attr_toggle_reverse(struct draw_attrs*);
+static void draw_attr_toggle_strike(struct draw_attrs*);
+static void draw_attr_toggle_underline(struct draw_attrs*);
 
 static int actv_colours[ACTIVITY_T_SIZE] = ACTIVITY_COLOURS
-static int bg_last = -1;
-static int fg_last = -1;
 static int nick_colours[] = NICK_COLOURS
 static int drawing;
 
@@ -187,7 +201,7 @@ draw(enum draw_bit bit)
 			draw_state.bits.all = -1;
 			break;
 		case DRAW_CLEAR:
-			draw_attr_reset();
+			draw_attr_reset(NULL);
 			draw_clear_full();
 			break;
 		default:
@@ -230,34 +244,23 @@ draw_bits(void)
 
 	/* draw components */
 
-	if (draw_state.bits.separators) {
-		draw_attr_reset();
+	if (draw_state.bits.separators)
 		draw_separators();
-	}
 
-	if (draw_state.bits.buffer) {
-		draw_attr_reset();
+	if (draw_state.bits.buffer)
 		draw_buffer(&c->buffer, coords(1, cols, 3, rows - 2));
-	}
 
-	if (draw_state.bits.input) {
-		draw_attr_reset();
+	if (draw_state.bits.input)
 		draw_input(&c->input, coords(1, cols, rows, rows));
-	}
 
-	if (draw_state.bits.nav) {
-		draw_attr_reset();
+	if (draw_state.bits.nav)
 		draw_nav(c);
-	}
 
-	if (draw_state.bits.status) {
-		draw_attr_reset();
+	if (draw_state.bits.status)
 		draw_status(c);
-	}
 
 flush:
 
-	draw_attr_reset();
 	draw_cursor_pos_restore();
 
 	fflush(stdout);
@@ -531,6 +534,7 @@ draw_buffer_line(
 		int from_fg;
 		unsigned head_cols = cols_head;
 		struct tm tm;
+		struct draw_attrs attrs = DRAW_ATTRS_EMPTY;
 
 		if (localtime_r(&(line->time), &tm)) {
 			(void) snprintf(buf_h, sizeof(buf_h), "%02d", tm.tm_hour);
@@ -539,7 +543,7 @@ draw_buffer_line(
 
 		draw_cursor_pos(coords.r1, head_col);
 
-		if (!drawf(&head_cols, " %b%f%s:%s%a ",
+		if (!drawf(&attrs, &head_cols, " %b%f%s:%s%a ",
 				BUFFER_LINE_HEADER_BG,
 				BUFFER_LINE_HEADER_FG,
 				buf_h,
@@ -547,7 +551,7 @@ draw_buffer_line(
 			goto print_text;
 
 		while (pad--) {
-			if (!drawf(&head_cols, "%s", " "))
+			if (!drawf(&attrs, &head_cols, "%s", " "))
 				goto print_text;
 		}
 
@@ -566,7 +570,7 @@ draw_buffer_line(
 				break;
 		}
 
-		if (!drawf(&head_cols, "%b%f%s%a %b%f~%a ",
+		if (!drawf(&attrs, &head_cols, "%b%f%s%a %b%f~%a ",
 				from_bg,
 				from_fg,
 				line->from,
@@ -587,8 +591,11 @@ print_text:
 		}
 	}
 
-	draw_attr_bg(text_bg);
-	draw_attr_fg(text_fg);
+	struct draw_attrs attrs = DRAW_ATTRS_EMPTY;
+
+	draw_attr_set_bg(&attrs, text_bg);
+	draw_attr_set_fg(&attrs, text_fg);
+	draw_attrs(&attrs, 0);
 
 	for (unsigned row = coords.r1; row <= coords.rN; row++) {
 
@@ -603,9 +610,46 @@ print_text:
 				size_t attr_len;
 
 				if ((attr_len = draw_attr_len(p))) {
-					;
+
+					int bg = -1;
+					int fg = -1;
+
+					switch (*p) {
+						case ATTR_CODE_BOLD:
+							draw_attr_toggle_bold(&attrs);
+							break;
+						case ATTR_CODE_COLOUR:
+							draw_parse_irc_colour(p, &fg, &bg);
+							if (bg > 0)
+								draw_attr_set_bg(&attrs, bg);
+							if (fg > 0)
+								draw_attr_set_fg(&attrs, fg);
+							if (bg == -1 && fg == -1) {
+								draw_attr_set_bg(&attrs, bg);
+								draw_attr_set_fg(&attrs, fg);
+							}
+							break;
+						case ATTR_CODE_ITALIC:
+							draw_attr_toggle_italic(&attrs);
+							break;
+						case ATTR_CODE_RESET:
+							draw_attr_reset(&attrs);
+							break;
+						case ATTR_CODE_REVERSE:
+							draw_attr_toggle_reverse(&attrs);
+							break;
+						case ATTR_CODE_STRIKE:
+							draw_attr_toggle_strike(&attrs);
+							break;
+						case ATTR_CODE_UNDERLINE:
+							draw_attr_toggle_underline(&attrs);
+							break;
+						default:
+							break;
+					}
 				} else {
-					draw_char(*p);
+					draw_attrs(&attrs, 0);
+					draw_char(&attrs, *p);
 				}
 
 				n -= (attr_len ? attr_len : 1);
@@ -613,6 +657,8 @@ print_text:
 			}
 		}
 	}
+
+	draw_attr_reset(NULL);
 }
 
 static void
@@ -733,11 +779,16 @@ draw_separators(void)
 
 	draw_cursor_pos(2, 1);
 
-	draw_attr_bg(SEP_BG);
-	draw_attr_fg(SEP_FG);
+	struct draw_attrs attrs = DRAW_ATTRS_EMPTY;
 
-	while (drawf(&cols, "%s", SEP_HORZ))
+	draw_attr_set_bg(&attrs, SEP_BG);
+	draw_attr_set_fg(&attrs, SEP_FG);
+	draw_attrs(&attrs, 0);
+
+	while (drawf(&attrs, &cols, "%s", SEP_HORZ))
 		;
+
+	draw_attr_reset(NULL);
 }
 
 static void
@@ -749,11 +800,12 @@ draw_input(struct input *inp, struct coords coords)
 	unsigned cols = coords.cN - coords.c1 + 1;
 	unsigned cursor_row = coords.r1;
 	unsigned cursor_col = coords.cN;
+	struct draw_attrs attrs = DRAW_ATTRS_EMPTY;
 
 	draw_cursor_pos(coords.r1, coords.c1);
 
 	if ((action = action_message())) {
-		if (!drawf(&cols, "%b%f%s%b%f-- %s --",
+		if (!drawf(&attrs, &cols, "%b%f%s%b%f-- %s --",
 				INPUT_PREFIX_BG,
 				INPUT_PREFIX_FG,
 				INPUT_PREFIX,
@@ -768,7 +820,7 @@ draw_input(struct input *inp, struct coords coords)
 		unsigned cursor_pre;
 		unsigned cursor_inp;
 
-		if (!drawf(&cols, "%b%f%s",
+		if (!drawf(&attrs, &cols, "%b%f%s",
 				INPUT_PREFIX_BG,
 				INPUT_PREFIX_FG,
 				INPUT_PREFIX))
@@ -777,7 +829,7 @@ draw_input(struct input *inp, struct coords coords)
 		cursor_pre = coords.cN - coords.c1 - cols + 1;
 		cursor_inp = input_frame(inp, input, cols);
 
-		if (!drawf(&cols, "%b%f%s",
+		if (!drawf(&attrs, &cols, "%b%f%s",
 				INPUT_BG,
 				INPUT_FG,
 				input))
@@ -786,10 +838,10 @@ draw_input(struct input *inp, struct coords coords)
 		cursor_col = cursor_pre + cursor_inp + 1;
 	}
 
-	draw_attr_reset();
+	draw_attr_reset(NULL);
 
 	while (cols--)
-		draw_char(' ');
+		draw_char(NULL, ' ');
 
 cursor:
 
@@ -916,12 +968,16 @@ draw_nav(struct channel *c)
 
 		int fg = (tmp == c) ? NAV_CURRENT_CHAN : actv_colours[tmp->activity];
 
-		if (!drawf(&cols, "%f %s ", fg, tmp->name))
+		struct draw_attrs attrs = DRAW_ATTRS_EMPTY;
+
+		if (!drawf(&attrs, &cols, " %f%s ", fg, tmp->name))
 			break;
 
 		if (tmp == frame_next)
 			break;
 	}
+
+	draw_attr_reset(NULL);
 }
 
 static void
@@ -940,6 +996,7 @@ draw_status(struct channel *c)
 	#define STATUS_SEP_HORZ \
 		"%b%f" SEP_HORZ "%b%f", SEP_BG, SEP_FG, STATUS_BG, STATUS_FG
 
+	struct draw_attrs attrs = DRAW_ATTRS_EMPTY;
 	unsigned cols = state_cols();
 	unsigned rows = state_rows();
 	char scrollback[4];
@@ -951,9 +1008,9 @@ draw_status(struct channel *c)
 
 	/* -[nick +usermodes] */
 	if (c->server && c->server->registered) {
-		if (!drawf(&cols, STATUS_SEP_HORZ))
+		if (!drawf(&attrs, &cols, STATUS_SEP_HORZ))
 			return;
-		if (!drawf(&cols, "[%s%s%s]",
+		if (!drawf(&attrs, &cols, "[%s%s%s]",
 				c->server->nick,
 				(*(c->server->mode_str.str) ? " +" : ""),
 				(*(c->server->mode_str.str) ? c->server->mode_str.str : "")))
@@ -962,17 +1019,17 @@ draw_status(struct channel *c)
 
 	/* -[privmsg] */
 	if (c->type == CHANNEL_T_PRIVMSG) {
-		if (!drawf(&cols, STATUS_SEP_HORZ))
+		if (!drawf(&attrs, &cols, STATUS_SEP_HORZ))
 			return;
-		if (!drawf(&cols, "[privmsg]"))
+		if (!drawf(&attrs, &cols, "[privmsg]"))
 			return;
 	}
 
 	/* -[+chanmodes chancount] */
 	if (c->type == CHANNEL_T_CHANNEL && c->joined) {
-		if (!drawf(&cols, STATUS_SEP_HORZ))
+		if (!drawf(&attrs, &cols, STATUS_SEP_HORZ))
 			return;
-		if (!drawf(&cols, "[%s%s%s%u]",
+		if (!drawf(&attrs, &cols, "[%s%s%s%u]",
 				(*(c->chanmodes_str.str) ? "+" : ""),
 				(*(c->chanmodes_str.str) ? c->chanmodes_str.str : ""),
 				(*(c->chanmodes_str.str) ? " " : ""),
@@ -982,25 +1039,27 @@ draw_status(struct channel *c)
 
 	/* -(ping) */
 	if (c->server && c->server->ping) {
-		if (!drawf(&cols, STATUS_SEP_HORZ))
+		if (!drawf(&attrs, &cols, STATUS_SEP_HORZ))
 			return;
-		if (!drawf(&cols, "(%us)", c->server->ping))
+		if (!drawf(&attrs, &cols, "(%us)", c->server->ping))
 			return;
 	}
 
 	/* -(scrollback) */
 	if ((draw_buffer_scrollback_status(&c->buffer, scrollback, sizeof(scrollback)))) {
-		if (!drawf(&cols, STATUS_SEP_HORZ))
+		if (!drawf(&attrs, &cols, STATUS_SEP_HORZ))
 			return;
-		if (!drawf(&cols, "(%s%s)", scrollback, "%"))
+		if (!drawf(&attrs, &cols, "(%s%s)", scrollback, "%"))
 			return;
 	}
 
-	draw_attr_bg(SEP_BG);
-	draw_attr_fg(SEP_FG);
+	draw_attr_set_bg(&attrs, SEP_BG);
+	draw_attr_set_fg(&attrs, SEP_FG);
 
-	while (drawf(&cols, "%s", SEP_HORZ))
+	while (drawf(&attrs, &cols, "%s", SEP_HORZ))
 		;
+
+	draw_attr_reset(NULL);
 }
 
 static struct coords
@@ -1030,7 +1089,7 @@ nick_col(char *nick)
 }
 
 static unsigned
-drawf(unsigned *cols_p, const char *fmt, ...)
+drawf(struct draw_attrs *attrs, unsigned *cols_p, const char *fmt, ...)
 {
 	/* Draw formatted text up to a given number of
 	 * columns. Returns number of unused columns.
@@ -1057,26 +1116,29 @@ drawf(unsigned *cols_p, const char *fmt, ...)
 		if (c == '%') {
 			switch ((c = *fmt++)) {
 				case 'a':
-					draw_attr_reset();
+					draw_attr_reset(attrs);
 					break;
 				case 'b':
-					draw_attr_bg(va_arg(arg, int));
+					draw_attr_set_bg(attrs, va_arg(arg, int));
 					break;
 				case 'f':
-					draw_attr_fg(va_arg(arg, int));
+					draw_attr_set_fg(attrs, va_arg(arg, int));
 					break;
 				case 'd':
+					draw_attrs(attrs, 0);
 					(void) snprintf(buf, sizeof(buf), "%d", va_arg(arg, int));
 					cols -= (unsigned) printf("%.*s", cols, buf);
 					break;
 				case 'u':
+					draw_attrs(attrs, 0);
 					(void) snprintf(buf, sizeof(buf), "%u", va_arg(arg, unsigned));
 					cols -= (unsigned) printf("%.*s", cols, buf);
 					break;
 				case 's':
+					draw_attrs(attrs, 0);
 					for (const char *str = va_arg(arg, const char*); *str && cols; cols--) {
 						do {
-							draw_char(*str++);
+							draw_char(attrs, *str++);
 						} while (UTF8_CONT(*str));
 					}
 					break;
@@ -1084,65 +1146,17 @@ drawf(unsigned *cols_p, const char *fmt, ...)
 					fatal("unknown drawf format character '%c'", c);
 			}
 		} else {
+			draw_attrs(attrs, 0);
 			cols--;
-			draw_char(c);
+			draw_char(attrs, c);
 			while (UTF8_CONT(*fmt))
-				draw_char(*fmt++);
+				draw_char(attrs, *fmt++);
 		}
 	}
 
 	va_end(arg);
 
 	return (*cols_p = cols);
-}
-
-static size_t
-draw_attr_len(const char *str)
-{
-	switch (*str) {
-		case ATTR_CODE_COLOUR:
-			return draw_irc_colour(str, NULL, NULL);
-		case ATTR_CODE_BOLD:
-		case ATTR_CODE_ITALIC:
-		case ATTR_CODE_MONOSPACE:
-		case ATTR_CODE_RESET:
-		case ATTR_CODE_REVERSE:
-		case ATTR_CODE_STRIKE:
-		case ATTR_CODE_UNDERLINE:
-			return 1;
-		default:
-			return 0;
-	}
-}
-
-static void
-draw_attr_bg(int bg)
-{
-	if (bg == -1)
-		printf(ATTR_RESET_BG);
-
-	if (bg >= 0 && bg <= 255)
-		printf(ATTR_BG(%d), bg);
-
-	bg_last = bg;
-}
-
-static void
-draw_attr_fg(int fg)
-{
-	if (fg == -1)
-		printf(ATTR_RESET_FG);
-
-	if (fg >= 0 && fg <= 255)
-		printf(ATTR_FG(%d), fg);
-
-	fg_last = fg;
-}
-
-static void
-draw_attr_reset(void)
-{
-	printf(ATTR_RESET);
 }
 
 static void
@@ -1158,16 +1172,15 @@ draw_clear_line(void)
 }
 
 static void
-draw_char(int c)
+draw_char(struct draw_attrs *attrs, int c)
 {
 	if (iscntrl(c)) {
-		int ctrl_bg_last = bg_last;
-		int ctrl_fg_last = fg_last;
-		draw_attr_bg(CTRL_BG);
-		draw_attr_fg(CTRL_FG);
+		struct draw_attrs attrs_cntrl = DRAW_ATTRS_EMPTY;
+		draw_attr_set_bg(&attrs_cntrl, CNTRL_BG);
+		draw_attr_set_fg(&attrs_cntrl, CNTRL_FG);
+		draw_attrs(&attrs_cntrl, 0);
 		putchar((c | 0x40));
-		draw_attr_bg(ctrl_bg_last);
-		draw_attr_fg(ctrl_fg_last);
+		draw_attrs(attrs, 1);
 	} else {
 		putchar(c);
 	}
@@ -1192,7 +1205,7 @@ draw_cursor_pos_save(void)
 }
 
 static unsigned
-draw_irc_colour(const char *code, int *fg, int *bg)
+draw_parse_irc_colour(const char *code, int *fg, int *bg)
 {
 	char c;
 	int comma = 0;
@@ -1241,4 +1254,119 @@ draw_irc_colour(const char *code, int *fg, int *bg)
 		*bg = irc_to_ansi_colour[parsed_bg];
 
 	return (1 + digits_fg + digits_bg + (comma && digits_bg));
+}
+
+static size_t
+draw_attr_len(const char *str)
+{
+	switch (*str) {
+		case ATTR_CODE_COLOUR:
+			return draw_parse_irc_colour(str, NULL, NULL);
+		case ATTR_CODE_BOLD:
+		case ATTR_CODE_ITALIC:
+		case ATTR_CODE_MONOSPACE:
+		case ATTR_CODE_RESET:
+		case ATTR_CODE_REVERSE:
+		case ATTR_CODE_STRIKE:
+		case ATTR_CODE_UNDERLINE:
+			return 1;
+		default:
+			return 0;
+	}
+}
+
+static void
+draw_attrs(struct draw_attrs *draw_attrs, int flush)
+{
+	#define ATTR_BG ";48;5;"
+	#define ATTR_FG ";38;5;"
+
+	char bg[sizeof(ATTR_BG) + 4];
+	char fg[sizeof(ATTR_FG) + 4];
+
+	if (draw_attrs->flush || flush) {
+		draw_attrs->flush = 0;
+
+		if (draw_attrs->bg >= 0 && draw_attrs->bg <= 255)
+			(void) snprintf(bg, sizeof(bg), ATTR_BG "%d", draw_attrs->bg);
+
+		if (draw_attrs->fg >= 0 && draw_attrs->fg <= 255)
+			(void) snprintf(fg, sizeof(fg), ATTR_FG "%d", draw_attrs->fg);
+
+		printf(CSI "0%s%s%s%s%s%s%sm",
+			((draw_attrs->bg >= 0 && draw_attrs->bg <= 255) ? bg : ""),
+			((draw_attrs->fg >= 0 && draw_attrs->fg <= 255) ? fg : ""),
+			(draw_attrs->bold      ? ";1" : ""),
+			(draw_attrs->italic    ? ";3" : ""),
+			(draw_attrs->reverse   ? ";7" : ""),
+			(draw_attrs->strike    ? ";9" : ""),
+			(draw_attrs->underline ? ";4" : ""));
+	}
+}
+
+static void
+draw_attr_reset(struct draw_attrs *attrs)
+{
+	if (attrs) {
+		attrs->bg        = -1;
+		attrs->fg        = -1;
+		attrs->flush     = 0;
+		attrs->bold      = 0;
+		attrs->italic    = 0;
+		attrs->reverse   = 0;
+		attrs->strike    = 0;
+		attrs->underline = 0;
+		attrs->flush     = 1;
+	} else {
+		printf(CSI "0m");
+	}
+}
+
+static void
+draw_attr_set_bg(struct draw_attrs *attrs, int bg)
+{
+	attrs->bg = bg;
+	attrs->flush = 1;
+}
+
+static void
+draw_attr_set_fg(struct draw_attrs *attrs, int fg)
+{
+	attrs->fg = fg;
+	attrs->flush = 1;
+}
+
+static void
+draw_attr_toggle_bold(struct draw_attrs *attrs)
+{
+	attrs->bold = !attrs->bold;
+	attrs->flush = 1;
+}
+
+static void
+draw_attr_toggle_italic(struct draw_attrs *attrs)
+{
+	attrs->italic = !attrs->italic;
+	attrs->flush = 1;
+}
+
+static void
+draw_attr_toggle_reverse(struct draw_attrs *attrs)
+{
+	attrs->reverse = !attrs->reverse;
+	attrs->flush = 1;
+}
+
+static void
+draw_attr_toggle_strike(struct draw_attrs *attrs)
+{
+	attrs->strike = !attrs->strike;
+	attrs->flush = 1;
+}
+
+static void
+draw_attr_toggle_underline(struct draw_attrs *attrs)
+{
+	attrs->underline = !attrs->underline;
+	attrs->flush = 1;
 }

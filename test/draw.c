@@ -261,134 +261,134 @@ test_draw_irc_colour(void)
 
 	fg = -2;
 	bg = -2;
-	assert_eq(draw_irc_colour("xxx", &fg, &bg), 0);
+	assert_eq(draw_parse_irc_colour("xxx", &fg, &bg), 0);
 	assert_eq(fg, -2);
 	assert_eq(bg, -2);
 
 	fg = -2;
 	bg = -2;
-	assert_eq(draw_irc_colour("\x03", &fg, &bg), 1);
+	assert_eq(draw_parse_irc_colour("\x03", &fg, &bg), 1);
 	assert_eq(fg, -1);
 	assert_eq(bg, -1);
 
 	fg = -2;
 	bg = -2;
-	assert_eq(draw_irc_colour("\x03xxx", &fg, &bg), 1);
+	assert_eq(draw_parse_irc_colour("\x03xxx", &fg, &bg), 1);
 	assert_eq(fg, -1);
 	assert_eq(bg, -1);
 
 	fg = -2;
 	bg = -2;
-	assert_eq(draw_irc_colour("\x03,", &fg, &bg), 1);
+	assert_eq(draw_parse_irc_colour("\x03,", &fg, &bg), 1);
 	assert_eq(fg, -1);
 	assert_eq(bg, -1);
 
 	fg = -2;
 	bg = -2;
-	assert_eq(draw_irc_colour("\x03,1", &fg, &bg), 3);
+	assert_eq(draw_parse_irc_colour("\x03,1", &fg, &bg), 3);
 	assert_eq(fg, -2);
 	assert_eq(bg, irc_to_ansi_colour[1]);
 
 	fg = -2;
 	bg = -2;
-	assert_eq(draw_irc_colour("\x03,11", &fg, &bg), 4);
+	assert_eq(draw_parse_irc_colour("\x03,11", &fg, &bg), 4);
 	assert_eq(fg, -2);
 	assert_eq(bg, irc_to_ansi_colour[11]);
 
 	fg = -2;
 	bg = -2;
-	assert_eq(draw_irc_colour("\x03" "2", &fg, &bg), 2);
+	assert_eq(draw_parse_irc_colour("\x03" "2", &fg, &bg), 2);
 	assert_eq(fg, irc_to_ansi_colour[2]);
 	assert_eq(bg, -2);
 
 	fg = -2;
 	bg = -2;
-	assert_eq(draw_irc_colour("\x03" "3,", &fg, &bg), 2);
+	assert_eq(draw_parse_irc_colour("\x03" "3,", &fg, &bg), 2);
 	assert_eq(fg, irc_to_ansi_colour[3]);
 	assert_eq(bg, -2);
 
 	fg = -2;
 	bg = -2;
-	assert_eq(draw_irc_colour("\x03" "4,5", &fg, &bg), 4);
+	assert_eq(draw_parse_irc_colour("\x03" "4,5", &fg, &bg), 4);
 	assert_eq(fg, irc_to_ansi_colour[4]);
 	assert_eq(bg, irc_to_ansi_colour[5]);
 
 	fg = -2;
 	bg = -2;
-	assert_eq(draw_irc_colour("\x03" "6,77", &fg, &bg), 5);
+	assert_eq(draw_parse_irc_colour("\x03" "6,77", &fg, &bg), 5);
 	assert_eq(fg, irc_to_ansi_colour[6]);
 	assert_eq(bg, irc_to_ansi_colour[77]);
 
 	fg = -2;
 	bg = -2;
-	assert_eq(draw_irc_colour("\x03" "11", &fg, &bg), 3);
+	assert_eq(draw_parse_irc_colour("\x03" "11", &fg, &bg), 3);
 	assert_eq(fg, irc_to_ansi_colour[11]);
 	assert_eq(bg, -2);
 
 	fg = -2;
 	bg = -2;
-	assert_eq(draw_irc_colour("\x03" "22,", &fg, &bg), 3);
+	assert_eq(draw_parse_irc_colour("\x03" "22,", &fg, &bg), 3);
 	assert_eq(fg, irc_to_ansi_colour[22]);
 	assert_eq(bg, -2);
 
 	fg = -2;
 	bg = -2;
-	assert_eq(draw_irc_colour("\x03" "33,4", &fg, &bg), 5);
+	assert_eq(draw_parse_irc_colour("\x03" "33,4", &fg, &bg), 5);
 	assert_eq(fg, irc_to_ansi_colour[33]);
 	assert_eq(bg, irc_to_ansi_colour[4]);
 
 	fg = -2;
 	bg = -2;
-	assert_eq(draw_irc_colour("\x03" "55,66", &fg, &bg), 6);
+	assert_eq(draw_parse_irc_colour("\x03" "55,66", &fg, &bg), 6);
 	assert_eq(fg, irc_to_ansi_colour[55]);
 	assert_eq(bg, irc_to_ansi_colour[66]);
 
 	fg = -2;
 	bg = -2;
-	assert_eq(draw_irc_colour("\x03" "111", &fg, &bg), 3);
+	assert_eq(draw_parse_irc_colour("\x03" "111", &fg, &bg), 3);
 	assert_eq(fg, irc_to_ansi_colour[11]);
 	assert_eq(bg, -2);
 
 	fg = -2;
 	bg = -2;
-	assert_eq(draw_irc_colour("\x03" "222,", &fg, &bg), 3);
+	assert_eq(draw_parse_irc_colour("\x03" "222,", &fg, &bg), 3);
 	assert_eq(fg, irc_to_ansi_colour[22]);
 	assert_eq(bg, -2);
 
 	fg = -2;
 	bg = -2;
-	assert_eq(draw_irc_colour("\x03" "333,4,", &fg, &bg), 3);
+	assert_eq(draw_parse_irc_colour("\x03" "333,4,", &fg, &bg), 3);
 	assert_eq(fg, irc_to_ansi_colour[33]);
 	assert_eq(bg, -2);
 
 	fg = -2;
 	bg = -2;
-	assert_eq(draw_irc_colour("\x03" "1,222", &fg, &bg), 5);
+	assert_eq(draw_parse_irc_colour("\x03" "1,222", &fg, &bg), 5);
 	assert_eq(fg, irc_to_ansi_colour[1]);
 	assert_eq(bg, irc_to_ansi_colour[22]);
 
 	fg = -2;
 	bg = -2;
-	assert_eq(draw_irc_colour("\x03" "22,333", &fg, &bg), 6);
+	assert_eq(draw_parse_irc_colour("\x03" "22,333", &fg, &bg), 6);
 	assert_eq(fg, irc_to_ansi_colour[22]);
 	assert_eq(bg, irc_to_ansi_colour[33]);
 
 	fg = -2;
 	bg = -2;
-	assert_eq(draw_irc_colour("\x03" "11,22", &fg, NULL), 6);
+	assert_eq(draw_parse_irc_colour("\x03" "11,22", &fg, NULL), 6);
 	assert_eq(fg, irc_to_ansi_colour[11]);
 	assert_eq(bg, -2);
 
 	fg = -2;
 	bg = -2;
-	assert_eq(draw_irc_colour("\x03" "11,22", NULL, &bg), 6);
+	assert_eq(draw_parse_irc_colour("\x03" "11,22", NULL, &bg), 6);
 	assert_eq(fg, -2);
 	assert_eq(bg, irc_to_ansi_colour[22]);
 
-	assert_eq(draw_irc_colour("\x03",         NULL, NULL), 1);
-	assert_eq(draw_irc_colour("\x03" "11",    NULL, NULL), 3);
-	assert_eq(draw_irc_colour("\x03" ",22",   NULL, NULL), 4);
-	assert_eq(draw_irc_colour("\x03" "11,22", NULL, NULL), 6);
+	assert_eq(draw_parse_irc_colour("\x03",         NULL, NULL), 1);
+	assert_eq(draw_parse_irc_colour("\x03" "11",    NULL, NULL), 3);
+	assert_eq(draw_parse_irc_colour("\x03" ",22",   NULL, NULL), 4);
+	assert_eq(draw_parse_irc_colour("\x03" "11,22", NULL, NULL), 6);
 }
 
 int

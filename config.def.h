@@ -87,8 +87,8 @@
 #define QUOTE_TEXT_BG -1
 
 /* Control character print colour */
-#define CTRL_FG 0
-#define CTRL_BG 9
+#define CNTRL_FG 0
+#define CNTRL_BG 9
 
 /* BUFFER_PADDING:
  * How the buffer line headers will be padded [0, 1]
