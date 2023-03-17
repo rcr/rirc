@@ -213,6 +213,36 @@ newlinev(struct channel *c, enum buffer_line_type type, const char *from, const 
 		}
 	}
 
+	/* new date separator */
+	struct tm tm_old;
+	struct tm tm_new;
+
+	time_t t_old = c->buffer.time_last;
+	time_t t_new = time(NULL);
+
+	if ((c->type == CHANNEL_T_CHANNEL
+	  || c->type == CHANNEL_T_PRIVMSG
+	  || c->type == CHANNEL_T_SERVER)
+	 && localtime_r(&t_old, &tm_old)
+	 && localtime_r(&t_new, &tm_new)
+	 && (tm_old.tm_year != tm_new.tm_year
+	  || tm_old.tm_yday != tm_new.tm_yday))
+	{
+		char buf_date[64];
+
+		if (strftime(buf_date, sizeof(buf_date), "-- %e %b %Y --", &tm_new))
+			buffer_newline(
+				&(c->buffer),
+				BUFFER_LINE_OTHER,
+				FROM_INFO,
+				buf_date,
+				strlen(FROM_INFO),
+				strlen(buf_date),
+				0);
+	}
+
+	c->buffer.time_last = t_new;
+
 	buffer_newline(
 		&(c->buffer),
 		type,

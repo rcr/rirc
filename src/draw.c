@@ -531,11 +531,12 @@ draw_buffer_line(
 		int from_bg;
 		int from_fg;
 		unsigned head_cols = cols_head;
+		struct tm tm;
 
-		struct tm *tm = localtime(&line->time);
-
-		(void) snprintf(buf_h, sizeof(buf_h), "%02d", tm->tm_hour);
-		(void) snprintf(buf_m, sizeof(buf_h), "%02d", tm->tm_min);
+		if (localtime_r(&(line->time), &tm)) {
+			(void) snprintf(buf_h, sizeof(buf_h), "%02d", tm.tm_hour);
+			(void) snprintf(buf_m, sizeof(buf_h), "%02d", tm.tm_min);
+		}
 
 		draw_cursor_pos(coords.r1, head_col);
 

@@ -53,6 +53,7 @@ struct buffer
 	struct buffer_line buffer_lines[BUFFER_LINES_MAX];
 	unsigned buffer_i_bot; /* index of last drawn bottom buffer line */
 	unsigned buffer_i_top; /* index of last drawn top buffer line */
+	time_t time_last;
 };
 
 unsigned buffer_size(struct buffer*);
