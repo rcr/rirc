@@ -511,8 +511,7 @@ draw_buffer_line(
 		unsigned skip,
 		unsigned pad)
 {
-	char *p1 = line->text;
-	size_t ret;
+	const char *p = line->text;
 	unsigned head_col = coords.c1;
 	unsigned text_bg = BUFFER_TEXT_BG;
 	unsigned text_col = coords.c1 + cols_head;
@@ -579,7 +578,7 @@ draw_buffer_line(
 print_text:
 
 	while (skip--)
-		p1 += draw_buffer_wrap(p1, (line->text_len - (p1 - line->text)), cols_text);
+		p += draw_buffer_wrap(p, (line->text_len - (p - line->text)), cols_text);
 
 	if (strlen(QUOTE_LEADER) && line->type == BUFFER_LINE_CHAT) {
 		if (!strncmp(line->text, QUOTE_LEADER, strlen(QUOTE_LEADER))) {
@@ -588,34 +587,32 @@ print_text:
 		}
 	}
 
-	do {
-		unsigned text_cols = cols_text;
+	draw_attr_bg(text_bg);
+	draw_attr_fg(text_fg);
 
-		draw_cursor_pos(coords.r1, text_col);
+	for (unsigned row = coords.r1; row <= coords.rN; row++) {
 
-		if (*p1) {
+		draw_cursor_pos(row, text_col);
 
-			ret = draw_buffer_wrap(p1, strlen(p1), text_cols);
+		if (*p) {
 
-			draw_attr_bg(text_bg);
-			draw_attr_fg(text_fg);
+			size_t n = draw_buffer_wrap(p, strlen(p), cols_text);
 
-			while (ret--) {
+			while (n) {
 
 				size_t attr_len;
 
-				while ((attr_len = draw_attr_len(p1)))
-					p1 += attr_len;
+				if ((attr_len = draw_attr_len(p))) {
+					;
+				} else {
+					draw_char(*p);
+				}
 
-				draw_char(*p1++);
+				n -= (attr_len ? attr_len : 1);
+				p += (attr_len ? attr_len : 1);
 			}
-
-			draw_attr_reset();
 		}
-
-		coords.r1++;
-
-	} while (*p1 && coords.r1 <= coords.rN);
+	}
 }
 
 static void
