@@ -34,7 +34,8 @@ $(PATH_BUILD)/%.t: $(PATH_TEST)/%.c | config.h $(PATH_BUILD)
 	@{ rm -f $(@:.t=.td) && ./$@; } || mv $@ $(@:.t=.td)
 
 rirc.debug: config.h $(OBJ_D)
-	$(CC) $(LDFLAGS) -pthread $(OBJ_D) $(MBEDTLS) -o $@
+	@echo "$(CC) $(LDFLAGS) $@"
+	@$(CC) $(LDFLAGS) -pthread $(OBJ_D) $(MBEDTLS) -o $@
 
 check: $(OBJ_T)
 	@[ ! "$$(find $(PATH_BUILD) -name '*.td' -print -quit)" ] && echo OK

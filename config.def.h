@@ -37,7 +37,7 @@
 #define BUFFER_LINE_HEADER_FG_PINGED  250
 #define BUFFER_LINE_HEADER_BG_PINGED  1
 
-#define BUFFER_TEXT_FG 250;
+#define BUFFER_TEXT_FG -1;
 #define BUFFER_TEXT_BG -1;
 
 /* Number of buffer lines to keep in history, must be power of 2 */
@@ -77,7 +77,7 @@
 #define ACTION_BG 239
 
 /* Input line text colours */
-#define INPUT_FG 250
+#define INPUT_FG -1
 #define INPUT_BG -1
 
 /* Buffer text quoting
