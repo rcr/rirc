@@ -16,12 +16,6 @@
 /* Control sequence initiator */
 #define CSI "\x1b["
 
-#define CLEAR_FULL         CSI "2J"
-#define CLEAR_LINE         CSI "2K"
-#define CURSOR_POS(X, Y)   CSI #X";"#Y"H"
-#define CURSOR_POS_RESTORE CSI "u"
-#define CURSOR_POS_SAVE    CSI "s"
-
 /* Minimum rows or columns to safely draw */
 #define COLS_MIN 5
 #define ROWS_MIN 5
@@ -93,6 +87,7 @@ struct draw_attrs
 
 static struct
 {
+	unsigned drawing : 1;
 	union {
 		struct {
 			unsigned separators  : 1;
@@ -147,20 +142,18 @@ static void draw_attr_toggle_underline(struct draw_attrs*);
 
 static int actv_colours[ACTIVITY_T_SIZE] = ACTIVITY_COLOURS
 static int nick_colours[] = NICK_COLOURS
-static int drawing;
 
 void
 draw_init(void)
 {
-	drawing = 1;
+	draw_state.drawing = 1;
 }
 
 void
 draw_term(void)
 {
-	drawing = 0;
-
-	draw(DRAW_CLEAR);
+	draw_state.drawing = 0;
+	draw_clear_full();
 }
 
 void
@@ -200,10 +193,6 @@ draw(enum draw_bit bit)
 		case DRAW_ALL:
 			draw_state.bits.all = -1;
 			break;
-		case DRAW_CLEAR:
-			draw_attr_reset(NULL);
-			draw_clear_full();
-			break;
 		default:
 			fatal("unknown draw bit");
 	}
@@ -212,7 +201,7 @@ draw(enum draw_bit bit)
 static void
 draw_bits(void)
 {
-	if (!drawing)
+	if (!draw_state.drawing)
 		return;
 
 	if (draw_state.bell && BELL_ON_PINGED)
@@ -454,33 +443,16 @@ draw_buffer(struct buffer *b, struct coords coords)
 
 	b->buffer_i_top = buffer_i;
 
-	/* Handle impartial top line print */
-	if (row_count > row_total) {
-
-		draw_buffer_line_split(line, &cols_head, &cols_text, cols_total, b->pad);
-
-		draw_buffer_line(
-			line,
-			coords,
-			cols_head,
-			cols_text,
-			row_count - row_total,
-			BUFFER_PADDING ? (b->pad - line->from_len) : 0
-		);
-
-		coords.r1 += draw_buffer_line_rows(line, cols_text) - (row_count - row_total);
-
-		if (line == head) {
-			b->buffer_i_bot = buffer_i;
-			return;
-		}
-
-		line = buffer_line(b, ++buffer_i);
-	}
-
-	/* Draw all remaining lines */
+	/* Draw lines */
 	while (coords.r1 <= coords.rN) {
 
+		unsigned skip = 0;
+
+		if (row_count > row_total) {
+			skip = (row_count - row_total);
+			row_count -= skip;
+		}
+
 		draw_buffer_line_split(line, &cols_head, &cols_text, cols_total, b->pad);
 
 		draw_buffer_line(
@@ -488,11 +460,11 @@ draw_buffer(struct buffer *b, struct coords coords)
 			coords,
 			cols_head,
 			cols_text,
-			0,
+			skip,
 			BUFFER_PADDING ? (b->pad - line->from_len) : 0
 		);
 
-		coords.r1 += draw_buffer_line_rows(line, cols_text);
+		coords.r1 += draw_buffer_line_rows(line, cols_text) - skip;
 
 		if (line == head) {
 			b->buffer_i_bot = buffer_i;
@@ -581,9 +553,6 @@ draw_buffer_line(
 
 print_text:
 
-	while (skip--)
-		p += draw_buffer_wrap(p, (line->text_len - (p - line->text)), cols_text);
-
 	if (strlen(QUOTE_LEADER) && line->type == BUFFER_LINE_CHAT) {
 		if (!strncmp(line->text, QUOTE_LEADER, strlen(QUOTE_LEADER))) {
 			text_bg = QUOTE_TEXT_BG;
@@ -597,9 +566,9 @@ print_text:
 	draw_attr_set_fg(&attrs, text_fg);
 	draw_attrs(&attrs, 0);
 
-	for (unsigned row = coords.r1; row <= coords.rN; row++) {
+	while (coords.r1 <= coords.rN) {
 
-		draw_cursor_pos(row, text_col);
+		draw_cursor_pos(coords.r1, text_col);
 
 		if (*p) {
 
@@ -625,8 +594,8 @@ print_text:
 							if (fg > 0)
 								draw_attr_set_fg(&attrs, fg);
 							if (bg == -1 && fg == -1) {
-								draw_attr_set_bg(&attrs, bg);
-								draw_attr_set_fg(&attrs, fg);
+								draw_attr_set_bg(&attrs, text_bg);
+								draw_attr_set_fg(&attrs, text_fg);
 							}
 							break;
 						case ATTR_CODE_ITALIC:
@@ -634,6 +603,8 @@ print_text:
 							break;
 						case ATTR_CODE_RESET:
 							draw_attr_reset(&attrs);
+							draw_attr_set_bg(&attrs, text_bg);
+							draw_attr_set_fg(&attrs, text_fg);
 							break;
 						case ATTR_CODE_REVERSE:
 							draw_attr_toggle_reverse(&attrs);
@@ -649,13 +620,19 @@ print_text:
 					}
 				} else {
 					draw_attrs(&attrs, 0);
-					draw_char(&attrs, *p);
+					if (!skip)
+						draw_char(&attrs, *p);
 				}
 
 				n -= (attr_len ? attr_len : 1);
 				p += (attr_len ? attr_len : 1);
 			}
 		}
+
+		if (skip)
+			skip--;
+		else
+			coords.r1++;
 	}
 
 	draw_attr_reset(NULL);
@@ -1162,13 +1139,13 @@ drawf(struct draw_attrs *attrs, unsigned *cols_p, const char *fmt, ...)
 static void
 draw_clear_full(void)
 {
-	printf(CLEAR_FULL);
+	printf(CSI "2J");
 }
 
 static void
 draw_clear_line(void)
 {
-	printf(CLEAR_LINE);
+	printf(CSI "2K");
 }
 
 static void
@@ -1189,19 +1166,19 @@ draw_char(struct draw_attrs *attrs, int c)
 static void
 draw_cursor_pos(int row, int col)
 {
-	printf(CURSOR_POS(%d, %d), row, col);
+	printf(CSI "%d;%dH", row, col);
 }
 
 static void
 draw_cursor_pos_restore(void)
 {
-	printf(CURSOR_POS_RESTORE);
+	printf(CSI "u");
 }
 
 static void
 draw_cursor_pos_save(void)
 {
-	printf(CURSOR_POS_SAVE);
+	printf(CSI "s");
 }
 
 static unsigned
