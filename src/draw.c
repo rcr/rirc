@@ -127,6 +127,8 @@ static void draw_clear_line(void);
 static void draw_cursor_pos(int, int);
 static void draw_cursor_pos_restore(void);
 static void draw_cursor_pos_save(void);
+static void draw_cursor_hide(void);
+static void draw_cursor_show(void);
 static unsigned draw_parse_irc_colour(const char *code, int *fg, int *bg);
 
 static size_t draw_attr_len(const char *str);
@@ -215,6 +217,7 @@ draw_bits(void)
 	unsigned cols = state_cols();
 	unsigned rows = state_rows();
 
+	draw_cursor_hide();
 	draw_cursor_pos_save();
 
 	if (cols < COLS_MIN || rows < ROWS_MIN) {
@@ -251,6 +254,7 @@ draw_bits(void)
 flush:
 
 	draw_cursor_pos_restore();
+	draw_cursor_show();
 
 	fflush(stdout);
 }
@@ -407,20 +411,13 @@ draw_buffer(struct buffer *b, struct coords coords)
 	unsigned cols_head;
 	unsigned cols_text;
 	unsigned cols_total = coords.cN - coords.c1 + 1;
-	unsigned row;
 	unsigned row_count = 0;
 	unsigned row_total = coords.rN - coords.r1 + 1;
+	struct buffer_line *line;
 
-	/* Clear the buffer area */
-	for (row = coords.r1; row <= coords.rN; row++) {
-		draw_cursor_pos(row, 1);
-		draw_clear_line();
-	}
-
-	struct buffer_line *line = buffer_line(b, buffer_i);
-
-	if (line == NULL)
-		return;
+	/* empty buffer */
+	if (!(line = buffer_line(b, buffer_i)))
+		goto clear;
 
 	struct buffer_line *tail = buffer_tail(b);
 	struct buffer_line *head = buffer_head(b);
@@ -466,15 +463,24 @@ draw_buffer(struct buffer *b, struct coords coords)
 
 		coords.r1 += draw_buffer_line_rows(line, cols_text) - skip;
 
-		if (line == head) {
-			b->buffer_i_bot = buffer_i;
-			return;
-		}
+		if (line == head)
+			break;
 
 		line = buffer_line(b, ++buffer_i);
 	}
 
-	b->buffer_i_bot = (buffer_i - 1);
+	if (line == head)
+		b->buffer_i_bot = buffer_i;
+	else
+		b->buffer_i_bot = buffer_i - 1;
+
+clear:
+
+	/* clear remaining buffer space */
+	while (coords.r1 <= coords.rN) {
+		draw_cursor_pos(coords.r1++, 1);
+		draw_clear_line();
+	}
 }
 
 static void
@@ -514,6 +520,7 @@ draw_buffer_line(
 		}
 
 		draw_cursor_pos(coords.r1, head_col);
+		draw_clear_line();
 
 		if (!drawf(&attrs, &head_cols, " %b%f%s:%s%a ",
 				BUFFER_LINE_HEADER_BG,
@@ -1177,6 +1184,18 @@ static void
 draw_cursor_pos_save(void)
 {
 	printf(CSI "s");
+}
+
+static void
+draw_cursor_hide(void)
+{
+	printf(CSI "?25l");
+}
+
+static void
+draw_cursor_show(void)
+{
+	printf(CSI "?25h");
 }
 
 static unsigned
