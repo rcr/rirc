@@ -673,13 +673,12 @@ draw_buffer_scroll_back(void)
 
 	struct buffer *b = &(current_channel()->buffer);
 
-	unsigned buffer_i = b->scrollback;
 	unsigned count = 0;
 	unsigned cols_text = 0;
 	unsigned cols = state_cols();
 	unsigned rows = state_rows() - 4;
 
-	struct buffer_line *line = buffer_line(b, buffer_i);
+	struct buffer_line *line = buffer_line(b, b->scrollback);
 
 	/* Skip redraw */
 	if (line == buffer_tail(b))
@@ -692,17 +691,16 @@ draw_buffer_scroll_back(void)
 
 		count += draw_buffer_line_rows(line, cols_text);
 
+		if (line == buffer_tail(b))
+			break;
+
 		if (count >= rows)
 			break;
 
-		if (line == buffer_tail(b))
-			return;
-
-		line = buffer_line(b, --buffer_i);
+		line = buffer_line(b, --b->scrollback);
 	}
 
-	b->scrollback = buffer_i;
-
+	/* Top line in view draws in full; scroll forward one additional line */
 	if (count == rows && line != buffer_tail(b))
 		b->scrollback--;
 }

@@ -37,8 +37,8 @@ static int state_input_linef(struct channel*);
 static int state_input_ctrlch(const char*, size_t);
 static int state_input_action(const char*, size_t);
 
-static void buffer_scrollback_bot(void);
-static void buffer_scrollback_top(void);
+static void buffer_scrollback_tail(void);
+static void buffer_scrollback_head(void);
 static void buffer_scrollback_back(void);
 static void buffer_scrollback_forw(void);
 
@@ -414,35 +414,51 @@ state_channel_close(int action_confirm)
 }
 
 static void
-buffer_scrollback_bot(void)
+buffer_scrollback_tail(void)
 {
-	state.current_channel->buffer.scrollback = state.current_channel->buffer.tail;
-	draw(DRAW_BUFFER);
-	draw(DRAW_STATUS);
+	struct buffer *b = &(state.current_channel->buffer);
+
+	if (buffer_line(b, b->scrollback) != (buffer_tail(b))) {
+		state.current_channel->buffer.scrollback = state.current_channel->buffer.tail;
+		draw(DRAW_BUFFER);
+		draw(DRAW_STATUS);
+	}
 }
 
 static void
-buffer_scrollback_top(void)
+buffer_scrollback_head(void)
 {
-	state.current_channel->buffer.scrollback = state.current_channel->buffer.head - 1;
-	draw(DRAW_BUFFER);
-	draw(DRAW_STATUS);
+	struct buffer *b = &(state.current_channel->buffer);
+
+	if (buffer_line(b, b->scrollback) != (buffer_head(b))) {
+		state.current_channel->buffer.scrollback = state.current_channel->buffer.head - 1;
+		draw(DRAW_BUFFER);
+		draw(DRAW_STATUS);
+	}
 }
 
 static void
 buffer_scrollback_back(void)
 {
-	draw(DRAW_BUFFER_BACK);
-	draw(DRAW_BUFFER);
-	draw(DRAW_STATUS);
+	struct buffer *b = &(state.current_channel->buffer);
+
+	if (buffer_line(b, b->scrollback) != (buffer_tail(b))) {
+		draw(DRAW_BUFFER_BACK);
+		draw(DRAW_BUFFER);
+		draw(DRAW_STATUS);
+	}
 }
 
 static void
 buffer_scrollback_forw(void)
 {
-	draw(DRAW_BUFFER_FORW);
-	draw(DRAW_BUFFER);
-	draw(DRAW_STATUS);
+	struct buffer *b = &(state.current_channel->buffer);
+
+	if (buffer_line(b, b->scrollback) != (buffer_head(b))) {
+		draw(DRAW_BUFFER_FORW);
+		draw(DRAW_BUFFER);
+		draw(DRAW_STATUS);
+	}
 }
 
 struct channel*
@@ -873,11 +889,11 @@ state_input_ctrlch(const char *c, size_t len)
 
 		/* home */
 		else if (!strncmp(c, "[H", len - 1))
-			buffer_scrollback_bot();
+			buffer_scrollback_tail();
 
 		/* end */
 		else if (!strncmp(c, "[F", len - 1))
-			buffer_scrollback_top();
+			buffer_scrollback_head();
 
 		/* delete */
 		else if (!strncmp(c, "[3~", len - 1))
