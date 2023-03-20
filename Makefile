@@ -1,5 +1,3 @@
-.POSIX:
-
 VERSION = 0.1.6
 
 CC      = cc
@@ -30,20 +28,17 @@ SRC = \
 
 OBJ = $(SRC:.c=.o)
 
-all: options rirc
+all: rirc
+
+include lib/mbedtls.Makefile
 
 config.h:
 	cp config.def.h config.h
 
-options:
-	@echo "CC      = $(CC)"
-	@echo "CFLAGS  = $(CFLAGS)"
-	@echo "LDFLAGS = $(LDFLAGS)"
-
-rirc: config.h mbedtls $(OBJ)
+rirc: config.h $(OBJ) $(MBEDTLS)
 	$(CC) $(LDFLAGS) -pthread $(OBJ) $(MBEDTLS) -o $@
 
-install: all
+install: rirc
 	@sed -i "s/VERSION/$(VERSION)/g" rirc.1
 	mkdir -p $(PATH_BIN)
 	mkdir -p $(PATH_MAN)
@@ -59,9 +54,9 @@ uninstall:
 clean:
 	@rm -f rirc $(MBEDTLS) $(OBJ)
 
-.c.o:
+%.o: %.c $(MBEDTLS)
 	$(CC) -c $(CFLAGS) $(MBEDTLS_CFLAGS) -std=c11 -I. -D_POSIX_C_SOURCE=200809L -DVERSION=$(VERSION) $< -o $@
 
-include lib/mbedtls.Makefile
-
 .PHONY: all clean options install uninstall
+
+.SUFFIXES:

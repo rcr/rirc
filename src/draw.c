@@ -577,6 +577,9 @@ print_text:
 
 		draw_cursor_pos(coords.r1, text_col);
 
+		if (p != line->text)
+			draw_clear_line();
+
 		if (*p) {
 
 			size_t n = draw_buffer_wrap(p, strlen(p), cols_text);

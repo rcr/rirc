@@ -15,16 +15,18 @@ MBEDTLS = \
 
 MBEDTLS_CFLAGS = -I$(MBEDTLS_SRC)/include -DMBEDTLS_CONFIG_FILE='<$(MBEDTLS_CFG)>'
 
-mbedtls: $(MBEDTLS_SRC)
-	@$(MAKE) --silent -C $(MBEDTLS_SRC) CC="$(CC)" CFLAGS="$(CFLAGS) -DMBEDTLS_CONFIG_FILE='<$(MBEDTLS_CFG)>'" LDFLAGS="$(LDFLAGS)" lib
+%/libmbedtls.a: $(MBEDTLS_SRC)
+	@$(MAKE) -C $(MBEDTLS_SRC) CC="$(CC)" CFLAGS="$(CFLAGS) -DMBEDTLS_CONFIG_FILE='<$(MBEDTLS_CFG)>'" LDFLAGS="$(LDFLAGS)" lib
 
-$(MBEDTLS_SRC): $(MBEDTLS_TAR)
-	@tar -xf $(MBEDTLS_TAR) --directory $(MBEDTLS_DIR)
+%/libmbedx509.a: %/libmbedtls.a
+	@/bin/sh -c true
 
-$(MBEDTLS_TAR):
+%/libmbedcrypto.a: %/libmbedtls.a
+	@/bin/sh -c true
+
+$(MBEDTLS_SRC):
 	@echo "$(MBEDTLS_TAR)..."
 	@curl -LfsS $(MBEDTLS_URL) -o $(MBEDTLS_TAR)
 	@command -v shasum > /dev/null || echo ' -- NO SHASUM -- '
 	@command -v shasum > /dev/null && echo "$(MBEDTLS_SHA) *$(MBEDTLS_TAR)" | shasum -c -
-
-.PHONY: mbedtls
+	@tar -xf $(MBEDTLS_TAR) --directory $(MBEDTLS_DIR)
