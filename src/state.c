@@ -887,17 +887,25 @@ state_input_ctrlch(const char *c, size_t len)
 		else if (!strncmp(c, "[D", len - 1))
 			return input_cursor_back(&(current_channel()->input));
 
-		/* home */
+		/* home (DECCKM) */
 		else if (!strncmp(c, "[H", len - 1))
 			buffer_scrollback_tail();
 
-		/* end */
+		/* end (DECCKM) */
 		else if (!strncmp(c, "[F", len - 1))
 			buffer_scrollback_head();
+
+		/* home (VT220) */
+		else if (!strncmp(c, "[1~", len - 1))
+			buffer_scrollback_tail();
 
 		/* delete */
 		else if (!strncmp(c, "[3~", len - 1))
 			return input_delete_forw(&(current_channel()->input));
+
+		/* end (VT220) */
+		else if (!strncmp(c, "[4~", len - 1))
+			buffer_scrollback_head();
 
 		/* page up */
 		else if (!strncmp(c, "[5~", len - 1))
