@@ -119,10 +119,10 @@ state_init(void)
 	newlinef(state.default_channel, 0, FROM_INFO, "| |  | | | | (__");
 	newlinef(state.default_channel, 0, FROM_INFO, "|_|  |_|_|  \\___|");
 	newlinef(state.default_channel, 0, FROM_INFO, "");
-	newlinef(state.default_channel, 0, FROM_INFO, " - version %s", STR(VERSION));
-	newlinef(state.default_channel, 0, FROM_INFO, " - compiled %s, %s", __DATE__, __TIME__);
-#ifndef NDEBUG
-	newlinef(state.default_channel, 0, FROM_INFO, " - compiled with DEBUG flags");
+#ifdef NDEBUG
+	newlinef(state.default_channel, 0, FROM_INFO, "v" STR(VERSION));
+#else
+	newlinef(state.default_channel, 0, FROM_INFO, "v" STR(VERSION) " (debug " STR(GITHASH) ")");
 #endif
 
 	channel_set_current(state.default_channel);

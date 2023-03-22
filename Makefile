@@ -1,7 +1,7 @@
 VERSION = 0.1.6
 
 CC      = cc
-CFLAGS  = -flto -O2 -DNDEBUG
+CFLAGS  = -flto -O2
 LDFLAGS = -flto
 
 PREFIX   = /usr/local
@@ -55,7 +55,7 @@ clean:
 	@rm -f rirc $(MBEDTLS) $(OBJ)
 
 %.o: %.c $(MBEDTLS)
-	$(CC) -c $(CFLAGS) $(MBEDTLS_CFLAGS) -std=c11 -I. -D_POSIX_C_SOURCE=200809L -DVERSION=$(VERSION) $< -o $@
+	$(CC) -c $(CFLAGS) $(MBEDTLS_CFLAGS) -std=c11 -I. -D_POSIX_C_SOURCE=200809L -DVERSION=$(VERSION) -DNDEBUG $< -o $@
 
 .PHONY: all clean options install uninstall
 

@@ -95,7 +95,7 @@ static const char *const rirc_help =
 
 static const char *const rirc_version =
 #ifndef NDEBUG
-"rirc v" STR(VERSION)" (debug build)";
+"rirc v" STR(VERSION) " (debug " STR(GITHASH) ")";
 #else
 "rirc v" STR(VERSION);
 #endif

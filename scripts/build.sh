@@ -11,11 +11,10 @@ set -u
 
 export MAKEFLAGS="-f Makefile.dev -j $(nproc)"
 
-make clean-dev
-make mbedtls
-
 if [ -x "$(command -v bear)" ]; then
 	BEAR="bear --append --"
+else
+	BEAR=""
 fi
 
 if [ -x "$(command -v entr)" ]; then
