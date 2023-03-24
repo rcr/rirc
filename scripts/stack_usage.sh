@@ -2,10 +2,13 @@
 
 set -e
 
-export CC=clang
-export CFLAGS="-fstack-usage"
-export LDFLAGS="-fuse-ld=lld"
+export CC=gcc
+export CFLAGS="-pipe -O0 -fstack-usage"
+export LDFLAGS="-pipe"
 
-make clean rirc
+export MAKEFLAGS="-e -f Makefile.dev -j $(nproc)"
 
-find build -name '*.su' | xargs cat | sort -n -k2 | column -t
+make clean-dev
+make rirc.debug check
+
+find build -name '*.su' | xargs cat | sort -n -k2 | column -t | tail -n 50

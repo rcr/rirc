@@ -4,6 +4,8 @@
 #include "src/components/buffer.c"
 #include "src/utils/utils.c"
 
+static struct buffer *b;
+
 static char*
 t__fmt_int(int i)
 {
@@ -16,11 +18,11 @@ t__fmt_int(int i)
 }
 
 static void
-t__buffer_newline(struct buffer *b, const char *t)
+t__buffer_newline(struct buffer *buffer, const char *t)
 {
 	/* Abstract newline with default values */
 
-	buffer_newline(b, BUFFER_LINE_OTHER, "", t, 0, strlen(t), 0);
+	buffer_newline(buffer, BUFFER_LINE_OTHER, "", t, 0, strlen(t), 0);
 }
 
 static void
@@ -28,22 +30,18 @@ test_buffer(void)
 {
 	/* Test retrieving values from an initialized buffer and resetting it */
 
-	struct buffer b;
-
-	buffer(&b);
-
-	assert_eq(buffer_size(&b), 0);
-	assert_ptr_null(buffer_head(&b));
-	assert_ptr_null(buffer_tail(&b));
-	assert_ptr_null(buffer_line(&b, b.scrollback));
+	assert_eq(buffer_size(b), 0);
+	assert_ptr_null(buffer_head(b));
+	assert_ptr_null(buffer_tail(b));
+	assert_ptr_null(buffer_line(b, b->scrollback));
 
 	/* Reset the buffer, check values again */
-	buffer(&b);
+	buffer(b);
 
-	assert_eq(buffer_size(&b), 0);
-	assert_ptr_null(buffer_head(&b));
-	assert_ptr_null(buffer_tail(&b));
-	assert_ptr_null(buffer_line(&b, b.scrollback));
+	assert_eq(buffer_size(b), 0);
+	assert_ptr_null(buffer_head(b));
+	assert_ptr_null(buffer_tail(b));
+	assert_ptr_null(buffer_line(b, b->scrollback));
 }
 
 static void
@@ -52,17 +50,14 @@ test_buffer_head(void)
 	/* Test retrieving the first line after pushing to a full buffer */
 
 	int i;
-	struct buffer b;
 
-	buffer(&b);
-
-	assert_ptr_null(buffer_head(&b));
+	assert_ptr_null(buffer_head(b));
 
 	for (i = 0; i < BUFFER_LINES_MAX + 1; i++)
-		t__buffer_newline(&b, t__fmt_int(i + 1));
+		t__buffer_newline(b, t__fmt_int(i + 1));
 
-	assert_strcmp(buffer_head(&b)->text, t__fmt_int(BUFFER_LINES_MAX + 1));
-	assert_eq(buffer_size(&b), BUFFER_LINES_MAX);
+	assert_strcmp(buffer_head(b)->text, t__fmt_int(BUFFER_LINES_MAX + 1));
+	assert_eq(buffer_size(b), BUFFER_LINES_MAX);
 }
 
 static void
@@ -71,22 +66,19 @@ test_buffer_tail(void)
 	/* Test retrieving the last line after pushing to a full buffer */
 
 	int i;
-	struct buffer b;
 
-	buffer(&b);
-
-	assert_ptr_null(buffer_tail(&b));
+	assert_ptr_null(buffer_tail(b));
 
 	for (i = 0; i < BUFFER_LINES_MAX; i++)
-		t__buffer_newline(&b, t__fmt_int(i + 1));
+		t__buffer_newline(b, t__fmt_int(i + 1));
 
-	assert_strcmp(buffer_tail(&b)->text, t__fmt_int(1));
-	assert_eq(buffer_size(&b), BUFFER_LINES_MAX);
+	assert_strcmp(buffer_tail(b)->text, t__fmt_int(1));
+	assert_eq(buffer_size(b), BUFFER_LINES_MAX);
 
-	t__buffer_newline(&b, t__fmt_int(i + 1));
+	t__buffer_newline(b, t__fmt_int(i + 1));
 
-	assert_strcmp(buffer_tail(&b)->text, t__fmt_int(2));
-	assert_eq(buffer_size(&b), BUFFER_LINES_MAX);
+	assert_strcmp(buffer_tail(b)->text, t__fmt_int(2));
+	assert_eq(buffer_size(b), BUFFER_LINES_MAX);
 }
 
 static void
@@ -94,23 +86,19 @@ test_buffer_line(void)
 {
 	/* Test that retrieving a buffer line fails when i != [tail, head) */
 
-	struct buffer b;
-
-	buffer(&b);
-
 	/* Should retrieve null for an empty buffer */
-	assert_eq(buffer_size(&b), 0);
-	assert_ptr_null(buffer_line(&b, b.head));
-	assert_ptr_null(buffer_line(&b, b.tail));
-	assert_ptr_null(buffer_line(&b, b.scrollback));
+	assert_eq(buffer_size(b), 0);
+	assert_ptr_null(buffer_line(b, b->head));
+	assert_ptr_null(buffer_line(b, b->tail));
+	assert_ptr_null(buffer_line(b, b->scrollback));
 
 	/* For any buffer line retrieval, these conditions should always hold */
 	#define CHECK_BUFFER(B) \
-	    assert_fatal(buffer_line(&(B), (B).tail - 1)); \
-	    assert_fatal(buffer_line(&(B), (B).head));     \
-	    (void)buffer_line(&(B), (B).tail);             \
-	    (void)buffer_line(&(B), (B).tail + 1);         \
-	    (void)buffer_line(&(B), (B).head - 1);         \
+	    assert_fatal(buffer_line((B), (B)->tail - 1)); \
+	    assert_fatal(buffer_line((B), (B)->head));     \
+	    (void)buffer_line((B), (B)->tail);             \
+	    (void)buffer_line((B), (B)->tail + 1);         \
+	    (void)buffer_line((B), (B)->head - 1);         \
 
 	/* Normal case:
 	 * |-----T-----H-----|
@@ -119,8 +107,8 @@ test_buffer_line(void)
 	 * b    : valid
 	 * a, c : invalid */
 
-	b.tail = 1;
-	b.head = 1 + BUFFER_LINES_MAX;
+	b->tail = 1;
+	b->head = 1 + BUFFER_LINES_MAX;
 	CHECK_BUFFER(b);
 
 	/* Inverted case:
@@ -130,8 +118,8 @@ test_buffer_line(void)
 	 * b    : invalid
 	 * a, c : valid */
 
-	b.tail = UINT_MAX - 1;
-	b.head = UINT_MAX - 1 + BUFFER_LINES_MAX;
+	b->tail = UINT_MAX - 1;
+	b->head = UINT_MAX - 1 + BUFFER_LINES_MAX;
 	CHECK_BUFFER(b);
 
 	/* Edge case, head is 0
@@ -140,8 +128,8 @@ test_buffer_line(void)
 	 * a : invalid
 	 * b : valid */
 
-	b.tail = 0 - BUFFER_LINES_MAX;
-	b.head = 0;
+	b->tail = 0 - BUFFER_LINES_MAX;
+	b->head = 0;
 	CHECK_BUFFER(b);
 
 	/* Edge case, head is UINT_MAX
@@ -150,8 +138,8 @@ test_buffer_line(void)
 	 * a : invalid
 	 * b : valid */
 
-	b.tail = UINT_MAX - BUFFER_LINES_MAX;
-	b.head = UINT_MAX;
+	b->tail = UINT_MAX - BUFFER_LINES_MAX;
+	b->head = UINT_MAX;
 	CHECK_BUFFER(b);
 
 	/* Edge case, tail is 0:
@@ -160,8 +148,8 @@ test_buffer_line(void)
 	 * a : valid
 	 * b : invalid */
 
-	b.tail = 0;
-	b.head = 0 + BUFFER_LINES_MAX;
+	b->tail = 0;
+	b->head = 0 + BUFFER_LINES_MAX;
 	CHECK_BUFFER(b);
 
 	/* Edge case, tail is UINT_MAX
@@ -170,8 +158,8 @@ test_buffer_line(void)
 	 * a, b : valid
 	 * c    : invalid */
 
-	b.tail = UINT_MAX;
-	b.head = UINT_MAX + BUFFER_LINES_MAX;
+	b->tail = UINT_MAX;
+	b->head = UINT_MAX + BUFFER_LINES_MAX;
 	CHECK_BUFFER(b);
 
 	#undef CHECK_BUFFER
@@ -187,39 +175,35 @@ test_buffer_scrollback(void)
 	 *   Buffer scrollback stays locked to the tail when incrementing
 	 * */
 
-	struct buffer b;
-
-	buffer(&b);
-
 	/* Empty buffer returns NULL */
-	assert_ptr_null(buffer_line(&b, b.scrollback));
+	assert_ptr_null(buffer_line(b, b->scrollback));
 
 	/* Buffer scrollback stays locked to the buffer head when incrementing */
-	t__buffer_newline(&b, "a");
-	assert_strcmp(buffer_line(&b, b.scrollback)->text, "a");
+	t__buffer_newline(b, "a");
+	assert_strcmp(buffer_line(b, b->scrollback)->text, "a");
 
-	t__buffer_newline(&b, "b");
-	assert_strcmp(buffer_line(&b, b.scrollback)->text, "b");
+	t__buffer_newline(b, "b");
+	assert_strcmp(buffer_line(b, b->scrollback)->text, "b");
 
-	t__buffer_newline(&b, "c");
-	assert_strcmp(buffer_line(&b, b.scrollback)->text, "c");
+	t__buffer_newline(b, "c");
+	assert_strcmp(buffer_line(b, b->scrollback)->text, "c");
 
 	/* Buffer scrollback stays between [tail, head) when scrolled back */
-	b.scrollback = b.tail + 1;
-	assert_strcmp(buffer_line(&b, b.scrollback)->text, "b");
+	b->scrollback = b->tail + 1;
+	assert_strcmp(buffer_line(b, b->scrollback)->text, "b");
 
-	t__buffer_newline(&b, "d");
-	assert_strcmp(buffer_line(&b, b.scrollback)->text, "b");
+	t__buffer_newline(b, "d");
+	assert_strcmp(buffer_line(b, b->scrollback)->text, "b");
 
 	/* Buffer scrollback stays locked to the buffer tail when incrementing */
-	b.head = b.tail + BUFFER_LINES_MAX;
-	assert_true(buffer_size(&b) == BUFFER_LINES_MAX);
+	b->head = b->tail + BUFFER_LINES_MAX;
+	assert_true(buffer_size(b) == BUFFER_LINES_MAX);
 
-	t__buffer_newline(&b, "e");
-	assert_strcmp(buffer_line(&b, b.scrollback)->text, "b");
+	t__buffer_newline(b, "e");
+	assert_strcmp(buffer_line(b, b->scrollback)->text, "b");
 
-	t__buffer_newline(&b, "f");
-	assert_strcmp(buffer_line(&b, b.scrollback)->text, "c");
+	t__buffer_newline(b, "f");
+	assert_strcmp(buffer_line(b, b->scrollback)->text, "c");
 }
 
 static void
@@ -227,26 +211,22 @@ test_buffer_index_overflow(void)
 {
 	/* Test masked indexing after unsigned overflow */
 
-	struct buffer b;
+	b->head = UINT_MAX;
+	b->tail = UINT_MAX - 1;
+	b->scrollback = b->tail;
 
-	buffer(&b);
+	assert_eq(buffer_size(b), 1);
+	assert_eq(BUFFER_MASK(b->head), (BUFFER_LINES_MAX - 1));
 
-	b.head = UINT_MAX;
-	b.tail = UINT_MAX - 1;
-	b.scrollback = b.tail;
+	t__buffer_newline(b, t__fmt_int(0));
 
-	assert_eq(buffer_size(&b), 1);
-	assert_eq(BUFFER_MASK(b.head), (BUFFER_LINES_MAX - 1));
+	assert_eq(buffer_size(b), 2);
+	assert_eq(BUFFER_MASK(b->head), 0);
 
-	t__buffer_newline(&b, t__fmt_int(0));
+	t__buffer_newline(b, t__fmt_int(-1));
 
-	assert_eq(buffer_size(&b), 2);
-	assert_eq(BUFFER_MASK(b.head), 0);
-
-	t__buffer_newline(&b, t__fmt_int(-1));
-
-	assert_eq(buffer_size(&b), 3);
-	assert_strcmp(b.buffer_lines[0].text, t__fmt_int(-1));
+	assert_eq(buffer_size(b), 3);
+	assert_strcmp(b->buffer_lines[0].text, t__fmt_int(-1));
 }
 
 static void
@@ -260,15 +240,11 @@ test_buffer_newline_prefix(void)
 {
 	/* Test adding lines to a buffer with prefix */
 
-	struct buffer b;
-	struct buffer_line *line;
-
-	buffer(&b);
-
 	char *from_str;
 	char *text_str;
 	size_t from_len;
 	size_t text_len;
+	struct buffer_line *line;
 
 	/* Test adding line with prefix */
 	from_str = "testing";
@@ -277,17 +253,17 @@ test_buffer_newline_prefix(void)
 	text_str = "abc";
 	text_len = strlen(text_str);
 
-	buffer_newline(&b, BUFFER_LINE_OTHER, from_str, text_str, from_len, text_len, 0);
+	buffer_newline(b, BUFFER_LINE_OTHER, from_str, text_str, from_len, text_len, 0);
 
-	line = buffer_head(&b);
+	line = buffer_head(b);
 
 	assert_strcmp(line->text, "abc");
 	assert_strcmp(line->from, "testing");
 	assert_ueq(line->from_len, strlen("testing"));
 
-	buffer_newline(&b, BUFFER_LINE_OTHER, from_str, text_str, from_len, text_len, '@');
+	buffer_newline(b, BUFFER_LINE_OTHER, from_str, text_str, from_len, text_len, '@');
 
-	line = buffer_head(&b);
+	line = buffer_head(b);
 
 	assert_strcmp(line->text, "abc");
 	assert_strcmp(line->from, "@testing");
@@ -312,18 +288,36 @@ test_buffer_newline_prefix(void)
 	from_str = _from;
 	from_len = FROM_LENGTH_MAX;
 
-	buffer_newline(&b, BUFFER_LINE_OTHER, from_str, text_str, from_len, text_len, 0);
+	buffer_newline(b, BUFFER_LINE_OTHER, from_str, text_str, from_len, text_len, 0);
 
-	line = buffer_head(&b);
+	line = buffer_head(b);
 	assert_ueq(line->from_len, FROM_LENGTH_MAX);
 	assert_eq(line->from[FROM_LENGTH_MAX - 1], 'c');
 
 
-	buffer_newline(&b, BUFFER_LINE_OTHER, from_str, text_str, from_len, text_len, '@');
+	buffer_newline(b, BUFFER_LINE_OTHER, from_str, text_str, from_len, text_len, '@');
 
-	line = buffer_head(&b);
+	line = buffer_head(b);
 	assert_ueq(line->from_len, FROM_LENGTH_MAX);
 	assert_eq(line->from[FROM_LENGTH_MAX - 1], 'b');
+}
+
+static int
+test_init(void)
+{
+	b = malloc(sizeof(*b));
+
+	buffer(b);
+
+	return 0;
+}
+
+static int
+test_term(void)
+{
+	free(b);
+
+	return 0;
 }
 
 int
@@ -340,5 +334,5 @@ main(void)
 		TESTCASE(test_buffer_newline_prefix),
 	};
 
-	return run_tests(NULL, NULL, tests);
+	return run_tests(test_init, test_term, tests);
 }

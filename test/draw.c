@@ -31,17 +31,17 @@ test_draw_buffer_line_rows(void)
 {
 	/* Test calculating the number of rows a buffer line occupies */
 
-	struct buffer b;
+	struct buffer *b = malloc(sizeof(*b));
 
-	buffer(&b);
+	buffer(b);
 
 	/* Test empty line should return at least 1 row */
-	t__buffer_newline(&b, "");
+	t__buffer_newline(b, "");
 
-	assert_eq(draw_buffer_line_rows(buffer_head(&b), 1), 1);
+	assert_eq(draw_buffer_line_rows(buffer_head(b), 1), 1);
 
 	/* Test wraps are calculated */
-	t__buffer_newline(&b, "aa bb cc");
+	t__buffer_newline(b, "aa bb cc");
 
 	/* 1 column: 8 rows
 	 * a
@@ -53,7 +53,7 @@ test_draw_buffer_line_rows(void)
 	 * c
 	 * c
 	 * */
-	assert_eq(draw_buffer_line_rows(buffer_head(&b), 1), 8);
+	assert_eq(draw_buffer_line_rows(buffer_head(b), 1), 8);
 
 	/* 4 columns: 3 rows:
 	 * 'aa b' -> wraps to
@@ -63,10 +63,10 @@ test_draw_buffer_line_rows(void)
 	 *   'bb'
 	 *   'cc'
 	 * */
-	assert_eq(draw_buffer_line_rows(buffer_head(&b), 4), 3);
+	assert_eq(draw_buffer_line_rows(buffer_head(b), 4), 3);
 
 	/* Greater columns than length should always return one row */
-	assert_eq(draw_buffer_line_rows(buffer_head(&b), buffer_head(&b)->text_len + 1), 1);
+	assert_eq(draw_buffer_line_rows(buffer_head(b), buffer_head(b)->text_len + 1), 1);
 }
 
 static void
@@ -75,63 +75,65 @@ test_draw_buffer_scrollback_status(void)
 	/* Test retrieving buffer scrollback status */
 
 	char buf[4];
-	struct buffer b;
+	struct buffer *b = malloc(sizeof(*b));
 
-	buffer(&b);
+	buffer(b);
 
-	b.head = 100;
-	b.tail = 0;
-	assert_ueq(buffer_size(&b), 100);
+	b->head = 100;
+	b->tail = 0;
+	assert_ueq(buffer_size(b), 100);
 
 	/* test scrollback head in view */
-	b.buffer_i_bot = (b.head - 1);
-	assert_strcmp((draw_buffer_scrollback_status(&b, buf, sizeof(buf))), NULL);
+	b->buffer_i_bot = (b->head - 1);
+	assert_strcmp((draw_buffer_scrollback_status(b, buf, sizeof(buf))), NULL);
 
 	/* test scrollback tail in view */
-	b.buffer_i_bot = b.tail;
-	b.buffer_i_top = b.tail;
-	assert_strcmp((draw_buffer_scrollback_status(&b, buf, sizeof(buf))), "100");
+	b->buffer_i_bot = b->tail;
+	b->buffer_i_top = b->tail;
+	assert_strcmp((draw_buffer_scrollback_status(b, buf, sizeof(buf))), "100");
 
 	/* test scrollback at half */
-	b.buffer_i_bot = (b.head / 2);
-	b.buffer_i_top = (b.head / 2) - 2;
-	assert_strcmp((draw_buffer_scrollback_status(&b, buf, sizeof(buf))), "50");
+	b->buffer_i_bot = (b->head / 2);
+	b->buffer_i_top = (b->head / 2) - 2;
+	assert_strcmp((draw_buffer_scrollback_status(b, buf, sizeof(buf))), "50");
 
 	/* test buffer index wrapping */
-	b.head = 999;
-	b.tail = UINT_MAX - 1000;
-	assert_ueq(buffer_size(&b), 2000);
+	b->head = 999;
+	b->tail = UINT_MAX - 1000;
+	assert_ueq(buffer_size(b), 2000);
 
 	/* test scrollback head in view */
-	b.scrollback = (b.head - 1);
-	assert_strcmp((draw_buffer_scrollback_status(&b, buf, sizeof(buf))), NULL);
+	b->scrollback = (b->head - 1);
+	assert_strcmp((draw_buffer_scrollback_status(b, buf, sizeof(buf))), NULL);
 
 	/* test scrollback tail in view */
-	b.buffer_i_bot = b.tail;
-	b.buffer_i_top = b.tail;
-	b.scrollback = (b.head - 2);
-	assert_strcmp((draw_buffer_scrollback_status(&b, buf, sizeof(buf))), "100");
+	b->buffer_i_bot = b->tail;
+	b->buffer_i_top = b->tail;
+	b->scrollback = (b->head - 2);
+	assert_strcmp((draw_buffer_scrollback_status(b, buf, sizeof(buf))), "100");
 
 	/* test scrollback at half */
-	b.buffer_i_bot = UINT_MAX;
-	b.buffer_i_top = UINT_MAX - 2;
-	assert_strcmp((draw_buffer_scrollback_status(&b, buf, sizeof(buf))), "50");
+	b->buffer_i_bot = UINT_MAX;
+	b->buffer_i_top = UINT_MAX - 2;
+	assert_strcmp((draw_buffer_scrollback_status(b, buf, sizeof(buf))), "50");
 
-	b.head++;
-	b.tail++;
-	b.buffer_i_bot++;
-	b.buffer_i_top++;
-	assert_ueq(b.buffer_i_bot, 0);
-	assert_ueq(b.buffer_i_top, UINT_MAX - 1);
-	assert_strcmp((draw_buffer_scrollback_status(&b, buf, sizeof(buf))), "50");
+	b->head++;
+	b->tail++;
+	b->buffer_i_bot++;
+	b->buffer_i_top++;
+	assert_ueq(b->buffer_i_bot, 0);
+	assert_ueq(b->buffer_i_top, UINT_MAX - 1);
+	assert_strcmp((draw_buffer_scrollback_status(b, buf, sizeof(buf))), "50");
 
-	b.head++;
-	b.tail++;
-	b.buffer_i_bot++;
-	b.buffer_i_top++;
-	assert_ueq(b.buffer_i_bot, 1);
-	assert_ueq(b.buffer_i_top, UINT_MAX);
-	assert_strcmp((draw_buffer_scrollback_status(&b, buf, sizeof(buf))), "50");
+	b->head++;
+	b->tail++;
+	b->buffer_i_bot++;
+	b->buffer_i_top++;
+	assert_ueq(b->buffer_i_bot, 1);
+	assert_ueq(b->buffer_i_top, UINT_MAX);
+	assert_strcmp((draw_buffer_scrollback_status(b, buf, sizeof(buf))), "50");
+
+	free(b);
 }
 
 static void
