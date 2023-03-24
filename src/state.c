@@ -148,7 +148,7 @@ state_term(void)
 	do {
 		s2 = s1;
 		s1 = s2->next;
-		connection_free(s2->connection);
+		io_dx(s2->connection, 1);
 		server_free(s2);
 	} while (s1 != state_server_list()->head);
 
@@ -402,11 +402,10 @@ state_channel_close(int action_confirm)
 		if (s->connected) {
 			if ((ret = io_sendf(s->connection, "QUIT :%s", DEFAULT_QUIT_MESG)))
 				server_error(s, "sendf fail: %s", io_err(ret));
-			io_dx(s->connection);
 		}
 
 		channel_set_current((s->next != s ? s->next->channel : state.default_channel));
-		connection_free(s->connection);
+		io_dx(s->connection, 1);
 		server_list_del(state_server_list(), s);
 		server_free(s);
 		return;
@@ -839,7 +838,7 @@ command_disconnect(struct channel *c, char *args)
 		return;
 	}
 
-	if ((err = io_dx(c->server->connection)))
+	if ((err = io_dx(c->server->connection, 0)))
 		action(action_error, "disconnect: %s", io_err(err));
 }
 

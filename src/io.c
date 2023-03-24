@@ -79,14 +79,26 @@
 #define PT_UL(X) PT_CF(pthread_mutex_unlock((X)))
 
 /* IO callback */
-#define IO_CB(X) \
-	do { PT_LK(&io_cb_mutex); (X); PT_UL(&io_cb_mutex); } while (0)
+#define IO_CB(C, X) \
+	do { \
+		int callback = 1; \
+		if (((struct connection *)(C))) { \
+			PT_LK(&(((struct connection *)(C))->mtx)); \
+			callback = ((struct connection *)(C))->callback; \
+			PT_UL(&(((struct connection *)(C))->mtx)); \
+		} \
+		if (callback) { \
+			PT_LK(&io_cb_mutex); \
+			(X); \
+			PT_UL(&io_cb_mutex); \
+		} \
+	} while (0)
 
-#define io_cxed(C)       IO_CB(io_cb_cxed((C)->obj))
-#define io_dxed(C)       IO_CB(io_cb_dxed((C)->obj))
-#define io_error(C, ...) IO_CB(io_cb_error((C)->obj,  __VA_ARGS__))
-#define io_info(C, ...)  IO_CB(io_cb_info((C)->obj, __VA_ARGS__))
-#define io_ping(C, P)    IO_CB(io_cb_ping((C)->obj, P))
+#define io_cxed(C)       IO_CB(C, io_cb_cxed((C)->obj))
+#define io_dxed(C)       IO_CB(C, io_cb_dxed((C)->obj))
+#define io_error(C, ...) IO_CB(C, io_cb_error((C)->obj,  __VA_ARGS__))
+#define io_info(C, ...)  IO_CB(C, io_cb_info((C)->obj, __VA_ARGS__))
+#define io_ping(C, P)    IO_CB(C, io_cb_ping((C)->obj, P))
 
 /* state transition */
 #define ST_X(OLD, NEW) (((OLD) << 3) | (NEW))
@@ -133,6 +145,7 @@ struct connection
 	uint32_t flags;
 	unsigned ping;
 	unsigned rx_sleep;
+	unsigned callback : 1;
 };
 
 static enum io_state io_state_cxed(struct connection*);
@@ -198,21 +211,10 @@ connection(
 	cx->tls_cert = (tls_cert ? irc_strdup(tls_cert) : NULL);
 	cx->st_cur = IO_ST_DXED;
 	cx->st_new = IO_ST_INVALID;
+	cx->callback = 1;
 	PT_CF(pthread_mutex_init(&(cx->mtx), NULL));
 
 	return cx;
-}
-
-void
-connection_free(struct connection *cx)
-{
-	PT_CF(pthread_mutex_destroy(&(cx->mtx)));
-	free((void*)cx->host);
-	free((void*)cx->port);
-	free((void*)cx->tls_ca_file);
-	free((void*)cx->tls_ca_path);
-	free((void*)cx->tls_cert);
-	free(cx);
 }
 
 int
@@ -252,21 +254,38 @@ io_cx(struct connection *cx)
 }
 
 int
-io_dx(struct connection *cx)
+io_dx(struct connection *cx, int destroy)
 {
-	enum io_err err = IO_ERR_NONE;
-
-	if (cx->st_cur == IO_ST_DXED)
+	if (cx->st_cur == IO_ST_DXED && !destroy)
 		return IO_ERR_DXED;
 
-	PT_LK(&(cx->mtx));
-	cx->st_new = IO_ST_DXED;
-	PT_UL(&(cx->mtx));
+	if (cx->st_cur != IO_ST_DXED) {
+		PT_LK(&(cx->mtx));
+		cx->callback = !destroy;
+		cx->st_new = IO_ST_DXED;
+		PT_UL(&(cx->mtx));
 
-	PT_CF(pthread_detach(cx->tid));
-	PT_CF(pthread_kill(cx->tid, SIGUSR1));
+		/* HACK: temporarily unlock the callback mutex, for cases when the
+		 * connection thread might be already simultaneously waiting on it.
+		 * Setting `destroy` prevents the thread from attempting additional
+		 * callbacks before moving to the DXED state */
+		PT_CF(pthread_kill(cx->tid, SIGUSR1));
+		PT_UL(&io_cb_mutex);
+		PT_CF(pthread_join(cx->tid, NULL));
+		PT_LK(&io_cb_mutex);
+	}
 
-	return err;
+	if (destroy) {
+		PT_CF(pthread_mutex_destroy(&(cx->mtx)));
+		free((void*)cx->host);
+		free((void*)cx->port);
+		free((void*)cx->tls_ca_file);
+		free((void*)cx->tls_ca_path);
+		free((void*)cx->tls_cert);
+		free(cx);
+	}
+
+	return IO_ERR_NONE;
 }
 
 int
@@ -317,7 +336,7 @@ io_sendf(struct connection *cx, const char *fmt, ...)
 				ret = 0;
 				continue;
 			default:
-				io_dx(cx);
+				io_dx(cx, 0);
 				io_cx(cx);
 				return IO_ERR_SSL_WRITE;
 		}
@@ -346,7 +365,7 @@ io_start(void)
 		ssize_t ret = read(STDIN_FILENO, buf, sizeof(buf));
 
 		if (ret > 0) {
-			IO_CB(io_cb_read_inp(buf, ret));
+			IO_CB(NULL, io_cb_read_inp(buf, ret));
 		} else {
 			if (errno == EINTR) {
 				if (flag_sigwinch_cb) {
@@ -374,7 +393,7 @@ io_tty_winsize(void)
 	if (ioctl(0, TIOCGWINSZ, &tty_ws) < 0)
 		fatal("ioctl: %s", strerror(errno));
 
-	IO_CB(io_cb_sigwinch(tty_ws.ws_col, tty_ws.ws_row));
+	IO_CB(NULL, io_cb_sigwinch(tty_ws.ws_col, tty_ws.ws_row));
 }
 
 const char*
@@ -639,9 +658,8 @@ io_cx_read(struct connection *cx, uint32_t timeout)
 		ret = mbedtls_net_recv(&(cx->net_ctx), buf, sizeof(buf));
 	}
 
-	if (ret > 0) {
-		IO_CB(io_cb_read_soc((char *)buf, (size_t)ret,  cx->obj));
-	}
+	if (ret > 0)
+		IO_CB(NULL, io_cb_read_soc((char *)buf, (size_t)ret,  cx->obj));
 
 	return ret;
 }

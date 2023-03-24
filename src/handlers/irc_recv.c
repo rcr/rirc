@@ -1346,7 +1346,7 @@ recv_ircv3_cap(struct server *s, struct irc_message *m)
 	int ret;
 
 	if ((ret = ircv3_recv_CAP(s, m)) && !s->registered)
-		io_dx(s->connection);
+		io_dx(s->connection, 0);
 
 	return ret;
 }
@@ -1357,7 +1357,7 @@ recv_ircv3_authenticate(struct server *s, struct irc_message *m)
 	int ret;
 
 	if ((ret = ircv3_recv_AUTHENTICATE(s, m)) && !s->registered)
-		io_dx(s->connection);
+		io_dx(s->connection, 0);
 
 	return ret;
 }
