@@ -84,29 +84,23 @@ current_channel(void)
 
 /* List of IRC commands for tab completion */
 static const char *irc_list[] = {
-	"cap-ls",
-	"cap-list",
-	"ctcp-action",
-	"ctcp-clientinfo",
-	"ctcp-finger",
-	"ctcp-ping",
-	"ctcp-source",
-	"ctcp-time",
-	"ctcp-userinfo",
-	"ctcp-version",
-	"away",
-	"topic-unset",
-	"admin",   "connect", "info",     "invite", "join",
-	"kick",    "kill",    "links",    "list",   "lusers",
-	"mode",    "motd",    "names",    "nick",   "notice",
-	"oper",    "part",    "pass",     "ping",   "pong",
-	"privmsg", "quit",    "servlist", "squery", "stats",
-	"time",    "topic",   "trace",    "user",   "version",
-	"who",     "whois",   "whowas",   NULL };
+	"admin",       "away",            "cap-list",     "cap-ls",      "connect",
+	"ctcp-action", "ctcp-clientinfo", "ctcp-finger",  "ctcp-ping",   "ctcp-source",
+	"ctcp-time",   "ctcp-userinfo",   "ctcp-version", "info",        "invite",
+	"join",        "kick",            "kill",         "links",       "list",
+	"lusers",      "mode",            "motd",         "names",       "nick",
+	"notice",      "oper",            "part",         "pass",        "ping",
+	"pong",        "privmsg",         "quit",         "servlist",    "squery",
+	"stats",       "time",            "topic",        "topic-unset", "trace",
+	"user",        "version",         "who",          "whois",       "whowas",
+	NULL };
 
 /* List of rirc commands for tab completeion */
 static const char *cmd_list[] = {
-	"clear", "close", "connect", "disconnect", "quit", NULL};
+	#define X(CMD) #CMD,
+	COMMAND_HANDLERS
+	#undef X
+	NULL };
 
 void
 state_init(void)
@@ -415,10 +409,10 @@ state_channel_close(int action_confirm)
 static void
 buffer_scrollback_tail(void)
 {
-	struct buffer *b = &(state.current_channel->buffer);
+	struct buffer *b = &(current_channel()->buffer);
 
 	if (buffer_line(b, b->scrollback) != (buffer_tail(b))) {
-		state.current_channel->buffer.scrollback = state.current_channel->buffer.tail;
+		current_channel()->buffer.scrollback = current_channel()->buffer.tail;
 		draw(DRAW_BUFFER);
 		draw(DRAW_STATUS);
 	}
@@ -427,10 +421,10 @@ buffer_scrollback_tail(void)
 static void
 buffer_scrollback_head(void)
 {
-	struct buffer *b = &(state.current_channel->buffer);
+	struct buffer *b = &(current_channel()->buffer);
 
 	if (buffer_line(b, b->scrollback) != (buffer_head(b))) {
-		state.current_channel->buffer.scrollback = state.current_channel->buffer.head - 1;
+		current_channel()->buffer.scrollback = current_channel()->buffer.head - 1;
 		draw(DRAW_BUFFER);
 		draw(DRAW_STATUS);
 	}
@@ -439,7 +433,7 @@ buffer_scrollback_head(void)
 static void
 buffer_scrollback_back(void)
 {
-	struct buffer *b = &(state.current_channel->buffer);
+	struct buffer *b = &(current_channel()->buffer);
 
 	if (buffer_line(b, b->scrollback) != (buffer_tail(b))) {
 		draw(DRAW_BUFFER_BACK);
@@ -451,7 +445,7 @@ buffer_scrollback_back(void)
 static void
 buffer_scrollback_forw(void)
 {
-	struct buffer *b = &(state.current_channel->buffer);
+	struct buffer *b = &(current_channel()->buffer);
 
 	if (buffer_line(b, b->scrollback) != (buffer_head(b))) {
 		draw(DRAW_BUFFER_FORW);
