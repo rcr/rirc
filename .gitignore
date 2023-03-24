@@ -2,7 +2,6 @@
 .cache
 TODO
 build
-compile_commands.json
 config.h
 coverage
 lib/mbedtls-*

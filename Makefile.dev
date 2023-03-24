@@ -46,8 +46,10 @@ $(PATH_BUILD):
 	@mkdir -p $(patsubst src%, build%, $(shell find src -type d))
 
 clean-dev: clean
-	@rm -rf $(MBEDTLS_SRC)
 	@rm -rfv rirc.debug $(PATH_BUILD)
+
+clean-lib:
+	@rm -rf $(MBEDTLS_SRC)
 
 -include $(OBJ_D:.o=.o.d)
 -include $(OBJ_T:.t=.t.d)

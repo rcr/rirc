@@ -11,8 +11,10 @@ set -u
 
 export MAKEFLAGS="-f Makefile.dev -j $(nproc)"
 
+make build
+
 if [ -x "$(command -v bear)" ]; then
-	BEAR="bear --append --"
+	BEAR="bear --append --force-wrapper --output build/compile_commands.json --"
 else
 	BEAR=""
 fi
@@ -22,5 +24,5 @@ if [ -x "$(command -v entr)" ]; then
 	  -o -name '*.h' \
 	  -o -name 'Makefile.*' | grep -v './lib/' | entr -cs "$BEAR make $*"
 else
-	eval "$BEAR make -j $(nproc) $*"
+	eval "$BEAR make $*"
 fi
