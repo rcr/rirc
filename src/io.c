@@ -836,12 +836,11 @@ io_strerror(char *buf, size_t buflen)
 static void
 io_tls_debug(void *ctx, int level, const char *file, int line, const char *msg)
 {
-	debug("no callback???");
-
 	UNUSED(ctx);
 	UNUSED(level);
 
-	debug("mbedtls: %s:%04d: %s", file, line, msg);
+	/* msg minus newline */
+	debug("mbedtls: %s:%04d: %.*s", file, line, (int)(strlen(msg) - 1), msg);
 }
 #endif
 
