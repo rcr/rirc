@@ -18,7 +18,7 @@
 
 /* User count in channel before filtering message types
  *   Integer
- *   (0: no filtering) */
+ *   (0: never filter, -1: always filter) */
 #define FILTER_THRESHOLD_JOIN    0
 #define FILTER_THRESHOLD_PART    0
 #define FILTER_THRESHOLD_NICK    0

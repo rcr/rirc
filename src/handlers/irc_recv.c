@@ -12,6 +12,7 @@
 
 #include <ctype.h>
 #include <errno.h>
+#include <limits.h>
 #include <stdlib.h>
 
 #define failf(S, ...) \
@@ -52,6 +53,7 @@ static int irc_numeric_433(struct server*, struct irc_message*);
 static int irc_recv_numeric(struct server*, struct irc_message*);
 static int recv_mode_chanmodes(struct irc_message*, const struct mode_cfg*, struct server*, struct channel*);
 static int recv_mode_usermodes(struct irc_message*, const struct mode_cfg*, struct server*);
+static int irc_recv_threshold_filter(unsigned, unsigned);
 
 static unsigned threshold_account = FILTER_THRESHOLD_ACCOUNT;
 static unsigned threshold_away    = FILTER_THRESHOLD_AWAY;
@@ -765,10 +767,17 @@ recv_join(struct server *s, struct irc_message *m)
 	if ((c = channel_list_get(&s->clist, chan, s->casemapping)) == NULL)
 		failf(s, "JOIN: channel '%s' not found", chan);
 
+	/* JOIN increments count, filter first */
+
+	int filter = irc_recv_threshold_filter(threshold_join, c->users.count);
+
 	if (user_list_add(&(c->users), s->casemapping, m->from, (struct mode){0}) == USER_ERR_DUPLICATE)
 		failf(s, "JOIN: user '%s' already on channel '%s'", m->from, chan);
 
-	if (!threshold_join || threshold_join > c->users.count) {
+	if (c == current_channel())
+		draw(DRAW_STATUS);
+
+	if (!filter) {
 
 		if (s->ircv3_caps.extended_join.set) {
 
@@ -784,11 +793,10 @@ recv_join(struct server *s, struct irc_message *m)
 			newlinef(c, BUFFER_LINE_JOIN, FROM_JOIN, "%s!%s has joined [%s - %s]",
 				m->from, m->host, account, realname);
 		} else {
-			newlinef(c, BUFFER_LINE_JOIN, FROM_JOIN, "%s!%s has joined", m->from, m->host);
+			newlinef(c, BUFFER_LINE_JOIN, FROM_JOIN, "%s!%s has joined",
+				m->from, m->host);
 		}
 	}
-
-	draw(DRAW_STATUS);
 
 	return 0;
 }
@@ -1082,14 +1090,16 @@ recv_nick(struct server *s, struct irc_message *m)
 	do {
 		enum user_err ret;
 
-		if (threshold_nick && threshold_nick <= c->users.count)
+		if ((ret = user_list_rpl(&(c->users), s->casemapping, m->from, nick)) == USER_ERR_NOT_FOUND)
 			continue;
 
-		if ((ret = user_list_rpl(&(c->users), s->casemapping, m->from, nick)) == USER_ERR_NONE)
-			newlinef(c, BUFFER_LINE_NICK, FROM_INFO, "%s  >>  %s", m->from, nick);
-
-		else if (ret == USER_ERR_DUPLICATE)
+		if (ret == USER_ERR_DUPLICATE)
 			server_error(s, "NICK: user '%s' already on channel '%s'", nick, c->name);
+
+		if (irc_recv_threshold_filter(threshold_nick, c->users.count))
+			continue;
+
+		newlinef(c, BUFFER_LINE_NICK, FROM_INFO, "%s  >>  %s", m->from, nick);
 
 	} while ((c = c->next) != s->channel);
 
@@ -1155,14 +1165,17 @@ recv_part(struct server *s, struct irc_message *m)
 			channel_part(c);
 		}
 	} else {
-
 		if ((c = channel_list_get(&s->clist, chan, s->casemapping)) == NULL)
 			failf(s, "PART: channel '%s' not found", chan);
+
+		/* PART decrements count, filter first */
+
+		int filter = irc_recv_threshold_filter(threshold_part, c->users.count);
 
 		if (user_list_del(&(c->users), s->casemapping, m->from) == USER_ERR_NOT_FOUND)
 			failf(s, "PART: nick '%s' not found in '%s'", m->from, chan);
 
-		if (!threshold_part || threshold_part > c->users.count) {
+		if (!filter) {
 
 			if (message && *message)
 				newlinef(c, 0, FROM_PART, "%s!%s has parted (%s)", m->from, m->host, message);
@@ -1272,18 +1285,23 @@ recv_quit(struct server *s, struct irc_message *m)
 	irc_message_param(m, &message);
 
 	do {
-		if (user_list_del(&(c->users), s->casemapping, m->from) == USER_ERR_NONE) {
+		/* QUIT decrements count, filter first */
 
-			if (threshold_quit && threshold_quit <= c->users.count)
-				continue;
+		int filter = irc_recv_threshold_filter(threshold_quit, c->users.count);
 
-			if (message && *message)
-				newlinef(c, BUFFER_LINE_QUIT, FROM_QUIT, "%s!%s has quit (%s)",
-					m->from, m->host, message);
-			else
-				newlinef(c, BUFFER_LINE_QUIT, FROM_QUIT, "%s!%s has quit",
-					m->from, m->host);
-		}
+		if (user_list_del(&(c->users), s->casemapping, m->from) == USER_ERR_NOT_FOUND)
+			continue;
+
+		if (filter)
+			continue;
+
+		if (message && *message)
+			newlinef(c, BUFFER_LINE_QUIT, FROM_QUIT, "%s!%s has quit (%s)",
+				m->from, m->host, message);
+		else
+			newlinef(c, BUFFER_LINE_QUIT, FROM_QUIT, "%s!%s has quit",
+				m->from, m->host);
+
 	} while ((c = c->next) != s->channel);
 
 	draw(DRAW_STATUS);
@@ -1359,10 +1377,10 @@ recv_ircv3_account(struct server *s, struct irc_message *m)
 		failf(s, "ACCOUNT: account is null");
 
 	do {
-		if (!user_list_get(&(c->users), s->casemapping, m->from, 0))
+		if (irc_recv_threshold_filter(threshold_account, c->users.count))
 			continue;
 
-		if (threshold_account && threshold_account <= c->users.count)
+		if (!user_list_get(&(c->users), s->casemapping, m->from, 0))
 			continue;
 
 		if (!strcmp(account, "*"))
@@ -1389,10 +1407,10 @@ recv_ircv3_away(struct server *s, struct irc_message *m)
 	irc_message_param(m, &message);
 
 	do {
-		if (!user_list_get(&(c->users), s->casemapping, m->from, 0))
+		if (irc_recv_threshold_filter(threshold_away, c->users.count))
 			continue;
 
-		if (threshold_away && threshold_away <= c->users.count)
+		if (!user_list_get(&(c->users), s->casemapping, m->from, 0))
 			continue;
 
 		if (message)
@@ -1424,10 +1442,10 @@ recv_ircv3_chghost(struct server *s, struct irc_message *m)
 		failf(s, "CHGHOST: host is null");
 
 	do {
-		if (!user_list_get(&(c->users), s->casemapping, m->from, 0))
+		if (irc_recv_threshold_filter(threshold_chghost, c->users.count))
 			continue;
 
-		if (threshold_chghost && threshold_chghost <= c->users.count)
+		if (!user_list_get(&(c->users), s->casemapping, m->from, 0))
 			continue;
 
 		newlinef(c, 0, FROM_INFO, "%s has changed user/host: %s/%s", m->from, user, host);
@@ -1435,6 +1453,20 @@ recv_ircv3_chghost(struct server *s, struct irc_message *m)
 	} while ((c = c->next) != s->channel);
 
 	return 0;
+}
+
+static int
+irc_recv_threshold_filter(unsigned filter, unsigned count)
+{
+	/* returns 1 if message should be filtered */
+
+	if (filter == UINT_MAX)
+		return 1;
+
+	if (filter == 0)
+		return 0;
+
+	return (filter < count);
 }
 
 #undef failf

@@ -442,10 +442,12 @@ test_recv_join(void)
 	/* :nick!user@host JOIN <channel>
 	 * :nick!user@host JOIN <channel> <account> :<realname> */
 
-	assert_eq(user_list_add(&(c1->users), CASEMAPPING_RFC1459, "nick1", (struct mode){0}), USER_ERR_NONE);
-	assert_eq(user_list_add(&(c2->users), CASEMAPPING_RFC1459, "nick1", (struct mode){0}), USER_ERR_NONE);
+	struct channel *c_filter;
 
 	threshold_join = 0;
+
+	assert_eq(user_list_add(&(c1->users), CASEMAPPING_RFC1459, "nick1", (struct mode){0}), USER_ERR_NONE);
+	assert_eq(user_list_add(&(c2->users), CASEMAPPING_RFC1459, "nick1", (struct mode){0}), USER_ERR_NONE);
 
 	CHECK_RECV("JOIN #c1", 1, 1, 0);
 	assert_strcmp(mock_chan[0], "host");
@@ -487,16 +489,66 @@ test_recv_join(void)
 	assert_strcmp(mock_chan[0], "#c1");
 	assert_strcmp(mock_line[0], "nick6!user@host has joined [account - real name]");
 
-	threshold_join = 2;
-
-	CHECK_RECV(":nick2!user@host JOIN #c2", 0, 0, 0);
-
 	/* test user joining new channel */
 	CHECK_RECV(":me!user@host JOIN #new", 0, 1, 1);
 	assert_strcmp(mock_chan[0], "#new");
 	assert_strcmp(mock_line[0], "Joined #new");
 	assert_strcmp(mock_send[0], "MODE #new");
 	assert_ptr_not_null(channel_list_get(&s->clist, "#new", s->casemapping));
+
+	/* test threshold_join */
+	c_filter = c2;
+
+	/* test threshold_join is set */
+	threshold_join = 100;
+
+	/* test threshold_join is set, count < threshold, no filter */
+	c_filter->users.count = 0;
+	CHECK_RECV(":nick-filter-1!user@host JOIN #c2 account :real name", 0, 1, 0);
+	assert_strcmp(mock_chan[0], c_filter->name);
+	assert_strcmp(mock_line[0], "nick-filter-1!user@host has joined [account - real name]");
+
+	/* test threshold_join is set, count < threshold, no filter */
+	c_filter->users.count = 99;
+	CHECK_RECV(":nick-filter-2!user@host JOIN #c2 account :real name", 0, 1, 0);
+	assert_strcmp(mock_chan[0], c_filter->name);
+	assert_strcmp(mock_line[0], "nick-filter-2!user@host has joined [account - real name]");
+
+	/* test threshold_join is set, count = threshold, no filter */
+	c_filter->users.count = 100;
+	CHECK_RECV(":nick-filter-3!user@host JOIN #c2 account :real name", 0, 1, 0);
+	assert_strcmp(mock_chan[0], c_filter->name);
+	assert_strcmp(mock_line[0], "nick-filter-3!user@host has joined [account - real name]");
+
+	/* test threshold_join is set, count > threshold, filter */
+	c_filter->users.count = 101;
+	CHECK_RECV(":nick-filter-4!user@host JOIN #c2 account :real name", 0, 0, 0);
+
+	/* test threshold_join is set, count > threshold, filter */
+	c_filter->users.count = UINT_MAX;
+	CHECK_RECV(":nick-filter-5!user@host JOIN #c2 account :real name", 0, 0, 0);
+
+	/* test threshold_join, never filter */
+	threshold_join = 0;
+
+	c_filter->users.count = 0;
+	CHECK_RECV(":nick-filter-6!user@host JOIN #c2 account :real name", 0, 1, 0);
+	assert_strcmp(mock_chan[0], c_filter->name);
+	assert_strcmp(mock_line[0], "nick-filter-6!user@host has joined [account - real name]");
+
+	c_filter->users.count = UINT_MAX;
+	CHECK_RECV(":nick-filter-7!user@host JOIN #c2 account :real name", 0, 1, 0);
+	assert_strcmp(mock_chan[0], c_filter->name);
+	assert_strcmp(mock_line[0], "nick-filter-7!user@host has joined [account - real name]");
+
+	/* test threshold_join, always filter */
+	threshold_join = -1;
+
+	c_filter->users.count = 0;
+	CHECK_RECV(":nick-filter-8!user@host JOIN #c2 account :real name", 0, 0, 0);
+
+	c_filter->users.count = UINT_MAX;
+	CHECK_RECV(":nick-filter-9!user@host JOIN #c2 account :real name", 0, 0, 0);
 }
 
 static void
@@ -579,6 +631,10 @@ test_recv_nick(void)
 {
 	/* :nick!user@host NICK <nick> */
 
+	struct channel *c_filter;
+
+	threshold_nick = 0;
+
 	assert_eq(user_list_add(&(c1->users), CASEMAPPING_RFC1459, "nick1", (struct mode){0}), USER_ERR_NONE);
 	assert_eq(user_list_add(&(c1->users), CASEMAPPING_RFC1459, "nick2", (struct mode){0}), USER_ERR_NONE);
 	assert_eq(user_list_add(&(c3->users), CASEMAPPING_RFC1459, "nick1", (struct mode){0}), USER_ERR_NONE);
@@ -603,11 +659,15 @@ test_recv_nick(void)
 	assert_ptr_null(user_list_get(&(c1->users), s->casemapping, "nick1", 0));
 	assert_ptr_null(user_list_get(&(c3->users), s->casemapping, "nick1", 0));
 
-	CHECK_RECV(":nick2!user@host NICK new_nick", 0, 2, 0);
+	CHECK_RECV(":nick2!user@host NICK new_nick", 0, 4, 0);
 	assert_strcmp(mock_chan[0], "host");
 	assert_strcmp(mock_line[0], "NICK: user 'new_nick' already on channel '#c1'");
-	assert_strcmp(mock_chan[1], "host");
-	assert_strcmp(mock_line[1], "NICK: user 'new_nick' already on channel '#c3'");
+	assert_strcmp(mock_chan[1], "#c1");
+	assert_strcmp(mock_line[1], "nick2  >>  new_nick");
+	assert_strcmp(mock_chan[2], "host");
+	assert_strcmp(mock_line[2], "NICK: user 'new_nick' already on channel '#c3'");
+	assert_strcmp(mock_chan[3], "#c3");
+	assert_strcmp(mock_line[3], "nick2  >>  new_nick");
 
 	CHECK_RECV(":me!user@host NICK new_me", 0, 1, 0);
 	assert_strcmp(mock_chan[0], "host");
@@ -622,12 +682,69 @@ test_recv_nick(void)
 
 	server_nick_set(s, "me");
 
-	/* test NICK message threshold */
-	threshold_nick = 0;
-	CHECK_RECV(":nick2!user@host NICK nick3", 0, 2, 0);
+	/* test threshold_nick */
+	c_filter = c2;
 
-	threshold_nick = 1;
-	CHECK_RECV(":nick3!user@host NICK nick2", 0, 0, 0);
+	assert_eq(user_list_add(&(c_filter->users), CASEMAPPING_RFC1459, "nick-filter-1", (struct mode){0}), USER_ERR_NONE);
+	assert_eq(user_list_add(&(c_filter->users), CASEMAPPING_RFC1459, "nick-filter-2", (struct mode){0}), USER_ERR_NONE);
+	assert_eq(user_list_add(&(c_filter->users), CASEMAPPING_RFC1459, "nick-filter-3", (struct mode){0}), USER_ERR_NONE);
+	assert_eq(user_list_add(&(c_filter->users), CASEMAPPING_RFC1459, "nick-filter-4", (struct mode){0}), USER_ERR_NONE);
+	assert_eq(user_list_add(&(c_filter->users), CASEMAPPING_RFC1459, "nick-filter-5", (struct mode){0}), USER_ERR_NONE);
+	assert_eq(user_list_add(&(c_filter->users), CASEMAPPING_RFC1459, "nick-filter-6", (struct mode){0}), USER_ERR_NONE);
+	assert_eq(user_list_add(&(c_filter->users), CASEMAPPING_RFC1459, "nick-filter-7", (struct mode){0}), USER_ERR_NONE);
+	assert_eq(user_list_add(&(c_filter->users), CASEMAPPING_RFC1459, "nick-filter-8", (struct mode){0}), USER_ERR_NONE);
+	assert_eq(user_list_add(&(c_filter->users), CASEMAPPING_RFC1459, "nick-filter-9", (struct mode){0}), USER_ERR_NONE);
+
+	/* test threshold_nick is set */
+	threshold_nick = 100;
+
+	/* test threshold_nick is set, count < threshold, no filter */
+	c_filter->users.count = 0;
+	CHECK_RECV(":nick-filter-1!user@host NICK nick-filter-1-", 0, 1, 0);
+	assert_strcmp(mock_chan[0], c_filter->name);
+	assert_strcmp(mock_line[0], "nick-filter-1  >>  nick-filter-1-");
+
+	/* test threshold_nick is set, count < threshold, no filter */
+	c_filter->users.count = 99;
+	CHECK_RECV(":nick-filter-2!user@host NICK nick-filter-2-", 0, 1, 0);
+	assert_strcmp(mock_chan[0], c_filter->name);
+	assert_strcmp(mock_line[0], "nick-filter-2  >>  nick-filter-2-");
+
+	/* test threshold_nick is set, count = threshold, no filter */
+	c_filter->users.count = 100;
+	CHECK_RECV(":nick-filter-3!user@host NICK nick-filter-3-", 0, 1, 0);
+	assert_strcmp(mock_chan[0], c_filter->name);
+	assert_strcmp(mock_line[0], "nick-filter-3  >>  nick-filter-3-");
+
+	/* test threshold_nick is set, count > threshold, filter */
+	c_filter->users.count = 101;
+	CHECK_RECV(":nick-filter-4!user@host NICK nick-filter-4-", 0, 0, 0);
+
+	/* test threshold_nick is set, count > threshold, filter */
+	c_filter->users.count = UINT_MAX;
+	CHECK_RECV(":nick-filter-5!user@host NICK nick-filter-5-", 0, 0, 0);
+
+	/* test threshold_nick, never filter */
+	threshold_nick = 0;
+
+	c_filter->users.count = 0;
+	CHECK_RECV(":nick-filter-6!user@host NICK nick-filter-6-", 0, 1, 0);
+	assert_strcmp(mock_chan[0], c_filter->name);
+	assert_strcmp(mock_line[0], "nick-filter-6  >>  nick-filter-6-");
+
+	c_filter->users.count = UINT_MAX;
+	CHECK_RECV(":nick-filter-7!user@host NICK nick-filter-7-", 0, 1, 0);
+	assert_strcmp(mock_chan[0], c_filter->name);
+	assert_strcmp(mock_line[0], "nick-filter-7  >>  nick-filter-7-");
+
+	/* test threshold_nick, always filter */
+	threshold_nick = -1;
+
+	c_filter->users.count = 0;
+	CHECK_RECV(":nick-filter-8!user@host NICK nick-filter-8-", 0, 0, 0);
+
+	c_filter->users.count = UINT_MAX;
+	CHECK_RECV(":nick-filter-9!user@host NICK nick-filter-9-", 0, 0, 0);
 }
 
 static void
@@ -677,13 +794,13 @@ test_recv_part(void)
 {
 	/* :nick!user@host PART <channel> [:message] */
 
+	struct channel *c_filter;
+
+	threshold_part = 0;
+
 	assert_eq(user_list_add(&(c1->users), CASEMAPPING_RFC1459, "nick1", (struct mode){0}), USER_ERR_NONE);
 	assert_eq(user_list_add(&(c1->users), CASEMAPPING_RFC1459, "nick2", (struct mode){0}), USER_ERR_NONE);
 	assert_eq(user_list_add(&(c1->users), CASEMAPPING_RFC1459, "nick3", (struct mode){0}), USER_ERR_NONE);
-	assert_eq(user_list_add(&(c1->users), CASEMAPPING_RFC1459, "nick4", (struct mode){0}), USER_ERR_NONE);
-	assert_eq(user_list_add(&(c1->users), CASEMAPPING_RFC1459, "nick5", (struct mode){0}), USER_ERR_NONE);
-
-	threshold_part = 0;
 
 	CHECK_RECV("PART #c1 :part message", 1, 1, 0);
 	assert_strcmp(mock_chan[0], "host");
@@ -692,7 +809,7 @@ test_recv_part(void)
 	CHECK_RECV(":nick1!user@host PART", 1, 1, 0);
 	assert_strcmp(mock_line[0], "PART: channel is null");
 
-	CHECK_RECV(":nick1!user@host PART #notfound :quit message", 1, 1, 0);
+	CHECK_RECV(":nick1!user@host PART #notfound :part message", 1, 1, 0);
 	assert_strcmp(mock_line[0], "PART: channel '#notfound' not found");
 
 	CHECK_RECV(":nick6!user@host PART #c1 :part message", 1, 1, 0);
@@ -703,33 +820,28 @@ test_recv_part(void)
 	assert_strcmp(mock_line[0], "nick1!user@host has parted (part message)");
 	assert_ptr_null(user_list_get(&(c1->users), s->casemapping, "nick1", 0));
 
-	/* no message */
+	/* test no message */
 	CHECK_RECV(":nick2!user@host PART #c1", 0, 1, 0);
 	assert_strcmp(mock_chan[0], "#c1");
 	assert_strcmp(mock_line[0], "nick2!user@host has parted");
 	assert_ptr_null(user_list_get(&(c1->users), s->casemapping, "nick2", 0));
 
-	/* empty message */
+	/* test empty message */
 	CHECK_RECV(":nick3!user@host PART #c1 :", 0, 1, 0);
 	assert_strcmp(mock_chan[0], "#c1");
 	assert_strcmp(mock_line[0], "nick3!user@host has parted");
 	assert_ptr_null(user_list_get(&(c1->users), s->casemapping, "nick3", 0));
 
-	threshold_part = 1;
-
-	CHECK_RECV(":nick4!user@host PART #c1", 0, 0, 0);
-	assert_ptr_null(user_list_get(&(c1->users), s->casemapping, "nick4", 0));
-
-	/* channel not found, assume closed */
+	/* test channel not found, assume closed */
 	CHECK_RECV(":me!user@host PART #notfound", 0, 0, 0);
 
-	/* no message */
+	/* test no message */
 	CHECK_RECV(":me!user@host PART #c1", 0, 1, 0);
 	assert_strcmp(mock_chan[0], "#c1");
 	assert_strcmp(mock_line[0], "you have parted");
 	assert_eq(c1->parted, 1);
 
-	/* empty message */
+	/* test empty message */
 	CHECK_RECV(":me!user@host PART #c2 :", 0, 1, 0);
 	assert_strcmp(mock_chan[0], "#c2");
 	assert_strcmp(mock_line[0], "you have parted");
@@ -739,6 +851,70 @@ test_recv_part(void)
 	assert_strcmp(mock_chan[0], "#c3");
 	assert_strcmp(mock_line[0], "you have parted (message)");
 	assert_eq(c3->parted, 1);
+
+	/* test threshold_part */
+	c_filter = c2;
+
+	assert_eq(user_list_add(&(c_filter->users), CASEMAPPING_RFC1459, "nick-filter-1", (struct mode){0}), USER_ERR_NONE);
+	assert_eq(user_list_add(&(c_filter->users), CASEMAPPING_RFC1459, "nick-filter-2", (struct mode){0}), USER_ERR_NONE);
+	assert_eq(user_list_add(&(c_filter->users), CASEMAPPING_RFC1459, "nick-filter-3", (struct mode){0}), USER_ERR_NONE);
+	assert_eq(user_list_add(&(c_filter->users), CASEMAPPING_RFC1459, "nick-filter-4", (struct mode){0}), USER_ERR_NONE);
+	assert_eq(user_list_add(&(c_filter->users), CASEMAPPING_RFC1459, "nick-filter-5", (struct mode){0}), USER_ERR_NONE);
+	assert_eq(user_list_add(&(c_filter->users), CASEMAPPING_RFC1459, "nick-filter-6", (struct mode){0}), USER_ERR_NONE);
+	assert_eq(user_list_add(&(c_filter->users), CASEMAPPING_RFC1459, "nick-filter-7", (struct mode){0}), USER_ERR_NONE);
+	assert_eq(user_list_add(&(c_filter->users), CASEMAPPING_RFC1459, "nick-filter-8", (struct mode){0}), USER_ERR_NONE);
+	assert_eq(user_list_add(&(c_filter->users), CASEMAPPING_RFC1459, "nick-filter-9", (struct mode){0}), USER_ERR_NONE);
+
+	/* test threshold_part is set */
+	threshold_part = 100;
+
+	/* test threshold_part is set, count < threshold, no filter */
+	c_filter->users.count = 0;
+	CHECK_RECV(":nick-filter-1!user@host PART #c2", 0, 1, 0);
+	assert_strcmp(mock_chan[0], c_filter->name);
+	assert_strcmp(mock_line[0], "nick-filter-1!user@host has parted");
+
+	/* test threshold_part is set, count < threshold, no filter */
+	c_filter->users.count = 99;
+	CHECK_RECV(":nick-filter-2!user@host PART #c2", 0, 1, 0);
+	assert_strcmp(mock_chan[0], c_filter->name);
+	assert_strcmp(mock_line[0], "nick-filter-2!user@host has parted");
+
+	/* test threshold_part is set, count = threshold, no filter */
+	c_filter->users.count = 100;
+	CHECK_RECV(":nick-filter-3!user@host PART #c2", 0, 1, 0);
+	assert_strcmp(mock_chan[0], c_filter->name);
+	assert_strcmp(mock_line[0], "nick-filter-3!user@host has parted");
+
+	/* test threshold_part is set, count > threshold, filter */
+	c_filter->users.count = 101;
+	CHECK_RECV(":nick-filter-4!user@host PART #c2", 0, 0, 0);
+
+	/* test threshold_part is set, count > threshold, filter */
+	c_filter->users.count = UINT_MAX;
+	CHECK_RECV(":nick-filter-5!user@host PART #c2", 0, 0, 0);
+
+	/* test threshold_part, never filter */
+	threshold_part = 0;
+
+	c_filter->users.count = 0;
+	CHECK_RECV(":nick-filter-6!user@host PART #c2", 0, 1, 0);
+	assert_strcmp(mock_chan[0], c_filter->name);
+	assert_strcmp(mock_line[0], "nick-filter-6!user@host has parted");
+
+	c_filter->users.count = UINT_MAX;
+	CHECK_RECV(":nick-filter-7!user@host PART #c2", 0, 1, 0);
+	assert_strcmp(mock_chan[0], c_filter->name);
+	assert_strcmp(mock_line[0], "nick-filter-7!user@host has parted");
+
+	/* test threshold_part, always filter */
+	threshold_part = -1;
+
+	c_filter->users.count = 0;
+	CHECK_RECV(":nick-filter-8!user@host PART #c2", 0, 0, 0);
+
+	c_filter->users.count = UINT_MAX;
+	CHECK_RECV(":nick-filter-9!user@host PART #c2", 0, 0, 0);
 }
 
 static void
@@ -775,22 +951,23 @@ test_recv_quit(void)
 {
 	/* :nick!user@host QUIT [:message] */
 
+	struct channel *c_filter;
+
+	threshold_quit = 0;
+
 	assert_eq(user_list_add(&(c1->users), CASEMAPPING_RFC1459, "nick1", (struct mode){0}), USER_ERR_NONE);
 	assert_eq(user_list_add(&(c1->users), CASEMAPPING_RFC1459, "nick2", (struct mode){0}), USER_ERR_NONE);
 	assert_eq(user_list_add(&(c1->users), CASEMAPPING_RFC1459, "nick3", (struct mode){0}), USER_ERR_NONE);
 	assert_eq(user_list_add(&(c1->users), CASEMAPPING_RFC1459, "nick4", (struct mode){0}), USER_ERR_NONE);
-	assert_eq(user_list_add(&(c1->users), CASEMAPPING_RFC1459, "nick5", (struct mode){0}), USER_ERR_NONE);
 
 	assert_eq(user_list_add(&(c3->users), CASEMAPPING_RFC1459, "nick1", (struct mode){0}), USER_ERR_NONE);
 	assert_eq(user_list_add(&(c3->users), CASEMAPPING_RFC1459, "nick2", (struct mode){0}), USER_ERR_NONE);
-
-	threshold_quit = 0;
 
 	CHECK_RECV("QUIT message", 1, 1, 0);
 	assert_strcmp(mock_chan[0], "host");
 	assert_strcmp(mock_line[0], "QUIT: sender's nick is null");
 
-	/* user not on channels */
+	/* test user not on channels */
 	CHECK_RECV(":nick6!user@host QUIT :quit message", 0, 0, 0);
 
 	CHECK_RECV(":nick2!user@host QUIT :quit message", 0, 2, 0);
@@ -801,26 +978,81 @@ test_recv_quit(void)
 	assert_ptr_null(user_list_get(&(c1->users), s->casemapping, "nick2", 0));
 	assert_ptr_null(user_list_get(&(c3->users), s->casemapping, "nick2", 0));
 
-	/* no message */
+	/* test no message */
 	CHECK_RECV(":nick3!user@host QUIT", 0, 1, 0);
 	assert_strcmp(mock_chan[0], "#c1");
 	assert_strcmp(mock_line[0], "nick3!user@host has quit");
 	assert_ptr_null(user_list_get(&(c1->users), s->casemapping, "nick3", 0));
 
-	/* empty message */
+	/* test empty message */
 	CHECK_RECV(":nick4!user@host QUIT :", 0, 1, 0);
 	assert_strcmp(mock_chan[0], "#c1");
 	assert_strcmp(mock_line[0], "nick4!user@host has quit");
 	assert_ptr_null(user_list_get(&(c1->users), s->casemapping, "nick4", 0));
 
-	threshold_quit = 1;
+	/* test threshold_quit */
+	c_filter = c2;
 
-	/* c1 = {nick1, nick5}, c3 = {nick1} */
-	CHECK_RECV(":nick1!user@host QUIT", 0, 1, 0);
-	assert_strcmp(mock_chan[0], "#c3");
-	assert_strcmp(mock_line[0], "nick1!user@host has quit");
-	assert_ptr_null(user_list_get(&(c1->users), s->casemapping, "nick1", 0));
-	assert_ptr_null(user_list_get(&(c3->users), s->casemapping, "nick1", 0));
+	assert_eq(user_list_add(&(c_filter->users), CASEMAPPING_RFC1459, "nick-filter-1", (struct mode){0}), USER_ERR_NONE);
+	assert_eq(user_list_add(&(c_filter->users), CASEMAPPING_RFC1459, "nick-filter-2", (struct mode){0}), USER_ERR_NONE);
+	assert_eq(user_list_add(&(c_filter->users), CASEMAPPING_RFC1459, "nick-filter-3", (struct mode){0}), USER_ERR_NONE);
+	assert_eq(user_list_add(&(c_filter->users), CASEMAPPING_RFC1459, "nick-filter-4", (struct mode){0}), USER_ERR_NONE);
+	assert_eq(user_list_add(&(c_filter->users), CASEMAPPING_RFC1459, "nick-filter-5", (struct mode){0}), USER_ERR_NONE);
+	assert_eq(user_list_add(&(c_filter->users), CASEMAPPING_RFC1459, "nick-filter-6", (struct mode){0}), USER_ERR_NONE);
+	assert_eq(user_list_add(&(c_filter->users), CASEMAPPING_RFC1459, "nick-filter-7", (struct mode){0}), USER_ERR_NONE);
+	assert_eq(user_list_add(&(c_filter->users), CASEMAPPING_RFC1459, "nick-filter-8", (struct mode){0}), USER_ERR_NONE);
+	assert_eq(user_list_add(&(c_filter->users), CASEMAPPING_RFC1459, "nick-filter-9", (struct mode){0}), USER_ERR_NONE);
+
+	/* test threshold_quit is set */
+	threshold_quit = 100;
+
+	/* test threshold_quit is set, count < threshold, no filter */
+	c_filter->users.count = 0;
+	CHECK_RECV(":nick-filter-1!user@host QUIT", 0, 1, 0);
+	assert_strcmp(mock_chan[0], c_filter->name);
+	assert_strcmp(mock_line[0], "nick-filter-1!user@host has quit");
+
+	/* test threshold_quit is set, count < threshold, no filter */
+	c_filter->users.count = 99;
+	CHECK_RECV(":nick-filter-2!user@host QUIT", 0, 1, 0);
+	assert_strcmp(mock_chan[0], c_filter->name);
+	assert_strcmp(mock_line[0], "nick-filter-2!user@host has quit");
+
+	/* test threshold_quit is set, count = threshold, no filter */
+	c_filter->users.count = 100;
+	CHECK_RECV(":nick-filter-3!user@host QUIT", 0, 1, 0);
+	assert_strcmp(mock_chan[0], c_filter->name);
+	assert_strcmp(mock_line[0], "nick-filter-3!user@host has quit");
+
+	/* test threshold_quit is set, count > threshold, filter */
+	c_filter->users.count = 101;
+	CHECK_RECV(":nick-filter-4!user@host QUIT", 0, 0, 0);
+
+	/* test threshold_quit is set, count > threshold, filter */
+	c_filter->users.count = UINT_MAX;
+	CHECK_RECV(":nick-filter-5!user@host QUIT", 0, 0, 0);
+
+	/* test threshold_quit, never filter */
+	threshold_quit = 0;
+
+	c_filter->users.count = 0;
+	CHECK_RECV(":nick-filter-6!user@host QUIT", 0, 1, 0);
+	assert_strcmp(mock_chan[0], c_filter->name);
+	assert_strcmp(mock_line[0], "nick-filter-6!user@host has quit");
+
+	c_filter->users.count = UINT_MAX;
+	CHECK_RECV(":nick-filter-7!user@host QUIT", 0, 1, 0);
+	assert_strcmp(mock_chan[0], c_filter->name);
+	assert_strcmp(mock_line[0], "nick-filter-7!user@host has quit");
+
+	/* test threshold_quit, always filter */
+	threshold_quit = -1;
+
+	c_filter->users.count = 0;
+	CHECK_RECV(":nick-filter-8!user@host QUIT", 0, 0, 0);
+
+	c_filter->users.count = UINT_MAX;
+	CHECK_RECV(":nick-filter-9!user@host QUIT", 0, 0, 0);
 }
 
 static void
@@ -875,11 +1107,13 @@ test_recv_ircv3_account(void)
 {
 	/* :nick!user@host ACCOUNT <account> */
 
+	struct channel *c_filter;
+
+	threshold_account = 0;
+
 	assert_eq(user_list_add(&(c1->users), CASEMAPPING_RFC1459, "nick1", (struct mode){0}), USER_ERR_NONE);
 	assert_eq(user_list_add(&(c1->users), CASEMAPPING_RFC1459, "nick2", (struct mode){0}), USER_ERR_NONE);
 	assert_eq(user_list_add(&(c3->users), CASEMAPPING_RFC1459, "nick1", (struct mode){0}), USER_ERR_NONE);
-
-	threshold_account = 0;
 
 	CHECK_RECV("ACCOUNT *", 1, 1, 0);
 	assert_strcmp(mock_chan[0], "host");
@@ -888,27 +1122,78 @@ test_recv_ircv3_account(void)
 	CHECK_RECV(":nick1!user@host ACCOUNT", 1, 1, 0);
 	assert_strcmp(mock_line[0], "ACCOUNT: account is null");
 
-	/* user not on channels */
+	/* test user not on channels */
 	CHECK_RECV(":nick3!user@host ACCOUNT account", 0, 0, 0);
 
-	/* logging in */
+	/* test logging in */
 	CHECK_RECV(":nick1!user@host ACCOUNT account", 0, 2, 0);
 	assert_strcmp(mock_chan[0], "#c1");
 	assert_strcmp(mock_line[0], "nick1 has logged in as account");
 	assert_strcmp(mock_chan[1], "#c3");
 	assert_strcmp(mock_line[1], "nick1 has logged in as account");
 
-	/* logging out */
+	/* test logging out */
 	CHECK_RECV(":nick1!user@host ACCOUNT *", 0, 2, 0);
 	assert_strcmp(mock_chan[0], "#c1");
 	assert_strcmp(mock_line[0], "nick1 has logged out");
 	assert_strcmp(mock_chan[1], "#c3");
 	assert_strcmp(mock_line[1], "nick1 has logged out");
 
-	threshold_account = 2;
+	/* test threshold_account */
+	c_filter = c2;
 
-	CHECK_RECV(":nick1!user@host ACCOUNT *", 0, 1, 0);
-	assert_strcmp(mock_chan[0], "#c3");
+	assert_eq(user_list_add(&(c_filter->users), CASEMAPPING_RFC1459, "nick-filter", (struct mode){0}), USER_ERR_NONE);
+
+	/* test threshold_account is set */
+	threshold_account = 100;
+
+	/* test threshold_account is set, count < threshold, no filter */
+	c_filter->users.count = 0;
+	CHECK_RECV(":nick-filter!user@host ACCOUNT *", 0, 1, 0);
+	assert_strcmp(mock_chan[0], c_filter->name);
+	assert_strcmp(mock_line[0], "nick-filter has logged out");
+
+	/* test threshold_account is set, count < threshold, no filter */
+	c_filter->users.count = 99;
+	CHECK_RECV(":nick-filter!user@host ACCOUNT *", 0, 1, 0);
+	assert_strcmp(mock_chan[0], c_filter->name);
+	assert_strcmp(mock_line[0], "nick-filter has logged out");
+
+	/* test threshold_account is set, count = threshold, no filter */
+	c_filter->users.count = 100;
+	CHECK_RECV(":nick-filter!user@host ACCOUNT *", 0, 1, 0);
+	assert_strcmp(mock_chan[0], c_filter->name);
+	assert_strcmp(mock_line[0], "nick-filter has logged out");
+
+	/* test threshold_account is set, count > threshold, filter */
+	c_filter->users.count = 101;
+	CHECK_RECV(":nick-filter!user@host ACCOUNT *", 0, 0, 0);
+
+	/* test threshold_account is set, count > threshold, filter */
+	c_filter->users.count = UINT_MAX;
+	CHECK_RECV(":nick-filter!user@host ACCOUNT *", 0, 0, 0);
+
+	/* test threshold_account, never filter */
+	threshold_account = 0;
+
+	c_filter->users.count = 0;
+	CHECK_RECV(":nick-filter!user@host ACCOUNT *", 0, 1, 0);
+	assert_strcmp(mock_chan[0], c_filter->name);
+	assert_strcmp(mock_line[0], "nick-filter has logged out");
+
+	c_filter->users.count = UINT_MAX;
+	CHECK_RECV(":nick-filter!user@host ACCOUNT *", 0, 1, 0);
+	assert_strcmp(mock_chan[0], c_filter->name);
+	assert_strcmp(mock_line[0], "nick-filter has logged out");
+
+	/* test threshold_account, always filter */
+	threshold_account = -1;
+
+	c_filter->users.count = 0;
+	CHECK_RECV(":nick-filter!user@host ACCOUNT *", 0, 0, 0);
+
+	c_filter->users.count = UINT_MAX;
+	CHECK_RECV(":nick-filter!user@host ACCOUNT *", 0, 0, 0);
 }
 
 static void
@@ -916,37 +1201,90 @@ test_recv_ircv3_away(void)
 {
 	/* :nick!user@host AWAY [:message] */
 
+	struct channel *c_filter;
+
+	threshold_away = 0;
+
 	assert_eq(user_list_add(&(c1->users), CASEMAPPING_RFC1459, "nick1", (struct mode){0}), USER_ERR_NONE);
 	assert_eq(user_list_add(&(c1->users), CASEMAPPING_RFC1459, "nick2", (struct mode){0}), USER_ERR_NONE);
 	assert_eq(user_list_add(&(c3->users), CASEMAPPING_RFC1459, "nick1", (struct mode){0}), USER_ERR_NONE);
-
-	threshold_away = 0;
 
 	CHECK_RECV("AWAY *", 1, 1, 0);
 	assert_strcmp(mock_chan[0], "host");
 	assert_strcmp(mock_line[0], "AWAY: sender's nick is null");
 
-	/* user not on channels */
+	/* test user not on channels */
 	CHECK_RECV(":nick3!user@host AWAY :away message", 0, 0, 0);
 
-	/* away set */
+	/* test away set */
 	CHECK_RECV(":nick1!user@host AWAY :away message", 0, 2, 0);
 	assert_strcmp(mock_chan[0], "#c1");
 	assert_strcmp(mock_line[0], "nick1 is now away: away message");
 	assert_strcmp(mock_chan[1], "#c3");
 	assert_strcmp(mock_line[1], "nick1 is now away: away message");
 
-	/* away unset */
+	/* test away unset */
 	CHECK_RECV(":nick1!user@host AWAY", 0, 2, 0);
 	assert_strcmp(mock_chan[0], "#c1");
 	assert_strcmp(mock_line[0], "nick1 is no longer away");
 	assert_strcmp(mock_chan[1], "#c3");
 	assert_strcmp(mock_line[1], "nick1 is no longer away");
 
-	threshold_away = 2;
+	/* test threshold_away */
+	c_filter = c2;
 
-	CHECK_RECV(":nick1!user@host AWAY", 0, 1, 0);
-	assert_strcmp(mock_chan[0], "#c3");
+	assert_eq(user_list_add(&(c_filter->users), CASEMAPPING_RFC1459, "nick-filter", (struct mode){0}), USER_ERR_NONE);
+
+	/* test threshold_away is set */
+	threshold_away = 100;
+
+	/* test threshold_away is set, count < threshold, no filter */
+	c_filter->users.count = 0;
+	CHECK_RECV(":nick-filter!user@host AWAY", 0, 1, 0);
+	assert_strcmp(mock_chan[0], c_filter->name);
+	assert_strcmp(mock_line[0], "nick-filter is no longer away");
+
+	/* test threshold_away is set, count < threshold, no filter */
+	c_filter->users.count = 99;
+	CHECK_RECV(":nick-filter!user@host AWAY", 0, 1, 0);
+	assert_strcmp(mock_chan[0], c_filter->name);
+	assert_strcmp(mock_line[0], "nick-filter is no longer away");
+
+	/* test threshold_away is set, count = threshold, no filter */
+	c_filter->users.count = 100;
+	CHECK_RECV(":nick-filter!user@host AWAY", 0, 1, 0);
+	assert_strcmp(mock_chan[0], c_filter->name);
+	assert_strcmp(mock_line[0], "nick-filter is no longer away");
+
+	/* test threshold_away is set, count > threshold, filter */
+	c_filter->users.count = 101;
+	CHECK_RECV(":nick-filter!user@host AWAY", 0, 0, 0);
+
+	/* test threshold_away is set, count > threshold, filter */
+	c_filter->users.count = UINT_MAX;
+	CHECK_RECV(":nick-filter!user@host AWAY", 0, 0, 0);
+
+	/* test threshold_away, never filter */
+	threshold_away = 0;
+
+	c_filter->users.count = 0;
+	CHECK_RECV(":nick-filter!user@host AWAY", 0, 1, 0);
+	assert_strcmp(mock_chan[0], c_filter->name);
+	assert_strcmp(mock_line[0], "nick-filter is no longer away");
+
+	c_filter->users.count = UINT_MAX;
+	CHECK_RECV(":nick-filter!user@host AWAY", 0, 1, 0);
+	assert_strcmp(mock_chan[0], c_filter->name);
+	assert_strcmp(mock_line[0], "nick-filter is no longer away");
+
+	/* test threshold_away, always filter */
+	threshold_away = -1;
+
+	c_filter->users.count = 0;
+	CHECK_RECV(":nick-filter!user@host AWAY", 0, 0, 0);
+
+	c_filter->users.count = UINT_MAX;
+	CHECK_RECV(":nick-filter!user@host AWAY", 0, 0, 0);
 }
 
 static void
@@ -954,11 +1292,13 @@ test_recv_ircv3_chghost(void)
 {
 	/* :nick!user@host CHGHOST new_user new_host */
 
+	struct channel *c_filter;
+
+	threshold_chghost = 0;
+
 	assert_eq(user_list_add(&(c1->users), CASEMAPPING_RFC1459, "nick1", (struct mode){0}), USER_ERR_NONE);
 	assert_eq(user_list_add(&(c1->users), CASEMAPPING_RFC1459, "nick2", (struct mode){0}), USER_ERR_NONE);
 	assert_eq(user_list_add(&(c3->users), CASEMAPPING_RFC1459, "nick1", (struct mode){0}), USER_ERR_NONE);
-
-	threshold_chghost = 0;
 
 	CHECK_RECV("CHGHOST new_user new_host", 1, 1, 0);
 	assert_strcmp(mock_chan[0], "host");
@@ -979,11 +1319,61 @@ test_recv_ircv3_chghost(void)
 	assert_strcmp(mock_chan[1], "#c3");
 	assert_strcmp(mock_line[1], "nick1 has changed user/host: new_user/new_host");
 
-	threshold_chghost = 2;
+	/* test threshold_chghost */
+	c_filter = c2;
 
-	CHECK_RECV(":nick1!user@host CHGHOST new_user new_host", 0, 1, 0);
-	assert_strcmp(mock_chan[0], "#c3");
-	assert_strcmp(mock_line[0], "nick1 has changed user/host: new_user/new_host");
+	assert_eq(user_list_add(&(c_filter->users), CASEMAPPING_RFC1459, "nick-filter", (struct mode){0}), USER_ERR_NONE);
+
+	/* test threshold_chghost is set */
+	threshold_chghost = 100;
+
+	/* test threshold_chghost is set, count < threshold, no filter */
+	c_filter->users.count = 0;
+	CHECK_RECV(":nick-filter!user@host CHGHOST new_user new_host", 0, 1, 0);
+	assert_strcmp(mock_chan[0], c_filter->name);
+	assert_strcmp(mock_line[0], "nick-filter has changed user/host: new_user/new_host");
+
+	/* test threshold_chghost is set, count < threshold, no filter */
+	c_filter->users.count = 99;
+	CHECK_RECV(":nick-filter!user@host CHGHOST new_user new_host", 0, 1, 0);
+	assert_strcmp(mock_chan[0], c_filter->name);
+	assert_strcmp(mock_line[0], "nick-filter has changed user/host: new_user/new_host");
+
+	/* test threshold_chghost is set, count = threshold, no filter */
+	c_filter->users.count = 100;
+	CHECK_RECV(":nick-filter!user@host CHGHOST new_user new_host", 0, 1, 0);
+	assert_strcmp(mock_chan[0], c_filter->name);
+	assert_strcmp(mock_line[0], "nick-filter has changed user/host: new_user/new_host");
+
+	/* test threshold_chghost is set, count > threshold, filter */
+	c_filter->users.count = 101;
+	CHECK_RECV(":nick-filter!user@host CHGHOST new_user new_host", 0, 0, 0);
+
+	/* test threshold_chghost is set, count > threshold, filter */
+	c_filter->users.count = UINT_MAX;
+	CHECK_RECV(":nick-filter!user@host CHGHOST new_user new_host", 0, 0, 0);
+
+	/* test threshold_chghost, never filter */
+	threshold_chghost = 0;
+
+	c_filter->users.count = 0;
+	CHECK_RECV(":nick-filter!user@host CHGHOST new_user new_host", 0, 1, 0);
+	assert_strcmp(mock_chan[0], c_filter->name);
+	assert_strcmp(mock_line[0], "nick-filter has changed user/host: new_user/new_host");
+
+	c_filter->users.count = UINT_MAX;
+	CHECK_RECV(":nick-filter!user@host CHGHOST new_user new_host", 0, 1, 0);
+	assert_strcmp(mock_chan[0], c_filter->name);
+	assert_strcmp(mock_line[0], "nick-filter has changed user/host: new_user/new_host");
+
+	/* test threshold_chghost, always filter */
+	threshold_chghost = -1;
+
+	c_filter->users.count = 0;
+	CHECK_RECV(":nick-filter!user@host CHGHOST new_user new_host", 0, 0, 0);
+
+	c_filter->users.count = UINT_MAX;
+	CHECK_RECV(":nick-filter!user@host CHGHOST new_user new_host", 0, 0, 0);
 }
 
 static int
@@ -1013,7 +1403,6 @@ test_init(void)
 
 	return 0;
 }
-
 
 static int
 test_term(void)
