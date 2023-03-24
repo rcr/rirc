@@ -42,8 +42,6 @@ sonar.links.ci       = https://builds.sr.ht/~rcr/rirc/
 
 # C, Sources
 sonar.cfamily.build-wrapper-output = $BUILD_WRAPPER_OUT
-sonar.cfamily.cache.enabled        = false
-sonar.cfamily.threads              = $(nproc)
 sonar.sources                      = src
 
 # Output
