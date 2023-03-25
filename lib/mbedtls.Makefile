@@ -27,6 +27,6 @@ MBEDTLS_CFLAGS = -I$(MBEDTLS_SRC)/include -DMBEDTLS_CONFIG_FILE='<$(MBEDTLS_CFG)
 $(MBEDTLS_SRC):
 	@echo "$(MBEDTLS_TAR)..."
 	@curl -LfsS $(MBEDTLS_URL) -o $(MBEDTLS_TAR)
-	@command -v shasum > /dev/null || echo ' -- NO SHASUM -- '
-	@command -v shasum > /dev/null && echo "$(MBEDTLS_SHA) *$(MBEDTLS_TAR)" | shasum -c -
-	@tar -xf $(MBEDTLS_TAR) --directory $(MBEDTLS_DIR)
+	-@command -v shasum > /dev/null || echo ' -- NO SHASUM -- '
+	-@command -v shasum > /dev/null && echo "$(MBEDTLS_SHA) *$(MBEDTLS_TAR)" | shasum -c -
+	@tar xf $(MBEDTLS_TAR) -C $(MBEDTLS_DIR)
