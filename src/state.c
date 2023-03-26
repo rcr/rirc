@@ -880,11 +880,11 @@ state_input_ctrlch(const char *c, size_t len)
 		else if (!strncmp(c, "[D", len - 1))
 			return input_cursor_back(&(current_channel()->input));
 
-		/* home (DECCKM) */
+		/* home */
 		else if (!strncmp(c, "[H", len - 1))
 			buffer_scrollback_tail();
 
-		/* end (DECCKM) */
+		/* end */
 		else if (!strncmp(c, "[F", len - 1))
 			buffer_scrollback_head();
 
@@ -910,8 +910,8 @@ state_input_ctrlch(const char *c, size_t len)
 
 	} else switch (*c) {
 
-		/* Backspace */
-		case 0x7F:
+		/* Backspace (VT100) */
+		case 0x08:
 			return input_delete_back(&(current_channel()->input));
 
 		/* Horizontal tab */
@@ -925,6 +925,10 @@ state_input_ctrlch(const char *c, size_t len)
 		case CTRL('c'):
 			/* Cancel current input */
 			return input_reset(&(current_channel()->input));
+
+		/* Backspace (VT220) */
+		case 0x7F:
+			return input_delete_back(&(current_channel()->input));
 
 #ifndef NDEBUG
 		case CTRL('q'):
