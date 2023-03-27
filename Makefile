@@ -54,7 +54,7 @@ uninstall:
 clean:
 	@rm -f rirc $(MBEDTLS) $(OBJ)
 
-%.o: %.c $(MBEDTLS)
+%.o: %.c config.h $(MBEDTLS)
 	$(CC) -c $(CFLAGS) $(MBEDTLS_CFLAGS) -std=c11 -I. -D_POSIX_C_SOURCE=200809L -DVERSION=$(VERSION) -DNDEBUG $< -o $@
 
 .PHONY: all clean options install uninstall
