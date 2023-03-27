@@ -13,7 +13,8 @@ tasks:
       gmake
   - check: |
       cd rirc
-      gmake -f Makefile.dev check
+      gmake -f Makefile.dev clean-lib clean-dev
+      gmake -f Makefile.dev rirc.debug check
 
 triggers:
   - action: email

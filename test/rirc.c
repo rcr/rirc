@@ -17,10 +17,9 @@
 #include "test/io.mock.c"
 
 static void
-test_rirc_parse_args(void)
+test_dummy(void)
 {
-	/* TODO */
-	(void)rirc_parse_args;
+	test_pass();
 }
 
 int
@@ -28,9 +27,10 @@ main(void)
 {
 	/* FIXME: */
 	(void)rirc_pw_name;
+	(void)rirc_parse_args;
 
 	struct testcase tests[] = {
-		TESTCASE(test_rirc_parse_args)
+		TESTCASE(test_dummy)
 	};
 
 	return run_tests(NULL, NULL, tests);

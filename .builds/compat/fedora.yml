@@ -12,7 +12,8 @@ tasks:
       make
   - check: |
       cd rirc
-      make -f Makefile.dev check
+      make -f Makefile.dev clean-lib clean-dev
+      make -f Makefile.dev rirc.debug check
 
 triggers:
   - action: email
