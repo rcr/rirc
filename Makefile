@@ -1,8 +1,14 @@
 VERSION = 0.1.6
 
-CC      = cc
-CFLAGS  = -flto -O2
-LDFLAGS = -flto
+CC       = cc
+CFLAGS   = -flto -O2
+LDFLAGS  = -flto
+
+CPPFLAGS = -I. -D_POSIX_C_SOURCE=200809L -DVERSION=$(VERSION)
+
+ifneq ($(filter %BSD,$(shell uname -s)),)
+	CPPFLAGS += -D_BSD_SOURCE -D__BSD_VISIBLE
+endif
 
 PREFIX   = /usr/local
 PATH_BIN = $(DESTDIR)$(PREFIX)/bin
@@ -55,7 +61,7 @@ clean:
 	@rm -f rirc $(MBEDTLS) $(OBJ)
 
 %.o: %.c config.h $(MBEDTLS)
-	$(CC) -c $(CFLAGS) $(MBEDTLS_CFLAGS) -std=c11 -I. -D_POSIX_C_SOURCE=200809L -DVERSION=$(VERSION) -DNDEBUG $< -o $@
+	$(CC) -std=c11 -c $(CFLAGS) $(CPPFLAGS) $(MBEDTLS_CFLAGS) -DNDEBUG $< -o $@
 
 .PHONY: all clean options install uninstall
 

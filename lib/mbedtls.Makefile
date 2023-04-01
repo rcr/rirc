@@ -1,7 +1,7 @@
 MBEDTLS_VER = 3.3.0
 MBEDTLS_SHA = 113fa84bc3cf862d56e7be0a656806a5d02448215d1e22c98176b1c372345d33
 
-MBEDTLS_DIR = $(shell dirname $(realpath lib/mbedtls.Makefile))
+MBEDTLS_DIR = $(shell dirname $(abspath $(lastword $(MAKEFILE_LIST))))
 
 MBEDTLS_CFG = $(MBEDTLS_DIR)/mbedtls.h
 MBEDTLS_SRC = $(MBEDTLS_DIR)/mbedtls-$(MBEDTLS_VER)
@@ -29,4 +29,4 @@ $(MBEDTLS_SRC):
 	@curl -LfsS $(MBEDTLS_URL) -o $(MBEDTLS_TAR)
 	-@command -v shasum > /dev/null || echo ' -- NO SHASUM -- '
 	-@command -v shasum > /dev/null && echo "$(MBEDTLS_SHA) *$(MBEDTLS_TAR)" | shasum -c -
-	@tar xf $(MBEDTLS_TAR) -C $(MBEDTLS_DIR)
+	@tar xzf $(MBEDTLS_TAR) -C $(MBEDTLS_DIR)
