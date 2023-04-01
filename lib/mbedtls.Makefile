@@ -1,7 +1,7 @@
 MBEDTLS_VER = 3.3.0
 MBEDTLS_SHA = 113fa84bc3cf862d56e7be0a656806a5d02448215d1e22c98176b1c372345d33
 
-MBEDTLS_DIR = $(shell dirname $(abspath $(lastword $(MAKEFILE_LIST))))
+MBEDTLS_DIR = $(shell dirname $(realpath $(filter %mbedtls.Makefile,$(MAKEFILE_LIST))))
 
 MBEDTLS_CFG = $(MBEDTLS_DIR)/mbedtls.h
 MBEDTLS_SRC = $(MBEDTLS_DIR)/mbedtls-$(MBEDTLS_VER)

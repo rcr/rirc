@@ -9,7 +9,7 @@
 set -e
 set -u
 
-export MAKEFLAGS="-f Makefile.dev -j $(nproc)"
+export MAKEFLAGS="-f Makefile.dev -j $(nproc) --keep-going --shuffle --warn-undefined"
 
 make build
 

@@ -63,6 +63,6 @@ clean:
 %.o: %.c config.h $(MBEDTLS)
 	$(CC) -std=c11 -c $(CFLAGS) $(CPPFLAGS) $(MBEDTLS_CFLAGS) -DNDEBUG $< -o $@
 
-.PHONY: all clean options install uninstall
+.PHONY: all clean install uninstall
 
 .SUFFIXES:
