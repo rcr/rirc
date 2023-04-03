@@ -247,15 +247,15 @@ test_recv_ctcp_request_finger(void)
 {
 	CHECK_REQUEST(":nick!user@host PRIVMSG me :\001FINGER", 0, 1, 1,
 		"CTCP FINGER from nick",
-		"NOTICE nick :\001FINGER rirc v"VERSION" ("__DATE__")\001");
+		"NOTICE nick :\001FINGER rirc v" STR(VERSION) " ("__DATE__")\001");
 
 	CHECK_REQUEST(":nick!user@host PRIVMSG me :\001FINGER\001", 0, 1, 1,
 		"CTCP FINGER from nick",
-		"NOTICE nick :\001FINGER rirc v"VERSION" ("__DATE__")\001");
+		"NOTICE nick :\001FINGER rirc v" STR(VERSION) " ("__DATE__")\001");
 
 	CHECK_REQUEST(":nick!user@host PRIVMSG me :\001FINGER unused args\001", 0, 1, 1,
 		"CTCP FINGER from nick (unused args)",
-		"NOTICE nick :\001FINGER rirc v"VERSION" ("__DATE__")\001");
+		"NOTICE nick :\001FINGER rirc v" STR(VERSION) " ("__DATE__")\001");
 }
 
 static void
@@ -327,15 +327,15 @@ test_recv_ctcp_request_version(void)
 {
 	CHECK_REQUEST(":nick!user@host PRIVMSG me :\001VERSION", 0, 1, 1,
 		"CTCP VERSION from nick",
-		"NOTICE nick :\001VERSION rirc v"VERSION" ("__DATE__")\001");
+		"NOTICE nick :\001VERSION rirc v" STR(VERSION) " ("__DATE__")\001");
 
 	CHECK_REQUEST(":nick!user@host PRIVMSG me :\001VERSION\001", 0, 1, 1,
 		"CTCP VERSION from nick",
-		"NOTICE nick :\001VERSION rirc v"VERSION" ("__DATE__")\001");
+		"NOTICE nick :\001VERSION rirc v" STR(VERSION) " ("__DATE__")\001");
 
 	CHECK_REQUEST(":nick!user@host PRIVMSG me :\001VERSION unused args\001", 0, 1, 1,
 		"CTCP VERSION from nick (unused args)",
-		"NOTICE nick :\001VERSION rirc v"VERSION" ("__DATE__")\001");
+		"NOTICE nick :\001VERSION rirc v" STR(VERSION) " ("__DATE__")\001");
 }
 
 static void

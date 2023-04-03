@@ -151,10 +151,10 @@ irc_send_privmsg(struct server *s, struct channel *c, char *m)
 	if (!m || !*m)
 		failf(c, "Usage: /privmsg <target> <message>");
 
-	p2 = dup = strdup(target);
+	p2 = dup = irc_strdup(target);
 
 	do {
-		struct channel *c;
+		struct channel *c_target;
 
 		p1 = p2;
 		p2 = strchr(p2, ',');
@@ -162,18 +162,18 @@ irc_send_privmsg(struct server *s, struct channel *c, char *m)
 		if (p2)
 			*p2++ = 0;
 
-		if (!(c = channel_list_get(&s->clist, p1, s->casemapping))) {
+		if (!(c_target = channel_list_get(&s->clist, p1, s->casemapping))) {
 
 			if (irc_isnick(p1))
-				c = channel(p1, CHANNEL_T_PRIVMSG);
+				c_target = channel(p1, CHANNEL_T_PRIVMSG);
 			else
-				c = channel(p1, CHANNEL_T_CHANNEL);
+				c_target = channel(p1, CHANNEL_T_CHANNEL);
 
-			c->server = s;
-			channel_list_add(&s->clist, c);
+			c_target->server = s;
+			channel_list_add(&s->clist, c_target);
 		}
 
-		newlinef(c, BUFFER_LINE_CHAT, s->nick, "%s", m);
+		newlinef(c_target, BUFFER_LINE_CHAT, s->nick, "%s", m);
 
 	} while (p2);
 

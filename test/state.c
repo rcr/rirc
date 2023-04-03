@@ -26,8 +26,8 @@
 	} while (0)
 
 #define CURRENT_LINE \
-	(buffer_head(&current_channel()->buffer) ? \
-	 buffer_head(&current_channel()->buffer)->text : NULL)
+	(buffer_head(&(current_channel()->buffer)) ? \
+	 buffer_head(&(current_channel()->buffer))->text : NULL)
 
 static void
 test_command(void)
@@ -35,20 +35,30 @@ test_command(void)
 	INP_COMMAND(":unknown command with args");
 
 	assert_strcmp(action_message(), "Unknown command 'unknown'");
+
+	/* clear error */
+	INP_C(0x0A);
 }
 
 static void
 test_command_clear(void)
 {
-	assert_strcmp(CURRENT_LINE, " - compiled with DEBUG flags");
-
-	INP_COMMAND(":clear");
-
 	assert_ptr_null(CURRENT_LINE);
 
 	INP_COMMAND(":clear with args");
 
 	assert_strcmp(action_message(), "clear: Unknown arg 'with'");
+
+	/* clear error */
+	INP_C(0x0A);
+
+	newlinef(current_channel(), 0, "", "testing");
+
+	assert_strcmp(CURRENT_LINE, "testing");
+
+	INP_COMMAND(":clear");
+
+	assert_ptr_null(CURRENT_LINE);
 }
 
 static void
@@ -62,7 +72,7 @@ test_command_close(void)
 	struct server *s1;
 	struct server *s2;
 
-	assert_strcmp(CURRENT_LINE, " - compiled with DEBUG flags");
+	assert_ptr_null(CURRENT_LINE);
 
 	INP_COMMAND(":close");
 
@@ -382,11 +392,10 @@ test_command_disconnect(void)
 
 	mock_reset_io();
 
-	assert_strcmp(CURRENT_LINE, " - compiled with DEBUG flags");
+	assert_ptr_null(CURRENT_LINE);
 
 	INP_COMMAND(":disconnect");
 
-	assert_strcmp(CURRENT_LINE, " - compiled with DEBUG flags");
 	assert_strcmp(action_message(), "disconnect: This is not a server");
 
 	/* clear error */
@@ -446,9 +455,6 @@ test_command_quit(void)
 static void
 test_state(void)
 {
-	/* Test splash message */
-	assert_strcmp(CURRENT_LINE, " - compiled with DEBUG flags");
-
 	/* Test messages sent to the default rirc buffer */
 	INP_S("/");
 	INP_C(0x0A);
@@ -497,6 +503,8 @@ static int
 test_init(void)
 {
 	state_init();
+
+	buffer(&(current_channel()->buffer));
 
 	return 0;
 }

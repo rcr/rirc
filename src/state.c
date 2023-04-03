@@ -31,11 +31,16 @@ static void command_##CMD(struct channel*, char*);
 COMMAND_HANDLERS
 #undef X
 
-static void _newline(struct channel*, enum buffer_line_type, const char*, const char*, va_list);
+static void newlinev(struct channel*, enum buffer_line_type, const char*, const char*, va_list);
 
 static int state_input_linef(struct channel*);
 static int state_input_ctrlch(const char*, size_t);
 static int state_input_action(const char*, size_t);
+
+static void buffer_scrollback_tail(void);
+static void buffer_scrollback_head(void);
+static void buffer_scrollback_back(void);
+static void buffer_scrollback_forw(void);
 
 static uint16_t state_complete(char*, uint16_t, uint16_t, int);
 static uint16_t state_complete_list(char*, uint16_t, uint16_t, const char**);
@@ -79,29 +84,23 @@ current_channel(void)
 
 /* List of IRC commands for tab completion */
 static const char *irc_list[] = {
-	"cap-ls",
-	"cap-list",
-	"ctcp-action",
-	"ctcp-clientinfo",
-	"ctcp-finger",
-	"ctcp-ping",
-	"ctcp-source",
-	"ctcp-time",
-	"ctcp-userinfo",
-	"ctcp-version",
-	"away",
-	"topic-unset",
-	"admin",   "connect", "info",     "invite", "join",
-	"kick",    "kill",    "links",    "list",   "lusers",
-	"mode",    "motd",    "names",    "nick",   "notice",
-	"oper",    "part",    "pass",     "ping",   "pong",
-	"privmsg", "quit",    "servlist", "squery", "stats",
-	"time",    "topic",   "trace",    "user",   "version",
-	"who",     "whois",   "whowas",   NULL };
+	"admin",       "away",            "cap-list",     "cap-ls",      "connect",
+	"ctcp-action", "ctcp-clientinfo", "ctcp-finger",  "ctcp-ping",   "ctcp-source",
+	"ctcp-time",   "ctcp-userinfo",   "ctcp-version", "info",        "invite",
+	"join",        "kick",            "kill",         "links",       "list",
+	"lusers",      "mode",            "motd",         "names",       "nick",
+	"notice",      "oper",            "part",         "pass",        "ping",
+	"pong",        "privmsg",         "quit",         "servlist",    "squery",
+	"stats",       "time",            "topic",        "topic-unset", "trace",
+	"user",        "version",         "who",          "whois",       "whowas",
+	NULL };
 
 /* List of rirc commands for tab completeion */
 static const char *cmd_list[] = {
-	"clear", "close", "connect", "disconnect", "quit", NULL};
+	#define X(CMD) #CMD,
+	COMMAND_HANDLERS
+	#undef X
+	NULL };
 
 void
 state_init(void)
@@ -114,10 +113,10 @@ state_init(void)
 	newlinef(state.default_channel, 0, FROM_INFO, "| |  | | | | (__");
 	newlinef(state.default_channel, 0, FROM_INFO, "|_|  |_|_|  \\___|");
 	newlinef(state.default_channel, 0, FROM_INFO, "");
-	newlinef(state.default_channel, 0, FROM_INFO, " - version %s", VERSION);
-	newlinef(state.default_channel, 0, FROM_INFO, " - compiled %s, %s", __DATE__, __TIME__);
-#ifndef NDEBUG
-	newlinef(state.default_channel, 0, FROM_INFO, " - compiled with DEBUG flags");
+#ifdef NDEBUG
+	newlinef(state.default_channel, 0, FROM_INFO, "v" STR(VERSION));
+#else
+	newlinef(state.default_channel, 0, FROM_INFO, "v" STR(VERSION) " (debug " STR(GITHASH) ")");
 #endif
 
 	channel_set_current(state.default_channel);
@@ -143,7 +142,7 @@ state_term(void)
 	do {
 		s2 = s1;
 		s1 = s2->next;
-		connection_free(s2->connection);
+		io_dx(s2->connection, 1);
 		server_free(s2);
 	} while (s1 != state_server_list()->head);
 
@@ -166,17 +165,15 @@ state_rows(void)
 void
 newlinef(struct channel *c, enum buffer_line_type type, const char *from, const char *fmt, ...)
 {
-	/* Formating wrapper for _newline */
-
 	va_list ap;
 
 	va_start(ap, fmt);
-	_newline(c, type, from, fmt, ap);
+	newlinev(c, type, from, fmt, ap);
 	va_end(ap);
 }
 
 static void
-_newline(struct channel *c, enum buffer_line_type type, const char *from, const char *fmt, va_list ap)
+newlinev(struct channel *c, enum buffer_line_type type, const char *from, const char *fmt, va_list ap)
 {
 	char buf[TEXT_LENGTH_MAX];
 	char prefix = 0;
@@ -198,7 +195,7 @@ _newline(struct channel *c, enum buffer_line_type type, const char *from, const 
 
 		const struct user *u = NULL;
 
-		if (type == BUFFER_LINE_CHAT) {
+		if (type == BUFFER_LINE_CHAT || type == BUFFER_LINE_PINGED) {
 			u = user_list_get(&(c->users), c->server->casemapping, from, 0);
 		}
 
@@ -209,6 +206,36 @@ _newline(struct channel *c, enum buffer_line_type type, const char *from, const 
 			from_len = strlen(from);
 		}
 	}
+
+	/* new date separator */
+	struct tm tm_old;
+	struct tm tm_new;
+
+	time_t t_old = c->buffer.time_last;
+	time_t t_new = time(NULL);
+
+	if ((c->type == CHANNEL_T_CHANNEL
+	  || c->type == CHANNEL_T_PRIVMSG
+	  || c->type == CHANNEL_T_SERVER)
+	 && localtime_r(&t_old, &tm_old)
+	 && localtime_r(&t_new, &tm_new)
+	 && (tm_old.tm_year != tm_new.tm_year
+	  || tm_old.tm_yday != tm_new.tm_yday))
+	{
+		char buf_date[64];
+
+		if (strftime(buf_date, sizeof(buf_date), "-- %e %b %Y --", &tm_new))
+			buffer_newline(
+				&(c->buffer),
+				BUFFER_LINE_OTHER,
+				FROM_INFO,
+				buf_date,
+				strlen(FROM_INFO),
+				strlen(buf_date),
+				0);
+	}
+
+	c->buffer.time_last = t_new;
 
 	buffer_newline(
 		&(c->buffer),
@@ -221,6 +248,7 @@ _newline(struct channel *c, enum buffer_line_type type, const char *from, const 
 
 	if (c == current_channel()) {
 		draw(DRAW_BUFFER);
+		draw(DRAW_STATUS);
 	} else {
 		c->activity = MAX(c->activity, ACTIVITY_ACTIVE);
 		draw(DRAW_NAV);
@@ -368,104 +396,62 @@ state_channel_close(int action_confirm)
 		if (s->connected) {
 			if ((ret = io_sendf(s->connection, "QUIT :%s", DEFAULT_QUIT_MESG)))
 				server_error(s, "sendf fail: %s", io_err(ret));
-			io_dx(s->connection);
 		}
 
 		channel_set_current((s->next != s ? s->next->channel : state.default_channel));
-		connection_free(s->connection);
+		io_dx(s->connection, 1);
 		server_list_del(state_server_list(), s);
 		server_free(s);
 		return;
 	}
 }
 
-//TODO:
-//improvement: don't set the scrollback if the buffer tail is in view
-void
-buffer_scrollback_back(struct channel *c)
+static void
+buffer_scrollback_tail(void)
 {
-	/* Scroll a buffer back one page */
+	struct buffer *b = &(current_channel()->buffer);
 
-	struct buffer *b = &c->buffer;
-
-	unsigned buffer_i = b->scrollback,
-	         count = 0,
-	         text_w = 0,
-	         cols = state_tty_cols,
-	         rows = state_tty_rows - 4;
-
-	struct buffer_line *line = buffer_line(b, buffer_i);
-
-	/* Skip redraw */
-	if (line == buffer_tail(b))
-		return;
-
-	/* Find top line */
-	for (;;) {
-
-		buffer_line_split(line, NULL, &text_w, cols, b->pad);
-
-		count += buffer_line_rows(line, text_w);
-
-		if (count >= rows)
-			break;
-
-		if (line == buffer_tail(b))
-			return;
-
-		line = buffer_line(b, --buffer_i);
+	if (buffer_line(b, b->scrollback) != (buffer_tail(b))) {
+		current_channel()->buffer.scrollback = current_channel()->buffer.tail;
+		draw(DRAW_BUFFER);
+		draw(DRAW_STATUS);
 	}
-
-	b->scrollback = buffer_i;
-
-	/* Top line in view draws in full; scroll back one additional line */
-	if (count == rows && line != buffer_tail(b))
-		b->scrollback--;
-
-	draw(DRAW_BUFFER);
-	draw(DRAW_STATUS);
 }
 
-void
-buffer_scrollback_forw(struct channel *c)
+static void
+buffer_scrollback_head(void)
 {
-	/* Scroll a buffer forward one page */
+	struct buffer *b = &(current_channel()->buffer);
 
-	unsigned count = 0,
-	         text_w = 0,
-	         cols = state_tty_cols,
-	         rows = state_tty_rows - 4;
-
-	struct buffer *b = &c->buffer;
-
-	struct buffer_line *line = buffer_line(b, b->scrollback);
-
-	/* Skip redraw */
-	if (line == buffer_head(b))
-		return;
-
-	/* Find top line */
-	for (;;) {
-
-		buffer_line_split(line, NULL, &text_w, cols, b->pad);
-
-		count += buffer_line_rows(line, text_w);
-
-		if (line == buffer_head(b))
-			break;
-
-		if (count >= rows)
-			break;
-
-		line = buffer_line(b, ++b->scrollback);
+	if (buffer_line(b, b->scrollback) != (buffer_head(b))) {
+		current_channel()->buffer.scrollback = current_channel()->buffer.head - 1;
+		draw(DRAW_BUFFER);
+		draw(DRAW_STATUS);
 	}
+}
 
-	/* Bottom line in view draws in full; scroll forward one additional line */
-	if (count == rows && line != buffer_head(b))
-		b->scrollback++;
+static void
+buffer_scrollback_back(void)
+{
+	struct buffer *b = &(current_channel()->buffer);
 
-	draw(DRAW_BUFFER);
-	draw(DRAW_STATUS);
+	if (buffer_line(b, b->scrollback) != (buffer_tail(b))) {
+		draw(DRAW_BUFFER_BACK);
+		draw(DRAW_BUFFER);
+		draw(DRAW_STATUS);
+	}
+}
+
+static void
+buffer_scrollback_forw(void)
+{
+	struct buffer *b = &(current_channel()->buffer);
+
+	if (buffer_line(b, b->scrollback) != (buffer_head(b))) {
+		draw(DRAW_BUFFER_FORW);
+		draw(DRAW_BUFFER);
+		draw(DRAW_STATUS);
+	}
 }
 
 struct channel*
@@ -604,30 +590,13 @@ command(struct channel *c, char *args)
 	if (!(arg = irc_strsep(&args)))
 		return;
 
-	if (!strcasecmp(arg, "clear")) {
-		command_clear(c, args);
-		return;
+	#define X(CMD) \
+	if (!strcasecmp(arg, #CMD)) { \
+		command_##CMD(c, args);   \
+		return;                   \
 	}
-
-	if (!strcasecmp(arg, "close")) {
-		command_close(c, args);
-		return;
-	}
-
-	if (!strcasecmp(arg, "connect")) {
-		command_connect(c, args);
-		return;
-	}
-
-	if (!strcasecmp(arg, "disconnect")) {
-		command_disconnect(c, args);
-		return;
-	}
-
-	if (!strcasecmp(arg, "quit")) {
-		command_quit(c, args);
-		return;
-	}
+	COMMAND_HANDLERS
+	#undef X
 
 	action(action_error, "Unknown command '%s'", arg);
 }
@@ -863,7 +832,7 @@ command_disconnect(struct channel *c, char *args)
 		return;
 	}
 
-	if ((err = io_dx(c->server->connection)))
+	if ((err = io_dx(c->server->connection, 0)))
 		action(action_error, "disconnect: %s", io_err(err));
 }
 
@@ -911,22 +880,38 @@ state_input_ctrlch(const char *c, size_t len)
 		else if (!strncmp(c, "[D", len - 1))
 			return input_cursor_back(&(current_channel()->input));
 
+		/* home */
+		else if (!strncmp(c, "[H", len - 1))
+			buffer_scrollback_tail();
+
+		/* end */
+		else if (!strncmp(c, "[F", len - 1))
+			buffer_scrollback_head();
+
+		/* home (VT220) */
+		else if (!strncmp(c, "[1~", len - 1))
+			buffer_scrollback_tail();
+
 		/* delete */
 		else if (!strncmp(c, "[3~", len - 1))
 			return input_delete_forw(&(current_channel()->input));
 
+		/* end (VT220) */
+		else if (!strncmp(c, "[4~", len - 1))
+			buffer_scrollback_head();
+
 		/* page up */
 		else if (!strncmp(c, "[5~", len - 1))
-			buffer_scrollback_back(current_channel());
+			buffer_scrollback_back();
 
 		/* page down */
 		else if (!strncmp(c, "[6~", len - 1))
-			buffer_scrollback_forw(current_channel());
+			buffer_scrollback_forw();
 
 	} else switch (*c) {
 
-		/* Backspace */
-		case 0x7F:
+		/* Backspace (VT100) */
+		case 0x08:
 			return input_delete_back(&(current_channel()->input));
 
 		/* Horizontal tab */
@@ -940,6 +925,15 @@ state_input_ctrlch(const char *c, size_t len)
 		case CTRL('c'):
 			/* Cancel current input */
 			return input_reset(&(current_channel()->input));
+
+		/* Backspace (VT220) */
+		case 0x7F:
+			return input_delete_back(&(current_channel()->input));
+
+#ifndef NDEBUG
+		case CTRL('q'):
+			exit(EXIT_SUCCESS);
+#endif
 
 		case CTRL('l'):
 			/* Clear current channel */
@@ -962,12 +956,12 @@ state_input_ctrlch(const char *c, size_t len)
 
 		case CTRL('u'):
 			/* Scoll buffer up */
-			buffer_scrollback_back(current_channel());
+			buffer_scrollback_back();
 			break;
 
 		case CTRL('d'):
 			/* Scoll buffer down */
-			buffer_scrollback_forw(current_channel());
+			buffer_scrollback_forw();
 			break;
 	}
 
@@ -1142,7 +1136,7 @@ io_cb_info(const void *cb_obj, const char *fmt, ...)
 	va_list ap;
 	va_start(ap, fmt);
 
-	_newline(((struct server *)cb_obj)->channel, 0, FROM_INFO, fmt, ap);
+	newlinev(((struct server *)cb_obj)->channel, 0, FROM_INFO, fmt, ap);
 
 	va_end(ap);
 
@@ -1155,7 +1149,7 @@ io_cb_error(const void *cb_obj, const char *fmt, ...)
 	va_list ap;
 	va_start(ap, fmt);
 
-	_newline(((struct server *)cb_obj)->channel, 0, FROM_ERROR, fmt, ap);
+	newlinev(((struct server *)cb_obj)->channel, 0, FROM_ERROR, fmt, ap);
 
 	va_end(ap);
 

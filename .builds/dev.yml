@@ -2,7 +2,6 @@ image: debian/stable
 
 packages:
   - curl
-  - gperf
   - unzip
 
 sources:
@@ -15,10 +14,11 @@ secrets:
 tasks:
   - build: |
       cd rirc
-      make all
+      make
   - check: |
       cd rirc
-      make check
+      make -f Makefile.dev clean-lib clean-dev
+      make -f Makefile.dev rirc.debug check
   - static-analysis: |
       cd rirc
       [ $(git name-rev --name-only HEAD) = "remotes/origin/static_analysis" ] || complete-build

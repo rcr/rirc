@@ -3,7 +3,6 @@ image: openbsd/latest
 packages:
   - curl
   - gmake
-  - gperf
 
 sources:
   - https://git.sr.ht/~rcr/rirc
@@ -11,10 +10,11 @@ sources:
 tasks:
   - build: |
       cd rirc
-      gmake all
+      gmake
   - check: |
       cd rirc
-      gmake check
+      gmake -f Makefile.dev clean-lib clean-dev
+      gmake -f Makefile.dev rirc.debug check
 
 triggers:
   - action: email

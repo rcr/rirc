@@ -172,7 +172,7 @@ ctcp_request_finger(struct server *s, const char *from, const char *targ, char *
 	else
 		server_info(s, "CTCP FINGER from %s", from);
 
-	sendf(s, "NOTICE %s :\001FINGER rirc v"VERSION" ("__DATE__")\001", from);
+	sendf(s, "NOTICE %s :\001FINGER rirc v" STR(VERSION) " ("__DATE__")\001", from);
 
 	return 0;
 }
@@ -312,7 +312,7 @@ ctcp_request_version(struct server *s, const char *from, const char *targ, char 
 	else
 		server_info(s, "CTCP VERSION from %s", from);
 
-	sendf(s, "NOTICE %s :\001VERSION rirc v"VERSION" ("__DATE__")\001", from);
+	sendf(s, "NOTICE %s :\001VERSION rirc v" STR(VERSION) " ("__DATE__")\001", from);
 
 	return 0;
 }

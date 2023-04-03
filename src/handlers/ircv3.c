@@ -140,7 +140,7 @@ ircv3_numeric_902(struct server *s, struct irc_message *m)
 	s->ircv3_sasl.state = IRCV3_SASL_STATE_NONE;
 
 	if (!s->registered)
-		io_dx(s->connection);
+		io_dx(s->connection, 0);
 
 	return 0;
 }
@@ -181,7 +181,7 @@ ircv3_numeric_904(struct server *s, struct irc_message *m)
 	s->ircv3_sasl.state = IRCV3_SASL_STATE_NONE;
 
 	if (!s->registered)
-		io_dx(s->connection);
+		io_dx(s->connection, 0);
 
 	return 0;
 }
@@ -203,7 +203,7 @@ ircv3_numeric_905(struct server *s, struct irc_message *m)
 	s->ircv3_sasl.state = IRCV3_SASL_STATE_NONE;
 
 	if (!s->registered)
-		io_dx(s->connection);
+		io_dx(s->connection, 0);
 
 	return 0;
 }
@@ -225,7 +225,7 @@ ircv3_numeric_906(struct server *s, struct irc_message *m)
 	s->ircv3_sasl.state = IRCV3_SASL_STATE_NONE;
 
 	if (!s->registered)
-		io_dx(s->connection);
+		io_dx(s->connection, 0);
 
 	return 0;
 }
@@ -247,7 +247,7 @@ ircv3_numeric_907(struct server *s, struct irc_message *m)
 	s->ircv3_sasl.state = IRCV3_SASL_STATE_NONE;
 
 	if (!s->registered)
-		io_dx(s->connection);
+		io_dx(s->connection, 0);
 
 	return 0;
 }
@@ -326,7 +326,7 @@ ircv3_recv_cap_LS(struct server *s, struct irc_message *m)
 			continue;
 
 		c->supported = 1;
-		c->val = (cap_val ? strdup(cap_val) : NULL);
+		c->val = (cap_val ? irc_strdup(cap_val) : NULL);
 
 		if (c->req_auto)
 			c->req = 1;

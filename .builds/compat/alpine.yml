@@ -2,7 +2,6 @@ image: alpine/latest
 
 packages:
   - curl
-  - gperf
 
 sources:
   - https://git.sr.ht/~rcr/rirc
@@ -10,10 +9,11 @@ sources:
 tasks:
   - build: |
       cd rirc
-      make all
+      make
   - check: |
       cd rirc
-      make check
+      make -f Makefile.dev clean-lib clean-dev
+      make -f Makefile.dev rirc.debug check
 
 triggers:
   - action: email

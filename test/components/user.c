@@ -13,15 +13,15 @@ test_user_list(void)
 	memset(&ulist, 0, sizeof(ulist));
 
 	/* Test adding users to list */
-	assert_eq(user_list_add(&ulist, CASEMAPPING_RFC1459, "aaa", MODE_EMPTY), USER_ERR_NONE);
-	assert_eq(user_list_add(&ulist, CASEMAPPING_RFC1459, "bbb", MODE_EMPTY), USER_ERR_NONE);
-	assert_eq(user_list_add(&ulist, CASEMAPPING_RFC1459, "ccc", MODE_EMPTY), USER_ERR_NONE);
+	assert_eq(user_list_add(&ulist, CASEMAPPING_RFC1459, "aaa", (struct mode){0}), USER_ERR_NONE);
+	assert_eq(user_list_add(&ulist, CASEMAPPING_RFC1459, "bbb", (struct mode){0}), USER_ERR_NONE);
+	assert_eq(user_list_add(&ulist, CASEMAPPING_RFC1459, "ccc", (struct mode){0}), USER_ERR_NONE);
 
 	if (ulist.count != 3)
 		test_abort("Failed to add users to list");
 
 	/* Test adding duplicates */
-	assert_eq(user_list_add(&ulist, CASEMAPPING_RFC1459, "aaa", MODE_EMPTY), USER_ERR_DUPLICATE);
+	assert_eq(user_list_add(&ulist, CASEMAPPING_RFC1459, "aaa", (struct mode){0}), USER_ERR_DUPLICATE);
 
 	/* Test retrieving by name, failure */
 	assert_ptr_null(user_list_get(&ulist, CASEMAPPING_RFC1459, "a", 0));
@@ -101,11 +101,11 @@ test_user_list_casemapping(void)
 
 	memset(&ulist, 0, sizeof(ulist));
 
-	assert_eq(user_list_add(&ulist, CASEMAPPING_RFC1459, "aaa", MODE_EMPTY), USER_ERR_NONE);
-	assert_eq(user_list_add(&ulist, CASEMAPPING_RFC1459, "AaA", MODE_EMPTY), USER_ERR_DUPLICATE);
-	assert_eq(user_list_add(&ulist, CASEMAPPING_RFC1459, "{}^", MODE_EMPTY), USER_ERR_NONE);
-	assert_eq(user_list_add(&ulist, CASEMAPPING_RFC1459, "[}~", MODE_EMPTY), USER_ERR_DUPLICATE);
-	assert_eq(user_list_add(&ulist, CASEMAPPING_RFC1459, "zzz", MODE_EMPTY), USER_ERR_NONE);
+	assert_eq(user_list_add(&ulist, CASEMAPPING_RFC1459, "aaa", (struct mode){0}), USER_ERR_NONE);
+	assert_eq(user_list_add(&ulist, CASEMAPPING_RFC1459, "AaA", (struct mode){0}), USER_ERR_DUPLICATE);
+	assert_eq(user_list_add(&ulist, CASEMAPPING_RFC1459, "{}^", (struct mode){0}), USER_ERR_NONE);
+	assert_eq(user_list_add(&ulist, CASEMAPPING_RFC1459, "[}~", (struct mode){0}), USER_ERR_DUPLICATE);
+	assert_eq(user_list_add(&ulist, CASEMAPPING_RFC1459, "zzz", (struct mode){0}), USER_ERR_NONE);
 
 	assert_eq(ulist.count, 3);
 
@@ -150,14 +150,14 @@ test_user_list_free(void)
 	};
 
 	for (p = users; *p; p++) {
-		if (user_list_add(&ulist, CASEMAPPING_RFC1459, *p, MODE_EMPTY) != USER_ERR_NONE)
+		if (user_list_add(&ulist, CASEMAPPING_RFC1459, *p, (struct mode){0}) != USER_ERR_NONE)
 			test_failf("Failed to add user to list: %s", *p);
 	}
 
 	user_list_free(&ulist);
 
 	for (p = users; *p; p++) {
-		if (user_list_add(&ulist, CASEMAPPING_RFC1459, *p, MODE_EMPTY) != USER_ERR_NONE)
+		if (user_list_add(&ulist, CASEMAPPING_RFC1459, *p, (struct mode){0}) != USER_ERR_NONE)
 			test_failf("Failed to remove user from list: %s", *p);
 	}
 
