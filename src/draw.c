@@ -826,7 +826,7 @@ draw_input(struct input *inp, struct coords coords)
 	draw_attr_reset(NULL);
 
 	while (cols--)
-		draw_char(NULL, ' ');
+		draw_char(&attrs, ' ');
 
 cursor:
 

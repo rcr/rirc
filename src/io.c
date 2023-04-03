@@ -72,7 +72,7 @@
 #define PT_CF(X) \
 	do {                           \
 		int _ptcf = (X);           \
-		if (_ptcf < 0) {           \
+		if (_ptcf != 0) {          \
 			io_fatal((#X), _ptcf); \
 		}                          \
 	} while (0)
@@ -89,7 +89,7 @@
 			callback = ((struct connection *)(C))->callback; \
 			PT_UL(&(((struct connection *)(C))->mtx)); \
 		} \
-		if (callback) { \
+		if (((struct connection *)(C)) && callback) { \
 			PT_LK(&io_cb_mutex); \
 			(X); \
 			PT_UL(&io_cb_mutex); \
@@ -230,7 +230,8 @@ io_cx(struct connection *cx)
 
 	switch (cx->st_cur) {
 		case IO_ST_DXED:
-			PT_CF(sigfillset(&sigset));
+			if (sigfillset(&sigset) == -1)
+				fatal("sigfillset: %s", strerror(errno));
 			PT_CF(pthread_sigmask(SIG_BLOCK, &sigset, &sigset_old));
 			if (pthread_create(&(cx->tid), NULL, io_thread, cx) < 0)
 				err = IO_ERR_THREAD;
@@ -367,7 +368,9 @@ io_start(void)
 		ssize_t ret = read(STDIN_FILENO, buf, sizeof(buf));
 
 		if (ret > 0) {
-			IO_CB(NULL, io_cb_read_inp(buf, ret));
+			PT_LK(&io_cb_mutex);
+			io_cb_read_inp(buf, ret);
+			PT_UL(&io_cb_mutex);
 		} else {
 			if (errno == EINTR) {
 				if (flag_sigwinch_cb) {
@@ -395,7 +398,9 @@ io_tty_winsize(void)
 	if (ioctl(0, TIOCGWINSZ, &tty_ws) < 0)
 		fatal("ioctl: %s", strerror(errno));
 
-	IO_CB(NULL, io_cb_sigwinch(tty_ws.ws_col, tty_ws.ws_row));
+	PT_LK(&io_cb_mutex);
+	io_cb_sigwinch(tty_ws.ws_col, tty_ws.ws_row);
+	PT_UL(&io_cb_mutex);
 }
 
 const char*
@@ -553,7 +558,9 @@ io_thread(void *arg)
 
 	sigset_t sigset;
 
-	PT_CF(sigaddset(&sigset, SIGUSR1));
+	if (sigaddset(&sigset, SIGUSR1) == -1)
+		fatal("sigaddset: %s", strerror(errno));
+
 	PT_CF(pthread_sigmask(SIG_UNBLOCK, &sigset, NULL));
 
 	cx->st_cur = IO_ST_CXNG;
@@ -660,8 +667,11 @@ io_cx_read(struct connection *cx, uint32_t timeout)
 		ret = mbedtls_net_recv(&(cx->net_ctx), buf, sizeof(buf));
 	}
 
-	if (ret > 0)
-		IO_CB(NULL, io_cb_read_soc((char *)buf, (size_t)ret,  cx->obj));
+	if (ret > 0) {
+		PT_LK(&io_cb_mutex);
+		io_cb_read_soc((char *)buf, (size_t)ret,  cx->obj);
+		PT_UL(&io_cb_mutex);
+	}
 
 	return ret;
 }
