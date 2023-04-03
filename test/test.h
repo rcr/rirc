@@ -231,13 +231,13 @@ struct testcase
 
 static unsigned t__tc_n;
 
-[[ maybe_unused ]] static char t__tc_errbuf_1_[512];
-[[ maybe_unused ]] static char t__tc_errbuf_2_[512];
-[[ maybe_unused ]] static jmp_buf t__tc_fatal_expected_;
-[[ maybe_unused ]] static jmp_buf t__tc_fatal_unexpected_;
-[[ maybe_unused ]] static unsigned t__tc_assert_fatal_;
+static char t__tc_errbuf_1_[512];
+static char t__tc_errbuf_2_[512];
+static jmp_buf t__tc_fatal_expected_;
+static jmp_buf t__tc_fatal_unexpected_;
+static unsigned t__tc_assert_fatal_;
 
-[[ maybe_unused ]] static inline int
+static inline int
 t__assert_strcmp_(const char *p1, const char *p2)
 {
 	if (!p1 || !p2)
@@ -246,7 +246,7 @@ t__assert_strcmp_(const char *p1, const char *p2)
 	return strcmp(p1, p2);
 }
 
-[[ maybe_unused ]] static inline int
+static inline int
 t__assert_strncmp_(const char *p1, const char *p2, size_t n)
 {
 	if (!p1 || !p2)
@@ -262,6 +262,14 @@ t__run_tests_(
 	const struct testcase testcases[],
 	const size_t len)
 {
+	(void)t__assert_strncmp_;
+	(void)t__assert_strcmp_;
+	(void)t__tc_errbuf_1_;
+	(void)t__tc_errbuf_2_;
+	(void)t__tc_fatal_expected_;
+	(void)t__tc_fatal_unexpected_;
+	(void)t__tc_assert_fatal_;
+
 	for (volatile size_t i = 0; i < len; i++) {
 
 		if (setjmp(t__tc_fatal_unexpected_)) {
