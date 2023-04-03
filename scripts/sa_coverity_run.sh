@@ -25,12 +25,15 @@ VERSION=$(git rev-parse --short HEAD)
 
 export PATH="$PWD/$DIR/bin:$PATH"
 
-make clean
-make libs
+make -f Makefile.dev clean-dev clean-lib
+make -f Makefile.dev libs
 
-cov-build --dir "$COVERITY_OUT" make all check
+export CFLAGS=-O0
+export LDFLAGS=
 
-tar -czf "$COVERITY_TAR" "$COVERITY_OUT"
+cov-build --dir "$COVERITY_OUT" make -e -f Makefile.dev rirc check
+
+tar czf "$COVERITY_TAR" "$COVERITY_OUT"
 
 curl https://scan.coverity.com/builds?project=rcr%2Frirc \
 	--form description="$VERSION" \

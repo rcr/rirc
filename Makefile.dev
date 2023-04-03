@@ -47,7 +47,9 @@ gperf:
 	gperf --output-file=src/handlers/irc_recv.gperf.out src/handlers/irc_recv.gperf
 	gperf --output-file=src/handlers/irc_send.gperf.out src/handlers/irc_send.gperf
 
+libs: $(MBEDTLS)
+
 -include $(OBJ_D:.o=.o.d)
 -include $(OBJ_T:.t=.t.d)
 
-.PHONY: check clean-dev clean-lib gperf
+.PHONY: check clean-dev clean-lib gperf libs
