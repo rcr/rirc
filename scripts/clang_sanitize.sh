@@ -9,6 +9,9 @@
 
 set -u
 
+BUILD=
+CHECK=
+
 for arg in "$@"; do
 	[[ "$arg" == "--build" ]] && eval "BUILD=true"
 	[[ "$arg" == "--check" ]] && eval "CHECK=true"
