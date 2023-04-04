@@ -1,6 +1,7 @@
 #!/bin/bash
 
 set -e
+set -u
 
 fail() { >&2 printf "%s\n" "$*"; exit 1; }
 
@@ -47,11 +48,12 @@ sonar.sources                      = src,test
 sonar.working.directory = $DIR/scannerwork
 EOF
 
-make -f Makefile.dev clean-dev clean-lib
-make -f Makefile.dev libs
+export CFLAGS="-pipe -O0"
+export LDFLAGS="-pipe"
+export MAKEFLAGS="-e -f Makefile.dev -j $(nproc)"
 
-export CFLAGS=-O0
-export LDFLAGS=
+make clean-dev clean-lib
+make libs
 
-eval "$BUILD_WRAPPER_BIN --out-dir $BUILD_WRAPPER_OUT make -e -f Makefile.dev rirc check"
+eval "$BUILD_WRAPPER_BIN --out-dir $BUILD_WRAPPER_OUT make rirc check"
 eval "$SONAR_SCANNER_BIN --define project.settings=$SONAR_CONFIG"

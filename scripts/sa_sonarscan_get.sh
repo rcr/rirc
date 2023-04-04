@@ -1,6 +1,7 @@
 #!/bin/bash
 
 set -e
+set -u
 
 fail() { >&2 printf "%s\n" "$*"; exit 1; }
 
