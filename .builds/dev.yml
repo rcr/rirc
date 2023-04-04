@@ -8,8 +8,8 @@ sources:
   - https://git.sr.ht/~rcr/rirc
 
 secrets:
-  - 8c2439c9-5f91-4b19-b3c3-33d82f1b861f
-  - a58d0951-f57f-44ef-8ef2-25f2f84f0e89
+  - 13e1d9a4-c816-4e8e-9f7c-d43152d0cafb
+  - 36318f9b-773a-4c78-b338-d57ec14a40aa
 
 tasks:
   - build: |
