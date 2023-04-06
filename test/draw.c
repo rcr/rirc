@@ -67,6 +67,8 @@ test_draw_buffer_line_rows(void)
 
 	/* Greater columns than length should always return one row */
 	assert_eq(draw_buffer_line_rows(buffer_head(b), buffer_head(b)->text_len + 1), 1);
+
+	free(b);
 }
 
 static void

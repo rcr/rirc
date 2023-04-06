@@ -8,5 +8,6 @@ lib/mbedtls-*
 rirc
 rirc.debug
 rirc.debug.address
+rirc.debug.memory
 rirc.debug.thread
 tags

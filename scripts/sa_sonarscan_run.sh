@@ -1,6 +1,7 @@
 #!/bin/bash
 
 set -e
+set -u
 
 fail() { >&2 printf "%s\n" "$*"; exit 1; }
 
@@ -32,8 +33,7 @@ sonar.host.url = https://sonarcloud.io
 
 # Project
 sonar.organization   = rirc
-sonar.projectKey     = rirc
-sonar.projectName    = rirc
+sonar.projectKey     = rirc_rirc
 sonar.projectVersion = $(git rev-parse --short HEAD)
 sonar.branch.name    = $(git name-rev --name-only HEAD)
 sonar.links.homepage = https://rcr.io/rirc/
@@ -42,17 +42,18 @@ sonar.links.ci       = https://builds.sr.ht/~rcr/rirc/
 
 # C, Sources
 sonar.cfamily.build-wrapper-output = $BUILD_WRAPPER_OUT
-sonar.sources                      = src
+sonar.sources                      = src,test
 
 # Output
 sonar.working.directory = $DIR/scannerwork
 EOF
 
-make -f Makefile.dev clean-dev clean-lib
-make -f Makefile.dev libs
+export CFLAGS="-pipe -O0"
+export LDFLAGS="-pipe"
+export MAKEFLAGS="-e -f Makefile.dev -j $(nproc)"
 
-export CFLAGS=-O0
-export LDFLAGS=
+make clean-dev clean-lib
+make libs
 
-eval "$BUILD_WRAPPER_BIN --out-dir $BUILD_WRAPPER_OUT make -e -f Makefile.dev rirc check"
+eval "$BUILD_WRAPPER_BIN --out-dir $BUILD_WRAPPER_OUT make rirc check"
 eval "$SONAR_SCANNER_BIN --define project.settings=$SONAR_CONFIG"

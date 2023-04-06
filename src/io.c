@@ -557,6 +557,7 @@ io_thread(void *arg)
 	 * to the state machine and check for a new state */
 
 	sigset_t sigset;
+	sigemptyset(&sigset);
 
 	if (sigaddset(&sigset, SIGUSR1) == -1)
 		fatal("sigaddset: %s", strerror(errno));

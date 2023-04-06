@@ -1,6 +1,7 @@
 #!/bin/bash
 
 set -e
+set -u
 
 fail() { >&2 printf "%s\n" "$*"; exit 1; }
 
@@ -25,13 +26,14 @@ VERSION=$(git rev-parse --short HEAD)
 
 export PATH="$PWD/$DIR/bin:$PATH"
 
-make -f Makefile.dev clean-dev clean-lib
-make -f Makefile.dev libs
+export CFLAGS="-pipe -O0"
+export LDFLAGS="-pipe"
+export MAKEFLAGS="-e -f Makefile.dev -j $(nproc)"
 
-export CFLAGS=-O0
-export LDFLAGS=
+make clean-dev clean-lib
+make libs
 
-cov-build --dir "$COVERITY_OUT" make -e -f Makefile.dev rirc check
+cov-build --dir "$COVERITY_OUT" make rirc check
 
 tar czf "$COVERITY_TAR" "$COVERITY_OUT"
 

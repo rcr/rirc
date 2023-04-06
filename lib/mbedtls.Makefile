@@ -24,9 +24,11 @@ MBEDTLS_CFLAGS = -I$(MBEDTLS_SRC)/include -DMBEDTLS_CONFIG_FILE='<$(MBEDTLS_CFG)
 %/libmbedcrypto.a: %/libmbedtls.a
 	@/bin/sh -c true
 
-$(MBEDTLS_SRC):
+$(MBEDTLS_SRC): $(MBEDTLS_TAR)
+	@tar xzf $(MBEDTLS_TAR) -C $(MBEDTLS_DIR)
+
+$(MBEDTLS_TAR):
 	@echo "$(MBEDTLS_TAR)..."
 	@curl -LfsS $(MBEDTLS_URL) -o $(MBEDTLS_TAR)
 	-@command -v shasum > /dev/null || echo ' -- NO SHASUM -- '
 	-@command -v shasum > /dev/null && echo "$(MBEDTLS_SHA) *$(MBEDTLS_TAR)" | shasum -c -
-	@tar xzf $(MBEDTLS_TAR) -C $(MBEDTLS_DIR)

@@ -25,9 +25,9 @@ $(PATH_BUILD)/%.o: $(PATH_SRC)/%.c | config.h $(PATH_BUILD) $(MBEDTLS)
 
 $(PATH_BUILD)/%.t: $(PATH_TEST)/%.c | config.h $(PATH_BUILD) $(MBEDTLS)
 	@echo "$(CC) $(CFLAGS) $<"
-	@$(CC) -std=c2x $(CPPFLAGS) $(CFLAGS) $(MBEDTLS_CFLAGS) -MM -MP -MT $@ -MF $(@:.t=.t.d) $<
-	@$(CC) -std=c2x $(CPPFLAGS) $(CFLAGS) $(MBEDTLS_CFLAGS) -c -o $(@:.t=.t.o) $<
-	@$(CC) -std=c2x $(LDFLAGS) -o $@ $(@:.t=.t.o) $(MBEDTLS)
+	@$(CC) -std=c11 $(CPPFLAGS) $(CFLAGS) $(MBEDTLS_CFLAGS) -MM -MP -MT $@ -MF $(@:.t=.t.d) $<
+	@$(CC) -std=c11 $(CPPFLAGS) $(CFLAGS) $(MBEDTLS_CFLAGS) -c -o $(@:.t=.t.o) $<
+	@$(CC) -std=c11 $(LDFLAGS) -o $@ $(@:.t=.t.o) $(MBEDTLS)
 
 rirc.debug: config.h $(OBJ_D) $(MBEDTLS)
 	@echo "$(CC) $(LDFLAGS) $@"
