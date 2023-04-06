@@ -25,7 +25,7 @@
  *   Assert that the expression exits rirc fatally:
  *    - assert_fatal(expr)
  *
- *   Explicitly fail or abort a test [with formated] message
+ *   Explicitly fail or abort a test with [formated] message
  *    - test_fail(M)
  *    - test_failf(M, ...)
  *    - test_abort(M)
@@ -212,13 +212,13 @@
 #define test_abort(M) \
 	do { \
 		printf("Bail out! %u: " M "\n", __LINE__); \
-		return; \
+		exit(EXIT_SUCCESS); \
 	} while (0)
 
 #define test_abortf(M, ...) \
 	do { \
 		printf("Bail out! %u: " M "\n", __LINE__, __VA_ARGS__); \
-		return; \
+		exit(EXIT_SUCCESS); \
 	} while (0)
 
 #define run_tests(INIT, TERM, TESTS) \
@@ -272,22 +272,16 @@ t__run_tests_(
 
 	for (volatile size_t i = 0; i < len; i++) {
 
-		if (setjmp(t__tc_fatal_unexpected_)) {
-			printf("Bail out! Unexpected fatal: %s %s\n", t__tc_errbuf_1_, t__tc_errbuf_2_);
-			break;
-		}
+		if (setjmp(t__tc_fatal_unexpected_))
+			test_abortf("Bail out! Unexpected fatal: %s %s\n", t__tc_errbuf_1_, t__tc_errbuf_2_);
 
-		if (tc_init && (*tc_init)()) {
-			printf("Bail out! Testcase init failed\n");
-			break;
-		}
+		if (tc_init && (*tc_init)())
+			test_abort("Bail out! Testcase init failed\n");
 
 		(*testcases[i].tc_ptr)();
 
-		if (tc_term && (*tc_term)()) {
-			printf("Bail out! Testcase term failed\n");
-			break;
-		}
+		if (tc_term && (*tc_term)())
+			test_abort("Bail out! Testcase term failed\n");
 	}
 
 	printf("1..%u\n", t__tc_n);
