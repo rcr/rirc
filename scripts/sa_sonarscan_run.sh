@@ -50,10 +50,9 @@ EOF
 
 export CFLAGS="-pipe -O0"
 export LDFLAGS="-pipe"
-export MAKEFLAGS="-e -f Makefile.dev -j $(nproc)"
 
-make clean-dev clean-lib
-make libs
+make -e -f Makefile.dev clean-dev clean-lib
+make -e -f Makefile.dev libs
 
-eval "$BUILD_WRAPPER_BIN --out-dir $BUILD_WRAPPER_OUT make rirc check"
+eval "$BUILD_WRAPPER_BIN --out-dir $BUILD_WRAPPER_OUT make -e -f Makefile.dev rirc check"
 eval "$SONAR_SCANNER_BIN --define project.settings=$SONAR_CONFIG"
