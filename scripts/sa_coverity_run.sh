@@ -28,12 +28,11 @@ export PATH="$PWD/$DIR/bin:$PATH"
 
 export CFLAGS="-pipe -O0"
 export LDFLAGS="-pipe"
-export MAKEFLAGS="-e -f Makefile.dev -j $(nproc)"
 
-make clean-dev clean-lib
-make libs
+make -e -f Makefile.dev clean-dev clean-lib
+make -e -f Makefile.dev libs
 
-cov-build --dir "$COVERITY_OUT" make rirc check
+cov-build --dir "$COVERITY_OUT" make -e -f Makefile.dev rirc check
 
 tar czf "$COVERITY_TAR" "$COVERITY_OUT"
 

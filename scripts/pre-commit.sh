@@ -12,7 +12,6 @@ echo "Running pre-commit hook..."
 export MAKEFLAGS="-f Makefile.dev -j $(nproc)"
 
 make clean-dev
-make clean-lib
 
 RESULTS=$(make rirc rirc.debug check)
 
