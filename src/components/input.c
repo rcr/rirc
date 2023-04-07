@@ -9,9 +9,10 @@
 #define INPUT_MASK(X) ((X) & (INPUT_HIST_MAX - 1))
 
 #if INPUT_MASK(INPUT_HIST_MAX)
-/* Required for proper masking when indexing */
 #error INPUT_HIST_MAX must be a power of 2
 #endif
+
+#define INPUT_HIST_LINE(I, X) ((I)->hist.ptrs[INPUT_MASK((X))])
 
 static char *input_text_copy(struct input*);
 static int input_text_isfull(struct input*);
@@ -30,10 +31,8 @@ input_init(struct input *inp)
 void
 input_free(struct input *inp)
 {
-	free(inp->hist.save);
-
 	while (inp->hist.tail != inp->hist.head)
-		free(inp->hist.ptrs[INPUT_MASK(inp->hist.tail++)]);
+		free(INPUT_HIST_LINE(inp, inp->hist.tail++));
 }
 
 int
@@ -42,7 +41,7 @@ input_cursor_back(struct input *inp)
 	if (inp->head == 0)
 		return 0;
 
-	inp->text[--inp->tail] = inp->text[--inp->head];
+	inp->buf[--inp->tail] = inp->buf[--inp->head];
 
 	return 1;
 }
@@ -53,7 +52,7 @@ input_cursor_forw(struct input *inp)
 	if (inp->tail == INPUT_LEN_MAX)
 		return 0;
 
-	inp->text[inp->head++] = inp->text[inp->tail++];
+	inp->buf[inp->head++] = inp->buf[inp->tail++];
 
 	return 1;
 }
@@ -89,10 +88,10 @@ input_insert(struct input *inp, const char *c, size_t count)
 	while (!input_text_isfull(inp) && count--) {
 
 		if (iscntrl(*c))
-			inp->text[inp->head++] = ' ';
+			inp->buf[inp->head++] = ' ';
 
 		if (isprint(*c))
-			inp->text[inp->head++] = *c;
+			inp->buf[inp->head++] = *c;
 
 		c++;
 	}
@@ -106,11 +105,7 @@ input_reset(struct input *inp)
 	if (input_text_iszero(inp))
 		return 0;
 
-	free(inp->hist.save);
-
 	inp->hist.current = inp->hist.head;
-	inp->hist.save = NULL;
-
 	inp->head = 0;
 	inp->tail = INPUT_LEN_MAX;
 	inp->window = 0;
@@ -134,17 +129,17 @@ input_complete(struct input *inp, f_completion_cb cb)
 	head = inp->head;
 	tail = inp->tail;
 
-	while (head && inp->text[head - 1] != ' ')
+	while (head && inp->buf[head - 1] != ' ')
 		head--;
 
-	if (inp->text[head] == ' ')
+	if (inp->buf[head] == ' ')
 		return 0;
 
-	while (tail < INPUT_LEN_MAX && inp->text[tail] != ' ')
+	while (tail < INPUT_LEN_MAX && inp->buf[tail] != ' ')
 		tail++;
 
 	ret = (*cb)(
-		(inp->text + head),
+		(inp->buf + head),
 		(inp->head - head - inp->tail + tail),
 		(INPUT_LEN_MAX - input_text_size(inp)),
 		(head == 0));
@@ -165,17 +160,10 @@ input_hist_back(struct input *inp)
 	if (input_hist_size(inp) == 0 || inp->hist.current == inp->hist.tail)
 		return 0;
 
-	if (inp->hist.current == inp->hist.head) {
-		inp->hist.save = input_text_copy(inp);
-	} else {
-		free(inp->hist.ptrs[INPUT_MASK(inp->hist.current)]);
-		inp->hist.ptrs[INPUT_MASK(inp->hist.current)] = input_text_copy(inp);
-	}
-
 	inp->hist.current--;
 
-	len = strlen(inp->hist.ptrs[INPUT_MASK(inp->hist.current)]);
-	memcpy(inp->text, inp->hist.ptrs[INPUT_MASK(inp->hist.current)], len);
+	len = strlen(INPUT_HIST_LINE(inp, inp->hist.current));
+	memcpy(inp->buf, INPUT_HIST_LINE(inp, inp->hist.current), len);
 
 	inp->head = len;
 	inp->tail = INPUT_LEN_MAX;
@@ -186,30 +174,18 @@ input_hist_back(struct input *inp)
 int
 input_hist_forw(struct input *inp)
 {
-	char *str;
-	size_t len = 0;
+	size_t len;
 
 	if (input_hist_size(inp) == 0 || inp->hist.current == inp->hist.head)
 		return 0;
 
-	free(inp->hist.ptrs[INPUT_MASK(inp->hist.current)]);
-	inp->hist.ptrs[INPUT_MASK(inp->hist.current)] = input_text_copy(inp);
-
 	inp->hist.current++;
 
-	if (inp->hist.current == inp->hist.head)
-		str = inp->hist.save;
-	else
-		str = inp->hist.ptrs[INPUT_MASK(inp->hist.current)];
-
-	if (str) {
-		len = strlen(str);
-		memcpy(inp->text, str, len);
-	}
-
 	if (inp->hist.current == inp->hist.head) {
-		free(inp->hist.save);
-		inp->hist.save = NULL;
+		len = 0;
+	} else {
+		len = strlen(INPUT_HIST_LINE(inp, inp->hist.current));
+		memcpy(inp->buf, INPUT_HIST_LINE(inp, inp->hist.current), len);
 	}
 
 	inp->head = len;
@@ -221,32 +197,15 @@ input_hist_forw(struct input *inp)
 int
 input_hist_push(struct input *inp)
 {
-	char *save;
+	char *hist;
 
-	if ((save = input_text_copy(inp)) == NULL)
+	if ((hist = input_text_copy(inp)) == NULL)
 		return 0;
 
-	if (inp->hist.current < inp->hist.head) {
+	if (input_hist_size(inp) == INPUT_HIST_MAX)
+		free(INPUT_HIST_LINE(inp, inp->hist.tail++));
 
-		uint16_t i;
-
-		free(inp->hist.ptrs[INPUT_MASK(inp->hist.current)]);
-
-		for (i = inp->hist.current; i < inp->hist.head - 1; i++)
-			inp->hist.ptrs[INPUT_MASK(i)] = inp->hist.ptrs[INPUT_MASK(i + 1)];
-
-		inp->hist.current = i;
-		inp->hist.ptrs[INPUT_MASK(inp->hist.current)] = save;
-
-	} else if (input_hist_size(inp) == INPUT_HIST_MAX) {
-
-		free(inp->hist.ptrs[INPUT_MASK(inp->hist.tail++)]);
-		inp->hist.ptrs[INPUT_MASK(inp->hist.head++)] = save;
-
-	} else {
-
-		inp->hist.ptrs[INPUT_MASK(inp->hist.head++)] = save;
-	}
+	INPUT_HIST_LINE(inp, inp->hist.head++) = hist;
 
 	return input_reset(inp);
 }
@@ -289,14 +248,14 @@ input_write(struct input *inp, char *buf, uint16_t max, uint16_t pos)
 	uint16_t buf_len = 0;
 
 	while (max > 1 && pos < inp->head) {
-		buf[buf_len++] = inp->text[pos++];
+		buf[buf_len++] = inp->buf[pos++];
 		max--;
 	}
 
 	pos = inp->tail;
 
 	while (max > 1 && pos < INPUT_LEN_MAX) {
-		buf[buf_len++] = inp->text[pos++];
+		buf[buf_len++] = inp->buf[pos++];
 		max--;
 	}
 

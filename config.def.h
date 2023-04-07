@@ -18,17 +18,18 @@
 
 /* User count in channel before filtering message types
  *   Integer
- *   (0: no filtering) */
+ *   (0: never filter, -1: always filter) */
 #define FILTER_THRESHOLD_JOIN    0
 #define FILTER_THRESHOLD_PART    0
+#define FILTER_THRESHOLD_NICK    0
 #define FILTER_THRESHOLD_QUIT    0
 #define FILTER_THRESHOLD_ACCOUNT 0
 #define FILTER_THRESHOLD_AWAY    0
 #define FILTER_THRESHOLD_CHGHOST 0
 
 /* Message sent for PART and QUIT by default */
-#define DEFAULT_QUIT_MESG "rirc v" VERSION
-#define DEFAULT_PART_MESG "rirc v" VERSION
+#define DEFAULT_QUIT_MESG "rirc v" STR(VERSION)
+#define DEFAULT_PART_MESG "rirc v" STR(VERSION)
 
 /* Buffer colours */
 #define BUFFER_LINE_HEADER_FG         239
@@ -36,7 +37,7 @@
 #define BUFFER_LINE_HEADER_FG_PINGED  250
 #define BUFFER_LINE_HEADER_BG_PINGED  1
 
-#define BUFFER_TEXT_FG 250;
+#define BUFFER_TEXT_FG -1;
 #define BUFFER_TEXT_BG -1;
 
 /* Number of buffer lines to keep in history, must be power of 2 */
@@ -57,7 +58,6 @@
 
 /* Separator characters */
 #define SEP_HORZ "─"
-#define SEP_VERT "~"
 
 /* Separator colours */
 #define SEP_FG 239
@@ -77,7 +77,7 @@
 #define ACTION_BG 239
 
 /* Input line text colours */
-#define INPUT_FG 250
+#define INPUT_FG -1
 #define INPUT_BG -1
 
 /* Buffer text quoting
@@ -87,8 +87,8 @@
 #define QUOTE_TEXT_BG -1
 
 /* Control character print colour */
-#define CTRL_FG 0
-#define CTRL_BG 9
+#define CNTRL_FG 0
+#define CNTRL_BG 9
 
 /* BUFFER_PADDING:
  * How the buffer line headers will be padded [0, 1]

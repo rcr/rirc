@@ -30,8 +30,8 @@ struct server
 	struct ircv3_caps ircv3_caps;
 	struct ircv3_sasl ircv3_sasl;
 	struct mode usermodes;
-	struct mode_str mode_str;
 	struct mode_cfg mode_cfg;
+	struct mode_str mode_str;
 	struct server *next;
 	struct server *prev;
 	unsigned ping;

@@ -41,13 +41,13 @@ server(
 	if ((s = calloc(1, sizeof(*s))) == NULL)
 		fatal("calloc: %s", strerror(errno));
 
-	s->host     = strdup(host);
-	s->port     = strdup(port);
-	s->username = strdup(username);
-	s->realname = strdup(realname);
+	s->host     = irc_strdup(host);
+	s->port     = irc_strdup(port);
+	s->username = irc_strdup(username);
+	s->realname = irc_strdup(realname);
 
-	s->pass = (pass ? strdup(pass) : NULL);
-	s->mode = (mode ? strdup(mode) : NULL);
+	s->pass = (pass ? irc_strdup(pass) : NULL);
+	s->mode = (mode ? irc_strdup(mode) : NULL);
 
 	s->casemapping = CASEMAPPING_RFC1459;
 	ircv3_caps(&(s->ircv3_caps));
@@ -175,7 +175,7 @@ server_set_chans(struct server *s, const char *str)
 	char *p2;
 	size_t n_chans = 0;
 
-	p2 = dup = strdup(str);
+	p2 = dup = irc_strdup(str);
 
 	do {
 		n_chans++;
@@ -223,7 +223,7 @@ server_set_nicks(struct server *s, const char *str)
 	char *p2;
 	size_t n_nicks = 0;
 
-	p2 = dup = strdup(str);
+	p2 = dup = irc_strdup(str);
 
 	do {
 		n_nicks++;
@@ -281,14 +281,14 @@ server_set_004(struct server *s, char *str)
 		server_error(s, "invalid numeric 004: chan_modes is null");
 
 	if (user_modes) {
-		if (mode_cfg(&(s->mode_cfg), user_modes, MODE_CFG_USERMODES) == MODE_ERR_NONE)
+		if (!mode_cfg(&(s->mode_cfg), user_modes, MODE_CFG_USERMODES))
 			debug("Setting numeric 004 user_modes: %s", user_modes);
 		else
 			server_error(s, "invalid numeric 004 user_modes: %s", user_modes);
 	}
 
 	if (chan_modes) {
-		if (mode_cfg(&(s->mode_cfg), chan_modes, MODE_CFG_CHANMODES) == MODE_ERR_NONE)
+		if (!mode_cfg(&(s->mode_cfg), chan_modes, MODE_CFG_CHANMODES))
 			debug("Setting numeric 004 chan_modes: %s", chan_modes);
 		else
 			server_error(s, "invalid numeric 004 chan_modes: %s", chan_modes);
@@ -338,8 +338,8 @@ server_set_sasl(struct server *s, const char *mech, const char *user, const char
 
 	if (!strcasecmp(mech, "PLAIN")) {
 		s->ircv3_sasl.mech = IRCV3_SASL_MECH_PLAIN;
-		s->ircv3_sasl.user = (user ? strdup(user) : NULL);
-		s->ircv3_sasl.pass = (pass ? strdup(pass) : NULL);
+		s->ircv3_sasl.user = (user ? irc_strdup(user) : NULL);
+		s->ircv3_sasl.pass = (pass ? irc_strdup(pass) : NULL);
 	}
 }
 
@@ -445,19 +445,19 @@ server_set_CASEMAPPING(struct server *s, char *val)
 		return 0;
 	}
 
-	return 1;
+	return -1;
 }
 
 static int
 server_set_CHANMODES(struct server *s, char *val)
 {
-	return mode_cfg(&(s->mode_cfg), val, MODE_CFG_SUBTYPES) != MODE_ERR_NONE;
+	return mode_cfg(&(s->mode_cfg), val, MODE_CFG_SUBTYPES);
 }
 
 static int
 server_set_PREFIX(struct server *s, char *val)
 {
-	return mode_cfg(&(s->mode_cfg), val, MODE_CFG_PREFIX) != MODE_ERR_NONE;
+	return mode_cfg(&(s->mode_cfg), val, MODE_CFG_PREFIX);
 }
 
 void
@@ -468,7 +468,7 @@ server_nick_set(struct server *s, const char *nick)
 	if (s->nick)
 		free((void *)s->nick);
 
-	s->nick = strdup(nick);
+	s->nick = irc_strdup(nick);
 }
 
 void

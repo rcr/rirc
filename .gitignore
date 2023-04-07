@@ -1,14 +1,13 @@
-*.gperf.out
-*.out
+*.o
 .cache
+TODO
 build
 config.h
 coverage
 lib/mbedtls-*
-lib/mbedtls.sha256
 rirc
-rirc.1
 rirc.debug
 rirc.debug.address
+rirc.debug.memory
 rirc.debug.thread
 tags

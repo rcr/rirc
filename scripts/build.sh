@@ -2,27 +2,27 @@
 
 # Development build script.
 #
-#  Usage:
+#  Usage, e.g.:
 #
-#   $ ./scripts/build.sh [make targets]
+#   $ ./scripts/build.sh 'mbedtls rirc.debug check; gdb ./rirc.debug'
 
 set -e
+set -u
 
-# export CC=clang
-# export LDFLAGS="-flto -fuse-ld=lld"
-# export LDFLAGS_DEBUG="-fuse-ld=lld"
+export MAKEFLAGS="-f Makefile.dev -j $(nproc) --keep-going --shuffle --warn-undefined"
 
-if [ -x "$(command -v entr)" ]; then
-	ENTR="entr -c"
-fi
-
-if [ -x "$(command -v bear)" ]; then
-	BEAR="bear --append --output ./build/compile_commands.json --"
-fi
-
-make clean
 make build
 
-find -name '*.c' \
-  -o -name '*.h' \
-  -o -name Makefile | grep -v './lib/' | $ENTR $BEAR make -j $(nproc) "$@"
+if [ -x "$(command -v bear)" ]; then
+	BEAR="bear --append --force-wrapper --output build/compile_commands.json --"
+else
+	BEAR=""
+fi
+
+if [ -x "$(command -v entr)" ]; then
+	find -name '*.c' \
+	  -o -name '*.h' \
+	  -o -name 'Makefile.*' | grep -v './lib/' | entr -cs "$BEAR make $*"
+else
+	eval "$BEAR make $*"
+fi

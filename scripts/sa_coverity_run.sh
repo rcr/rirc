@@ -1,6 +1,7 @@
 #!/bin/bash
 
 set -e
+set -u
 
 fail() { >&2 printf "%s\n" "$*"; exit 1; }
 
@@ -25,12 +26,15 @@ VERSION=$(git rev-parse --short HEAD)
 
 export PATH="$PWD/$DIR/bin:$PATH"
 
-make clean
-make libs
+export CFLAGS="-pipe -O0"
+export LDFLAGS="-pipe"
 
-cov-build --dir "$COVERITY_OUT" make all check
+make -e -f Makefile.dev clean-dev clean-lib
+make -e -f Makefile.dev libs
 
-tar -czf "$COVERITY_TAR" "$COVERITY_OUT"
+cov-build --dir "$COVERITY_OUT" make -e -f Makefile.dev rirc check
+
+tar czf "$COVERITY_TAR" "$COVERITY_OUT"
 
 curl https://scan.coverity.com/builds?project=rcr%2Frirc \
 	--form description="$VERSION" \

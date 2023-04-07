@@ -1,16 +1,16 @@
 #!/bin/bash
 
 set -e
+set -u
 
 CDIR="coverage"
 
-export CC=gcc
-export CFLAGS_DEBUG="-fprofile-arcs -ftest-coverage -fprofile-abs-path"
-export LDFLAGS_DEBUG="-fprofile-arcs"
+export CC="gcc"
+export CFLAGS="-pipe -O0 -fprofile-arcs -ftest-coverage -fprofile-abs-path"
+export LDFLAGS="-pipe -fprofile-arcs"
+export MAKEFLAGS="-e -f Makefile.dev -j $(nproc)"
 
-export MAKEFLAGS="-e -j $(nproc)"
-
-make clean
+make clean-dev
 make check
 
 rm -rf $CDIR && mkdir -p $CDIR

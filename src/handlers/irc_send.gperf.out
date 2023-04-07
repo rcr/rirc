@@ -1,0 +1,202 @@
+/* ANSI-C code produced by gperf version 3.1 */
+/* Command-line: gperf --output-file=src/handlers/irc_send.gperf.out src/handlers/irc_send.gperf  */
+/* Computed positions: -k'1,$' */
+
+#if !((' ' == 32) && ('!' == 33) && ('"' == 34) && ('#' == 35) \
+      && ('%' == 37) && ('&' == 38) && ('\'' == 39) && ('(' == 40) \
+      && (')' == 41) && ('*' == 42) && ('+' == 43) && (',' == 44) \
+      && ('-' == 45) && ('.' == 46) && ('/' == 47) && ('0' == 48) \
+      && ('1' == 49) && ('2' == 50) && ('3' == 51) && ('4' == 52) \
+      && ('5' == 53) && ('6' == 54) && ('7' == 55) && ('8' == 56) \
+      && ('9' == 57) && (':' == 58) && (';' == 59) && ('<' == 60) \
+      && ('=' == 61) && ('>' == 62) && ('?' == 63) && ('A' == 65) \
+      && ('B' == 66) && ('C' == 67) && ('D' == 68) && ('E' == 69) \
+      && ('F' == 70) && ('G' == 71) && ('H' == 72) && ('I' == 73) \
+      && ('J' == 74) && ('K' == 75) && ('L' == 76) && ('M' == 77) \
+      && ('N' == 78) && ('O' == 79) && ('P' == 80) && ('Q' == 81) \
+      && ('R' == 82) && ('S' == 83) && ('T' == 84) && ('U' == 85) \
+      && ('V' == 86) && ('W' == 87) && ('X' == 88) && ('Y' == 89) \
+      && ('Z' == 90) && ('[' == 91) && ('\\' == 92) && (']' == 93) \
+      && ('^' == 94) && ('_' == 95) && ('a' == 97) && ('b' == 98) \
+      && ('c' == 99) && ('d' == 100) && ('e' == 101) && ('f' == 102) \
+      && ('g' == 103) && ('h' == 104) && ('i' == 105) && ('j' == 106) \
+      && ('k' == 107) && ('l' == 108) && ('m' == 109) && ('n' == 110) \
+      && ('o' == 111) && ('p' == 112) && ('q' == 113) && ('r' == 114) \
+      && ('s' == 115) && ('t' == 116) && ('u' == 117) && ('v' == 118) \
+      && ('w' == 119) && ('x' == 120) && ('y' == 121) && ('z' == 122) \
+      && ('{' == 123) && ('|' == 124) && ('}' == 125) && ('~' == 126))
+/* The character set is not based on ISO-646.  */
+#error "gperf generated tables don't work with this execution character set. Please report a bug to <bug-gperf@gnu.org>."
+#endif
+
+#line 1 "src/handlers/irc_send.gperf"
+
+#include <string.h>
+
+#define SEND_HANDLERS \
+	X(away) \
+	X(notice) \
+	X(part) \
+	X(privmsg) \
+	X(quit) \
+	X(topic) \
+	X(topic_unset)
+
+#define SEND_CTCP_HANDLERS \
+	X(action) \
+	X(clientinfo) \
+	X(finger) \
+	X(ping) \
+	X(source) \
+	X(time) \
+	X(userinfo) \
+	X(version)
+
+#define SEND_IRCV3_CAP_HANDLERS \
+	X(ls) \
+	X(list)
+
+#define X(cmd) static int irc_send_##cmd(struct server*, struct channel*, char*);
+SEND_HANDLERS
+#undef X
+
+#define X(cmd) static int irc_send_ctcp_##cmd(struct server*, struct channel*, char*);
+SEND_CTCP_HANDLERS
+#undef X
+
+#define X(cmd) static int irc_send_ircv3_cap_##cmd(struct server*, struct channel*, char*);
+SEND_IRCV3_CAP_HANDLERS
+#undef X
+
+typedef int (*irc_send_f)(struct server*, struct channel*, char*);
+
+struct send_handler
+{
+	char *key;
+	irc_send_f f;
+};
+#line 57 "src/handlers/irc_send.gperf"
+struct send_handler;
+/* maximum key range = 33, duplicates = 0 */
+
+#ifdef __GNUC__
+__inline
+#else
+#ifdef __cplusplus
+inline
+#endif
+#endif
+static unsigned int
+send_handler_hash (register const char *str, register size_t len)
+{
+  static const unsigned char asso_values[] =
+    {
+      37, 37, 37, 37, 37, 37, 37, 37, 37, 37,
+      37, 37, 37, 37, 37, 37, 37, 37, 37, 37,
+      37, 37, 37, 37, 37, 37, 37, 37, 37, 37,
+      37, 37, 37, 37, 37, 37, 37, 37, 37, 37,
+      37, 37, 37, 37, 37, 37, 37, 37, 37, 37,
+      37, 37, 37, 37, 37, 37, 37, 37, 37, 37,
+      37, 37, 37, 37, 37,  5, 37, 10, 37, 10,
+      37,  0, 37, 37, 37, 37, 37, 37,  0,  0,
+       0,  5, 15, 10,  0, 37, 37, 37, 37,  5,
+      37, 37, 37, 37, 37, 37, 37, 37, 37, 37,
+      37, 37, 37, 37, 37, 37, 37, 37, 37, 37,
+      37, 37, 37, 37, 37, 37, 37, 37, 37, 37,
+      37, 37, 37, 37, 37, 37, 37, 37, 37, 37,
+      37, 37, 37, 37, 37, 37, 37, 37, 37, 37,
+      37, 37, 37, 37, 37, 37, 37, 37, 37, 37,
+      37, 37, 37, 37, 37, 37, 37, 37, 37, 37,
+      37, 37, 37, 37, 37, 37, 37, 37, 37, 37,
+      37, 37, 37, 37, 37, 37, 37, 37, 37, 37,
+      37, 37, 37, 37, 37, 37, 37, 37, 37, 37,
+      37, 37, 37, 37, 37, 37, 37, 37, 37, 37,
+      37, 37, 37, 37, 37, 37, 37, 37, 37, 37,
+      37, 37, 37, 37, 37, 37, 37, 37, 37, 37,
+      37, 37, 37, 37, 37, 37, 37, 37, 37, 37,
+      37, 37, 37, 37, 37, 37, 37, 37, 37, 37,
+      37, 37, 37, 37, 37, 37, 37, 37, 37, 37,
+      37, 37, 37, 37, 37, 37
+    };
+  return len + asso_values[(unsigned char)str[len - 1]] + asso_values[(unsigned char)str[0]];
+}
+
+const struct send_handler *
+send_handler_lookup (register const char *str, register size_t len)
+{
+  enum
+    {
+      TOTAL_KEYWORDS = 17,
+      MIN_WORD_LENGTH = 4,
+      MAX_WORD_LENGTH = 15,
+      MIN_HASH_VALUE = 4,
+      MAX_HASH_VALUE = 36
+    };
+
+  static const struct send_handler send_handlers[] =
+    {
+      {(char*)0,(irc_send_f)0}, {(char*)0,(irc_send_f)0},
+      {(char*)0,(irc_send_f)0}, {(char*)0,(irc_send_f)0},
+#line 71 "src/handlers/irc_send.gperf"
+      {"PART",            irc_send_part},
+      {(char*)0,(irc_send_f)0}, {(char*)0,(irc_send_f)0},
+#line 72 "src/handlers/irc_send.gperf"
+      {"PRIVMSG",         irc_send_privmsg},
+      {(char*)0,(irc_send_f)0},
+#line 73 "src/handlers/irc_send.gperf"
+      {"QUIT",            irc_send_quit},
+      {(char*)0,(irc_send_f)0},
+#line 75 "src/handlers/irc_send.gperf"
+      {"TOPIC-UNSET",     irc_send_topic_unset},
+      {(char*)0,(irc_send_f)0}, {(char*)0,(irc_send_f)0},
+#line 69 "src/handlers/irc_send.gperf"
+      {"AWAY",            irc_send_away},
+#line 74 "src/handlers/irc_send.gperf"
+      {"TOPIC",           irc_send_topic},
+#line 70 "src/handlers/irc_send.gperf"
+      {"NOTICE",          irc_send_notice},
+      {(char*)0,(irc_send_f)0},
+#line 60 "src/handlers/irc_send.gperf"
+      {"CAP-LIST",        irc_send_ircv3_cap_list},
+#line 64 "src/handlers/irc_send.gperf"
+      {"CTCP-PING",       irc_send_ctcp_ping},
+      {(char*)0,(irc_send_f)0},
+#line 61 "src/handlers/irc_send.gperf"
+      {"CTCP-ACTION",     irc_send_ctcp_action},
+#line 68 "src/handlers/irc_send.gperf"
+      {"CTCP-VERSION",    irc_send_ctcp_version},
+#line 67 "src/handlers/irc_send.gperf"
+      {"CTCP-USERINFO",   irc_send_ctcp_userinfo},
+      {(char*)0,(irc_send_f)0},
+#line 62 "src/handlers/irc_send.gperf"
+      {"CTCP-CLIENTINFO", irc_send_ctcp_clientinfo},
+#line 59 "src/handlers/irc_send.gperf"
+      {"CAP-LS",          irc_send_ircv3_cap_ls},
+      {(char*)0,(irc_send_f)0}, {(char*)0,(irc_send_f)0},
+#line 66 "src/handlers/irc_send.gperf"
+      {"CTCP-TIME",       irc_send_ctcp_time},
+      {(char*)0,(irc_send_f)0},
+#line 65 "src/handlers/irc_send.gperf"
+      {"CTCP-SOURCE",     irc_send_ctcp_source},
+      {(char*)0,(irc_send_f)0}, {(char*)0,(irc_send_f)0},
+      {(char*)0,(irc_send_f)0}, {(char*)0,(irc_send_f)0},
+#line 63 "src/handlers/irc_send.gperf"
+      {"CTCP-FINGER",     irc_send_ctcp_finger}
+    };
+
+  if (len <= MAX_WORD_LENGTH && len >= MIN_WORD_LENGTH)
+    {
+      register unsigned int key = send_handler_hash (str, len);
+
+      if (key <= MAX_HASH_VALUE)
+        {
+          register const char *s = send_handlers[key].key;
+
+          if (s && *str == *s && !strcmp (str + 1, s + 1))
+            return &send_handlers[key];
+        }
+    }
+  return 0;
+}
+#line 76 "src/handlers/irc_send.gperf"
+

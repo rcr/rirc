@@ -1,6 +1,7 @@
 #!/bin/bash
 
 set -e
+set -u
 
 fail() { >&2 printf "%s\n" "$*"; exit 1; }
 
@@ -8,7 +9,7 @@ if [[ -z $1 ]]; then
 	fail "Usage: '$0 dir'"
 fi
 
-SONAR_VER="4.6.2.2472"
+SONAR_VER="4.8.0.2856"
 
 BUILD_ZIP="$1/build-wrapper.zip"
 SONAR_ZIP="$1/sonar-scanner.zip"

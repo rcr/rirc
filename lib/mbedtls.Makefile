@@ -1,38 +1,34 @@
-MBEDTLS_VER     := 3.0.0
-MBEDTLS_VER_SHA := 525bfde06e024c1218047dee1c8b4c89312df1a4b5658711009086cda5dfaa55
+MBEDTLS_VER = 3.4.0
+MBEDTLS_SHA = 1b899f355022e8d02c4d313196a0a16af86c5a692456fa99d302915b8cf0320a
 
-MBEDTLS_CFG := $(abspath $(PATH_LIB)/mbedtls.h)
-MBEDTLS_SHA := $(abspath $(PATH_LIB)/mbedtls.sha256)
-MBEDTLS_SRC := $(abspath $(PATH_LIB)/mbedtls-$(MBEDTLS_VER))
-MBEDTLS_TAR := $(abspath $(PATH_LIB)/mbedtls-$(MBEDTLS_VER).tar.gz)
-MBEDTLS_URL := https://github.com/ARMmbed/mbedtls/archive/v$(MBEDTLS_VER).tar.gz
+MBEDTLS_DIR = $(shell dirname $(realpath $(filter %mbedtls.Makefile,$(MAKEFILE_LIST))))
 
-MBEDTLS_LIBS := \
+MBEDTLS_CFG = $(MBEDTLS_DIR)/mbedtls.h
+MBEDTLS_SRC = $(MBEDTLS_DIR)/mbedtls-$(MBEDTLS_VER)
+MBEDTLS_TAR = $(MBEDTLS_DIR)/mbedtls-$(MBEDTLS_VER).tar.gz
+MBEDTLS_URL = https://github.com/Mbed-TLS/mbedtls/archive/refs/tags/v$(MBEDTLS_VER).tar.gz
+
+MBEDTLS = \
 	$(MBEDTLS_SRC)/library/libmbedtls.a \
 	$(MBEDTLS_SRC)/library/libmbedx509.a \
 	$(MBEDTLS_SRC)/library/libmbedcrypto.a
 
-$(MBEDTLS_LIBS): $(MBEDTLS_CFG) $(MBEDTLS_SRC)
-	@$(MAKE) --silent -C $(MBEDTLS_SRC) clean
-	@$(MAKE) --silent -C $(MBEDTLS_SRC) CFLAGS="$(CFLAGS) -DMBEDTLS_CONFIG_FILE='<$(MBEDTLS_CFG)>'" lib
+MBEDTLS_CFLAGS = -I$(MBEDTLS_SRC)/include -DMBEDTLS_CONFIG_FILE='<$(MBEDTLS_CFG)>'
+
+%/libmbedtls.a: $(MBEDTLS_SRC)
+	@$(MAKE) -C $(MBEDTLS_SRC) CC="$(CC)" CFLAGS="$(CFLAGS) -DMBEDTLS_CONFIG_FILE='<$(MBEDTLS_CFG)>'" LDFLAGS="$(LDFLAGS)" lib
+
+%/libmbedx509.a: %/libmbedtls.a
+	@/bin/sh -c true
+
+%/libmbedcrypto.a: %/libmbedtls.a
+	@/bin/sh -c true
 
 $(MBEDTLS_SRC): $(MBEDTLS_TAR)
-	@tar -xmf $(MBEDTLS_TAR) --directory $(PATH_LIB)
+	@tar xzf $(MBEDTLS_TAR) -C $(MBEDTLS_DIR)
 
 $(MBEDTLS_TAR):
 	@echo "$(MBEDTLS_TAR)..."
 	@curl -LfsS $(MBEDTLS_URL) -o $(MBEDTLS_TAR)
-	@eval $(MBEDTLS_SHA_FILE)
-	@eval $(MBEDTLS_SHA_CHECK)
-
-ifneq ($(shell command -v shasum 2>/dev/null),)
-MBEDTLS_SHA_FILE  := 'echo "$(MBEDTLS_VER_SHA)  $(MBEDTLS_TAR)" > $(MBEDTLS_SHA)'
-MBEDTLS_SHA_CHECK := 'shasum -c $(MBEDTLS_SHA)'
-endif
-
-CFLAGS_RIRC += -I$(MBEDTLS_SRC)/include/
-CFLAGS_RIRC += -DMBEDTLS_CONFIG_FILE='<$(MBEDTLS_CFG)>'
-
-RIRC_LIBS += $(MBEDTLS_LIBS)
-
-.DELETE_ON_ERROR:
+	-@command -v shasum > /dev/null || echo ' -- NO SHASUM -- '
+	-@command -v shasum > /dev/null && echo "$(MBEDTLS_SHA) *$(MBEDTLS_TAR)" | shasum -c -

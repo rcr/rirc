@@ -94,11 +94,9 @@ struct connection* connection(
 	const char*, /* tls_cert */
 	uint32_t);   /* flags */
 
-void connection_free(struct connection*);
-
 /* Explicit direction of net state */
 int io_cx(struct connection*);
-int io_dx(struct connection*);
+int io_dx(struct connection*, int);
 
 /* Formatted write to connection */
 int io_sendf(struct connection*, const char*, ...);

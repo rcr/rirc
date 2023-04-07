@@ -69,9 +69,10 @@ io_cx(struct connection *c)
 }
 
 int
-io_dx(struct connection *c)
+io_dx(struct connection *c, int destroy)
 {
 	UNUSED(c);
+	UNUSED(destroy);
 
 	if (cxed) {
 		cxed = 0;
@@ -91,7 +92,6 @@ io_err(int err)
 
 unsigned io_tty_cols(void) { return 0; }
 unsigned io_tty_rows(void) { return 0; }
-void connection_free(struct connection *c) { UNUSED(c); }
 void io_init(void) { ; }
 void io_start(void) { ; }
 void io_stop(void) { ; }

@@ -1,6 +1,7 @@
 #!/bin/bash
 
 set -e
+set -u
 
 fail() { >&2 printf "%s\n" "$*"; exit 1; }
 
@@ -26,4 +27,4 @@ curl -fsS https://scan.coverity.com/download/linux64 -o "$COVERITY_TGZ" --data "
 
 printf "%s  %s" "$(cat "$COVERITY_MD5")" "$COVERITY_TGZ" | md5sum --quiet -c -
 
-tar -xzf "$COVERITY_TGZ" -C "$DIR" --strip-components 1
+tar xzf "$COVERITY_TGZ" -C "$DIR" --strip-components 1
