@@ -23,7 +23,7 @@
 	         failf((C), "Send fail: %s", io_err(ret)); \
 	} while (0)
 
-static const char* irc_send_target(struct channel*, char*, enum channel_type);
+static const char* irc_send_args(struct channel*, char*, enum channel_type);
 
 int
 irc_send_command(struct server *s, struct channel *c, char *m)
@@ -84,12 +84,12 @@ irc_send_message(struct server *s, struct channel *c, const char *m)
 }
 
 static const char*
-irc_send_target(struct channel *c, char *m, enum channel_type type)
+irc_send_args(struct channel *c, char *m, enum channel_type type)
 {
-	const char *target;
+	const char *args;
 
-	if ((target = irc_strsep(&m)))
-		return target;
+	if ((args = irc_strtrim(&m)))
+		return args;
 
 	if (c->type == type)
 		return c->name;
@@ -113,7 +113,7 @@ irc_send_names(struct server *s, struct channel *c, char *m)
 {
 	const char *target;
 
-	if ((target = irc_send_target(c, m, CHANNEL_T_CHANNEL)))
+	if ((target = irc_send_args(c, m, CHANNEL_T_CHANNEL)))
 		sendf(s, c, "NAMES %s", target);
 	else
 		sendf(s, c, "NAMES");
@@ -240,6 +240,82 @@ irc_send_topic_unset(struct server *s, struct channel *c, char *m)
 }
 
 static int
+irc_send_who(struct server *s, struct channel *c, char *m)
+{
+	/* WHO <mask>
+	 *
+	 * (352) RPL_WHOREPLY
+	 * (315) RPL_ENDOFWHO
+	 * (402) ERR_NOSUCHSERVER */
+
+	const char *target;
+
+	if (!(target = irc_send_args(c, m, CHANNEL_T_PRIVMSG)))
+		failf(c, "Usage: /who <target>");
+
+	sendf(s, c, "WHO %s", target);
+
+	return 0;
+}
+
+static int
+irc_send_whois(struct server *s, struct channel *c, char *m)
+{
+	/* WHOIS [target] <nick>
+	 *
+	 * (276) RPL_WHOISCERTFP
+	 * (301) RPL_AWAY
+	 * (307) RPL_WHOISREGNICK
+	 * (311) RPL_WHOISUSER
+	 * (312) RPL_WHOISSERVER
+	 * (313) RPL_WHOISOPERATOR
+	 * (317) RPL_WHOISIDLE
+	 * (318) RPL_ENDOFWHOIS
+	 * (319) RPL_WHOISCHANNELS
+	 * (320) RPL_WHOISSPECIAL
+	 * (330) RPL_WHOISACCOUNT
+	 * (338) RPL_WHOISACTUALLY
+	 * (378) RPL_WHOISHOST
+	 * (379) RPL_WHOISMODES
+	 * (401) ERR_NOSUCHNICK
+	 * (402) ERR_NOSUCHSERVER
+	 * (431) ERR_NONICKNAMEGIVEN
+	 * (671) RPL_WHOISSECURE */
+
+	const char *target;
+
+	if (!(target = irc_send_args(c, m, CHANNEL_T_PRIVMSG)))
+		failf(c, "Usage: /whois <target>");
+
+	sendf(s, c, "WHOIS %s", target);
+
+	return 0;
+}
+
+static int
+irc_send_whowas(struct server *s, struct channel *c, char *m)
+{
+	/* WHOWAS <nick> [count]
+	 *
+	 * (312) RPL_WHOISSERVER
+	 * (314) RPL_WHOWASUSER
+	 * (338) RPL_WHOISACTUALLY
+	 * (369) RPL_ENDOFWHOWAS
+	 * (406) ERR_WASNOSUCHNICK
+	 * (431) ERR_NONICKNAMEGIVEN
+	 * (461) ERR_NEEDMOREPARAMS */
+
+	const char *target;
+
+	if (!(target = irc_send_args(c, m, CHANNEL_T_PRIVMSG)))
+		failf(c, "Usage: /whowas <target> [count]");
+
+	sendf(s, c, "WHOWAS %s", target);
+
+	return 0;
+}
+
+static int
 irc_send_ctcp_action(struct server *s, struct channel *c, char *m)
 {
 	const char *target;
@@ -257,7 +333,7 @@ irc_send_ctcp_clientinfo(struct server *s, struct channel *c, char *m)
 {
 	const char *target;
 
-	if (!(target = irc_send_target(c, m, CHANNEL_T_PRIVMSG)))
+	if (!(target = irc_send_args(c, m, CHANNEL_T_PRIVMSG)))
 		failf(c, "Usage: /ctcp-clientinfo <target>");
 
 	sendf(s, c, "PRIVMSG %s :\001CLIENTINFO\001", target);
@@ -270,7 +346,7 @@ irc_send_ctcp_finger(struct server *s, struct channel *c, char *m)
 {
 	const char *target;
 
-	if (!(target = irc_send_target(c, m, CHANNEL_T_PRIVMSG)))
+	if (!(target = irc_send_args(c, m, CHANNEL_T_PRIVMSG)))
 		failf(c, "Usage: /ctcp-finger <target>");
 
 	sendf(s, c, "PRIVMSG %s :\001FINGER\001", target);
@@ -284,7 +360,7 @@ irc_send_ctcp_ping(struct server *s, struct channel *c, char *m)
 	const char *target;
 	struct timeval t;
 
-	if (!(target = irc_send_target(c, m, CHANNEL_T_PRIVMSG)))
+	if (!(target = irc_send_args(c, m, CHANNEL_T_PRIVMSG)))
 		failf(c, "Usage: /ctcp-ping <target>");
 
 	(void) gettimeofday(&t, NULL);
@@ -301,7 +377,7 @@ irc_send_ctcp_source(struct server *s, struct channel *c, char *m)
 {
 	const char *target;
 
-	if (!(target = irc_send_target(c, m, CHANNEL_T_PRIVMSG)))
+	if (!(target = irc_send_args(c, m, CHANNEL_T_PRIVMSG)))
 		failf(c, "Usage: /ctcp-source <target>");
 
 	sendf(s, c, "PRIVMSG %s :\001SOURCE\001", target);
@@ -314,7 +390,7 @@ irc_send_ctcp_time(struct server *s, struct channel *c, char *m)
 {
 	const char *target;
 
-	if (!(target = irc_send_target(c, m, CHANNEL_T_PRIVMSG)))
+	if (!(target = irc_send_args(c, m, CHANNEL_T_PRIVMSG)))
 		failf(c, "Usage: /ctcp-time <target>");
 
 	sendf(s, c, "PRIVMSG %s :\001TIME\001", target);
@@ -327,7 +403,7 @@ irc_send_ctcp_userinfo(struct server *s, struct channel *c, char *m)
 {
 	const char *target;
 
-	if (!(target = irc_send_target(c, m, CHANNEL_T_PRIVMSG)))
+	if (!(target = irc_send_args(c, m, CHANNEL_T_PRIVMSG)))
 		failf(c, "Usage: /ctcp-userinfo <target>");
 
 	sendf(s, c, "PRIVMSG %s :\001USERINFO\001", target);
@@ -340,7 +416,7 @@ irc_send_ctcp_version(struct server *s, struct channel *c, char *m)
 {
 	const char *target;
 
-	if (!(target = irc_send_target(c, m, CHANNEL_T_PRIVMSG)))
+	if (!(target = irc_send_args(c, m, CHANNEL_T_PRIVMSG)))
 		failf(c, "Usage: /ctcp-version <target>");
 
 	sendf(s, c, "PRIVMSG %s :\001VERSION\001", target);

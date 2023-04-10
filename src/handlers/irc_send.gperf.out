@@ -1,6 +1,6 @@
 /* ANSI-C code produced by gperf version 3.1 */
 /* Command-line: gperf --output-file=src/handlers/irc_send.gperf.out src/handlers/irc_send.gperf  */
-/* Computed positions: -k'1,$' */
+/* Computed positions: -k'1,6' */
 
 #if !((' ' == 32) && ('!' == 33) && ('"' == 34) && ('#' == 35) \
       && ('%' == 37) && ('&' == 38) && ('\'' == 39) && ('(' == 40) \
@@ -41,7 +41,10 @@
 	X(privmsg) \
 	X(quit) \
 	X(topic) \
-	X(topic_unset)
+	X(topic_unset) \
+	X(who) \
+	X(whois) \
+	X(whowas)
 
 #define SEND_CTCP_HANDLERS \
 	X(action) \
@@ -76,7 +79,7 @@ struct send_handler
 	char *key;
 	irc_send_f f;
 };
-#line 58 "src/handlers/irc_send.gperf"
+#line 61 "src/handlers/irc_send.gperf"
 struct send_handler;
 /* maximum key range = 33, duplicates = 0 */
 
@@ -96,11 +99,11 @@ send_handler_hash (register const char *str, register size_t len)
       37, 37, 37, 37, 37, 37, 37, 37, 37, 37,
       37, 37, 37, 37, 37, 37, 37, 37, 37, 37,
       37, 37, 37, 37, 37, 37, 37, 37, 37, 37,
+      37, 37, 37, 37, 37, 20, 37, 37, 37, 37,
       37, 37, 37, 37, 37, 37, 37, 37, 37, 37,
-      37, 37, 37, 37, 37, 37, 37, 37, 37, 37,
-      37, 37, 37, 37, 37,  5, 37, 10, 37, 10,
-      37,  0, 37, 37, 37, 37, 37, 37,  0,  5,
-       0,  5,  5, 20,  0, 37, 37, 37, 37,  5,
+      37, 37, 37, 37, 37, 15, 37,  0, 37, 25,
+       5, 37, 37,  0, 37, 37, 37, 37,  0, 37,
+       0, 20, 37,  0,  5,  0,  0, 15, 37, 37,
       37, 37, 37, 37, 37, 37, 37, 37, 37, 37,
       37, 37, 37, 37, 37, 37, 37, 37, 37, 37,
       37, 37, 37, 37, 37, 37, 37, 37, 37, 37,
@@ -119,7 +122,22 @@ send_handler_hash (register const char *str, register size_t len)
       37, 37, 37, 37, 37, 37, 37, 37, 37, 37,
       37, 37, 37, 37, 37, 37
     };
-  return len + asso_values[(unsigned char)str[len - 1]] + asso_values[(unsigned char)str[0]];
+  register unsigned int hval = len;
+
+  switch (hval)
+    {
+      default:
+        hval += asso_values[(unsigned char)str[5]];
+      /*FALLTHROUGH*/
+      case 5:
+      case 4:
+      case 3:
+      case 2:
+      case 1:
+        hval += asso_values[(unsigned char)str[0]];
+        break;
+    }
+  return hval;
 }
 
 const struct send_handler *
@@ -127,8 +145,8 @@ send_handler_lookup (register const char *str, register size_t len)
 {
   enum
     {
-      TOTAL_KEYWORDS = 18,
-      MIN_WORD_LENGTH = 4,
+      TOTAL_KEYWORDS = 21,
+      MIN_WORD_LENGTH = 3,
       MAX_WORD_LENGTH = 15,
       MIN_HASH_VALUE = 4,
       MAX_HASH_VALUE = 36
@@ -138,52 +156,55 @@ send_handler_lookup (register const char *str, register size_t len)
     {
       {(char*)0,(irc_send_f)0}, {(char*)0,(irc_send_f)0},
       {(char*)0,(irc_send_f)0}, {(char*)0,(irc_send_f)0},
-#line 73 "src/handlers/irc_send.gperf"
-      {"PART",            irc_send_part},
-      {(char*)0,(irc_send_f)0}, {(char*)0,(irc_send_f)0},
-#line 74 "src/handlers/irc_send.gperf"
-      {"PRIVMSG",         irc_send_privmsg},
-      {(char*)0,(irc_send_f)0},
-#line 75 "src/handlers/irc_send.gperf"
-      {"QUIT",            irc_send_quit},
-      {(char*)0,(irc_send_f)0},
-#line 77 "src/handlers/irc_send.gperf"
-      {"TOPIC-UNSET",     irc_send_topic_unset},
-      {(char*)0,(irc_send_f)0}, {(char*)0,(irc_send_f)0},
-#line 70 "src/handlers/irc_send.gperf"
-      {"AWAY",            irc_send_away},
 #line 76 "src/handlers/irc_send.gperf"
-      {"TOPIC",           irc_send_topic},
-#line 72 "src/handlers/irc_send.gperf"
-      {"NOTICE",          irc_send_notice},
-      {(char*)0,(irc_send_f)0},
-#line 61 "src/handlers/irc_send.gperf"
-      {"CAP-LIST",        irc_send_ircv3_cap_list},
-#line 65 "src/handlers/irc_send.gperf"
-      {"CTCP-PING",       irc_send_ctcp_ping},
-      {(char*)0,(irc_send_f)0},
-#line 62 "src/handlers/irc_send.gperf"
-      {"CTCP-ACTION",     irc_send_ctcp_action},
-#line 69 "src/handlers/irc_send.gperf"
-      {"CTCP-VERSION",    irc_send_ctcp_version},
-      {(char*)0,(irc_send_f)0}, {(char*)0,(irc_send_f)0},
-#line 71 "src/handlers/irc_send.gperf"
+      {"PART",            irc_send_part},
+#line 74 "src/handlers/irc_send.gperf"
       {"NAMES",           irc_send_names},
+#line 63 "src/handlers/irc_send.gperf"
+      {"CAP-LS",          irc_send_ircv3_cap_ls},
+#line 77 "src/handlers/irc_send.gperf"
+      {"PRIVMSG",         irc_send_privmsg},
 #line 64 "src/handlers/irc_send.gperf"
+      {"CAP-LIST",        irc_send_ircv3_cap_list},
+#line 68 "src/handlers/irc_send.gperf"
+      {"CTCP-PING",       irc_send_ctcp_ping},
+#line 79 "src/handlers/irc_send.gperf"
+      {"TOPIC",           irc_send_topic},
+#line 69 "src/handlers/irc_send.gperf"
+      {"CTCP-SOURCE",     irc_send_ctcp_source},
+#line 72 "src/handlers/irc_send.gperf"
+      {"CTCP-VERSION",    irc_send_ctcp_version},
+#line 71 "src/handlers/irc_send.gperf"
+      {"CTCP-USERINFO",   irc_send_ctcp_userinfo},
+#line 70 "src/handlers/irc_send.gperf"
+      {"CTCP-TIME",       irc_send_ctcp_time},
+#line 66 "src/handlers/irc_send.gperf"
+      {"CTCP-CLIENTINFO", irc_send_ctcp_clientinfo},
+#line 67 "src/handlers/irc_send.gperf"
       {"CTCP-FINGER",     irc_send_ctcp_finger},
       {(char*)0,(irc_send_f)0},
-#line 68 "src/handlers/irc_send.gperf"
-      {"CTCP-USERINFO",   irc_send_ctcp_userinfo},
-#line 67 "src/handlers/irc_send.gperf"
-      {"CTCP-TIME",       irc_send_ctcp_time},
-#line 63 "src/handlers/irc_send.gperf"
-      {"CTCP-CLIENTINFO", irc_send_ctcp_clientinfo},
-#line 66 "src/handlers/irc_send.gperf"
-      {"CTCP-SOURCE",     irc_send_ctcp_source},
+#line 81 "src/handlers/irc_send.gperf"
+      {"WHO",             irc_send_who},
+#line 73 "src/handlers/irc_send.gperf"
+      {"AWAY",            irc_send_away},
+#line 82 "src/handlers/irc_send.gperf"
+      {"WHOIS",           irc_send_whois},
+#line 83 "src/handlers/irc_send.gperf"
+      {"WHOWAS",          irc_send_whowas},
+      {(char*)0,(irc_send_f)0}, {(char*)0,(irc_send_f)0},
+#line 78 "src/handlers/irc_send.gperf"
+      {"QUIT",            irc_send_quit},
+      {(char*)0,(irc_send_f)0},
+#line 65 "src/handlers/irc_send.gperf"
+      {"CTCP-ACTION",     irc_send_ctcp_action},
       {(char*)0,(irc_send_f)0}, {(char*)0,(irc_send_f)0},
       {(char*)0,(irc_send_f)0}, {(char*)0,(irc_send_f)0},
-#line 60 "src/handlers/irc_send.gperf"
-      {"CAP-LS",          irc_send_ircv3_cap_ls}
+#line 75 "src/handlers/irc_send.gperf"
+      {"NOTICE",          irc_send_notice},
+      {(char*)0,(irc_send_f)0}, {(char*)0,(irc_send_f)0},
+      {(char*)0,(irc_send_f)0}, {(char*)0,(irc_send_f)0},
+#line 80 "src/handlers/irc_send.gperf"
+      {"TOPIC-UNSET",     irc_send_topic_unset}
     };
 
   if (len <= MAX_WORD_LENGTH && len >= MIN_WORD_LENGTH)
@@ -200,5 +221,5 @@ send_handler_lookup (register const char *str, register size_t len)
     }
   return 0;
 }
-#line 78 "src/handlers/irc_send.gperf"
+#line 84 "src/handlers/irc_send.gperf"
 

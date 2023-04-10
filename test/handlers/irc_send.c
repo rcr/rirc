@@ -289,6 +289,50 @@ test_send_topic_unset(void)
 }
 
 static void
+test_send_who(void)
+{
+	char m1[] = "who";
+	char m2[] = "who";
+	char m3[] = "who";
+	char m4[] = "who targ";
+
+	CHECK_SEND_COMMAND(c_chan, m1, 1, 1, 0, "Usage: /who <target>", "");
+	CHECK_SEND_COMMAND(c_serv, m2, 1, 1, 0, "Usage: /who <target>", "");
+	CHECK_SEND_COMMAND(c_priv, m3, 0, 0, 1, "", "WHO priv");
+	CHECK_SEND_COMMAND(c_priv, m4, 0, 0, 1, "", "WHO targ");
+}
+
+static void
+test_send_whois(void)
+{
+	char m1[] = "whois";
+	char m2[] = "whois";
+	char m3[] = "whois";
+	char m4[] = "whois targ";
+
+	CHECK_SEND_COMMAND(c_chan, m1, 1, 1, 0, "Usage: /whois <target>", "");
+	CHECK_SEND_COMMAND(c_serv, m2, 1, 1, 0, "Usage: /whois <target>", "");
+	CHECK_SEND_COMMAND(c_priv, m3, 0, 0, 1, "", "WHOIS priv");
+	CHECK_SEND_COMMAND(c_priv, m4, 0, 0, 1, "", "WHOIS targ");
+}
+
+static void
+test_send_whowas(void)
+{
+	char m1[] = "whowas";
+	char m2[] = "whowas";
+	char m3[] = "whowas";
+	char m4[] = "whowas targ";
+	char m5[] = "whowas targ 5";
+
+	CHECK_SEND_COMMAND(c_chan, m1, 1, 1, 0, "Usage: /whowas <target> [count]", "");
+	CHECK_SEND_COMMAND(c_serv, m2, 1, 1, 0, "Usage: /whowas <target> [count]", "");
+	CHECK_SEND_COMMAND(c_priv, m3, 0, 0, 1, "", "WHOWAS priv");
+	CHECK_SEND_COMMAND(c_priv, m4, 0, 0, 1, "", "WHOWAS targ");
+	CHECK_SEND_COMMAND(c_priv, m5, 0, 0, 1, "", "WHOWAS targ 5");
+}
+
+static void
 test_send_ctcp_action(void)
 {
 	char m1[] = "ctcp-action";

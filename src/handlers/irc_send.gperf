@@ -9,7 +9,10 @@
 	X(privmsg) \
 	X(quit) \
 	X(topic) \
-	X(topic_unset)
+	X(topic_unset) \
+	X(who) \
+	X(whois) \
+	X(whowas)
 
 #define SEND_CTCP_HANDLERS \
 	X(action) \
@@ -75,4 +78,7 @@ PRIVMSG,         irc_send_privmsg
 QUIT,            irc_send_quit
 TOPIC,           irc_send_topic
 TOPIC-UNSET,     irc_send_topic_unset
+WHO,             irc_send_who
+WHOIS,           irc_send_whois
+WHOWAS,          irc_send_whowas
 %%
