@@ -3,6 +3,7 @@
 
 #define SEND_HANDLERS \
 	X(away) \
+	X(names) \
 	X(notice) \
 	X(part) \
 	X(privmsg) \
@@ -67,6 +68,7 @@ CTCP-TIME,       irc_send_ctcp_time
 CTCP-USERINFO,   irc_send_ctcp_userinfo
 CTCP-VERSION,    irc_send_ctcp_version
 AWAY,            irc_send_away
+NAMES,           irc_send_names
 NOTICE,          irc_send_notice
 PART,            irc_send_part
 PRIVMSG,         irc_send_privmsg

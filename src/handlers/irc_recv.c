@@ -46,6 +46,7 @@ static int irc_numeric_329(struct server*, struct irc_message*);
 static int irc_numeric_332(struct server*, struct irc_message*);
 static int irc_numeric_333(struct server*, struct irc_message*);
 static int irc_numeric_353(struct server*, struct irc_message*);
+static int irc_numeric_366(struct server*, struct irc_message*);
 static int irc_numeric_401(struct server*, struct irc_message*);
 static int irc_numeric_403(struct server*, struct irc_message*);
 static int irc_numeric_433(struct server*, struct irc_message*);
@@ -146,7 +147,7 @@ static const irc_recv_f irc_numerics[] = {
 	[353] = irc_numeric_353,    /* RPL_NAMEREPLY */
 	[364] = irc_generic_info,   /* RPL_LINKS */
 	[365] = irc_generic_ignore, /* RPL_ENDOFLINKS */
-	[366] = irc_generic_ignore, /* RPL_ENDOFNAMES */
+	[366] = irc_numeric_366,    /* RPL_ENDOFNAMES */
 	[367] = irc_generic_info,   /* RPL_BANLIST */
 	[368] = irc_generic_ignore, /* RPL_ENDOFBANLIST */
 	[369] = irc_generic_ignore, /* RPL_ENDOFWHOWAS */
@@ -536,7 +537,6 @@ irc_numeric_353(struct server *s, struct irc_message *m)
 	/* <type> <channel> 1*(<modes><nick>) */
 
 	char *chan;
-	char *nick;
 	char *nicks;
 	char *prefix;
 	struct channel *c;
@@ -550,35 +550,69 @@ irc_numeric_353(struct server *s, struct irc_message *m)
 	if (!irc_message_param(m, &nicks))
 		failf(s, "RPL_NAMEREPLY: nicks is null");
 
-	if ((c = channel_list_get(&s->clist, chan, s->casemapping)) == NULL)
-		failf(s, "RPL_NAMEREPLY: channel '%s' not found", chan);
+	if (!(c = channel_list_get(&s->clist, chan, s->casemapping)))
+		c = s->channel;
 
-	if (*prefix != '@' && *prefix != '*' && *prefix != '=')
-		failf(s, "RPL_NAMEREPLY: invalid channel type: '%c'", *prefix);
+	if (c->type == CHANNEL_T_CHANNEL && !c->_366) {
 
-	if (*prefix == '@')
-		(void) mode_chanmode_set(&(c->chanmodes), &(s->mode_cfg), 's', 1);
+		char *nick;
 
-	if (*prefix == '*')
-		(void) mode_chanmode_set(&(c->chanmodes), &(s->mode_cfg), 'p', 1);
+		if (*prefix != '@' && *prefix != '*' && *prefix != '=') {
+			server_error(s, "RPL_NAMEREPLY: invalid channel type: '%c'", *prefix);
+			return 1;
+		} else {
 
-	c->chanmodes.prefix = *prefix;
+			if (*prefix == '@')
+				(void) mode_chanmode_set(&(c->chanmodes), &(s->mode_cfg), 's', 1);
 
-	while ((prefix = nick = irc_strsep(&nicks))) {
+			if (*prefix == '*')
+				(void) mode_chanmode_set(&(c->chanmodes), &(s->mode_cfg), 'p', 1);
 
-		struct mode prfxmode = {0};
+			c->chanmodes.prefix = *prefix;
+		}
 
-		while (*nick && strchr(s->mode_cfg.PREFIX.T, *nick))
-			(void) mode_prfxmode_set(&prfxmode, &(s->mode_cfg), *nick++, 1);
+		while ((prefix = nick = irc_strsep(&nicks))) {
 
-		if (*nick == 0)
-			failf(s, "RPL_NAMEREPLY: invalid nick: '%s'", prefix);
+			struct mode prfxmode = {0};
 
-		if (user_list_add(&(c->users), s->casemapping, nick, prfxmode) == USER_ERR_DUPLICATE)
-			failf(s, "RPL_NAMEREPLY: duplicate nick: '%s'", nick);
+			while (*nick && strchr(s->mode_cfg.PREFIX.T, *nick))
+				(void) mode_prfxmode_set(&prfxmode, &(s->mode_cfg), *nick++, 1);
+
+			if (*nick == 0) {
+				server_error(s, "RPL_NAMEREPLY: invalid nick: '%s'", prefix);
+				continue;
+			}
+
+			if (user_list_add(&(c->users), s->casemapping, nick, prfxmode) == USER_ERR_DUPLICATE) {
+				server_error(s, "RPL_NAMEREPLY: duplicate nick: '%s'", nick);
+				continue;
+			}
+		}
+
+		if (c == current_channel())
+			draw(DRAW_STATUS);
+
+	} else {
+		newlinef(c, 0, FROM_INFO, "%s: %s", chan, nicks);
 	}
 
-	draw(DRAW_STATUS);
+	return 0;
+}
+
+
+static int
+irc_numeric_366(struct server *s, struct irc_message *m)
+{
+	/* <channel> :End of NAMES list */
+
+	char *chan;
+	struct channel *c;
+
+	if (!irc_message_param(m, &chan))
+		failf(s, "RPL_NAMEREPLY: channel is null");
+
+	if ((c = channel_list_get(&s->clist, chan, s->casemapping)))
+		c->_366 = 1;
 
 	return 0;
 }

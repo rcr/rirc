@@ -2,6 +2,7 @@
 
 #include "config.h"
 #include "src/components/buffer.h"
+#include "src/components/channel.h"
 #include "src/components/ircv3.h"
 #include "src/handlers/irc_send.gperf.out"
 #include "src/io.h"
@@ -22,7 +23,7 @@
 	         failf((C), "Send fail: %s", io_err(ret)); \
 	} while (0)
 
-static const char* irc_send_target(struct channel*, char*);
+static const char* irc_send_target(struct channel*, char*, enum channel_type);
 
 int
 irc_send_command(struct server *s, struct channel *c, char *m)
@@ -83,14 +84,14 @@ irc_send_message(struct server *s, struct channel *c, const char *m)
 }
 
 static const char*
-irc_send_target(struct channel *c, char *m)
+irc_send_target(struct channel *c, char *m, enum channel_type type)
 {
 	const char *target;
 
 	if ((target = irc_strsep(&m)))
 		return target;
 
-	if (c->type == CHANNEL_T_PRIVMSG)
+	if (c->type == type)
 		return c->name;
 
 	return NULL;
@@ -103,6 +104,19 @@ irc_send_away(struct server *s, struct channel *c, char *m)
 		sendf(s, c, "AWAY :%s", m);
 	else
 		sendf(s, c, "AWAY");
+
+	return 0;
+}
+
+static int
+irc_send_names(struct server *s, struct channel *c, char *m)
+{
+	const char *target;
+
+	if ((target = irc_send_target(c, m, CHANNEL_T_CHANNEL)))
+		sendf(s, c, "NAMES %s", target);
+	else
+		sendf(s, c, "NAMES");
 
 	return 0;
 }
@@ -243,7 +257,7 @@ irc_send_ctcp_clientinfo(struct server *s, struct channel *c, char *m)
 {
 	const char *target;
 
-	if (!(target = irc_send_target(c, m)))
+	if (!(target = irc_send_target(c, m, CHANNEL_T_PRIVMSG)))
 		failf(c, "Usage: /ctcp-clientinfo <target>");
 
 	sendf(s, c, "PRIVMSG %s :\001CLIENTINFO\001", target);
@@ -256,7 +270,7 @@ irc_send_ctcp_finger(struct server *s, struct channel *c, char *m)
 {
 	const char *target;
 
-	if (!(target = irc_send_target(c, m)))
+	if (!(target = irc_send_target(c, m, CHANNEL_T_PRIVMSG)))
 		failf(c, "Usage: /ctcp-finger <target>");
 
 	sendf(s, c, "PRIVMSG %s :\001FINGER\001", target);
@@ -270,7 +284,7 @@ irc_send_ctcp_ping(struct server *s, struct channel *c, char *m)
 	const char *target;
 	struct timeval t;
 
-	if (!(target = irc_send_target(c, m)))
+	if (!(target = irc_send_target(c, m, CHANNEL_T_PRIVMSG)))
 		failf(c, "Usage: /ctcp-ping <target>");
 
 	(void) gettimeofday(&t, NULL);
@@ -287,7 +301,7 @@ irc_send_ctcp_source(struct server *s, struct channel *c, char *m)
 {
 	const char *target;
 
-	if (!(target = irc_send_target(c, m)))
+	if (!(target = irc_send_target(c, m, CHANNEL_T_PRIVMSG)))
 		failf(c, "Usage: /ctcp-source <target>");
 
 	sendf(s, c, "PRIVMSG %s :\001SOURCE\001", target);
@@ -300,7 +314,7 @@ irc_send_ctcp_time(struct server *s, struct channel *c, char *m)
 {
 	const char *target;
 
-	if (!(target = irc_send_target(c, m)))
+	if (!(target = irc_send_target(c, m, CHANNEL_T_PRIVMSG)))
 		failf(c, "Usage: /ctcp-time <target>");
 
 	sendf(s, c, "PRIVMSG %s :\001TIME\001", target);
@@ -313,7 +327,7 @@ irc_send_ctcp_userinfo(struct server *s, struct channel *c, char *m)
 {
 	const char *target;
 
-	if (!(target = irc_send_target(c, m)))
+	if (!(target = irc_send_target(c, m, CHANNEL_T_PRIVMSG)))
 		failf(c, "Usage: /ctcp-userinfo <target>");
 
 	sendf(s, c, "PRIVMSG %s :\001USERINFO\001", target);
@@ -326,7 +340,7 @@ irc_send_ctcp_version(struct server *s, struct channel *c, char *m)
 {
 	const char *target;
 
-	if (!(target = irc_send_target(c, m)))
+	if (!(target = irc_send_target(c, m, CHANNEL_T_PRIVMSG)))
 		failf(c, "Usage: /ctcp-version <target>");
 
 	sendf(s, c, "PRIVMSG %s :\001VERSION\001", target);

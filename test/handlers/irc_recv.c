@@ -225,55 +225,68 @@ test_irc_numeric_353(void)
 {
 	/* 353 <nick> <type> <channel> 1*(<modes><nick>) */
 
-	struct user *u1;
-	struct user *u2;
-	struct user *u3;
-	struct user *u4;
+	const struct user *u1;
+	const struct user *u2;
+	const struct user *u3;
+	const struct user *u4;
 
-	/* test errors */
+	/* test invalid 353 errors */
 	CHECK_RECV("353 me", 1, 1, 0);
 	assert_strcmp(mock_chan[0], "host");
 	assert_strcmp(mock_line[0], "RPL_NAMEREPLY: type is null");
-	assert_strcmp(mock_send[0], "");
 
 	CHECK_RECV("353 me =", 1, 1, 0);
+	assert_strcmp(mock_chan[0], "host");
 	assert_strcmp(mock_line[0], "RPL_NAMEREPLY: channel is null");
 
 	CHECK_RECV("353 me = #c1", 1, 1, 0);
+	assert_strcmp(mock_chan[0], "host");
 	assert_strcmp(mock_line[0], "RPL_NAMEREPLY: nicks is null");
 
-	CHECK_RECV("353 me = #x :n1", 1, 1, 0);
-	assert_strcmp(mock_line[0], "RPL_NAMEREPLY: channel '#x' not found");
-
+	/* test initial user list populating, invalid channel type */
 	CHECK_RECV("353 me x #c1 :n1", 1, 1, 0);
+	assert_strcmp(mock_chan[0], "host");
 	assert_strcmp(mock_line[0], "RPL_NAMEREPLY: invalid channel type: 'x'");
 
-	CHECK_RECV("353 me = #c1 :+@", 1, 1, 0);
+	/* test initial user list populating, invalid nick */
+	CHECK_RECV("353 me = #c1 :+@ @+", 0, 2, 0);
+	assert_strcmp(mock_chan[0], "host");
 	assert_strcmp(mock_line[0], "RPL_NAMEREPLY: invalid nick: '+@'");
-
-	/* test single nick */
+	assert_strcmp(mock_line[1], "RPL_NAMEREPLY: invalid nick: '@+'");
 	channel_reset(c1);
+
+	/* test initial user list populating, duplicate nick */
+	CHECK_RECV("353 me = #c1 :n1 n1 n1", 0, 2, 0);
+	assert_strcmp(mock_chan[0], "host");
+	assert_strcmp(mock_line[0], "RPL_NAMEREPLY: duplicate nick: 'n1'");
+	assert_strcmp(mock_line[1], "RPL_NAMEREPLY: duplicate nick: 'n1'");
+	channel_reset(c1);
+
+	/* test initial user list populating, single nick */
 	CHECK_RECV("353 me = #c1 n1", 0, 0, 0);
 
 	if (user_list_get(&(c1->users), s->casemapping, "n1", 0) == NULL)
 		test_fail("Failed to retrieve user n1");
 
-	/* test single nick with prefix */
 	channel_reset(c1);
+
+	/* test initial user list populating, single nick with prefix */
 	CHECK_RECV("353 me = #c1 :@n1", 0, 0, 0);
 
 	if (user_list_get(&(c1->users), s->casemapping, "n1", 0) == NULL)
 		test_fail("Failed to retrieve user n1");
 
-	/* test single nickwith prefix, contains mode characters */
 	channel_reset(c1);
+
+	/* test initial user list populating, single nick with prefix, contains mode characters */
 	CHECK_RECV("353 me = #c1 @v", 0, 0, 0);
 
 	if (user_list_get(&(c1->users), s->casemapping, "v", 0) == NULL)
 		test_fail("Failed to retrieve user v");
 
-	/* test multiple nicks */
 	channel_reset(c1);
+
+	/* test initial user list populating, multiple nicks */
 	CHECK_RECV("353 me = #c1 :@n1 +n2 n3", 0, 0, 0);
 
 	if (!(u1 = user_list_get(&(c1->users), CASEMAPPING_RFC1459, "n1", 0))
@@ -285,10 +298,11 @@ test_irc_numeric_353(void)
 	assert_eq(u2->prfxmodes.lower, (mode_bit('v')));
 	assert_eq(u3->prfxmodes.lower, 0);
 
-	/* test multiple nicks, multiprefix enabled */
+	channel_reset(c1);
+
+	/* test initial user list populating, multiple nicks, multiprefix enabled */
 	s->ircv3_caps.multi_prefix.set = 1;
 
-	channel_reset(c1);
 	CHECK_RECV("353 me = #c1 :@n1 +n2 @+n3 +@n4", 0, 0, 0);
 
 	if (!(u1 = user_list_get(&(c1->users), CASEMAPPING_RFC1459, "n1", 0))
@@ -305,6 +319,39 @@ test_irc_numeric_353(void)
 	assert_eq(u2->prfxmodes.lower, (mode_bit('v')));
 	assert_eq(u3->prfxmodes.lower, (mode_bit('o') | mode_bit('v')));
 	assert_eq(u4->prfxmodes.lower, (mode_bit('o') | mode_bit('v')));
+
+	channel_reset(c1);
+
+	/* test print 353, known channel */
+	c1->_366 = 1;
+
+	CHECK_RECV("353 me = #c1 :@n1 +n2 @+n3 +@n4", 0, 1, 0);
+	assert_strcmp(mock_chan[0], "#c1");
+	assert_strcmp(mock_line[0], "#c1: @n1 +n2 @+n3 +@n4");
+
+	/* test print 353, unknown channel */
+	CHECK_RECV("353 me = #zz :@n1 +n2 @+n3 +@n4", 0, 1, 0);
+	assert_strcmp(mock_chan[0], "host");
+	assert_strcmp(mock_line[0], "#zz: @n1 +n2 @+n3 +@n4");
+}
+
+static void
+test_irc_numeric_366(void)
+{
+	/* <channel> :End of NAMES list */
+
+	/* test no channel */
+	CHECK_RECV("366 me", 1, 1, 0);
+	assert_strcmp(mock_chan[0], "host");
+	assert_strcmp(mock_line[0], "RPL_NAMEREPLY: channel is null");
+
+	/* test receive 366, known channel */
+	assert_ueq(c1->_366, 0);
+	CHECK_RECV("366 me #c1", 0, 0, 0);
+	assert_ueq(c1->_366, 1);
+
+	/* test receive 366, unknown channel */
+	CHECK_RECV("366 me #zz", 0, 0, 0);
 }
 
 static void
@@ -1423,6 +1470,7 @@ main(void)
 		TESTCASE(test_irc_generic_unknown),
 		TESTCASE(test_irc_numeric_001),
 		TESTCASE(test_irc_numeric_353),
+		TESTCASE(test_irc_numeric_366),
 		TESTCASE(test_irc_numeric_401),
 		TESTCASE(test_irc_numeric_403),
 		TESTCASE(test_recv),

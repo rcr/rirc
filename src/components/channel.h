@@ -43,6 +43,7 @@ struct channel
 	struct user_list users;
 	unsigned parted : 1;
 	unsigned joined : 1;
+	unsigned _366   : 1;
 	char _[];
 };
 

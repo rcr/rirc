@@ -122,6 +122,26 @@ test_send_away(void)
 }
 
 static void
+test_send_names(void)
+{
+	char m1[] = "names";
+	char m2[] = "names target";
+	char m3[] = "names";
+	char m4[] = "names target";
+	char m5[] = "names";
+	char m6[] = "names target";
+
+	CHECK_SEND_COMMAND(c_chan, m1, 0, 0, 1, "", "NAMES chan");
+	CHECK_SEND_COMMAND(c_chan, m2, 0, 0, 1, "", "NAMES target");
+
+	CHECK_SEND_COMMAND(c_priv, m3, 0, 0, 1, "", "NAMES");
+	CHECK_SEND_COMMAND(c_priv, m4, 0, 0, 1, "", "NAMES target");
+
+	CHECK_SEND_COMMAND(c_serv, m5, 0, 0, 1, "", "NAMES");
+	CHECK_SEND_COMMAND(c_serv, m6, 0, 0, 1, "", "NAMES target");
+}
+
+static void
 test_send_notice(void)
 {
 	char m1[] = "notice";

@@ -137,4 +137,5 @@ channel_reset(struct channel *c)
 	memset(&(c->chanmodes_str), 0, sizeof(c->chanmodes_str));
 	user_list_free(&(c->users));
 	c->joined = 0;
+	c->_366   = 0;
 }
