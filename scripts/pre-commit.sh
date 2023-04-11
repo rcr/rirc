@@ -8,10 +8,7 @@ set -u
 
 echo "Running pre-commit hook..."
 
-
 export MAKEFLAGS="-f Makefile.dev -j $(nproc)"
-
-make clean-dev
 
 RESULTS=$(make rirc rirc.debug check)
 
