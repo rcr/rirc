@@ -577,8 +577,10 @@ print_text:
 
 		draw_cursor_pos(coords.r1, text_col);
 
-		if (p != line->text)
+		if (p != line->text) {
 			draw_clear_line();
+			draw_attrs(&attrs, 1);
+		}
 
 		if (*p) {
 
@@ -1147,12 +1149,16 @@ drawf(struct draw_attrs *attrs, unsigned *cols_p, const char *fmt, ...)
 static void
 draw_clear_full(void)
 {
+	draw_attrs(&((struct draw_attrs) DRAW_ATTRS_EMPTY), 1);
+
 	printf(CSI "2J");
 }
 
 static void
 draw_clear_line(void)
 {
+	draw_attrs(&((struct draw_attrs) DRAW_ATTRS_EMPTY), 1);
+
 	printf(CSI "2K");
 }
 
