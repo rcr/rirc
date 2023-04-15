@@ -26,50 +26,72 @@
 	         failf((S), "Send fail: %s", io_err(ret)); \
 	} while (0)
 
-/* Generic message handler */
 static int irc_generic(struct server*, struct irc_message*, const char*, const char*);
-
-/* Generic message handler subtypes */
 static int irc_generic_error(struct server*, struct irc_message*);
 static int irc_generic_ignore(struct server*, struct irc_message*);
 static int irc_generic_info(struct server*, struct irc_message*);
 static int irc_generic_unknown(struct server*, struct irc_message*);
-
-/* Numeric handlers */
-static int irc_numeric_001(struct server*, struct irc_message*);
-static int irc_numeric_004(struct server*, struct irc_message*);
-static int irc_numeric_005(struct server*, struct irc_message*);
-static int irc_numeric_221(struct server*, struct irc_message*);
-static int irc_numeric_324(struct server*, struct irc_message*);
-static int irc_numeric_328(struct server*, struct irc_message*);
-static int irc_numeric_329(struct server*, struct irc_message*);
-static int irc_numeric_332(struct server*, struct irc_message*);
-static int irc_numeric_333(struct server*, struct irc_message*);
-static int irc_numeric_353(struct server*, struct irc_message*);
-static int irc_numeric_366(struct server*, struct irc_message*);
-static int irc_numeric_401(struct server*, struct irc_message*);
-static int irc_numeric_403(struct server*, struct irc_message*);
-static int irc_numeric_433(struct server*, struct irc_message*);
-
 static int irc_recv_numeric(struct server*, struct irc_message*);
+static int irc_recv_threshold_filter(unsigned, unsigned);
 static int recv_mode_chanmodes(struct irc_message*, const struct mode_cfg*, struct server*, struct channel*);
 static int recv_mode_usermodes(struct irc_message*, const struct mode_cfg*, struct server*);
-static int irc_recv_threshold_filter(unsigned, unsigned);
 
-static unsigned threshold_account = FILTER_THRESHOLD_ACCOUNT;
-static unsigned threshold_away    = FILTER_THRESHOLD_AWAY;
-static unsigned threshold_chghost = FILTER_THRESHOLD_CHGHOST;
-static unsigned threshold_join    = FILTER_THRESHOLD_JOIN;
-static unsigned threshold_nick    = FILTER_THRESHOLD_NICK;
-static unsigned threshold_part    = FILTER_THRESHOLD_PART;
-static unsigned threshold_quit    = FILTER_THRESHOLD_QUIT;
+/* List of explicitly handled IRC numeric replies */
+#define IRC_RECV_NUMERICS \
+	X(001) /* RPL_WELCOME */         \
+	X(004) /* RPL_MYINFO */          \
+	X(005) /* RPL_ISUPPORT */        \
+	X(042) /* RPL_YOURID */          \
+	X(221) /* RPL_UMODEIS */         \
+	X(252) /* RPL_LUSEROP */         \
+	X(253) /* RPL_LUSERUNKNOWN */    \
+	X(254) /* RPL_LUSERCHANNELS */   \
+	X(265) /* RPL_LOCALUSERS */      \
+	X(266) /* RPL_GLOBALUSERS */     \
+	X(276) /* RPL_WHOISCERTFP */     \
+	X(301) /* RPL_AWAY */            \
+	X(307) /* RPL_WHOISREGNICK */    \
+	X(311) /* RPL_WHOISUSER */       \
+	X(312) /* RPL_WHOISSERVER */     \
+	X(313) /* RPL_WHOISOPERATOR */   \
+	X(314) /* RPL_WHOWASUSER */      \
+	X(317) /* RPL_WHOISIDLE */       \
+	X(319) /* RPL_WHOISCHANNELS */   \
+	X(320) /* RPL_WHOISSPECIAL */    \
+	X(324) /* RPL_CHANNELMODEIS */   \
+	X(328) /* RPL_CHANNEL_URL */     \
+	X(329) /* RPL_CREATIONTIME */    \
+	X(330) /* RPL_WHOISACCOUNT */    \
+	X(332) /* RPL_TOPIC */           \
+	X(333) /* RPL_TOPICWHOTIME */    \
+	X(338) /* RPL_WHOISACTUALLY */   \
+	X(341) /* RPL_INVITING */        \
+	X(353) /* RPL_NAMEREPLY */       \
+	X(366) /* RPL_ENDOFNAMES */      \
+	X(378) /* RPL_WHOISHOST */       \
+	X(379) /* RPL_WHOISMODES */      \
+	X(401) /* ERR_NOSUCHNICK */      \
+	X(402) /* ERR_NOSUCHSERVER */    \
+	X(403) /* ERR_NOSUCHCHANNEL */   \
+	X(406) /* ERR_WASNOSUCHNICK */   \
+	X(433) /* ERR_NICKNAMEINUSE */   \
+	X(671) /* RPL_WHOISSECURE */     \
+	X(716) /* RPL_TARGUMODEG */      \
+	X(717) /* RPL_TARGNOTIFY */      \
+	X(718) /* RPL_UMODEGMSG */       \
+
+#define X(numeric) \
+static int irc_recv_##numeric(struct server*, struct irc_message*);
+IRC_RECV_NUMERICS
+#undef X
 
 static const irc_recv_f irc_numerics[] = {
-	  [1] = irc_numeric_001,    /* RPL_WELCOME */
+	  [1] = irc_recv_001,       /* RPL_WELCOME */
 	  [2] = irc_generic_info,   /* RPL_YOURHOST */
 	  [3] = irc_generic_info,   /* RPL_CREATED */
-	  [4] = irc_numeric_004,    /* RPL_MYINFO */
-	  [5] = irc_numeric_005,    /* RPL_ISUPPORT */
+	  [4] = irc_recv_004,       /* RPL_MYINFO */
+	  [5] = irc_recv_005,       /* RPL_ISUPPORT */
+	 [42] = irc_recv_042,       /* RPL_YOURID */
 	[200] = irc_generic_info,   /* RPL_TRACELINK */
 	[201] = irc_generic_info,   /* RPL_TRACECONNECTING */
 	[202] = irc_generic_info,   /* RPL_TRACEHANDSHAKE */
@@ -80,7 +102,7 @@ static const irc_recv_f irc_numerics[] = {
 	[207] = irc_generic_info,   /* RPL_TRACESERVICE */
 	[208] = irc_generic_info,   /* RPL_TRACENEWTYPE */
 	[209] = irc_generic_info,   /* RPL_TRACECLASS */
-	[210] = irc_generic_info,   /* RPL_TRACELOG */
+	[210] = irc_generic_info,   /* RPL_TRACERECONNECT */
 	[211] = irc_generic_info,   /* RPL_STATSLINKINFO */
 	[212] = irc_generic_info,   /* RPL_STATSCOMMANDS */
 	[213] = irc_generic_info,   /* RPL_STATSCLINE */
@@ -90,7 +112,7 @@ static const irc_recv_f irc_numerics[] = {
 	[217] = irc_generic_info,   /* RPL_STATSQLINE */
 	[218] = irc_generic_info,   /* RPL_STATSYLINE */
 	[219] = irc_generic_ignore, /* RPL_ENDOFSTATS */
-	[221] = irc_numeric_221,    /* RPL_UMODEIS */
+	[221] = irc_recv_221,       /* RPL_UMODEIS */
 	[234] = irc_generic_info,   /* RPL_SERVLIST */
 	[235] = irc_generic_ignore, /* RPL_SERVLISTEND */
 	[240] = irc_generic_info,   /* RPL_STATSVLINE */
@@ -101,53 +123,60 @@ static const irc_recv_f irc_numerics[] = {
 	[245] = irc_generic_info,   /* RPL_STATSSLINE */
 	[246] = irc_generic_info,   /* RPL_STATSPING */
 	[247] = irc_generic_info,   /* RPL_STATSBLINE */
-	[250] = irc_generic_info,   /* RPL_STATSCONN */
+	[250] = irc_generic_info,   /* RPL_STATSDLINE */
 	[251] = irc_generic_info,   /* RPL_LUSERCLIENT */
-	[252] = irc_generic_info,   /* RPL_LUSEROP */
-	[253] = irc_generic_info,   /* RPL_LUSERUNKNOWN */
-	[254] = irc_generic_info,   /* RPL_LUSERCHANNELS */
+	[252] = irc_recv_252,       /* RPL_LUSEROP */
+	[253] = irc_recv_253,       /* RPL_LUSERUNKNOWN */
+	[254] = irc_recv_254,       /* RPL_LUSERCHANNELS */
 	[255] = irc_generic_info,   /* RPL_LUSERME */
 	[256] = irc_generic_info,   /* RPL_ADMINME */
 	[257] = irc_generic_info,   /* RPL_ADMINLOC1 */
 	[258] = irc_generic_info,   /* RPL_ADMINLOC2 */
 	[259] = irc_generic_info,   /* RPL_ADMINEMAIL */
-	[262] = irc_generic_info,   /* RPL_TRACEEND */
+	[261] = irc_generic_info,   /* RPL_TRACELOG */
+	[262] = irc_generic_ignore, /* RPL_TRACEEND */
 	[263] = irc_generic_info,   /* RPL_TRYAGAIN */
-	[265] = irc_generic_info,   /* RPL_LOCALUSERS */
-	[266] = irc_generic_info,   /* RPL_GLOBALUSERS */
-	[301] = irc_generic_info,   /* RPL_AWAY */
-	[302] = irc_generic_info,   /* ERR_USERHOST */
+	[265] = irc_recv_265,       /* RPL_LOCALUSERS */
+	[266] = irc_recv_266,       /* RPL_GLOBALUSERS */
+	[276] = irc_recv_276,       /* RPL_WHOISCERTFP */
+	[301] = irc_recv_301,       /* RPL_AWAY */
+	[302] = irc_generic_info,   /* RPL_USERHOST */
 	[303] = irc_generic_info,   /* RPL_ISON */
+	[304] = irc_generic_info,   /* RPL_TEXT */
 	[305] = irc_generic_info,   /* RPL_UNAWAY */
 	[306] = irc_generic_info,   /* RPL_NOWAWAY */
-	[311] = irc_generic_info,   /* RPL_WHOISUSER */
-	[312] = irc_generic_info,   /* RPL_WHOISSERVER */
-	[313] = irc_generic_info,   /* RPL_WHOISOPERATOR */
-	[314] = irc_generic_info,   /* RPL_WHOWASUSER */
+	[307] = irc_recv_307,       /* RPL_WHOISREGNICK */
+	[311] = irc_recv_311,       /* RPL_WHOISUSER */
+	[312] = irc_recv_312,       /* RPL_WHOISSERVER */
+	[313] = irc_recv_313,       /* RPL_WHOISOPERATOR */
+	[314] = irc_recv_314,       /* RPL_WHOWASUSER */
 	[315] = irc_generic_ignore, /* RPL_ENDOFWHO */
-	[317] = irc_generic_info,   /* RPL_WHOISIDLE */
+	[317] = irc_recv_317,       /* RPL_WHOISIDLE */
 	[318] = irc_generic_ignore, /* RPL_ENDOFWHOIS */
-	[319] = irc_generic_info,   /* RPL_WHOISCHANNELS */
+	[319] = irc_recv_319,       /* RPL_WHOISCHANNELS */
+	[320] = irc_recv_320,       /* RPL_WHOISSPECIAL */
 	[322] = irc_generic_info,   /* RPL_LIST */
 	[323] = irc_generic_ignore, /* RPL_LISTEND */
-	[324] = irc_numeric_324,    /* RPL_CHANNELMODEIS */
+	[324] = irc_recv_324,       /* RPL_CHANNELMODEIS */
 	[325] = irc_generic_info,   /* RPL_UNIQOPIS */
-	[328] = irc_numeric_328,    /* RPL_CHANNEL_URL */
-	[329] = irc_numeric_329,    /* RPL_CREATIONTIME */
+	[328] = irc_recv_328,       /* RPL_CHANNEL_URL */
+	[329] = irc_recv_329,       /* RPL_CREATIONTIME */
+	[330] = irc_recv_330,       /* RPL_WHOISACCOUNT */
 	[331] = irc_generic_ignore, /* RPL_NOTOPIC */
-	[332] = irc_numeric_332,    /* RPL_TOPIC */
-	[333] = irc_numeric_333,    /* RPL_TOPICWHOTIME */
-	[341] = irc_generic_info,   /* RPL_INVITING */
+	[332] = irc_recv_332,       /* RPL_TOPIC */
+	[333] = irc_recv_333,       /* RPL_TOPICWHOTIME */
+	[338] = irc_recv_338,       /* RPL_WHOISACTUALLY */
+	[341] = irc_recv_341,       /* RPL_INVITING */
 	[346] = irc_generic_info,   /* RPL_INVITELIST */
 	[347] = irc_generic_ignore, /* RPL_ENDOFINVITELIST */
 	[348] = irc_generic_info,   /* RPL_EXCEPTLIST */
 	[349] = irc_generic_ignore, /* RPL_ENDOFEXCEPTLIST */
 	[351] = irc_generic_info,   /* RPL_VERSION */
 	[352] = irc_generic_info,   /* RPL_WHOREPLY */
-	[353] = irc_numeric_353,    /* RPL_NAMEREPLY */
+	[353] = irc_recv_353,       /* RPL_NAMEREPLY */
 	[364] = irc_generic_info,   /* RPL_LINKS */
 	[365] = irc_generic_ignore, /* RPL_ENDOFLINKS */
-	[366] = irc_numeric_366,    /* RPL_ENDOFNAMES */
+	[366] = irc_recv_366,       /* RPL_ENDOFNAMES */
 	[367] = irc_generic_info,   /* RPL_BANLIST */
 	[368] = irc_generic_ignore, /* RPL_ENDOFBANLIST */
 	[369] = irc_generic_ignore, /* RPL_ENDOFWHOWAS */
@@ -156,15 +185,17 @@ static const irc_recv_f irc_numerics[] = {
 	[374] = irc_generic_ignore, /* RPL_ENDOFINFO */
 	[375] = irc_generic_ignore, /* RPL_MOTDSTART */
 	[376] = irc_generic_ignore, /* RPL_ENDOFMOTD */
+	[378] = irc_recv_378,       /* RPL_WHOISHOST */
+	[379] = irc_recv_379,       /* RPL_WHOISMODES */
 	[381] = irc_generic_info,   /* RPL_YOUREOPER */
 	[391] = irc_generic_info,   /* RPL_TIME */
 	[396] = irc_generic_info,   /* RPL_VISIBLEHOST */
-	[401] = irc_numeric_401,    /* ERR_NOSUCHNICK */
-	[402] = irc_generic_error,  /* ERR_NOSUCHSERVER */
-	[403] = irc_numeric_403,    /* ERR_NOSUCHCHANNEL */
+	[401] = irc_recv_401,       /* ERR_NOSUCHNICK */
+	[402] = irc_recv_402,       /* ERR_NOSUCHSERVER */
+	[403] = irc_recv_403,       /* ERR_NOSUCHCHANNEL */
 	[404] = irc_generic_error,  /* ERR_CANNOTSENDTOCHAN */
 	[405] = irc_generic_error,  /* ERR_TOOMANYCHANNELS */
-	[406] = irc_generic_error,  /* ERR_WASNOSUCHNICK */
+	[406] = irc_recv_406,       /* ERR_WASNOSUCHNICK */
 	[407] = irc_generic_error,  /* ERR_TOOMANYTARGETS */
 	[408] = irc_generic_error,  /* ERR_NOSUCHSERVICE */
 	[409] = irc_generic_error,  /* ERR_NOORIGIN */
@@ -180,7 +211,7 @@ static const irc_recv_f irc_numerics[] = {
 	[423] = irc_generic_error,  /* ERR_NOADMININFO */
 	[431] = irc_generic_error,  /* ERR_NONICKNAMEGIVEN */
 	[432] = irc_generic_error,  /* ERR_ERRONEUSNICKNAME */
-	[433] = irc_numeric_433,    /* ERR_NICKNAMEINUSE */
+	[433] = irc_recv_433,       /* ERR_NICKNAMEINUSE */
 	[436] = irc_generic_error,  /* ERR_NICKCOLLISION */
 	[437] = irc_generic_error,  /* ERR_UNAVAILRESOURCE */
 	[441] = irc_generic_error,  /* ERR_USERNOTINCHANNEL */
@@ -210,20 +241,33 @@ static const irc_recv_f irc_numerics[] = {
 	[491] = irc_generic_error,  /* ERR_NOOPERHOST */
 	[501] = irc_generic_error,  /* ERR_UMODEUNKNOWNFLAG */
 	[502] = irc_generic_error,  /* ERR_USERSDONTMATCH */
+	[524] = irc_generic_error,  /* ERR_HELPNOTFOUND */
+	[671] = irc_recv_671,       /* RPL_WHOISSECURE */
 	[704] = irc_generic_info,   /* RPL_HELPSTART */
 	[705] = irc_generic_info,   /* RPL_HELP */
 	[706] = irc_generic_ignore, /* RPL_ENDOFHELP */
-	[900] = ircv3_numeric_900,  /* IRCv3 RPL_LOGGEDIN */
-	[901] = ircv3_numeric_901,  /* IRCv3 RPL_LOGGEDOUT */
-	[902] = ircv3_numeric_902,  /* IRCv3 ERR_NICKLOCKED */
-	[903] = ircv3_numeric_903,  /* IRCv3 RPL_SASLSUCCESS */
-	[904] = ircv3_numeric_904,  /* IRCv3 ERR_SASLFAIL */
-	[905] = ircv3_numeric_905,  /* IRCv3 ERR_SASLTOOLONG */
-	[906] = ircv3_numeric_906,  /* IRCv3 ERR_SASLABORTED */
-	[907] = ircv3_numeric_907,  /* IRCv3 ERR_SASLALREADY */
-	[908] = ircv3_numeric_908,  /* IRCv3 RPL_SASLMECHS */
+	[716] = irc_recv_716,       /* RPL_TARGUMODEG */
+	[717] = irc_recv_717,       /* RPL_TARGNOTIFY */
+	[718] = irc_recv_718,       /* RPL_UMODEGMSG */
+	[900] = ircv3_recv_900,     /* IRCv3 RPL_LOGGEDIN */
+	[901] = ircv3_recv_901,     /* IRCv3 RPL_LOGGEDOUT */
+	[902] = ircv3_recv_902,     /* IRCv3 ERR_NICKLOCKED */
+	[903] = ircv3_recv_903,     /* IRCv3 RPL_SASLSUCCESS */
+	[904] = ircv3_recv_904,     /* IRCv3 ERR_SASLFAIL */
+	[905] = ircv3_recv_905,     /* IRCv3 ERR_SASLTOOLONG */
+	[906] = ircv3_recv_906,     /* IRCv3 ERR_SASLABORTED */
+	[907] = ircv3_recv_907,     /* IRCv3 ERR_SASLALREADY */
+	[908] = ircv3_recv_908,     /* IRCv3 RPL_SASLMECHS */
 	[1000] = NULL               /* Out of range */
 };
+
+static unsigned threshold_account = FILTER_THRESHOLD_ACCOUNT;
+static unsigned threshold_away    = FILTER_THRESHOLD_AWAY;
+static unsigned threshold_chghost = FILTER_THRESHOLD_CHGHOST;
+static unsigned threshold_join    = FILTER_THRESHOLD_JOIN;
+static unsigned threshold_nick    = FILTER_THRESHOLD_NICK;
+static unsigned threshold_part    = FILTER_THRESHOLD_PART;
+static unsigned threshold_quit    = FILTER_THRESHOLD_QUIT;
 
 int
 irc_recv(struct server *s, struct irc_message *m)
@@ -244,7 +288,7 @@ irc_generic(struct server *s, struct irc_message *m, const char *command, const 
 {
 	/* Generic handling of messages, in the form:
 	 *
-	 *   [command] [params] ~ trailing
+	 *   [command] [params] trailing
 	 */
 
 	const char *params       = NULL;
@@ -252,16 +296,16 @@ irc_generic(struct server *s, struct irc_message *m, const char *command, const 
 	const char *trailing     = NULL;
 	const char *trailing_sep = NULL;
 
-	if (!command && !irc_strtrim(&m->params))
-		return 1;
-
 	irc_message_split(m, &params, &trailing);
+
+	if (!command && (!params || !*params) && (!trailing || !*trailing))
+		return 1;
 
 	if (command && params)
 		params_sep = " ";
 
 	if ((command || params) && trailing)
-		trailing_sep = " ~ ";
+		trailing_sep = " ";
 
 	newlinef(s->channel, 0, from,
 		"%s%s%s" "%s%s%s%s" "%s%s",
@@ -315,9 +359,11 @@ irc_generic_unknown(struct server *s, struct irc_message *m)
 }
 
 static int
-irc_numeric_001(struct server *s, struct irc_message *m)
+irc_recv_001(struct server *s, struct irc_message *m)
 {
-	/* 001 :<Welcome message> */
+	/* RPL_WELCOME
+	 *
+	 * :Welcome to the <networkname> Network <nick>[!<user>@<host>] */
 
 	const char *params;
 	const char *trailing;
@@ -345,16 +391,16 @@ irc_numeric_001(struct server *s, struct irc_message *m)
 }
 
 static int
-irc_numeric_004(struct server *s, struct irc_message *m)
+irc_recv_004(struct server *s, struct irc_message *m)
 {
-	/* 004 1*<params> [:message] */
+	/* RPL_MYINFO
+	 *
+	 * <servername> <version> <usermodes> <chanmodes> [chanmodes with parameter] */
 
 	const char *params;
 	const char *trailing;
 
 	if (irc_message_split(m, &params, &trailing))
-		server_info(s, "%s ~ %s", params, trailing);
-	else
 		server_info(s, "%s", params);
 
 	server_set_004(s, m->params);
@@ -363,17 +409,17 @@ irc_numeric_004(struct server *s, struct irc_message *m)
 }
 
 static int
-irc_numeric_005(struct server *s, struct irc_message *m)
+irc_recv_005(struct server *s, struct irc_message *m)
 {
-	/* 005 1*<params> [:message] */
+	/* RPL_ISUPPORT
+	 *
+	 * 1*<params> [:message] */
 
 	const char *params;
 	const char *trailing;
 
 	if (irc_message_split(m, &params, &trailing))
-		server_info(s, "%s ~ %s", params, trailing);
-	else
-		server_info(s, "%s ~ are supported by this server", params);
+		server_info(s, "%s", params);
 
 	server_set_005(s, m->params);
 
@@ -381,17 +427,415 @@ irc_numeric_005(struct server *s, struct irc_message *m)
 }
 
 static int
-irc_numeric_221(struct server *s, struct irc_message *m)
+irc_recv_042(struct server *s, struct irc_message *m)
 {
-	/* 221 <modestring> */
+	/* RPL_YOURID
+	 *
+	 * <id> :your unique ID */
+
+	char *param;
+
+	if (!irc_message_param(m, &param))
+		failf(s, "RPL_YOURID: param is null");
+
+	server_info(s, "Your unique ID is: [%s]", param);
+
+	return 0;
+}
+
+static int
+irc_recv_221(struct server *s, struct irc_message *m)
+{
+	/* RPL_UMODEIS
+	 *
+	 * <usermodes> */
 
 	return recv_mode_usermodes(m, &(s->mode_cfg), s);
 }
 
 static int
-irc_numeric_324(struct server *s, struct irc_message *m)
+irc_recv_252(struct server *s, struct irc_message *m)
 {
-	/* 324 <channel> 1*[<modestring> [<mode arguments>]] */
+	/* RPL_LUSEROP
+	 *
+	 * <int> :operator(s) online */
+
+	char *param;
+
+	if (!irc_message_param(m, &param))
+		failf(s, "RPL_LUSEROP: param is null");
+
+	server_info(s, "%s operator(s) online", param);
+
+	return 0;
+}
+
+static int
+irc_recv_253(struct server *s, struct irc_message *m)
+{
+	/* RPL_LUSERUNKNOWN
+	 *
+	 * <int> :unknown connection(s) */
+
+	char *param;
+
+	if (!irc_message_param(m, &param))
+		failf(s, "RPL_LUSERUNKNOWN: param is null");
+
+	server_info(s, "%s unknown connection(s)", param);
+
+	return 0;
+}
+
+static int
+irc_recv_254(struct server *s, struct irc_message *m)
+{
+	/* RPL_LUSERCHANNELS
+	 *
+	 * <int> :channel(s) formed */
+
+	char *param;
+
+	if (!irc_message_param(m, &param))
+		failf(s, "RPL_LUSERCHANNELS: param is null");
+
+	server_info(s, "%s channel(s) formed", param);
+
+	return 0;
+}
+
+static int
+irc_recv_265(struct server *s, struct irc_message *m)
+{
+	/* RPL_LOCALUSERS
+	 *
+	 * [<int> <int>] :Current local users <int>, max <int> */
+
+	const char *params;
+	const char *trailing;
+
+	irc_message_split(m, &params, &trailing);
+
+	if (!trailing || !*trailing)
+		failf(s, "RPL_LOCALUSERS: trailing is null");
+
+	server_info(s, "%s", trailing);
+
+	return 0;
+}
+
+static int
+irc_recv_266(struct server *s, struct irc_message *m)
+{
+	/* RPL_GLOBALUSERS
+	 *
+	 * [<int> <int>] :Current global users <int>, max <int> */
+
+	const char *params;
+	const char *trailing;
+
+	irc_message_split(m, &params, &trailing);
+
+	if (!trailing || !*trailing)
+		failf(s, "RPL_GLOBALUSERS: trailing is null");
+
+	server_info(s, "%s", trailing);
+
+	return 0;
+}
+
+static int
+irc_recv_276(struct server *s, struct irc_message *m)
+{
+	/* RPL_WHOISCERTFP
+	 *
+	 * <nick> :has client certificate fingerprint <fingerprint> */
+
+	char *nick;
+	char *message;
+
+	if (!irc_message_param(m, &nick))
+		failf(s, "RPL_WHOISCERTFP: nick is null");
+
+	if (!irc_message_param(m, &message))
+		failf(s, "RPL_WHOISCERTFP: message is null");
+
+	server_info(s, "%s %s", nick, message);
+
+	return 0;
+}
+
+static int
+irc_recv_301(struct server *s, struct irc_message *m)
+{
+	/* RPL_AWAY
+	 *
+	 * <nick> :<message> */
+
+	char *nick;
+	char *message;
+
+	if (!irc_message_param(m, &nick))
+		failf(s, "RPL_AWAY: nick is null");
+
+	if (!irc_message_param(m, &message))
+		failf(s, "RPL_AWAY: message is null");
+
+	server_info(s, "%s is away (%s)", nick, message);
+
+	return 0;
+}
+
+static int
+irc_recv_307(struct server *s, struct irc_message *m)
+{
+	/* RPL_WHOISREGNICK
+	 *
+	 * <nick> :has identified for this nick */
+
+	char *nick;
+	char *message;
+
+	if (!irc_message_param(m, &nick))
+		failf(s, "RPL_WHOISREGNICK: nick is null");
+
+	if (!irc_message_param(m, &message))
+		failf(s, "RPL_WHOISREGNICK: message is null");
+
+	server_info(s, "%s %s", nick, message);
+
+	return 0;
+}
+
+static int
+irc_recv_311(struct server *s, struct irc_message *m)
+{
+	/* RPL_WHOISUSER
+	 *
+	 * <nick> <username> <host> * :<realname> */
+
+	char *nick;
+	char *username;
+	char *hostname;
+	char *unused;
+	char *realname;
+
+	if (!irc_message_param(m, &nick))
+		failf(s, "RPL_WHOISUSER: nick is null");
+
+	if (!irc_message_param(m, &username))
+		failf(s, "RPL_WHOISUSER: username is null");
+
+	if (!irc_message_param(m, &hostname))
+		failf(s, "RPL_WHOISUSER: username is null");
+
+	if (!irc_message_param(m, &unused))
+		failf(s, "RPL_WHOISUSER: unused is null");
+
+	if (!irc_message_param(m, &realname))
+		failf(s, "RPL_WHOISUSER: realname is null");
+
+	server_info(s, "%s has username: %s", nick, username);
+	server_info(s, "%s has hostname: %s", nick, hostname);
+	server_info(s, "%s has realname: %s", nick, realname);
+
+	return 0;
+}
+
+static int
+irc_recv_312(struct server *s, struct irc_message *m)
+{
+	/* RPL_WHOISSERVER
+	 *
+	 * <nick> <server> :<server info> */
+
+	char *nick;
+	char *servername;
+	char *serverinfo;
+
+	if (!irc_message_param(m, &nick))
+		failf(s, "RPL_WHOISSERVER: nick is null");
+
+	if (!irc_message_param(m, &servername))
+		failf(s, "RPL_WHOISSERVER: servername is null");
+
+	if (!irc_message_param(m, &serverinfo))
+		failf(s, "RPL_WHOISSERVER: serverinfo is null");
+
+	server_info(s, "%s connected to: %s (%s)", nick, servername, serverinfo);
+
+	return 0;
+}
+
+static int
+irc_recv_313(struct server *s, struct irc_message *m)
+{
+	/* RPL_WHOISOPERATOR
+	 *
+	 * <nick> :is an IRC operator */
+
+	char *nick;
+	char *message;
+
+	if (!irc_message_param(m, &nick))
+		failf(s, "RPL_WHOISREGNICK: nick is null");
+
+	if (!irc_message_param(m, &message))
+		failf(s, "RPL_WHOISREGNICK: message is null");
+
+	server_info(s, "%s %s", nick, message);
+
+	return 0;
+}
+
+static int
+irc_recv_314(struct server *s, struct irc_message *m)
+{
+	/* RPL_WHOWASUSER
+	 *
+	 * <nick> <username> <host> * :<realname> */
+
+	char *nick;
+	char *username;
+	char *hostname;
+	char *unused;
+	char *realname;
+
+	if (!irc_message_param(m, &nick))
+		failf(s, "RPL_WHOWASUSER: nick is null");
+
+	if (!irc_message_param(m, &username))
+		failf(s, "RPL_WHOWASUSER: username is null");
+
+	if (!irc_message_param(m, &hostname))
+		failf(s, "RPL_WHOWASUSER: username is null");
+
+	if (!irc_message_param(m, &unused))
+		failf(s, "RPL_WHOWASUSER: unused is null");
+
+	if (!irc_message_param(m, &realname))
+		failf(s, "RPL_WHOWASUSER: realname is null");
+
+	server_info(s, "%s had username: %s", nick, username);
+	server_info(s, "%s had hostname: %s", nick, hostname);
+	server_info(s, "%s had realname: %s", nick, realname);
+
+	return 0;
+}
+
+static int
+irc_recv_317(struct server *s, struct irc_message *m)
+{
+	/* RPL_WHOISIDLE
+	 *
+	 * <nick> <secs> <signon> :seconds idle, signon time */
+
+	char *idle;
+	char *nick;
+	char *signon;
+	char buf[sizeof("1970-01-01T00:00:00")];
+	struct tm tm;
+	time_t t_idle = 0;
+	time_t t_signon = 0;
+	unsigned idle_d;
+	unsigned idle_h;
+	unsigned idle_m;
+	unsigned idle_s;
+
+	if (!irc_message_param(m, &nick))
+		failf(s, "RPL_WHOISIDLE: nick is null");
+
+	if (!irc_message_param(m, &idle))
+		failf(s, "RPL_WHOISIDLE: idle is null");
+
+	if (!irc_message_param(m, &signon))
+		failf(s, "RPL_WHOISIDLE: signon is null");
+
+	errno = 0;
+	t_idle = strtoul(idle, NULL, 0);
+
+	if (errno)
+		failf(s, "RPL_WHOISIDLE: t_idle strtoul error: %s", strerror(errno));
+
+	errno = 0;
+	t_signon = strtoul(signon, NULL, 0);
+
+	if (errno)
+		failf(s, "RPL_WHOISIDLE: t_signon strtoul error: %s", strerror(errno));
+
+	idle_d = t_idle / 86400;
+	idle_h = t_idle % 86400 / 3600;
+	idle_m = t_idle % 3600 / 60;
+	idle_s = t_idle % 60;
+
+	if (gmtime_r(&t_signon, &tm) == NULL)
+		failf(s, "RPL_WHOISIDLE: gmtime_r error: %s", strerror(errno));
+
+	if ((strftime(buf, sizeof(buf), "%FT%T", &tm)) == 0)
+		failf(s, "RPL_WHOISIDLE: strftime error");
+
+	server_info(s, "%s has been idle %.0u%s%.0u%s%.0u%s%u%s, connected since %s",
+		nick,
+		idle_d,
+		idle_d ? "d:" : "",
+		idle_h,
+		idle_h ? "h:" : "",
+		idle_m,
+		idle_m ? "m:" : "",
+		idle_s,
+		buf);
+
+	return 0;
+}
+
+static int
+irc_recv_319(struct server *s, struct irc_message *m)
+{
+	/* RPL_WHOISCHANNELS
+	 *
+	 * <nick> :1*[prefix]<channel> */
+
+	char *nick;
+	char *channels;
+
+	if (!irc_message_param(m, &nick))
+		failf(s, "RPL_WHOISCHANNELS: nick is null");
+
+	if (!irc_message_param(m, &channels))
+		failf(s, "RPL_WHOISCHANNELS: message is null");
+
+	server_info(s, "%s is on channels: %s", nick, channels);
+
+	return 0;
+}
+
+static int
+irc_recv_320(struct server *s, struct irc_message *m)
+{
+	/* RPL_WHOISSPECIAL
+	 *
+	 * <nick> :message */
+
+	char *nick;
+	char *message;
+
+	if (!irc_message_param(m, &nick))
+		failf(s, "RPL_WHOISSPECIAL: nick is null");
+
+	if (!irc_message_param(m, &message))
+		failf(s, "RPL_WHOISSPECIAL: message is null");
+
+	server_info(s, "%s %s", nick, message);
+
+	return 0;
+}
+
+static int
+irc_recv_324(struct server *s, struct irc_message *m)
+{
+	/* RPL_CHANNELMODEIS
+	 *
+	 * <channel> 1*[<modestring> [<mode arguments>]] */
 
 	char *chan;
 	struct channel *c;
@@ -408,9 +852,11 @@ irc_numeric_324(struct server *s, struct irc_message *m)
 }
 
 static int
-irc_numeric_328(struct server *s, struct irc_message *m)
+irc_recv_328(struct server *s, struct irc_message *m)
 {
-	/* 328 <channel> <url> */
+	/* RPL_CHANNEL_URL
+	 *
+	 * <channel> :<url> */
 
 	char *chan;
 	char *url;
@@ -431,8 +877,12 @@ irc_numeric_328(struct server *s, struct irc_message *m)
 }
 
 static int
-irc_numeric_329(struct server *s, struct irc_message *m)
+irc_recv_329(struct server *s, struct irc_message *m)
 {
+	/* RPL_CREATIONTIME
+	 *
+	 * <channel> <creationtime> */
+
 	char buf[sizeof("1970-01-01T00:00:00")];
 	char *chan;
 	char *time_str;
@@ -467,9 +917,32 @@ irc_numeric_329(struct server *s, struct irc_message *m)
 }
 
 static int
-irc_numeric_332(struct server *s, struct irc_message *m)
+irc_recv_330(struct server *s, struct irc_message *m)
 {
-	/* 332 <channel> :<topic> */
+	/* RPL_WHOISACCOUNT
+	 *
+	 * <nick> <account> :is logged in as */
+
+	char *nick;
+	char *account;
+
+	if (!irc_message_param(m, &nick))
+		failf(s, "RPL_WHOISACCOUNT: nick is null");
+
+	if (!irc_message_param(m, &account))
+		failf(s, "RPL_WHOISACCOUNT: account is null");
+
+	server_info(s, "%s is logged in as %s", nick, account);
+
+	return 0;
+}
+
+static int
+irc_recv_332(struct server *s, struct irc_message *m)
+{
+	/* RPL_TOPIC
+	 *
+	 * <channel> :<topic> */
 
 	char *chan;
 	char *topic;
@@ -490,9 +963,11 @@ irc_numeric_332(struct server *s, struct irc_message *m)
 }
 
 static int
-irc_numeric_333(struct server *s, struct irc_message *m)
+irc_recv_333(struct server *s, struct irc_message *m)
 {
-	/* 333 <channel> <nick> <time> */
+	/* RPL_TOPICWHOTIME
+	 *
+	 * <channel> <nick> <time> */
 
 	char buf[sizeof("1970-01-01T00:00:00")];
 	char *chan;
@@ -532,9 +1007,75 @@ irc_numeric_333(struct server *s, struct irc_message *m)
 }
 
 static int
-irc_numeric_353(struct server *s, struct irc_message *m)
+irc_recv_338(struct server *s, struct irc_message *m)
 {
-	/* <type> <channel> 1*(<modes><nick>) */
+	/* RPL_WHOISACTUALLY
+	 *
+	 * <nick> :Is actually
+	 * <nick> <host|ip> :Is actually using host
+	 * <nick> <username>@<hostname> <ip> :Is actually using host */
+
+	char *nick;
+	char *param1;
+	char *param2;
+	char *param3;
+
+	if (!irc_message_param(m, &nick))
+		failf(s, "RPL_WHOISACTUALLY: nick is null");
+
+	irc_message_param(m, &param1);
+	irc_message_param(m, &param2);
+	irc_message_param(m, &param3);
+
+	switch (!!param1 + !!param2 + !!param3) {
+		case 1:
+			server_info(s, "%s", nick, param1);
+			break;
+		case 2:
+			server_info(s, "%s", nick, param1, param2);
+			break;
+		case 3:
+			server_info(s, "%s", nick, param1, param2, param3);
+			break;
+		default:
+			failf(s, "RPL_WHOISACTUALLY: invalid arg count");
+			break;
+	}
+
+	return 0;
+}
+
+static int
+irc_recv_341(struct server *s, struct irc_message *m)
+{
+	/* RPL_INVITING
+	 *
+	 * <nick> <channel> */
+
+	char *nick;
+	char *chan;
+	struct channel *c;
+
+	if (!irc_message_param(m, &nick))
+		failf(s, "RPL_INVITING: nick is null");
+
+	if (!irc_message_param(m, &chan))
+		failf(s, "RPL_INVITING: channel is null");
+
+	if ((c = channel_list_get(&s->clist, chan, s->casemapping)) == NULL)
+		failf(s, "RPL_INVITING: channel '%s' not found", chan);
+
+	newlinef(c, 0, FROM_INFO, "Invited %s to %s", nick, chan);
+
+	return 0;
+}
+
+static int
+irc_recv_353(struct server *s, struct irc_message *m)
+{
+	/* RPL_NAMREPLY
+	 *
+	 * <type> <channel> :1*([prefix]<nick>) */
 
 	char *chan;
 	char *nicks;
@@ -601,9 +1142,11 @@ irc_numeric_353(struct server *s, struct irc_message *m)
 
 
 static int
-irc_numeric_366(struct server *s, struct irc_message *m)
+irc_recv_366(struct server *s, struct irc_message *m)
 {
-	/* <channel> :End of NAMES list */
+	/* RPL_ENDOFNAMES
+	 *
+	 * <channel> :End of NAMES list */
 
 	char *chan;
 	struct channel *c;
@@ -618,9 +1161,53 @@ irc_numeric_366(struct server *s, struct irc_message *m)
 }
 
 static int
-irc_numeric_401(struct server *s, struct irc_message *m)
+irc_recv_378(struct server *s, struct irc_message *m)
 {
-	/* <nick> :No such nick/channel */
+	/* RPL_WHOISHOST
+	 *
+	 * <nick> :is connecting from ... */
+
+	char *nick;
+	char *message;
+
+	if (!irc_message_param(m, &nick))
+		failf(s, "RPL_WHOISHOST: nick is null");
+
+	if (!irc_message_param(m, &message))
+		failf(s, "RPL_WHOISHOST: message is null");
+
+	server_info(s, "%s %s", nick, message);
+
+	return 0;
+}
+
+static int
+irc_recv_379(struct server *s, struct irc_message *m)
+{
+	/* RPL_WHOISMODES
+	 *
+	 * <nick> :is using modes +ailosw */
+
+	char *nick;
+	char *message;
+
+	if (!irc_message_param(m, &nick))
+		failf(s, "RPL_WHOISMODES: nick is null");
+
+	if (!irc_message_param(m, &message))
+		failf(s, "RPL_WHOISMODES: message is null");
+
+	server_info(s, "%s %s", nick, message);
+
+	return 0;
+}
+
+static int
+irc_recv_401(struct server *s, struct irc_message *m)
+{
+	/* ERR_NOSUCHNICK
+	 *
+	 * <nick> :No such nick/channel */
 
 	char *message;
 	char *nick;
@@ -643,16 +1230,41 @@ irc_numeric_401(struct server *s, struct irc_message *m)
 }
 
 static int
-irc_numeric_403(struct server *s, struct irc_message *m)
+irc_recv_402(struct server *s, struct irc_message *m)
 {
-	/* <chan> :No such channel */
+	/* ERR_NOSUCHSERVER
+	 *
+	 * <server> :No such server */
 
+	char *server;
 	char *message;
+
+	if (!irc_message_param(m, &server))
+		failf(s, "ERR_NOSUCHSERVER: server is null");
+
+	irc_message_param(m, &message);
+
+	if (message && *message)
+		server_error(s, "[%s] %s", server, message);
+	else
+		server_error(s, "[%s] No such server", server);
+
+	return 0;
+}
+
+static int
+irc_recv_403(struct server *s, struct irc_message *m)
+{
+	/* ERR_NOSUCHCHANNEL
+	 *
+	 * <channel> :No such channel */
+
 	char *chan;
+	char *message;
 	struct channel *c;
 
 	if (!irc_message_param(m, &chan))
-		failf(s, "ERR_NOSUCHCHANNEL: chan is null");
+		failf(s, "ERR_NOSUCHCHANNEL: channel is null");
 
 	if (!(c = channel_list_get(&(s->clist), chan, s->casemapping)))
 		c = s->channel;
@@ -668,9 +1280,38 @@ irc_numeric_403(struct server *s, struct irc_message *m)
 }
 
 static int
-irc_numeric_433(struct server *s, struct irc_message *m)
+irc_recv_406(struct server *s, struct irc_message *m)
 {
-	/* 433 <nick> :Nickname is already in use */
+	/* ERR_WASNOSUCHNICK
+	 *
+	 * <nick> :There was no such nickname */
+
+	char *nick;
+	char *message;
+	struct channel *c;
+
+	if (!irc_message_param(m, &nick))
+		failf(s, "ERR_WASNOSUCHNICK: nick is null");
+
+	if (!(c = channel_list_get(&(s->clist), nick, s->casemapping)))
+		c = s->channel;
+
+	irc_message_param(m, &message);
+
+	if (message && *message)
+		newlinef(c, 0, FROM_ERROR, "[%s] %s", nick, message);
+	else
+		newlinef(c, 0, FROM_ERROR, "[%s] No such nick", nick);
+
+	return 0;
+}
+
+static int
+irc_recv_433(struct server *s, struct irc_message *m)
+{
+	/* ERR_NICKNAMEINUSE
+	 *
+	 * <nick> :Nickname is already in use */
 
 	char *nick;
 
@@ -684,6 +1325,108 @@ irc_numeric_433(struct server *s, struct irc_message *m)
 		server_error(s, "Trying again with '%s'", s->nick);
 		sendf(s, "NICK %s", s->nick);
 	}
+
+	return 0;
+}
+
+static int
+irc_recv_671(struct server *s, struct irc_message *m)
+{
+	/* RPL_WHOISSECURE
+	 *
+	 * <nick> :is using a secure connection */
+
+	char *nick;
+	char *message;
+
+	if (!irc_message_param(m, &nick))
+		failf(s, "RPL_WHOISSECURE: nick is null");
+
+	if (!irc_message_param(m, &message))
+		failf(s, "RPL_WHOISSECURE: message is null");
+
+	server_info(s, "%s %s", nick, message);
+
+	return 0;
+}
+
+static int
+irc_recv_716(struct server *s, struct irc_message *m)
+{
+	/* RPL_TARGUMODEG
+	 *
+	 * <nick> :<info> */
+
+	char *nick;
+	char *message;
+	struct channel *c;
+
+	if (!irc_message_param(m, &nick))
+		failf(s, "RPL_TARGUMODEG: nick is null");
+
+	if (!irc_message_param(m, &message))
+		failf(s, "RPL_TARGUMODEG: message is null");
+
+	if (!(c = channel_list_get(&(s->clist), nick, s->casemapping)))
+		c = s->channel;
+
+	if (message && *message)
+		newlinef(c, 0, FROM_INFO, "%s %s", nick, message);
+	else
+		newlinef(c, 0, FROM_INFO, "%s has +g mode enabled (server-side ignore)", nick);
+
+	return 0;
+}
+
+static int
+irc_recv_717(struct server *s, struct irc_message *m)
+{
+	/* RPL_TARGNOTIFY
+	 *
+	 * <nick> :<info> */
+
+	char *nick;
+	char *message;
+	struct channel *c;
+
+	if (!irc_message_param(m, &nick))
+		failf(s, "RPL_TARGNOTIFY: nick is null");
+
+	if (!irc_message_param(m, &message))
+		failf(s, "RPL_TARGNOTIFY: message is null");
+
+	if (!(c = channel_list_get(&(s->clist), nick, s->casemapping)))
+		c = s->channel;
+
+	if (message && *message)
+		newlinef(c, 0, FROM_INFO, "%s %s", nick, message);
+	else
+		newlinef(c, 0, FROM_INFO, "%s has been informed that you messaged them", nick);
+
+	return 0;
+}
+
+static int
+irc_recv_718(struct server *s, struct irc_message *m)
+{
+	/* RPL_UMODEGMSG
+	 *
+	 * <nick> <user>@<host> :<info> */
+
+	char *nick;
+	char *host;
+	char *message;
+
+	if (!irc_message_param(m, &nick))
+		failf(s, "RPL_UMODEGMSG: nick is null");
+
+	if (!irc_message_param(m, &host))
+		failf(s, "RPL_UMODEGMSG: host is null");
+
+	if (!irc_message_param(m, &message))
+		failf(s, "RPL_UMODEGMSG: message is null");
+
+	server_info(s, "%s (%s) %s", nick, host, message);
 
 	return 0;
 }
@@ -759,7 +1502,11 @@ recv_invite(struct server *s, struct irc_message *m)
 		return 0;
 	}
 
-	/* IRCv3 CAP invite-notify, sent to all users on the target channel */
+	/* IRCv3 CAP invite-notify, sent to all users on the target channel.
+	 *
+	 * Server is not required to send this to all users on the channel,
+	 * e.g. it may choose to send this message only to channel OPs or
+	 * users only to users with /invite privileges */
 	if ((c = channel_list_get(&s->clist, chan, s->casemapping)) == NULL)
 		failf(s, "INVITE: channel '%s' not found", chan);
 

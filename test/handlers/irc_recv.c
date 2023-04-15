@@ -1,5 +1,8 @@
 #include "test/test.h"
 
+// TODO:
+// implement test cases via the IRC_RECV_NUMERICS macro
+
 #include "src/components/buffer.c"
 #include "src/components/channel.c"
 #include "src/components/channel.h"
@@ -54,7 +57,11 @@ test_irc_generic(void)
 		assert_eq(mock_send_n, 0); \
 	} while (0)
 
+	/* test command, no args */
 	CHECK_IRC_GENERIC("COMMAND", NULL, NULL, 1, 0);
+
+	/* test command, empty args */
+	CHECK_IRC_GENERIC("COMMAND :", NULL, NULL, 1, 0);
 
 	/* test no command, only args */
 	CHECK_IRC_GENERIC("COMMAND arg1", NULL, NULL, 0, 1);
@@ -66,10 +73,14 @@ test_irc_generic(void)
 
 	/* test no command, args and trailing */
 	CHECK_IRC_GENERIC("COMMAND arg1 arg2 :trailing arg", NULL, NULL, 0, 1);
-	assert_strcmp(mock_line[0], "[arg1 arg2] ~ trailing arg");
+	assert_strcmp(mock_line[0], "[arg1 arg2] trailing arg");
 
 	/* test command, no args or trailing */
 	CHECK_IRC_GENERIC("COMMAND", "COMMAND", NULL, 0, 1);
+	assert_strcmp(mock_line[0], "[COMMAND]");
+
+	/* test command, no args, empty trailing */
+	CHECK_IRC_GENERIC("COMMAND :", "COMMAND", NULL, 0, 1);
 	assert_strcmp(mock_line[0], "[COMMAND]");
 
 	/* test command, only args */
@@ -78,11 +89,11 @@ test_irc_generic(void)
 
 	/* test command, only trailing */
 	CHECK_IRC_GENERIC("COMMAND :trailing arg", "COMMAND", NULL, 0, 1);
-	assert_strcmp(mock_line[0], "[COMMAND] ~ trailing arg");
+	assert_strcmp(mock_line[0], "[COMMAND] trailing arg");
 
 	/* test command, args and trailing */
 	CHECK_IRC_GENERIC("COMMAND arg1 arg2 :trailing arg", "COMMAND", NULL, 0, 1);
-	assert_strcmp(mock_line[0], "[COMMAND] [arg1 arg2] ~ trailing arg");
+	assert_strcmp(mock_line[0], "[COMMAND] [arg1 arg2] trailing arg");
 
 	#undef CHECK_IRC_GENERIC
 }
@@ -98,7 +109,7 @@ test_irc_generic_error(void)
 	assert_eq(irc_generic_error(s, &m), 0);
 	assert_eq(mock_line_n, 1);
 	assert_eq(mock_send_n, 0);
-	assert_strcmp(mock_line[0], "[arg1 arg2] ~ trailing arg");
+	assert_strcmp(mock_line[0], "[arg1 arg2] trailing arg");
 }
 
 static void
@@ -125,7 +136,7 @@ test_irc_generic_info(void)
 	assert_eq(irc_generic_info(s, &m), 0);
 	assert_eq(mock_line_n, 1);
 	assert_eq(mock_send_n, 0);
-	assert_strcmp(mock_line[0], "[arg1 arg2] ~ trailing arg");
+	assert_strcmp(mock_line[0], "[arg1 arg2] trailing arg");
 }
 
 static void
@@ -139,7 +150,7 @@ test_irc_generic_unknown(void)
 	assert_eq(irc_generic_unknown(s, &m), 0);
 	assert_eq(mock_line_n, 1);
 	assert_eq(mock_send_n, 0);
-	assert_strcmp(mock_line[0], "[COMMAND] [arg1 arg2] ~ trailing arg");
+	assert_strcmp(mock_line[0], "[COMMAND] [arg1 arg2] trailing arg");
 }
 
 static void
@@ -398,7 +409,7 @@ test_irc_numeric_403(void)
 	/* test errors */
 	CHECK_RECV("403 me", 1, 1, 0);
 	assert_strcmp(mock_chan[0], "host");
-	assert_strcmp(mock_line[0], "ERR_NOSUCHCHANNEL: chan is null");
+	assert_strcmp(mock_line[0], "ERR_NOSUCHCHANNEL: channel is null");
 
 	/* test channel buffer not found */
 	CHECK_RECV("403 me #notfound", 0, 1, 0);
@@ -832,7 +843,7 @@ test_recv_numeric(void)
 
 	/* test numeric unhandled */
 	CHECK_RECV(":hostname 666 me arg1 arg2 :trailing arg", 0, 1, 0);
-	assert_strcmp(mock_line[0], "[666] [arg1 arg2] ~ trailing arg");
+	assert_strcmp(mock_line[0], "[666] [arg1 arg2] trailing arg");
 	assert_ptr_null(irc_numerics[666]);
 }
 

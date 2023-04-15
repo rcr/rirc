@@ -261,7 +261,7 @@ server_set_nicks(struct server *s, const char *str)
 void
 server_set_004(struct server *s, char *str)
 {
-	/* <server_name> <version> <user_modes> <chan_modes> */
+	/* <servername> <version> <usermodes> <chanmodes> [chanmodes with parameter] */
 
 	const char *user_modes;
 	const char *chan_modes;

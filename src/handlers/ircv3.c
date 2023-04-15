@@ -78,9 +78,11 @@ ircv3_recv_CAP(struct server *s, struct irc_message *m)
 }
 
 int
-ircv3_numeric_900(struct server *s, struct irc_message *m)
+ircv3_recv_900(struct server *s, struct irc_message *m)
 {
-	/* <nick>!<ident>@<host> <account> :You are now logged in as <user> */
+	/* RPL_LOGGEDIN
+	 *
+	 * <nick>!<ident>@<host> <account> :You are now logged in as <user> */
 
 	char *account;
 	char *message;
@@ -103,7 +105,7 @@ ircv3_numeric_900(struct server *s, struct irc_message *m)
 }
 
 int
-ircv3_numeric_901(struct server *s, struct irc_message *m)
+ircv3_recv_901(struct server *s, struct irc_message *m)
 {
 	/* <nick>!<ident>@<host> :You are now logged out */
 
@@ -124,7 +126,7 @@ ircv3_numeric_901(struct server *s, struct irc_message *m)
 }
 
 int
-ircv3_numeric_902(struct server *s, struct irc_message *m)
+ircv3_recv_902(struct server *s, struct irc_message *m)
 {
 	/* :You must use a nick assigned to you */
 
@@ -146,7 +148,7 @@ ircv3_numeric_902(struct server *s, struct irc_message *m)
 }
 
 int
-ircv3_numeric_903(struct server *s, struct irc_message *m)
+ircv3_recv_903(struct server *s, struct irc_message *m)
 {
 	/* :SASL authentication successful */
 
@@ -165,7 +167,7 @@ ircv3_numeric_903(struct server *s, struct irc_message *m)
 }
 
 int
-ircv3_numeric_904(struct server *s, struct irc_message *m)
+ircv3_recv_904(struct server *s, struct irc_message *m)
 {
 	/* :SASL authentication failed */
 
@@ -187,7 +189,7 @@ ircv3_numeric_904(struct server *s, struct irc_message *m)
 }
 
 int
-ircv3_numeric_905(struct server *s, struct irc_message *m)
+ircv3_recv_905(struct server *s, struct irc_message *m)
 {
 	/* :SASL message too long */
 
@@ -209,7 +211,7 @@ ircv3_numeric_905(struct server *s, struct irc_message *m)
 }
 
 int
-ircv3_numeric_906(struct server *s, struct irc_message *m)
+ircv3_recv_906(struct server *s, struct irc_message *m)
 {
 	/* :SASL authentication aborted */
 
@@ -231,7 +233,7 @@ ircv3_numeric_906(struct server *s, struct irc_message *m)
 }
 
 int
-ircv3_numeric_907(struct server *s, struct irc_message *m)
+ircv3_recv_907(struct server *s, struct irc_message *m)
 {
 	/* :You have already authenticated using SASL */
 
@@ -253,7 +255,7 @@ ircv3_numeric_907(struct server *s, struct irc_message *m)
 }
 
 int
-ircv3_numeric_908(struct server *s, struct irc_message *m)
+ircv3_recv_908(struct server *s, struct irc_message *m)
 {
 	/* <mechanisms> :are available SASL mechanisms */
 

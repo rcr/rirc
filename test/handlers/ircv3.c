@@ -705,7 +705,7 @@ test_ircv3_recv_AUTHENTICATE_PLAIN(void)
 }
 
 static void
-test_ircv3_numeric_900(void)
+test_ircv3_recv_900(void)
 {
 	IRC_MESSAGE_PARSE("900 *");
 	assert_eq(irc_recv(s, &m), -1);
@@ -733,7 +733,7 @@ test_ircv3_numeric_900(void)
 }
 
 static void
-test_ircv3_numeric_901(void)
+test_ircv3_recv_901(void)
 {
 	IRC_MESSAGE_PARSE("901 *");
 	assert_eq(irc_recv(s, &m), -1);
@@ -755,7 +755,7 @@ test_ircv3_numeric_901(void)
 }
 
 static void
-test_ircv3_numeric_902(void)
+test_ircv3_recv_902(void)
 {
 	IRC_MESSAGE_PARSE("902 *");
 	assert_eq(irc_recv(s, &m), 0);
@@ -773,7 +773,7 @@ test_ircv3_numeric_902(void)
 }
 
 static void
-test_ircv3_numeric_903(void)
+test_ircv3_recv_903(void)
 {
 	IRC_MESSAGE_PARSE("903 *");
 	assert_eq(irc_recv(s, &m), 0);
@@ -793,7 +793,7 @@ test_ircv3_numeric_903(void)
 }
 
 static void
-test_ircv3_numeric_904(void)
+test_ircv3_recv_904(void)
 {
 	IRC_MESSAGE_PARSE("904 *");
 	assert_eq(irc_recv(s, &m), 0);
@@ -811,7 +811,7 @@ test_ircv3_numeric_904(void)
 }
 
 static void
-test_ircv3_numeric_905(void)
+test_ircv3_recv_905(void)
 {
 	IRC_MESSAGE_PARSE("905 *");
 	assert_eq(irc_recv(s, &m), 0);
@@ -829,7 +829,7 @@ test_ircv3_numeric_905(void)
 }
 
 static void
-test_ircv3_numeric_906(void)
+test_ircv3_recv_906(void)
 {
 	IRC_MESSAGE_PARSE("906 *");
 	assert_eq(irc_recv(s, &m), 0);
@@ -847,7 +847,7 @@ test_ircv3_numeric_906(void)
 }
 
 static void
-test_ircv3_numeric_907(void)
+test_ircv3_recv_907(void)
 {
 	IRC_MESSAGE_PARSE("907 *");
 	assert_eq(irc_recv(s, &m), 0);
@@ -865,7 +865,7 @@ test_ircv3_numeric_907(void)
 }
 
 static void
-test_ircv3_numeric_908(void)
+test_ircv3_recv_908(void)
 {
 	IRC_MESSAGE_PARSE("908 *");
 	assert_eq(irc_recv(s, &m), -1);
@@ -1057,15 +1057,15 @@ main(void)
 		TESTCASE(test_ircv3_recv_AUTHENTICATE),
 		TESTCASE(test_ircv3_recv_AUTHENTICATE_EXTERNAL),
 		TESTCASE(test_ircv3_recv_AUTHENTICATE_PLAIN),
-		TESTCASE(test_ircv3_numeric_900),
-		TESTCASE(test_ircv3_numeric_901),
-		TESTCASE(test_ircv3_numeric_902),
-		TESTCASE(test_ircv3_numeric_903),
-		TESTCASE(test_ircv3_numeric_904),
-		TESTCASE(test_ircv3_numeric_905),
-		TESTCASE(test_ircv3_numeric_906),
-		TESTCASE(test_ircv3_numeric_907),
-		TESTCASE(test_ircv3_numeric_908),
+		TESTCASE(test_ircv3_recv_900),
+		TESTCASE(test_ircv3_recv_901),
+		TESTCASE(test_ircv3_recv_902),
+		TESTCASE(test_ircv3_recv_903),
+		TESTCASE(test_ircv3_recv_904),
+		TESTCASE(test_ircv3_recv_905),
+		TESTCASE(test_ircv3_recv_906),
+		TESTCASE(test_ircv3_recv_907),
+		TESTCASE(test_ircv3_recv_908),
 		TESTCASE(test_ircv3_cap_req_count),
 		TESTCASE(test_ircv3_cap_req_send),
 		TESTCASE(test_ircv3_cap_end),
