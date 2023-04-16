@@ -1321,6 +1321,16 @@ test_irc_recv_266(void)
 }
 
 static void
+test_irc_recv_275(void)
+{
+	/* RPL_RPL_USINGSSL
+	 *
+	 * <nick> :is using a secure connection (SSL) */
+
+	/* TODO */
+}
+
+static void
 test_irc_recv_276(void)
 {
 	/* RPL_WHOISCERTFP
@@ -1489,7 +1499,30 @@ test_irc_recv_338(void)
 	 * <nick> <host|ip> :Is actually using host
 	 * <nick> <username>@<hostname> <ip> :Is actually using host */
 
-	/* TODO */
+	/* test invalid, no nick */
+	CHECK_RECV("338 me", 1, 1, 0);
+	assert_strcmp(mock_chan[0], "host");
+	assert_strcmp(mock_line[0], "RPL_WHOISACTUALLY: nick is null");
+
+	/* test invalid, no args */
+	CHECK_RECV("338 me nick", 1, 1, 0);
+	assert_strcmp(mock_chan[0], "host");
+	assert_strcmp(mock_line[0], "RPL_WHOISACTUALLY: trailing is null");
+
+	/* test 1 arg */
+	CHECK_RECV("338 me nick :is actually using host aaa@bbb", 0, 1, 0);
+	assert_strcmp(mock_chan[0], "host");
+	assert_strcmp(mock_line[0], "nick is actually using host aaa@bbb");
+
+	/* test 2 args */
+	CHECK_RECV("338 me nick ccc@ddd :is actually using host", 0, 1, 0);
+	assert_strcmp(mock_chan[0], "host");
+	assert_strcmp(mock_line[0], "nick is actually using host ccc@ddd");
+
+	/* test 3 args */
+	CHECK_RECV("338 me nick eee@fff ggg :is actually using host", 0, 1, 0);
+	assert_strcmp(mock_chan[0], "host");
+	assert_strcmp(mock_line[0], "nick is actually using host eee@fff ggg");
 }
 
 static void

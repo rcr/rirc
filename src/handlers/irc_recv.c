@@ -48,6 +48,7 @@ static int recv_mode_usermodes(struct irc_message*, const struct mode_cfg*, stru
 	X(254) /* RPL_LUSERCHANNELS */   \
 	X(265) /* RPL_LOCALUSERS */      \
 	X(266) /* RPL_GLOBALUSERS */     \
+	X(275) /* RPL_USINGSSL */        \
 	X(276) /* RPL_WHOISCERTFP */     \
 	X(301) /* RPL_AWAY */            \
 	X(307) /* RPL_WHOISREGNICK */    \
@@ -138,6 +139,7 @@ static const irc_recv_f irc_numerics[] = {
 	[263] = irc_generic_info,   /* RPL_TRYAGAIN */
 	[265] = irc_recv_265,       /* RPL_LOCALUSERS */
 	[266] = irc_recv_266,       /* RPL_GLOBALUSERS */
+	[275] = irc_recv_275,       /* RPL_USINGSSL */
 	[276] = irc_recv_276,       /* RPL_WHOISCERTFP */
 	[301] = irc_recv_301,       /* RPL_AWAY */
 	[302] = irc_generic_info,   /* RPL_USERHOST */
@@ -545,6 +547,27 @@ irc_recv_266(struct server *s, struct irc_message *m)
 }
 
 static int
+irc_recv_275(struct server *s, struct irc_message *m)
+{
+	/* RPL_RPL_USINGSSL
+	 *
+	 * <nick> :is using a secure connection (SSL) */
+
+	char *nick;
+	char *message;
+
+	if (!irc_message_param(m, &nick))
+		failf(s, "RPL_USINGSSL: nick is null");
+
+	if (!irc_message_param(m, &message))
+		failf(s, "RPL_USINGSSL: message is null");
+
+	server_info(s, "%s %s", nick, message);
+
+	return 0;
+}
+
+static int
 irc_recv_276(struct server *s, struct irc_message *m)
 {
 	/* RPL_WHOISCERTFP
@@ -616,7 +639,7 @@ irc_recv_311(struct server *s, struct irc_message *m)
 
 	char *nick;
 	char *username;
-	char *hostname;
+	char *host;
 	char *unused;
 	char *realname;
 
@@ -626,8 +649,8 @@ irc_recv_311(struct server *s, struct irc_message *m)
 	if (!irc_message_param(m, &username))
 		failf(s, "RPL_WHOISUSER: username is null");
 
-	if (!irc_message_param(m, &hostname))
-		failf(s, "RPL_WHOISUSER: username is null");
+	if (!irc_message_param(m, &host))
+		failf(s, "RPL_WHOISUSER: host is null");
 
 	if (!irc_message_param(m, &unused))
 		failf(s, "RPL_WHOISUSER: unused is null");
@@ -635,9 +658,7 @@ irc_recv_311(struct server *s, struct irc_message *m)
 	if (!irc_message_param(m, &realname))
 		failf(s, "RPL_WHOISUSER: realname is null");
 
-	server_info(s, "%s has username: %s", nick, username);
-	server_info(s, "%s has hostname: %s", nick, hostname);
-	server_info(s, "%s has realname: %s", nick, realname);
+	server_info(s, "%s is %s@%s (%s)", nick, username, host, realname);
 
 	return 0;
 }
@@ -662,7 +683,7 @@ irc_recv_312(struct server *s, struct irc_message *m)
 	if (!irc_message_param(m, &serverinfo))
 		failf(s, "RPL_WHOISSERVER: serverinfo is null");
 
-	server_info(s, "%s connected to: %s (%s)", nick, servername, serverinfo);
+	server_info(s, "%s is connected to: %s (%s)", nick, servername, serverinfo);
 
 	return 0;
 }
@@ -697,7 +718,7 @@ irc_recv_314(struct server *s, struct irc_message *m)
 
 	char *nick;
 	char *username;
-	char *hostname;
+	char *host;
 	char *unused;
 	char *realname;
 
@@ -707,8 +728,8 @@ irc_recv_314(struct server *s, struct irc_message *m)
 	if (!irc_message_param(m, &username))
 		failf(s, "RPL_WHOWASUSER: username is null");
 
-	if (!irc_message_param(m, &hostname))
-		failf(s, "RPL_WHOWASUSER: username is null");
+	if (!irc_message_param(m, &host))
+		failf(s, "RPL_WHOWASUSER: host is null");
 
 	if (!irc_message_param(m, &unused))
 		failf(s, "RPL_WHOWASUSER: unused is null");
@@ -716,9 +737,7 @@ irc_recv_314(struct server *s, struct irc_message *m)
 	if (!irc_message_param(m, &realname))
 		failf(s, "RPL_WHOWASUSER: realname is null");
 
-	server_info(s, "%s had username: %s", nick, username);
-	server_info(s, "%s had hostname: %s", nick, hostname);
-	server_info(s, "%s had realname: %s", nick, realname);
+	server_info(s, "%s was %s@%s (%s)", nick, username, host, realname);
 
 	return 0;
 }
@@ -763,25 +782,25 @@ irc_recv_317(struct server *s, struct irc_message *m)
 	if (errno)
 		failf(s, "RPL_WHOISIDLE: t_signon strtoul error: %s", strerror(errno));
 
-	idle_d = t_idle / 86400;
-	idle_h = t_idle % 86400 / 3600;
-	idle_m = t_idle % 3600 / 60;
-	idle_s = t_idle % 60;
-
 	if (gmtime_r(&t_signon, &tm) == NULL)
 		failf(s, "RPL_WHOISIDLE: gmtime_r error: %s", strerror(errno));
 
 	if ((strftime(buf, sizeof(buf), "%FT%T", &tm)) == 0)
 		failf(s, "RPL_WHOISIDLE: strftime error");
 
-	server_info(s, "%s has been idle %.0u%s%.0u%s%.0u%s%u%s, connected since %s",
+	idle_d = t_idle / 86400;
+	idle_h = t_idle % 86400 / 3600;
+	idle_m = t_idle % 3600 / 60;
+	idle_s = t_idle % 60;
+
+	server_info(s, "%s has been idle %.0u%s%.0u%s%.0u%s%u seconds, connected since %s",
 		nick,
 		idle_d,
-		idle_d ? "d:" : "",
+		idle_d ? " days " : "",
 		idle_h,
-		idle_h ? "h:" : "",
+		idle_h ? " hours " : "",
 		idle_m,
-		idle_m ? "m:" : "",
+		idle_m ? " minutes " : "",
 		idle_s,
 		buf);
 
@@ -1016,31 +1035,21 @@ irc_recv_338(struct server *s, struct irc_message *m)
 	 * <nick> <username>@<hostname> <ip> :Is actually using host */
 
 	char *nick;
-	char *param1;
-	char *param2;
-	char *param3;
+	const char *params;
+	const char *trailing;
 
 	if (!irc_message_param(m, &nick))
 		failf(s, "RPL_WHOISACTUALLY: nick is null");
 
-	irc_message_param(m, &param1);
-	irc_message_param(m, &param2);
-	irc_message_param(m, &param3);
+	irc_message_split(m, &params, &trailing);
 
-	switch (!!param1 + !!param2 + !!param3) {
-		case 1:
-			server_info(s, "%s", nick, param1);
-			break;
-		case 2:
-			server_info(s, "%s", nick, param1, param2);
-			break;
-		case 3:
-			server_info(s, "%s", nick, param1, param2, param3);
-			break;
-		default:
-			failf(s, "RPL_WHOISACTUALLY: invalid arg count");
-			break;
-	}
+	if (!trailing)
+		failf(s, "RPL_WHOISACTUALLY: trailing is null");
+
+	if (params && trailing)
+		server_info(s, "%s %s %s", nick, trailing, params);
+	else
+		server_info(s, "%s %s", nick, trailing);
 
 	return 0;
 }
