@@ -47,6 +47,7 @@
 	X(privmsg) \
 	X(quit) \
 	X(topic) \
+	X(wallops) \
 	X(ircv3_account) \
 	X(ircv3_authenticate) \
 	X(ircv3_away) \
@@ -64,9 +65,9 @@ struct recv_handler
 	char *key;
 	irc_recv_f f;
 };
-#line 46 "src/handlers/irc_recv.gperf"
+#line 47 "src/handlers/irc_recv.gperf"
 struct recv_handler;
-/* maximum key range = 36, duplicates = 0 */
+/* maximum key range = 42, duplicates = 0 */
 
 #ifdef __GNUC__
 __inline
@@ -80,32 +81,32 @@ recv_handler_hash (register const char *str, register size_t len)
 {
   static const unsigned char asso_values[] =
     {
-      40, 40, 40, 40, 40, 40, 40, 40, 40, 40,
-      40, 40, 40, 40, 40, 40, 40, 40, 40, 40,
-      40, 40, 40, 40, 40, 40, 40, 40, 40, 40,
-      40, 40, 40, 40, 40, 40, 40, 40, 40, 40,
-      40, 40, 40, 40, 40, 40, 40, 40, 40, 40,
-      40, 40, 40, 40, 40, 40, 40, 40, 40, 40,
-      40, 40, 40, 40, 40, 15, 40,  0, 40,  5,
-      40, 40, 10,  5,  8, 30, 40, 30,  5,  0,
-       0, 25,  0, 40,  0,  0, 40,  5, 40, 40,
-      40, 40, 40, 40, 40, 40, 40, 40, 40, 40,
-      40, 40, 40, 40, 40, 40, 40, 40, 40, 40,
-      40, 40, 40, 40, 40, 40, 40, 40, 40, 40,
-      40, 40, 40, 40, 40, 40, 40, 40, 40, 40,
-      40, 40, 40, 40, 40, 40, 40, 40, 40, 40,
-      40, 40, 40, 40, 40, 40, 40, 40, 40, 40,
-      40, 40, 40, 40, 40, 40, 40, 40, 40, 40,
-      40, 40, 40, 40, 40, 40, 40, 40, 40, 40,
-      40, 40, 40, 40, 40, 40, 40, 40, 40, 40,
-      40, 40, 40, 40, 40, 40, 40, 40, 40, 40,
-      40, 40, 40, 40, 40, 40, 40, 40, 40, 40,
-      40, 40, 40, 40, 40, 40, 40, 40, 40, 40,
-      40, 40, 40, 40, 40, 40, 40, 40, 40, 40,
-      40, 40, 40, 40, 40, 40, 40, 40, 40, 40,
-      40, 40, 40, 40, 40, 40, 40, 40, 40, 40,
-      40, 40, 40, 40, 40, 40, 40, 40, 40, 40,
-      40, 40, 40, 40, 40, 40
+      45, 45, 45, 45, 45, 45, 45, 45, 45, 45,
+      45, 45, 45, 45, 45, 45, 45, 45, 45, 45,
+      45, 45, 45, 45, 45, 45, 45, 45, 45, 45,
+      45, 45, 45, 45, 45, 45, 45, 45, 45, 45,
+      45, 45, 45, 45, 45, 45, 45, 45, 45, 45,
+      45, 45, 45, 45, 45, 45, 45, 45, 45, 45,
+      45, 45, 45, 45, 45,  0, 45,  0, 45,  0,
+      45, 45, 20,  5, 20, 30, 45, 10,  5, 20,
+       0, 25, 10, 45,  0,  0, 45, 15, 45, 45,
+      45, 45, 45, 45, 45, 45, 45, 45, 45, 45,
+      45, 45, 45, 45, 45, 45, 45, 45, 45, 45,
+      45, 45, 45, 45, 45, 45, 45, 45, 45, 45,
+      45, 45, 45, 45, 45, 45, 45, 45, 45, 45,
+      45, 45, 45, 45, 45, 45, 45, 45, 45, 45,
+      45, 45, 45, 45, 45, 45, 45, 45, 45, 45,
+      45, 45, 45, 45, 45, 45, 45, 45, 45, 45,
+      45, 45, 45, 45, 45, 45, 45, 45, 45, 45,
+      45, 45, 45, 45, 45, 45, 45, 45, 45, 45,
+      45, 45, 45, 45, 45, 45, 45, 45, 45, 45,
+      45, 45, 45, 45, 45, 45, 45, 45, 45, 45,
+      45, 45, 45, 45, 45, 45, 45, 45, 45, 45,
+      45, 45, 45, 45, 45, 45, 45, 45, 45, 45,
+      45, 45, 45, 45, 45, 45, 45, 45, 45, 45,
+      45, 45, 45, 45, 45, 45, 45, 45, 45, 45,
+      45, 45, 45, 45, 45, 45, 45, 45, 45, 45,
+      45, 45, 45, 45, 45, 45
     };
   return len + asso_values[(unsigned char)str[1]] + asso_values[(unsigned char)str[0]];
 }
@@ -115,65 +116,70 @@ recv_handler_lookup (register const char *str, register size_t len)
 {
   enum
     {
-      TOTAL_KEYWORDS = 18,
+      TOTAL_KEYWORDS = 19,
       MIN_WORD_LENGTH = 3,
       MAX_WORD_LENGTH = 12,
-      MIN_HASH_VALUE = 4,
-      MAX_HASH_VALUE = 39
+      MIN_HASH_VALUE = 3,
+      MAX_HASH_VALUE = 44
     };
 
   static const struct recv_handler recv_handlers[] =
     {
       {(char*)0,(irc_recv_f)0}, {(char*)0,(irc_recv_f)0},
-      {(char*)0,(irc_recv_f)0}, {(char*)0,(irc_recv_f)0},
-#line 57 "src/handlers/irc_recv.gperf"
-      {"PONG",         recv_pong},
-#line 60 "src/handlers/irc_recv.gperf"
-      {"TOPIC",        recv_topic},
       {(char*)0,(irc_recv_f)0},
-#line 58 "src/handlers/irc_recv.gperf"
-      {"PRIVMSG",      recv_privmsg},
-      {(char*)0,(irc_recv_f)0},
-#line 56 "src/handlers/irc_recv.gperf"
-      {"PING",         recv_ping},
-#line 48 "src/handlers/irc_recv.gperf"
-      {"ERROR",        recv_error},
-#line 54 "src/handlers/irc_recv.gperf"
-      {"NOTICE",       recv_notice},
-#line 50 "src/handlers/irc_recv.gperf"
-      {"JOIN",         recv_join},
-      {(char*)0,(irc_recv_f)0},
-#line 53 "src/handlers/irc_recv.gperf"
-      {"NICK",         recv_nick},
-      {(char*)0,(irc_recv_f)0},
-#line 49 "src/handlers/irc_recv.gperf"
-      {"INVITE",       recv_invite},
-#line 65 "src/handlers/irc_recv.gperf"
-      {"CHGHOST",      recv_ircv3_chghost},
-#line 64 "src/handlers/irc_recv.gperf"
+#line 66 "src/handlers/irc_recv.gperf"
       {"CAP",          recv_ircv3_cap},
-#line 55 "src/handlers/irc_recv.gperf"
+#line 56 "src/handlers/irc_recv.gperf"
       {"PART",         recv_part},
       {(char*)0,(irc_recv_f)0}, {(char*)0,(irc_recv_f)0},
-#line 61 "src/handlers/irc_recv.gperf"
+#line 63 "src/handlers/irc_recv.gperf"
       {"ACCOUNT",      recv_ircv3_account},
       {(char*)0,(irc_recv_f)0},
-#line 63 "src/handlers/irc_recv.gperf"
+#line 57 "src/handlers/irc_recv.gperf"
+      {"PING",         recv_ping},
+      {(char*)0,(irc_recv_f)0}, {(char*)0,(irc_recv_f)0},
+#line 64 "src/handlers/irc_recv.gperf"
+      {"AUTHENTICATE", recv_ircv3_authenticate},
+      {(char*)0,(irc_recv_f)0},
+#line 54 "src/handlers/irc_recv.gperf"
+      {"NICK",         recv_nick},
+#line 49 "src/handlers/irc_recv.gperf"
+      {"ERROR",        recv_error},
+#line 50 "src/handlers/irc_recv.gperf"
+      {"INVITE",       recv_invite},
+#line 59 "src/handlers/irc_recv.gperf"
+      {"PRIVMSG",      recv_privmsg},
+      {(char*)0,(irc_recv_f)0},
+#line 65 "src/handlers/irc_recv.gperf"
       {"AWAY",         recv_ircv3_away},
       {(char*)0,(irc_recv_f)0}, {(char*)0,(irc_recv_f)0},
 #line 62 "src/handlers/irc_recv.gperf"
-      {"AUTHENTICATE", recv_ircv3_authenticate},
+      {"WALLOPS",      recv_wallops},
       {(char*)0,(irc_recv_f)0},
-#line 59 "src/handlers/irc_recv.gperf"
+#line 58 "src/handlers/irc_recv.gperf"
+      {"PONG",         recv_pong},
+#line 61 "src/handlers/irc_recv.gperf"
+      {"TOPIC",        recv_topic},
+      {(char*)0,(irc_recv_f)0},
+#line 67 "src/handlers/irc_recv.gperf"
+      {"CHGHOST",      recv_ircv3_chghost},
+      {(char*)0,(irc_recv_f)0},
+#line 60 "src/handlers/irc_recv.gperf"
       {"QUIT",         recv_quit},
+      {(char*)0,(irc_recv_f)0},
+#line 55 "src/handlers/irc_recv.gperf"
+      {"NOTICE",       recv_notice},
       {(char*)0,(irc_recv_f)0}, {(char*)0,(irc_recv_f)0},
-      {(char*)0,(irc_recv_f)0}, {(char*)0,(irc_recv_f)0},
-#line 52 "src/handlers/irc_recv.gperf"
+#line 53 "src/handlers/irc_recv.gperf"
       {"MODE",         recv_mode},
       {(char*)0,(irc_recv_f)0}, {(char*)0,(irc_recv_f)0},
       {(char*)0,(irc_recv_f)0}, {(char*)0,(irc_recv_f)0},
+#line 52 "src/handlers/irc_recv.gperf"
+      {"KICK",         recv_kick},
+      {(char*)0,(irc_recv_f)0}, {(char*)0,(irc_recv_f)0},
+      {(char*)0,(irc_recv_f)0}, {(char*)0,(irc_recv_f)0},
 #line 51 "src/handlers/irc_recv.gperf"
-      {"KICK",         recv_kick}
+      {"JOIN",         recv_join}
     };
 
   if (len <= MAX_WORD_LENGTH && len >= MIN_WORD_LENGTH)
@@ -190,5 +196,5 @@ recv_handler_lookup (register const char *str, register size_t len)
     }
   return 0;
 }
-#line 66 "src/handlers/irc_recv.gperf"
+#line 68 "src/handlers/irc_recv.gperf"
 

@@ -1,8 +1,5 @@
 #include "test/test.h"
 
-// TODO:
-// implement test cases via the IRC_RECV_NUMERICS macro
-
 #include "src/components/buffer.c"
 #include "src/components/channel.c"
 #include "src/components/channel.h"
@@ -862,6 +859,32 @@ test_recv_topic(void)
 	CHECK_RECV(":nick1!user@host TOPIC #c1 :", 0, 1, 0);
 	assert_strcmp(mock_chan[0], "#c1");
 	assert_strcmp(mock_line[0], "nick1 has unset the topic");
+}
+
+static void
+test_recv_wallops(void)
+{
+	/* :nick!user@host WALLOPS <:message> */
+
+	CHECK_RECV("WALLOPS :message text", 1, 1, 0);
+	assert_strcmp(mock_chan[0], "host");
+	assert_strcmp(mock_line[0], "WALLOPS: sender's nick is null");
+
+	CHECK_RECV(":nick1!user@host WALLOPS", 1, 1, 0);
+	assert_strcmp(mock_chan[0], "host");
+	assert_strcmp(mock_line[0], "WALLOPS: message is null");
+
+	CHECK_RECV(":nick1!user@host WALLOPS foo bar baz", 1, 1, 0);
+	assert_strcmp(mock_chan[0], "host");
+	assert_strcmp(mock_line[0], "WALLOPS: message is null");
+
+	CHECK_RECV(":nick1!user@host WALLOPS foo bar baz :trailing message 1", 0, 1, 0);
+	assert_strcmp(mock_chan[0], "host");
+	assert_strcmp(mock_line[0], "trailing message 1");
+
+	CHECK_RECV(":nick1!user@host WALLOPS :trailing message 2", 0, 1, 0);
+	assert_strcmp(mock_chan[0], "host");
+	assert_strcmp(mock_line[0], "trailing message 2");
 }
 
 static void
@@ -1901,6 +1924,7 @@ main(void)
 		TESTCASE(test_recv_privmsg),
 		TESTCASE(test_recv_quit),
 		TESTCASE(test_recv_topic),
+		TESTCASE(test_recv_wallops),
 		TESTCASE(test_recv_ircv3_cap),
 		TESTCASE(test_recv_ircv3_account),
 		TESTCASE(test_recv_ircv3_away),

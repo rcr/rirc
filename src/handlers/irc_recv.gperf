@@ -15,6 +15,7 @@
 	X(privmsg) \
 	X(quit) \
 	X(topic) \
+	X(wallops) \
 	X(ircv3_account) \
 	X(ircv3_authenticate) \
 	X(ircv3_away) \
@@ -58,6 +59,7 @@ PONG,         recv_pong
 PRIVMSG,      recv_privmsg
 QUIT,         recv_quit
 TOPIC,        recv_topic
+WALLOPS,      recv_wallops
 ACCOUNT,      recv_ircv3_account
 AUTHENTICATE, recv_ircv3_authenticate
 AWAY,         recv_ircv3_away

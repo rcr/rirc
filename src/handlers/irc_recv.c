@@ -1149,7 +1149,6 @@ irc_recv_353(struct server *s, struct irc_message *m)
 	return 0;
 }
 
-
 static int
 irc_recv_366(struct server *s, struct irc_message *m)
 {
@@ -2126,6 +2125,27 @@ recv_topic(struct server *s, struct irc_message *m)
 	} else {
 		newlinef(c, 0, FROM_INFO, "%s has unset the topic", m->from);
 	}
+
+	return 0;
+}
+
+static int
+recv_wallops(struct server *s, struct irc_message *m)
+{
+	/* :nick!user@host WALLOPS <:message> */
+
+	const char *params;
+	const char *trailing;
+
+	irc_message_split(m, &params, &trailing);
+
+	if (!m->from)
+		failf(s, "WALLOPS: sender's nick is null");
+
+	if (!trailing)
+		failf(s, "WALLOPS: message is null");
+		
+	newlinef(s->channel, BUFFER_LINE_NICK, m->from, "%s", trailing);
 
 	return 0;
 }
