@@ -559,15 +559,17 @@ state_complete_user(char *str, uint16_t len, uint16_t max, int first)
 	if ((u = user_list_get(&(c->users), c->server->casemapping, str, len)) == NULL)
 		return 0;
 
-	if ((u->nick_len + (first != 0)) > max)
+	if ((u->nick_len + (first ? 2 : 0)) > max)
 		return 0;
 
 	memcpy(str, u->nick, u->nick_len);
 
-	if (first)
-		str[u->nick_len] = ':';
+	if (first) {
+		str[u->nick_len]     = ':';
+		str[u->nick_len + 1] = ' ';
+	}
 
-	return u->nick_len + (first != 0);
+	return u->nick_len + (first ? 2 : 0);
 }
 
 static uint16_t
