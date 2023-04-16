@@ -40,6 +40,10 @@
 #define BUFFER_TEXT_FG -1;
 #define BUFFER_TEXT_BG -1;
 
+/* Buffer text sent by rirc user */
+#define BUFFER_TEXT_RIRC_FG -1;
+#define BUFFER_TEXT_RIRC_BG -1;
+
 /* Number of buffer lines to keep in history, must be power of 2 */
 #define BUFFER_LINES_MAX (1 << 10)
 

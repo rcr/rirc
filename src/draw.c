@@ -494,9 +494,9 @@ draw_buffer_line(
 {
 	const char *p = line->text;
 	unsigned head_col = coords.c1;
-	unsigned text_bg = BUFFER_TEXT_BG;
+	unsigned text_bg;
 	unsigned text_col = coords.c1 + cols_head;
-	unsigned text_fg = BUFFER_TEXT_FG;
+	unsigned text_fg;
 
 	if (!line->cached.initialized) {
 		/* Initialize static cached properties of drawn lines */
@@ -560,8 +560,16 @@ draw_buffer_line(
 
 print_text:
 
-	if (strlen(QUOTE_LEADER) && line->type == BUFFER_LINE_CHAT) {
-		if (!strncmp(line->text, QUOTE_LEADER, strlen(QUOTE_LEADER))) {
+	if (line->type == BUFFER_LINE_CHAT_RIRC) {
+		text_bg = BUFFER_TEXT_RIRC_BG;
+		text_fg = BUFFER_TEXT_RIRC_FG;
+	} else {
+		text_bg = BUFFER_TEXT_BG;
+		text_fg = BUFFER_TEXT_FG;
+	}
+
+	if (line->type == BUFFER_LINE_CHAT || line->type == BUFFER_LINE_CHAT_RIRC) {
+		if (strlen(QUOTE_LEADER) && !strncmp(line->text, QUOTE_LEADER, strlen(QUOTE_LEADER))) {
 			text_bg = QUOTE_TEXT_BG;
 			text_fg = QUOTE_TEXT_FG;
 		}

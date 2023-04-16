@@ -23,6 +23,7 @@ enum buffer_line_type
 	BUFFER_LINE_PART,         /* Irc PART message */
 	BUFFER_LINE_QUIT,         /* Irc QUIT message */
 	BUFFER_LINE_CHAT,         /* Line of text from another IRC user */
+	BUFFER_LINE_CHAT_RIRC,    /* Line of text from rirc user */
 	BUFFER_LINE_PINGED,       /* Line of text from another IRC user containing current nick */
 	BUFFER_LINE_T_SIZE
 };
