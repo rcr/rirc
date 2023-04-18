@@ -1424,11 +1424,31 @@ test_irc_recv_314(void)
 }
 
 static void
+test_irc_recv_315(void)
+{
+	/* RPL_ENDOFWHO
+	 *
+	 * <nick> :End of /WHO list */
+
+	/* TODO */
+}
+
+static void
 test_irc_recv_317(void)
 {
 	/* RPL_WHOISIDLE
 	 *
 	 * <nick> <secs> <signon> :seconds idle, signon time */
+
+	/* TODO */
+}
+
+static void
+test_irc_recv_318(void)
+{
+	/* RPL_ENDOFWHOIS
+	 *
+	 * <nick> :End of /WHOIS list */
 
 	/* TODO */
 }
@@ -1554,6 +1574,16 @@ test_irc_recv_341(void)
 	/* RPL_INVITING
 	 *
 	 * <nick> <channel> */
+
+	/* TODO */
+}
+
+static void
+test_irc_recv_352(void)
+{
+	/* RPL_WHOREPLY
+	 *
+	 * <channel> <username> <host> <server> <nick> <flags> :<hopcount> <realname> */
 
 	/* TODO */
 }
@@ -1694,6 +1724,16 @@ test_irc_recv_366(void)
 
 	/* test receive 366, unknown channel */
 	CHECK_RECV("366 me #zz", 0, 0, 0);
+}
+
+static void
+test_irc_recv_369(void)
+{
+	/* RPL_ENDOFWHOWAS
+	 *
+	 * <nick> :End of /WHOWAS list */
+
+	/* TODO */
 }
 
 static void

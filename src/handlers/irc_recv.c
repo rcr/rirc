@@ -1,5 +1,60 @@
 #include "src/handlers/irc_recv.h"
 
+
+// -??- ~ [309] [CTCPServ] is a Network Service
+
+
+
+// TODO: related fixes:
+// - show /who,/whois,/whowas in the network buffer (or privmsg buffer for whois/whowas if open?)
+// - jump to network buffer when sending it (or privmsg buffer for whois/whowas if open?
+// - show a better version of /who output
+// - show END OF who,whois/whowas
+// - fix grammar of messages that are responses to whois and whowas
+//   - either make them neutral ("is"/"was") or look at what command is being responded to
+//   - e.g. "is connected to ..." is replied from whowas
+// - fix consistent who/whois/whowas message responses, gather an example of ALL of them,
+//   line them up here and come up with something consistent, like:
+//   ~ (who <nick>) : <info>
+//
+// something like:
+// ~ /who <nick>
+// ~   ...
+// ~   ...
+// ~   ...
+// ~ /who <nick> END
+
+#if 0
+08:26 -!-          * rirc-test H   0  ~u@7ts7bn7azdaug.oragono [rirc-test]
+08:26 -!- End of /WHO list
+08:27 -!- rirc-test- [~u@q23tfk77z59jq.oragono]
+08:27 -!-  was      : rirc-test
+08:27 -!- rirc-test- [~u@q23tfk77z59jq.oragono]
+08:27 -!-  was      : rirc-test
+08:27 -!- rirc-test- [~u@q23tfk77z59jq.oragono]
+08:27 -!-  was      : rirc-test
+08:27 -!- rirc-test- [~u@q23tfk77z59jq.oragono]
+08:27 -!-  was      : rirc-test
+08:27 -!- rirc-test- [~u@q23tfk77z59jq.oragono]
+08:27 -!-  was      : rirc-test
+08:27 -!- rirc-test- [~u@q23tfk77z59jq.oragono]
+08:27 -!-  was      : rirc-test
+08:27 -!- End of WHOWAS
+08:27 -!-          * rirc-test H   0  ~u@7ts7bn7azdaug.oragono [rirc-test]
+08:27 -!- End of /WHO list
+08:27 -!- rirc-test [~u@7ts7bn7azdaug.oragono]
+08:27 -!-  ircname  : rirc-test
+08:27 -!-           : is using a secure connection
+08:27 -!-  idle     : 0 days 0 hours 41 mins 53 secs [signon: Sat Apr 15 07:45:49 2023]
+08:27 -!- End of WHOIS
+08:28 -!- rcr [~u@7ts7bn7azdaug.oragono]
+08:28 -!-  ircname  : Unknown
+08:28 -!-  hostname : ~u@208.98.219.26 208.98.219.26
+08:28 -!-  modes    : +i
+08:28 -!-  idle     : 0 days 0 hours 2 mins 39 secs [signon: Sat Apr 15 08:25:38 2023]
+08:28 -!- End of WHOIS
+#endif
+
 #include "config.h"
 #include "src/components/server.h"
 #include "src/draw.h"
@@ -56,7 +111,9 @@ static int recv_mode_usermodes(struct irc_message*, const struct mode_cfg*, stru
 	X(312) /* RPL_WHOISSERVER */     \
 	X(313) /* RPL_WHOISOPERATOR */   \
 	X(314) /* RPL_WHOWASUSER */      \
+	X(315) /* RPL_ENDOFWHO */        \
 	X(317) /* RPL_WHOISIDLE */       \
+	X(318) /* RPL_ENDOFWHOIS */      \
 	X(319) /* RPL_WHOISCHANNELS */   \
 	X(320) /* RPL_WHOISSPECIAL */    \
 	X(324) /* RPL_CHANNELMODEIS */   \
@@ -67,8 +124,10 @@ static int recv_mode_usermodes(struct irc_message*, const struct mode_cfg*, stru
 	X(333) /* RPL_TOPICWHOTIME */    \
 	X(338) /* RPL_WHOISACTUALLY */   \
 	X(341) /* RPL_INVITING */        \
+	X(352) /* RPL_WHOREPLY */        \
 	X(353) /* RPL_NAMEREPLY */       \
 	X(366) /* RPL_ENDOFNAMES */      \
+	X(369) /* RPL_ENDOFWHOWAS */     \
 	X(378) /* RPL_WHOISHOST */       \
 	X(379) /* RPL_WHOISMODES */      \
 	X(401) /* ERR_NOSUCHNICK */      \
@@ -152,9 +211,9 @@ static const irc_recv_f irc_numerics[] = {
 	[312] = irc_recv_312,       /* RPL_WHOISSERVER */
 	[313] = irc_recv_313,       /* RPL_WHOISOPERATOR */
 	[314] = irc_recv_314,       /* RPL_WHOWASUSER */
-	[315] = irc_generic_ignore, /* RPL_ENDOFWHO */
+	[315] = irc_recv_315,       /* RPL_ENDOFWHO */
 	[317] = irc_recv_317,       /* RPL_WHOISIDLE */
-	[318] = irc_generic_ignore, /* RPL_ENDOFWHOIS */
+	[318] = irc_recv_318,       /* RPL_ENDOFWHOIS */
 	[319] = irc_recv_319,       /* RPL_WHOISCHANNELS */
 	[320] = irc_recv_320,       /* RPL_WHOISSPECIAL */
 	[322] = irc_generic_info,   /* RPL_LIST */
@@ -174,14 +233,14 @@ static const irc_recv_f irc_numerics[] = {
 	[348] = irc_generic_info,   /* RPL_EXCEPTLIST */
 	[349] = irc_generic_ignore, /* RPL_ENDOFEXCEPTLIST */
 	[351] = irc_generic_info,   /* RPL_VERSION */
-	[352] = irc_generic_info,   /* RPL_WHOREPLY */
+	[352] = irc_recv_352,       /* RPL_WHOREPLY */
 	[353] = irc_recv_353,       /* RPL_NAMEREPLY */
 	[364] = irc_generic_info,   /* RPL_LINKS */
 	[365] = irc_generic_ignore, /* RPL_ENDOFLINKS */
 	[366] = irc_recv_366,       /* RPL_ENDOFNAMES */
 	[367] = irc_generic_info,   /* RPL_BANLIST */
 	[368] = irc_generic_ignore, /* RPL_ENDOFBANLIST */
-	[369] = irc_generic_ignore, /* RPL_ENDOFWHOWAS */
+	[369] = irc_recv_369,       /* RPL_ENDOFWHOWAS */
 	[371] = irc_generic_info,   /* RPL_INFO */
 	[372] = irc_generic_info,   /* RPL_MOTD */
 	[374] = irc_generic_ignore, /* RPL_ENDOFINFO */
@@ -743,6 +802,27 @@ irc_recv_314(struct server *s, struct irc_message *m)
 }
 
 static int
+irc_recv_315(struct server *s, struct irc_message *m)
+{
+	/* RPL_ENDOFWHO
+	 *
+	 * <nick> :End of /WHO list */
+
+	char *nick;
+	struct channel *c;
+
+	if (!irc_message_param(m, &nick))
+		failf(s, "RPL_ENDOFWHO: nick is null");
+
+	if (!(c = channel_list_get(&s->clist, nick, s->casemapping)))
+		c = s->channel;
+
+	newlinef(c, 0, FROM_INFO, "/who %s END", nick);
+
+	return 0;
+}
+
+static int
 irc_recv_317(struct server *s, struct irc_message *m)
 {
 	/* RPL_WHOISIDLE
@@ -803,6 +883,27 @@ irc_recv_317(struct server *s, struct irc_message *m)
 		idle_m ? " minutes " : "",
 		idle_s,
 		buf);
+
+	return 0;
+}
+
+static int
+irc_recv_318(struct server *s, struct irc_message *m)
+{
+	/* RPL_ENDOFWHOIS
+	 *
+	 * <nick> :End of /WHOIS list */
+
+	char *nick;
+	struct channel *c;
+
+	if (!irc_message_param(m, &nick))
+		failf(s, "RPL_ENDOFWHOIS: nick is null");
+
+	if (!(c = channel_list_get(&s->clist, nick, s->casemapping)))
+		c = s->channel;
+
+	newlinef(c, 0, FROM_INFO, "/whois %s END", nick);
 
 	return 0;
 }
@@ -1080,6 +1181,53 @@ irc_recv_341(struct server *s, struct irc_message *m)
 }
 
 static int
+irc_recv_352(struct server *s, struct irc_message *m)
+{
+	/* RPL_WHOREPLY
+	 *
+	 * <channel> <username> <host> <server> <nick> <flags> :<hopcount> <realname> */
+
+	// TODO, this command might have a bunch of output, it can be returned from a mask
+	// to lookup users, channels
+	//
+	//
+	// compare the output of the same query on irssi vs rirc, see what information is potentially
+	// worth disaplying, ircv3 specs say hopcount is unreliable
+	//
+	//
+	// > <channel> is an arbitrary channel the client is joined to or a literal
+	// asterisk character ('*', 0x2A) if no channel is returned.
+
+	// irssi looks like:
+	//
+	// 08:27 -!-          * rirc-test H   0  ~u@7ts7bn7azdaug.oragono [rirc-test]
+	// 08:27 -!- End of /WHO list
+
+
+	// XXX: this one should always be printed in the network buffer, all other whois/whowas numerics
+	// should be buffer targeted
+
+	/* something like:
+
+
+    /who <mask>
+	  .. <result>
+	  .. <result>
+	  .. <result>
+	/who END
+
+
+	 where result is...
+
+	  .. nick: <info> [username realname]
+	 */
+
+	(void)s;
+	(void)m;
+	return 0;
+}
+
+static int
 irc_recv_353(struct server *s, struct irc_message *m)
 {
 	/* RPL_NAMREPLY
@@ -1164,6 +1312,27 @@ irc_recv_366(struct server *s, struct irc_message *m)
 
 	if ((c = channel_list_get(&s->clist, chan, s->casemapping)))
 		c->_366 = 1;
+
+	return 0;
+}
+
+static int
+irc_recv_369(struct server *s, struct irc_message *m)
+{
+	/* RPL_ENDOFWHOWAS
+	 *
+	 * <nick> :End of /WHOWAS list */
+
+	char *nick;
+	struct channel *c;
+
+	if (!irc_message_param(m, &nick))
+		failf(s, "RPL_ENDOFWHOWAS: nick is null");
+
+	if (!(c = channel_list_get(&s->clist, nick, s->casemapping)))
+		c = s->channel;
+
+	newlinef(c, 0, FROM_INFO, "/whowas %s END", nick);
 
 	return 0;
 }

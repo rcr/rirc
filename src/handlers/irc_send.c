@@ -1,5 +1,19 @@
 #include "src/handlers/irc_send.h"
 
+// XXX:
+//
+//
+// numerics returning from /who <mask> MIGHT include nicks, channels that are currently open...
+//
+// those numerics SHOULD be printed in the network buffer that we just jumped to...
+//
+// might require adding a flag server to keep note of what the last command that was run was, and
+// not allow sending another until END is received?
+//
+//
+// but also, /who ONLY responds with the one numeric 352????
+// so maybe this one explicitly is in the network buffer, everything else can be targeted
+
 #include "config.h"
 #include "src/components/buffer.h"
 #include "src/components/channel.h"
@@ -253,6 +267,8 @@ irc_send_who(struct server *s, struct channel *c, char *m)
 	if (!(target = irc_send_args(c, m, CHANNEL_T_PRIVMSG)))
 		failf(c, "Usage: /who <target>");
 
+	// TODO: this one should just indiscriminately jump to network buffer and print there
+
 	sendf(s, c, "WHO %s", target);
 
 	return 0;
@@ -286,6 +302,15 @@ irc_send_whois(struct server *s, struct channel *c, char *m)
 
 	if (!(target = irc_send_args(c, m, CHANNEL_T_PRIVMSG)))
 		failf(c, "Usage: /whois <target>");
+
+	// TODO: the numeric replies should also be targeting the buffer
+
+	if (!(c = channel_list_get(&(s->clist), target, s->casemapping)))
+		c = s->channel;
+
+	channel_set_current(c);
+
+	newlinef(c, 0, FROM_INFO, "/whois %s", target);
 
 	sendf(s, c, "WHOIS %s", target);
 

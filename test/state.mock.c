@@ -8,6 +8,7 @@ static char mock_chan[MOCK_LINE_N][MOCK_CHAN_LEN];
 static char mock_line[MOCK_LINE_N][MOCK_LINE_LEN];
 static unsigned mock_line_i;
 static unsigned mock_line_n;
+static struct channel *mock_current_chan;
 
 void
 mock_reset_state(void)
@@ -63,5 +64,5 @@ newline(struct channel *c, enum buffer_line_type t, const char *f, const char *f
 	assert_gt(r2, 0);
 }
 
-struct channel* current_channel(void) { return NULL; }
-void channel_set_current(struct channel *c) { UNUSED(c); }
+struct channel* current_channel(void) { return mock_current_chan; }
+void channel_set_current(struct channel *c) { mock_current_chan = c; }
