@@ -526,9 +526,10 @@ channel_set_current(struct channel *c)
 {
 	/* Set the state to an arbitrary channel */
 
-	state.current_channel = c;
-
-	draw(DRAW_ALL);
+	if (state.current_channel != c) {
+		state.current_channel = c;
+		draw(DRAW_ALL);
+	}
 }
 
 static uint16_t
