@@ -330,12 +330,32 @@ irc_send_whowas(struct server *s, struct channel *c, char *m)
 	 * (431) ERR_NONICKNAMEGIVEN
 	 * (461) ERR_NEEDMOREPARAMS */
 
-	const char *target;
+	const char *param1;
+	const char *param2;
 
-	if (!(target = irc_send_args(c, m, CHANNEL_T_PRIVMSG)))
-		failf(c, "Usage: /whowas <target> [count]");
+	param1 = irc_strsep(&m);
+	param2 = irc_strsep(&m);
 
-	sendf(s, c, "WHOWAS %s", target);
+	if (irc_strsep(&m))
+		failf(c, "Usage: /whowas <nick> [count]");
+
+	if (!param1 && c->type != CHANNEL_T_PRIVMSG)
+		failf(c, "Usage: /whowas <nick> [count]");
+
+	if (param1 && !(c = channel_list_get(&(s->clist), param1, s->casemapping)))
+		c = s->channel;
+
+	channel_set_current(c);
+
+	newlinef(c, 0, FROM_INFO, "/whowas %s%s%s",
+		param1 ? param1 : c->name,
+		param2 ? " "    : "",
+		param2 ? param2 : "");
+
+	sendf(s, c, "WHOWAS %s%s%s",
+		param1 ? param1 : c->name,
+		param2 ? " "    : "",
+		param2 ? param2 : "");
 
 	return 0;
 }

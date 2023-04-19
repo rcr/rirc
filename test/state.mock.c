@@ -13,6 +13,7 @@ static struct channel *mock_current_chan;
 void
 mock_reset_state(void)
 {
+	mock_current_chan = NULL;
 	mock_line_i = 0;
 	mock_line_n = 0;
 	memset(mock_chan, 0, MOCK_LINE_N * MOCK_CHAN_LEN);
