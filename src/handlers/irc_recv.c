@@ -1,5 +1,36 @@
 #include "src/handlers/irc_recv.h"
 
+// TODO: these plus other numeric replies related to WHO/WHOWAS/WHOIS
+// should be targeted to the nick buffer if it exists, see all numerics with a <nick>
+#if 0
+	 * (276) RPL_WHOISCERTFP
+	 * (301) RPL_AWAY
+	 * (307) RPL_WHOISREGNICK
+	 * (311) RPL_WHOISUSER
+	 * (312) RPL_WHOISSERVER
+	 * (313) RPL_WHOISOPERATOR
+	 * (317) RPL_WHOISIDLE
+	 * (318) RPL_ENDOFWHOIS
+	 * (319) RPL_WHOISCHANNELS
+	 * (320) RPL_WHOISSPECIAL
+	 * (330) RPL_WHOISACCOUNT
+	 * (338) RPL_WHOISACTUALLY
+	 * (378) RPL_WHOISHOST
+	 * (379) RPL_WHOISMODES
+	 * (401) ERR_NOSUCHNICK
+	 * (402) ERR_NOSUCHSERVER
+	 * (431) ERR_NONICKNAMEGIVEN
+	 * (671) RPL_WHOISSECURE */
+	 * (312) RPL_WHOISSERVER
+	 * (314) RPL_WHOWASUSER
+	 * (338) RPL_WHOISACTUALLY
+	 * (369) RPL_ENDOFWHOWAS
+	 * (406) ERR_WASNOSUCHNICK
+	 * (431) ERR_NONICKNAMEGIVEN
+	 * (461) ERR_NEEDMOREPARAMS */
+	 * (352) RPL_WHOREPLY
+#endif
+
 
 // -??- ~ [309] [CTCPServ] is a Network Service
 
@@ -608,12 +639,13 @@ irc_recv_266(struct server *s, struct irc_message *m)
 static int
 irc_recv_275(struct server *s, struct irc_message *m)
 {
-	/* RPL_RPL_USINGSSL
+	/* RPL_USINGSSL
 	 *
 	 * <nick> :is using a secure connection (SSL) */
 
 	char *nick;
 	char *message;
+	struct channel *c;
 
 	if (!irc_message_param(m, &nick))
 		failf(s, "RPL_USINGSSL: nick is null");
@@ -621,7 +653,10 @@ irc_recv_275(struct server *s, struct irc_message *m)
 	if (!irc_message_param(m, &message))
 		failf(s, "RPL_USINGSSL: message is null");
 
-	server_info(s, "%s %s", nick, message);
+	if (!(c = channel_list_get(&s->clist, nick, s->casemapping)))
+		c = s->channel;
+
+	newlinef(c, 0, FROM_INFO, "%s %s", nick, message);
 
 	return 0;
 }
@@ -635,6 +670,7 @@ irc_recv_276(struct server *s, struct irc_message *m)
 
 	char *nick;
 	char *message;
+	struct channel *c;
 
 	if (!irc_message_param(m, &nick))
 		failf(s, "RPL_WHOISCERTFP: nick is null");
@@ -642,7 +678,10 @@ irc_recv_276(struct server *s, struct irc_message *m)
 	if (!irc_message_param(m, &message))
 		failf(s, "RPL_WHOISCERTFP: message is null");
 
-	server_info(s, "%s %s", nick, message);
+	if (!(c = channel_list_get(&s->clist, nick, s->casemapping)))
+		c = s->channel;
+
+	newlinef(c, 0, FROM_INFO, "%s %s", nick, message);
 
 	return 0;
 }
@@ -656,6 +695,7 @@ irc_recv_301(struct server *s, struct irc_message *m)
 
 	char *nick;
 	char *message;
+	struct channel *c;
 
 	if (!irc_message_param(m, &nick))
 		failf(s, "RPL_AWAY: nick is null");
@@ -663,7 +703,10 @@ irc_recv_301(struct server *s, struct irc_message *m)
 	if (!irc_message_param(m, &message))
 		failf(s, "RPL_AWAY: message is null");
 
-	server_info(s, "%s is away (%s)", nick, message);
+	if (!(c = channel_list_get(&s->clist, nick, s->casemapping)))
+		c = s->channel;
+
+	newlinef(c, 0, FROM_INFO, "%s is away (%s)", nick, message);
 
 	return 0;
 }
@@ -677,6 +720,7 @@ irc_recv_307(struct server *s, struct irc_message *m)
 
 	char *nick;
 	char *message;
+	struct channel *c;
 
 	if (!irc_message_param(m, &nick))
 		failf(s, "RPL_WHOISREGNICK: nick is null");
@@ -684,7 +728,10 @@ irc_recv_307(struct server *s, struct irc_message *m)
 	if (!irc_message_param(m, &message))
 		failf(s, "RPL_WHOISREGNICK: message is null");
 
-	server_info(s, "%s %s", nick, message);
+	if (!(c = channel_list_get(&s->clist, nick, s->casemapping)))
+		c = s->channel;
+
+	newlinef(c, 0, FROM_INFO, "%s %s", nick, message);
 
 	return 0;
 }
@@ -701,6 +748,7 @@ irc_recv_311(struct server *s, struct irc_message *m)
 	char *host;
 	char *unused;
 	char *realname;
+	struct channel *c;
 
 	if (!irc_message_param(m, &nick))
 		failf(s, "RPL_WHOISUSER: nick is null");
@@ -717,7 +765,10 @@ irc_recv_311(struct server *s, struct irc_message *m)
 	if (!irc_message_param(m, &realname))
 		failf(s, "RPL_WHOISUSER: realname is null");
 
-	server_info(s, "%s is %s@%s (%s)", nick, username, host, realname);
+	if (!(c = channel_list_get(&s->clist, nick, s->casemapping)))
+		c = s->channel;
+
+	newlinef(c, 0, FROM_INFO, "%s is %s@%s (%s)", nick, username, host, realname);
 
 	return 0;
 }
@@ -732,6 +783,7 @@ irc_recv_312(struct server *s, struct irc_message *m)
 	char *nick;
 	char *servername;
 	char *serverinfo;
+	struct channel *c;
 
 	if (!irc_message_param(m, &nick))
 		failf(s, "RPL_WHOISSERVER: nick is null");
@@ -742,7 +794,10 @@ irc_recv_312(struct server *s, struct irc_message *m)
 	if (!irc_message_param(m, &serverinfo))
 		failf(s, "RPL_WHOISSERVER: serverinfo is null");
 
-	server_info(s, "%s is connected to: %s (%s)", nick, servername, serverinfo);
+	if (!(c = channel_list_get(&s->clist, nick, s->casemapping)))
+		c = s->channel;
+
+	newlinef(c, 0, FROM_INFO, "%s is connected to: %s (%s)", nick, servername, serverinfo);
 
 	return 0;
 }
@@ -756,14 +811,18 @@ irc_recv_313(struct server *s, struct irc_message *m)
 
 	char *nick;
 	char *message;
+	struct channel *c;
 
 	if (!irc_message_param(m, &nick))
-		failf(s, "RPL_WHOISREGNICK: nick is null");
+		failf(s, "RPL_WHOISOPERATOR: nick is null");
 
 	if (!irc_message_param(m, &message))
-		failf(s, "RPL_WHOISREGNICK: message is null");
+		failf(s, "RPL_WHOISOPERATOR: message is null");
 
-	server_info(s, "%s %s", nick, message);
+	if (!(c = channel_list_get(&s->clist, nick, s->casemapping)))
+		c = s->channel;
+
+	newlinef(c, 0, FROM_INFO, "%s %s", nick, message);
 
 	return 0;
 }
@@ -780,6 +839,7 @@ irc_recv_314(struct server *s, struct irc_message *m)
 	char *host;
 	char *unused;
 	char *realname;
+	struct channel *c;
 
 	if (!irc_message_param(m, &nick))
 		failf(s, "RPL_WHOWASUSER: nick is null");
@@ -796,7 +856,10 @@ irc_recv_314(struct server *s, struct irc_message *m)
 	if (!irc_message_param(m, &realname))
 		failf(s, "RPL_WHOWASUSER: realname is null");
 
-	server_info(s, "%s was %s@%s (%s)", nick, username, host, realname);
+	if (!(c = channel_list_get(&s->clist, nick, s->casemapping)))
+		c = s->channel;
+
+	newlinef(c, 0, FROM_INFO, "%s was %s@%s (%s)", nick, username, host, realname);
 
 	return 0;
 }
@@ -840,6 +903,7 @@ irc_recv_317(struct server *s, struct irc_message *m)
 	unsigned idle_h;
 	unsigned idle_m;
 	unsigned idle_s;
+	struct channel *c;
 
 	if (!irc_message_param(m, &nick))
 		failf(s, "RPL_WHOISIDLE: nick is null");
@@ -873,7 +937,10 @@ irc_recv_317(struct server *s, struct irc_message *m)
 	idle_m = t_idle % 3600 / 60;
 	idle_s = t_idle % 60;
 
-	server_info(s, "%s has been idle %.0u%s%.0u%s%.0u%s%u seconds, connected since %s",
+	if (!(c = channel_list_get(&s->clist, nick, s->casemapping)))
+		c = s->channel;
+
+	newlinef(c, 0, FROM_INFO, "%s has been idle %.0u%s%.0u%s%.0u%s%u seconds, connected since %s",
 		nick,
 		idle_d,
 		idle_d ? " days " : "",
@@ -917,6 +984,7 @@ irc_recv_319(struct server *s, struct irc_message *m)
 
 	char *nick;
 	char *channels;
+	struct channel *c;
 
 	if (!irc_message_param(m, &nick))
 		failf(s, "RPL_WHOISCHANNELS: nick is null");
@@ -924,7 +992,10 @@ irc_recv_319(struct server *s, struct irc_message *m)
 	if (!irc_message_param(m, &channels))
 		failf(s, "RPL_WHOISCHANNELS: message is null");
 
-	server_info(s, "%s is on channels: %s", nick, channels);
+	if (!(c = channel_list_get(&s->clist, nick, s->casemapping)))
+		c = s->channel;
+
+	newlinef(c, 0, FROM_INFO, "%s is on channels: %s", nick, channels);
 
 	return 0;
 }
@@ -938,6 +1009,7 @@ irc_recv_320(struct server *s, struct irc_message *m)
 
 	char *nick;
 	char *message;
+	struct channel *c;
 
 	if (!irc_message_param(m, &nick))
 		failf(s, "RPL_WHOISSPECIAL: nick is null");
@@ -945,7 +1017,10 @@ irc_recv_320(struct server *s, struct irc_message *m)
 	if (!irc_message_param(m, &message))
 		failf(s, "RPL_WHOISSPECIAL: message is null");
 
-	server_info(s, "%s %s", nick, message);
+	if (!(c = channel_list_get(&s->clist, nick, s->casemapping)))
+		c = s->channel;
+
+	newlinef(c, 0, FROM_INFO, "%s %s", nick, message);
 
 	return 0;
 }
@@ -1045,6 +1120,7 @@ irc_recv_330(struct server *s, struct irc_message *m)
 
 	char *nick;
 	char *account;
+	struct channel *c;
 
 	if (!irc_message_param(m, &nick))
 		failf(s, "RPL_WHOISACCOUNT: nick is null");
@@ -1052,7 +1128,10 @@ irc_recv_330(struct server *s, struct irc_message *m)
 	if (!irc_message_param(m, &account))
 		failf(s, "RPL_WHOISACCOUNT: account is null");
 
-	server_info(s, "%s is logged in as %s", nick, account);
+	if (!(c = channel_list_get(&s->clist, nick, s->casemapping)))
+		c = s->channel;
+
+	newlinef(c, 0, FROM_INFO, "%s is logged in as %s", nick, account);
 
 	return 0;
 }
@@ -1138,6 +1217,7 @@ irc_recv_338(struct server *s, struct irc_message *m)
 	char *nick;
 	const char *params;
 	const char *trailing;
+	struct channel *c;
 
 	if (!irc_message_param(m, &nick))
 		failf(s, "RPL_WHOISACTUALLY: nick is null");
@@ -1147,10 +1227,13 @@ irc_recv_338(struct server *s, struct irc_message *m)
 	if (!trailing)
 		failf(s, "RPL_WHOISACTUALLY: trailing is null");
 
+	if (!(c = channel_list_get(&s->clist, nick, s->casemapping)))
+		c = s->channel;
+
 	if (params && trailing)
-		server_info(s, "%s %s %s", nick, trailing, params);
+		newlinef(c, 0, FROM_INFO, "%s %s %s", nick, trailing, params);
 	else
-		server_info(s, "%s %s", nick, trailing);
+		newlinef(c, 0, FROM_INFO, "%s %s", nick, trailing);
 
 	return 0;
 }
@@ -1346,6 +1429,7 @@ irc_recv_378(struct server *s, struct irc_message *m)
 
 	char *nick;
 	char *message;
+	struct channel *c;
 
 	if (!irc_message_param(m, &nick))
 		failf(s, "RPL_WHOISHOST: nick is null");
@@ -1353,7 +1437,10 @@ irc_recv_378(struct server *s, struct irc_message *m)
 	if (!irc_message_param(m, &message))
 		failf(s, "RPL_WHOISHOST: message is null");
 
-	server_info(s, "%s %s", nick, message);
+	if (!(c = channel_list_get(&s->clist, nick, s->casemapping)))
+		c = s->channel;
+
+	newlinef(c, 0, FROM_INFO, "%s %s", nick, message);
 
 	return 0;
 }
@@ -1367,6 +1454,7 @@ irc_recv_379(struct server *s, struct irc_message *m)
 
 	char *nick;
 	char *message;
+	struct channel *c;
 
 	if (!irc_message_param(m, &nick))
 		failf(s, "RPL_WHOISMODES: nick is null");
@@ -1374,7 +1462,10 @@ irc_recv_379(struct server *s, struct irc_message *m)
 	if (!irc_message_param(m, &message))
 		failf(s, "RPL_WHOISMODES: message is null");
 
-	server_info(s, "%s %s", nick, message);
+	if (!(c = channel_list_get(&s->clist, nick, s->casemapping)))
+		c = s->channel;
+
+	newlinef(c, 0, FROM_INFO, "%s %s", nick, message);
 
 	return 0;
 }
@@ -1515,6 +1606,7 @@ irc_recv_671(struct server *s, struct irc_message *m)
 
 	char *nick;
 	char *message;
+	struct channel *c;
 
 	if (!irc_message_param(m, &nick))
 		failf(s, "RPL_WHOISSECURE: nick is null");
@@ -1522,7 +1614,10 @@ irc_recv_671(struct server *s, struct irc_message *m)
 	if (!irc_message_param(m, &message))
 		failf(s, "RPL_WHOISSECURE: message is null");
 
-	server_info(s, "%s %s", nick, message);
+	if (!(c = channel_list_get(&s->clist, nick, s->casemapping)))
+		c = s->channel;
+
+	newlinef(c, 0, FROM_INFO, "%s %s", nick, message);
 
 	return 0;
 }

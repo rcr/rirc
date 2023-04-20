@@ -1346,7 +1346,7 @@ test_irc_recv_266(void)
 static void
 test_irc_recv_275(void)
 {
-	/* RPL_RPL_USINGSSL
+	/* RPL_USINGSSL
 	 *
 	 * <nick> :is using a secure connection (SSL) */
 
