@@ -1,46 +1,20 @@
 #include "src/handlers/irc_recv.h"
 
-// TODO: these plus other numeric replies related to WHO/WHOWAS/WHOIS
-// should be targeted to the nick buffer if it exists, see all numerics with a <nick>
-#if 0
-	 * (276) RPL_WHOISCERTFP
-	 * (301) RPL_AWAY
-	 * (307) RPL_WHOISREGNICK
-	 * (311) RPL_WHOISUSER
-	 * (312) RPL_WHOISSERVER
-	 * (313) RPL_WHOISOPERATOR
-	 * (317) RPL_WHOISIDLE
-	 * (318) RPL_ENDOFWHOIS
-	 * (319) RPL_WHOISCHANNELS
-	 * (320) RPL_WHOISSPECIAL
-	 * (330) RPL_WHOISACCOUNT
-	 * (338) RPL_WHOISACTUALLY
-	 * (378) RPL_WHOISHOST
-	 * (379) RPL_WHOISMODES
-	 * (401) ERR_NOSUCHNICK
-	 * (402) ERR_NOSUCHSERVER
-	 * (431) ERR_NONICKNAMEGIVEN
-	 * (671) RPL_WHOISSECURE */
-	 * (312) RPL_WHOISSERVER
-	 * (314) RPL_WHOWASUSER
-	 * (338) RPL_WHOISACTUALLY
-	 * (369) RPL_ENDOFWHOWAS
-	 * (406) ERR_WASNOSUCHNICK
-	 * (431) ERR_NONICKNAMEGIVEN
-	 * (461) ERR_NEEDMOREPARAMS */
-	 * (352) RPL_WHOREPLY
-#endif
+// TODO: test these with the test-servers.sh script with/without privmsg buffer,
+// requires connecting with at least 3 instances
 
 
+// TODO: need explicit handling of:
+// * (352) RPL_WHOREPLY
+
+
+// TODO: ???
 // -??- ~ [309] [CTCPServ] is a Network Service
 
 
 
-// TODO: related fixes:
-// - show /who,/whois,/whowas in the network buffer (or privmsg buffer for whois/whowas if open?)
-// - jump to network buffer when sending it (or privmsg buffer for whois/whowas if open?
+// TODO:
 // - show a better version of /who output
-// - show END OF who,whois/whowas
 // - fix grammar of messages that are responses to whois and whowas
 //   - either make them neutral ("is"/"was") or look at what command is being responded to
 //   - e.g. "is connected to ..." is replied from whowas
@@ -55,36 +29,36 @@
 // ~   ...
 // ~ /who <nick> END
 
+
+// who/whois/whowas related numerics:
 #if 0
-08:26 -!-          * rirc-test H   0  ~u@7ts7bn7azdaug.oragono [rirc-test]
-08:26 -!- End of /WHO list
-08:27 -!- rirc-test- [~u@q23tfk77z59jq.oragono]
-08:27 -!-  was      : rirc-test
-08:27 -!- rirc-test- [~u@q23tfk77z59jq.oragono]
-08:27 -!-  was      : rirc-test
-08:27 -!- rirc-test- [~u@q23tfk77z59jq.oragono]
-08:27 -!-  was      : rirc-test
-08:27 -!- rirc-test- [~u@q23tfk77z59jq.oragono]
-08:27 -!-  was      : rirc-test
-08:27 -!- rirc-test- [~u@q23tfk77z59jq.oragono]
-08:27 -!-  was      : rirc-test
-08:27 -!- rirc-test- [~u@q23tfk77z59jq.oragono]
-08:27 -!-  was      : rirc-test
-08:27 -!- End of WHOWAS
-08:27 -!-          * rirc-test H   0  ~u@7ts7bn7azdaug.oragono [rirc-test]
-08:27 -!- End of /WHO list
-08:27 -!- rirc-test [~u@7ts7bn7azdaug.oragono]
-08:27 -!-  ircname  : rirc-test
-08:27 -!-           : is using a secure connection
-08:27 -!-  idle     : 0 days 0 hours 41 mins 53 secs [signon: Sat Apr 15 07:45:49 2023]
-08:27 -!- End of WHOIS
-08:28 -!- rcr [~u@7ts7bn7azdaug.oragono]
-08:28 -!-  ircname  : Unknown
-08:28 -!-  hostname : ~u@208.98.219.26 208.98.219.26
-08:28 -!-  modes    : +i
-08:28 -!-  idle     : 0 days 0 hours 2 mins 39 secs [signon: Sat Apr 15 08:25:38 2023]
-08:28 -!- End of WHOIS
+	 * (276) RPL_WHOISCERTFP
+	 * (301) RPL_AWAY
+	 * (307) RPL_WHOISREGNICK
+	 * (311) RPL_WHOISUSER
+	 * (312) RPL_WHOISSERVER
+	 * (313) RPL_WHOISOPERATOR
+	 * (314) RPL_WHOWASUSER
+	 * (315) RPL_ENDOFWHO
+	 * (317) RPL_WHOISIDLE
+	 * (318) RPL_ENDOFWHOIS
+	 * (319) RPL_WHOISCHANNELS
+	 * (320) RPL_WHOISSPECIAL
+	 * (330) RPL_WHOISACCOUNT
+	 * (338) RPL_WHOISACTUALLY
+	 * (352) RPL_WHOREPLY
+	 * (369) RPL_ENDOFWHOWAS
+	 * (378) RPL_WHOISHOST
+	 * (379) RPL_WHOISMODES
+	 * (401) ERR_NOSUCHNICK
+	 * (402) ERR_NOSUCHSERVER
+	 * (406) ERR_WASNOSUCHNICK
+	 * (431) ERR_NONICKNAMEGIVEN
+	 * (461) ERR_NEEDMOREPARAMS */
+	 * (671) RPL_WHOISSECURE */
 #endif
+
+
 
 #include "config.h"
 #include "src/components/server.h"
@@ -869,7 +843,7 @@ irc_recv_315(struct server *s, struct irc_message *m)
 {
 	/* RPL_ENDOFWHO
 	 *
-	 * <nick> :End of /WHO list */
+	 * <mask> :End of /WHO list */
 
 	char *nick;
 	struct channel *c;
@@ -1263,12 +1237,48 @@ irc_recv_341(struct server *s, struct irc_message *m)
 	return 0;
 }
 
+#if 0
+08:26 -!-          * rirc-test H   0  ~u@7ts7bn7azdaug.oragono [rirc-test]
+08:26 -!- End of /WHO list
+08:27 -!- rirc-test- [~u@q23tfk77z59jq.oragono]
+08:27 -!-  was      : rirc-test
+08:27 -!- rirc-test- [~u@q23tfk77z59jq.oragono]
+08:27 -!-  was      : rirc-test
+08:27 -!- rirc-test- [~u@q23tfk77z59jq.oragono]
+08:27 -!-  was      : rirc-test
+08:27 -!- rirc-test- [~u@q23tfk77z59jq.oragono]
+08:27 -!-  was      : rirc-test
+08:27 -!- rirc-test- [~u@q23tfk77z59jq.oragono]
+08:27 -!-  was      : rirc-test
+08:27 -!- rirc-test- [~u@q23tfk77z59jq.oragono]
+08:27 -!-  was      : rirc-test
+08:27 -!- End of WHOWAS
+08:27 -!-          * rirc-test H   0  ~u@7ts7bn7azdaug.oragono [rirc-test]
+08:27 -!- End of /WHO list
+08:27 -!- rirc-test [~u@7ts7bn7azdaug.oragono]
+08:27 -!-  ircname  : rirc-test
+08:27 -!-           : is using a secure connection
+08:27 -!-  idle     : 0 days 0 hours 41 mins 53 secs [signon: Sat Apr 15 07:45:49 2023]
+08:27 -!- End of WHOIS
+08:28 -!- rcr [~u@7ts7bn7azdaug.oragono]
+08:28 -!-  ircname  : Unknown
+08:28 -!-  hostname : ~u@208.98.219.26 208.98.219.26
+08:28 -!-  modes    : +i
+08:28 -!-  idle     : 0 days 0 hours 2 mins 39 secs [signon: Sat Apr 15 08:25:38 2023]
+08:28 -!- End of WHOIS
+#endif
+
 static int
 irc_recv_352(struct server *s, struct irc_message *m)
 {
 	/* RPL_WHOREPLY
 	 *
 	 * <channel> <username> <host> <server> <nick> <flags> :<hopcount> <realname> */
+
+
+	// THIS IS A WIP needs to be completed before testing /who command
+
+
 
 	// TODO, this command might have a bunch of output, it can be returned from a mask
 	// to lookup users, channels

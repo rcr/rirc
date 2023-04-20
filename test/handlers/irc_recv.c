@@ -1428,7 +1428,7 @@ test_irc_recv_315(void)
 {
 	/* RPL_ENDOFWHO
 	 *
-	 * <nick> :End of /WHO list */
+	 * <mask> :End of /WHO list */
 
 	/* TODO */
 }
