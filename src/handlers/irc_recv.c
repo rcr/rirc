@@ -957,19 +957,19 @@ irc_recv_319(struct server *s, struct irc_message *m)
 	 * <nick> :1*[prefix]<channel> */
 
 	char *nick;
-	char *channels;
+	char *chans;
 	struct channel *c;
 
 	if (!irc_message_param(m, &nick))
 		failf(s, "RPL_WHOISCHANNELS: nick is null");
 
-	if (!irc_message_param(m, &channels))
-		failf(s, "RPL_WHOISCHANNELS: message is null");
+	if (!irc_message_param(m, &chans))
+		failf(s, "RPL_WHOISCHANNELS: channels are null");
 
 	if (!(c = channel_list_get(&s->clist, nick, s->casemapping)))
 		c = s->channel;
 
-	newlinef(c, 0, FROM_INFO, "%s is on channels: %s", nick, channels);
+	newlinef(c, 0, FROM_INFO, "%s is on channels: %s", nick, chans);
 
 	return 0;
 }
@@ -1237,37 +1237,6 @@ irc_recv_341(struct server *s, struct irc_message *m)
 	return 0;
 }
 
-#if 0
-08:26 -!-          * rirc-test H   0  ~u@7ts7bn7azdaug.oragono [rirc-test]
-08:26 -!- End of /WHO list
-08:27 -!- rirc-test- [~u@q23tfk77z59jq.oragono]
-08:27 -!-  was      : rirc-test
-08:27 -!- rirc-test- [~u@q23tfk77z59jq.oragono]
-08:27 -!-  was      : rirc-test
-08:27 -!- rirc-test- [~u@q23tfk77z59jq.oragono]
-08:27 -!-  was      : rirc-test
-08:27 -!- rirc-test- [~u@q23tfk77z59jq.oragono]
-08:27 -!-  was      : rirc-test
-08:27 -!- rirc-test- [~u@q23tfk77z59jq.oragono]
-08:27 -!-  was      : rirc-test
-08:27 -!- rirc-test- [~u@q23tfk77z59jq.oragono]
-08:27 -!-  was      : rirc-test
-08:27 -!- End of WHOWAS
-08:27 -!-          * rirc-test H   0  ~u@7ts7bn7azdaug.oragono [rirc-test]
-08:27 -!- End of /WHO list
-08:27 -!- rirc-test [~u@7ts7bn7azdaug.oragono]
-08:27 -!-  ircname  : rirc-test
-08:27 -!-           : is using a secure connection
-08:27 -!-  idle     : 0 days 0 hours 41 mins 53 secs [signon: Sat Apr 15 07:45:49 2023]
-08:27 -!- End of WHOIS
-08:28 -!- rcr [~u@7ts7bn7azdaug.oragono]
-08:28 -!-  ircname  : Unknown
-08:28 -!-  hostname : ~u@208.98.219.26 208.98.219.26
-08:28 -!-  modes    : +i
-08:28 -!-  idle     : 0 days 0 hours 2 mins 39 secs [signon: Sat Apr 15 08:25:38 2023]
-08:28 -!- End of WHOIS
-#endif
-
 static int
 irc_recv_352(struct server *s, struct irc_message *m)
 {
@@ -1275,51 +1244,45 @@ irc_recv_352(struct server *s, struct irc_message *m)
 	 *
 	 * <channel> <username> <host> <server> <nick> <flags> :<hopcount> <realname> */
 
+	char *chan;
+	char *user;
+	char *host;
+	char *server;
+	char *nick;
+	char *flags;
+	char *trailing;
 
-	// THIS IS A WIP needs to be completed before testing /who command
+	if (!irc_message_param(m, &chan))
+		failf(s, "RPL_WHOREPLY: channel is null");
 
+	if (!irc_message_param(m, &user))
+		failf(s, "RPL_WHOREPLY: username is null");
 
+	if (!irc_message_param(m, &host))
+		failf(s, "RPL_WHOREPLY: hostname is null");
 
-	// TODO, this command might have a bunch of output, it can be returned from a mask
-	// to lookup users, channels
-	//
-	//
-	// compare the output of the same query on irssi vs rirc, see what information is potentially
-	// worth disaplying, ircv3 specs say hopcount is unreliable
-	//
-	//
-	// > <channel> is an arbitrary channel the client is joined to or a literal
-	// asterisk character ('*', 0x2A) if no channel is returned.
+	if (!irc_message_param(m, &server))
+		failf(s, "RPL_WHOREPLY: server is null");
 
-	// irssi looks like:
-	//
-	// 08:27 -!-          * rirc-test H   0  ~u@7ts7bn7azdaug.oragono [rirc-test]
-	// 08:27 -!- End of /WHO list
+	if (!irc_message_param(m, &nick))
+		failf(s, "RPL_WHOREPLY: nick is null");
 
+	if (!irc_message_param(m, &flags))
+		failf(s, "RPL_WHOREPLY: flags are null");
 
-	// XXX: this one should always be printed in the network buffer, all other whois/whowas numerics
-	// should be buffer targeted
+	if (!irc_message_param(m, &trailing))
+		failf(s, "RPL_WHOREPLY: trailing is null");
 
-	/* something like:
+	if (!irc_strsep(&trailing))
+		failf(s, "RPL_WHOREPLY: hopcount is null");
 
+	if (!irc_strtrim(&trailing))
+		failf(s, "RPL_WHOREPLY: realname is null");
 
-    /who <mask>
-	  .. <result>
-	  .. <result>
-	  .. <result>
-	/who END
+	server_info(s, "  %16s %2s %s [%s!%s  %s] %s", nick, flags, chan, user, host, server, trailing);
 
-
-	 where result is...
-
-	  .. nick: <info> [username realname]
-	 */
-
-	(void)s;
-	(void)m;
 	return 0;
 }
-
 static int
 irc_recv_353(struct server *s, struct irc_message *m)
 {
