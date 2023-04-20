@@ -306,38 +306,68 @@ test_send_who(void)
 static void
 test_send_whois(void)
 {
-	// FIXME: needs more testcases to cover the extra arg
+	/* test `/whois` takes at most 2 parameters */
+	char m1[] = "whois nick 1 x";
+	CHECK_SEND_COMMAND(c_chan, m1, 1, 1, 0, "Usage: /whois [target] <nick>", "chan", "");
 
 	/* test `/whois` requires a target for channel, network buffers */
-	char m1[] = "whois";
 	char m2[] = "whois";
-
-	CHECK_SEND_COMMAND(c_chan, m1, 1, 1, 0, "Usage: /whois [target] <nick>", "chan", "");
-	CHECK_SEND_COMMAND(c_serv, m2, 1, 1, 0, "Usage: /whois [target] <nick>", "host", "");
-
-	/* test `/whois` for privmsg buffer prints in privmsg buffer */
 	char m3[] = "whois";
 
-	CHECK_SEND_COMMAND(c_priv, m3, 0, 1, 1, "/whois priv", "priv", "WHOIS priv");
+	CHECK_SEND_COMMAND(c_chan, m2, 1, 1, 0, "Usage: /whois [target] <nick>", "chan", "");
+	CHECK_SEND_COMMAND(c_serv, m3, 1, 1, 0, "Usage: /whois [target] <nick>", "host", "");
 
-	/* test `/whois <nick>` for existing privmsg jumps to and prints in privmsg buffer */
-	char m4[] = "whois priv";
+	/* test `/whois` with no target for privmsg buffer prints in privmsg buffer */
+	char m4[] = "whois";
+
+	CHECK_SEND_COMMAND(c_priv, m4, 0, 1, 1, "/whois priv", "priv", "WHOIS priv");
+
+	/* test `/whois <nick>` for existing privmsg jumps/prints in privmsg buffer */
 	char m5[] = "whois priv";
+	char m6[] = "whois priv";
 
-	CHECK_SEND_COMMAND((mock_current_chan = c_chan), m4, 0, 1, 1, "/whois priv", "priv", "WHOIS priv");
+	CHECK_SEND_COMMAND((mock_current_chan = c_chan), m5, 0, 1, 1,
+		"/whois priv", "priv", "WHOIS priv");
 	assert_ptr_eq(mock_current_chan, c_priv);
 
-	CHECK_SEND_COMMAND((mock_current_chan = c_serv), m5, 0, 1, 1, "/whois priv", "priv", "WHOIS priv");
+	CHECK_SEND_COMMAND((mock_current_chan = c_serv), m6, 0, 1, 1,
+		"/whois priv", "priv", "WHOIS priv");
 	assert_ptr_eq(mock_current_chan, c_priv);
 
-	/* test `/whois <nick>` for non-existing privmsg jumps to and prints in network buffer */
-	char m6[] = "whois xxx";
+	/* test `/whois <nick>` for non-existing privmsg jumps/prints in network buffer */
 	char m7[] = "whois xxx";
+	char m8[] = "whois xxx";
 
-	CHECK_SEND_COMMAND((mock_current_chan = c_chan), m6, 0, 1, 1, "/whois xxx", "host", "WHOIS xxx");
+	CHECK_SEND_COMMAND((mock_current_chan = c_chan), m7, 0, 1, 1,
+		"/whois xxx", "host", "WHOIS xxx");
 	assert_ptr_eq(mock_current_chan, c_serv);
 
-	CHECK_SEND_COMMAND((mock_current_chan = c_priv), m7, 0, 1, 1, "/whois xxx", "host", "WHOIS xxx");
+	CHECK_SEND_COMMAND((mock_current_chan = c_priv), m8, 0, 1, 1,
+		"/whois xxx", "host", "WHOIS xxx");
+	assert_ptr_eq(mock_current_chan, c_serv);
+
+	/* test `/whois [target] <nick>` for existing privmsg jumps/prints in privmsg buffer */
+	char m9[]  = "whois irc.hostname.tld priv";
+	char m10[] = "whois irc.hostname.tld priv";
+
+	CHECK_SEND_COMMAND((mock_current_chan = c_chan), m9, 0, 1, 1,
+		"/whois irc.hostname.tld priv", "priv", "WHOIS irc.hostname.tld priv");
+	assert_ptr_eq(mock_current_chan, c_priv);
+
+	CHECK_SEND_COMMAND((mock_current_chan = c_serv), m10, 0, 1, 1,
+		"/whois irc.hostname.tld priv", "priv", "WHOIS irc.hostname.tld priv");
+	assert_ptr_eq(mock_current_chan, c_priv);
+
+	/* test `/whois [target] <nick>` for non-existing privmsg jumps/prints in network buffer */
+	char m11[] = "whois irc.hostname.tld xxx";
+	char m12[] = "whois irc.hostname.tld xxx";
+
+	CHECK_SEND_COMMAND((mock_current_chan = c_chan), m11, 0, 1, 1,
+		"/whois irc.hostname.tld xxx", "host", "WHOIS irc.hostname.tld xxx");
+	assert_ptr_eq(mock_current_chan, c_serv);
+
+	CHECK_SEND_COMMAND((mock_current_chan = c_priv), m12, 0, 1, 1,
+		"/whois irc.hostname.tld xxx", "host", "WHOIS irc.hostname.tld xxx");
 	assert_ptr_eq(mock_current_chan, c_serv);
 }
 
@@ -360,44 +390,52 @@ test_send_whowas(void)
 
 	CHECK_SEND_COMMAND(c_priv, m4, 0, 1, 1, "/whowas priv", "priv", "WHOWAS priv");
 
-	/* test `/whowas <nick>` for existing privmsg jumps to and prints in privmsg buffer */
+	/* test `/whowas <nick>` for existing privmsg jumps/prints in privmsg buffer */
 	char m5[] = "whowas priv";
 	char m6[] = "whowas priv";
 
-	CHECK_SEND_COMMAND((mock_current_chan = c_chan), m5, 0, 1, 1, "/whowas priv", "priv", "WHOWAS priv");
+	CHECK_SEND_COMMAND((mock_current_chan = c_chan), m5, 0, 1, 1,
+		"/whowas priv", "priv", "WHOWAS priv");
 	assert_ptr_eq(mock_current_chan, c_priv);
 
-	CHECK_SEND_COMMAND((mock_current_chan = c_serv), m6, 0, 1, 1, "/whowas priv", "priv", "WHOWAS priv");
+	CHECK_SEND_COMMAND((mock_current_chan = c_serv), m6, 0, 1, 1,
+		"/whowas priv", "priv", "WHOWAS priv");
 	assert_ptr_eq(mock_current_chan, c_priv);
 
-	/* test `/whowas <nick>` for non-existing privmsg jumps to and prints in network buffer */
+	/* test `/whowas <nick>` for non-existing privmsg jumps/prints in network buffer */
 	char m7[] = "whowas xxx";
 	char m8[] = "whowas xxx";
 
-	CHECK_SEND_COMMAND((mock_current_chan = c_chan), m7, 0, 1, 1, "/whowas xxx", "host", "WHOWAS xxx");
+	CHECK_SEND_COMMAND((mock_current_chan = c_chan), m7, 0, 1, 1,
+		"/whowas xxx", "host", "WHOWAS xxx");
 	assert_ptr_eq(mock_current_chan, c_serv);
 
-	CHECK_SEND_COMMAND((mock_current_chan = c_priv), m8, 0, 1, 1, "/whowas xxx", "host", "WHOWAS xxx");
+	CHECK_SEND_COMMAND((mock_current_chan = c_priv), m8, 0, 1, 1,
+		"/whowas xxx", "host", "WHOWAS xxx");
 	assert_ptr_eq(mock_current_chan, c_serv);
 
-	/* test `/whowas <nick> [count]` for existing privmsg jumps to and prints in privmsg buffer */
+	/* test `/whowas <nick> [count]` for existing privmsg jumps/prints in privmsg buffer */
 	char m9[]  = "whowas priv 123";
 	char m10[] = "whowas priv 123";
 
-	CHECK_SEND_COMMAND((mock_current_chan = c_chan), m9, 0, 1, 1, "/whowas priv 123", "priv", "WHOWAS priv 123");
+	CHECK_SEND_COMMAND((mock_current_chan = c_chan), m9, 0, 1, 1,
+		"/whowas priv 123", "priv", "WHOWAS priv 123");
 	assert_ptr_eq(mock_current_chan, c_priv);
 
-	CHECK_SEND_COMMAND((mock_current_chan = c_serv), m10, 0, 1, 1, "/whowas priv 123", "priv", "WHOWAS priv 123");
+	CHECK_SEND_COMMAND((mock_current_chan = c_serv), m10, 0, 1, 1,
+		"/whowas priv 123", "priv", "WHOWAS priv 123");
 	assert_ptr_eq(mock_current_chan, c_priv);
 
-	/* test `/whowas <nick> [count]` for non-existing privmsg jumps to and prints in network buffer */
+	/* test `/whowas <nick> [count]` for non-existing privmsg jumps/prints in network buffer */
 	char m11[] = "whowas xxx 123";
 	char m12[] = "whowas xxx 123";
 
-	CHECK_SEND_COMMAND((mock_current_chan = c_chan), m11, 0, 1, 1, "/whowas xxx 123", "host", "WHOWAS xxx 123");
+	CHECK_SEND_COMMAND((mock_current_chan = c_chan), m11, 0, 1, 1,
+		"/whowas xxx 123", "host", "WHOWAS xxx 123");
 	assert_ptr_eq(mock_current_chan, c_serv);
 
-	CHECK_SEND_COMMAND((mock_current_chan = c_priv), m12, 0, 1, 1, "/whowas xxx 123", "host", "WHOWAS xxx 123");
+	CHECK_SEND_COMMAND((mock_current_chan = c_priv), m12, 0, 1, 1,
+		"/whowas xxx 123", "host", "WHOWAS xxx 123");
 	assert_ptr_eq(mock_current_chan, c_serv);
 }
 

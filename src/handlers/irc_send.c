@@ -298,21 +298,40 @@ irc_send_whois(struct server *s, struct channel *c, char *m)
 	 * (431) ERR_NONICKNAMEGIVEN
 	 * (671) RPL_WHOISSECURE */
 
-	const char *target;
+	const char *param1;
+	const char *param2;
+	const char *nick;
 
-	if (!(target = irc_send_args(c, m, CHANNEL_T_PRIVMSG)))
-		failf(c, "Usage: /whois <target>");
+	param1 = irc_strsep(&m);
+	param2 = irc_strsep(&m);
 
-	// TODO: the numeric replies should also be targeting the buffer
+	nick = param2 ? param2 : param1 ? param1 : NULL;
 
-	if (!(c = channel_list_get(&(s->clist), target, s->casemapping)))
+	if (irc_strsep(&m))
+		failf(c, "Usage: /whois [target] <nick>");
+
+	if (!nick && c->type != CHANNEL_T_PRIVMSG)
+		failf(c, "Usage: /whois [target] <nick>");
+
+	if (nick && !(c = channel_list_get(&(s->clist), nick, s->casemapping)))
 		c = s->channel;
 
 	channel_set_current(c);
 
-	newlinef(c, 0, FROM_INFO, "/whois %s", target);
+	if (param1 && param2)
+		param2 = (nick ? nick : c->name);
+	else
+		param1 = (nick ? nick : c->name);
 
-	sendf(s, c, "WHOIS %s", target);
+	newlinef(c, 0, FROM_INFO, "/whois %s%s%s",
+		param1,
+		param2 ? " "    : "",
+		param2 ? param2 : "");
+
+	sendf(s, c, "WHOIS %s%s%s",
+		param1,
+		param2 ? " "    : "",
+		param2 ? param2 : "");
 
 	return 0;
 }
