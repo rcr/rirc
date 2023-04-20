@@ -292,15 +292,21 @@ test_send_topic_unset(void)
 static void
 test_send_who(void)
 {
+	/* test `/who` takes exactly 1 parameter */
 	char m1[] = "who";
-	char m2[] = "who";
-	char m3[] = "who";
-	char m4[] = "who targ";
+	char m2[] = "who xxx yyy";
 
-	CHECK_SEND_COMMAND(c_chan, m1, 1, 1, 0, "Usage: /who <target>", "chan", "");
-	CHECK_SEND_COMMAND(c_serv, m2, 1, 1, 0, "Usage: /who <target>", "host", "");
-	CHECK_SEND_COMMAND(c_priv, m3, 0, 0, 1, "", "", "WHO priv");
-	CHECK_SEND_COMMAND(c_priv, m4, 0, 0, 1, "", "", "WHO targ");
+	CHECK_SEND_COMMAND(c_chan, m1, 1, 1, 0, "Usage: /who <mask>", "chan", "");
+	CHECK_SEND_COMMAND(c_chan, m2, 1, 1, 0, "Usage: /who <mask>", "chan", "");
+
+	/* test `/whois <mask>` jumps/prints in network buffer */
+	char m3[] = "who xxx";
+	char m4[] = "who yyy";
+	char m5[] = "who zzz";
+
+	CHECK_SEND_COMMAND(c_chan, m3, 0, 1, 1, "/who xxx", "host", "WHO xxx");
+	CHECK_SEND_COMMAND(c_priv, m4, 0, 1, 1, "/who yyy", "host", "WHO yyy");
+	CHECK_SEND_COMMAND(c_priv, m5, 0, 1, 1, "/who zzz", "host", "WHO zzz");
 }
 
 static void
@@ -308,6 +314,7 @@ test_send_whois(void)
 {
 	/* test `/whois` takes at most 2 parameters */
 	char m1[] = "whois nick 1 x";
+
 	CHECK_SEND_COMMAND(c_chan, m1, 1, 1, 0, "Usage: /whois [target] <nick>", "chan", "");
 
 	/* test `/whois` requires a target for channel, network buffers */
@@ -376,6 +383,7 @@ test_send_whowas(void)
 {
 	/* test `/whowas` takes at most 2 parameters */
 	char m1[] = "whowas nick 1 x";
+
 	CHECK_SEND_COMMAND(c_chan, m1, 1, 1, 0, "Usage: /whowas <nick> [count]", "chan", "");
 
 	/* test `/whowas` requires a target for channel, network buffers */

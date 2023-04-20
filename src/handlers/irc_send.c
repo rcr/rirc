@@ -262,14 +262,19 @@ irc_send_who(struct server *s, struct channel *c, char *m)
 	 * (315) RPL_ENDOFWHO
 	 * (402) ERR_NOSUCHSERVER */
 
-	const char *target;
+	const char *mask;
 
-	if (!(target = irc_send_args(c, m, CHANNEL_T_PRIVMSG)))
-		failf(c, "Usage: /who <target>");
+	if (!(mask = irc_strsep(&m)))
+		failf(c, "Usage: /who <mask>");
 
-	// TODO: this one should just indiscriminately jump to network buffer and print there
+	if (irc_strsep(&m))
+		failf(c, "Usage: /who <mask>");
 
-	sendf(s, c, "WHO %s", target);
+	channel_set_current(s->channel);
+
+	newlinef(s->channel, 0, FROM_INFO, "/who %s", mask);
+
+	sendf(s, c, "WHO %s", mask);
 
 	return 0;
 }
