@@ -66,4 +66,4 @@ newline(struct channel *c, enum buffer_line_type t, const char *f, const char *f
 }
 
 struct channel* current_channel(void) { return mock_current_chan; }
-void channel_set_current(struct channel *c) { mock_current_chan = c; }
+void channel_set_current(struct channel *c, int scroll) { mock_current_chan = c; (void)scroll; }

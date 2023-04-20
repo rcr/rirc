@@ -119,7 +119,7 @@ state_init(void)
 	newlinef(state.default_channel, 0, FROM_INFO, "v" STR(VERSION) " (debug " STR(GITHASH) ")");
 #endif
 
-	channel_set_current(state.default_channel);
+	channel_set_current(state.default_channel, 0);
 }
 
 void
@@ -385,9 +385,9 @@ state_channel_close(int action_confirm)
 		}
 
 		if (c == channel_get_last())
-			channel_set_current(channel_get_prev(c));
+			channel_set_current(channel_get_prev(c), 0);
 		else
-			channel_set_current(channel_get_next(c));
+			channel_set_current(channel_get_next(c), 0);
 
 		channel_list_del(&(s->clist), c);
 		channel_free(c);
@@ -401,7 +401,7 @@ state_channel_close(int action_confirm)
 				server_error(s, "sendf fail: %s", io_err(ret));
 		}
 
-		channel_set_current((s->next != s ? s->next->channel : state.default_channel));
+		channel_set_current((s->next != s ? s->next->channel : state.default_channel), 0);
 		io_dx(s->connection, 1);
 		server_list_del(state_server_list(), s);
 		server_free(s);
@@ -505,7 +505,7 @@ channel_move_prev(void)
 	if ((c = channel_get_prev(current_channel())) == current_channel())
 		return;
 
-	channel_set_current(c);
+	channel_set_current(c, 0);
 }
 
 void
@@ -518,11 +518,11 @@ channel_move_next(void)
 	if ((c = channel_get_next(current_channel())) == current_channel())
 		return;
 
-	channel_set_current(c);
+	channel_set_current(c, 0);
 }
 
 void
-channel_set_current(struct channel *c)
+channel_set_current(struct channel *c, int scroll)
 {
 	/* Set the state to an arbitrary channel */
 
@@ -530,6 +530,9 @@ channel_set_current(struct channel *c)
 		state.current_channel = c;
 		draw(DRAW_ALL);
 	}
+
+	if (scroll)
+		buffer_scrollback_head();
 }
 
 static uint16_t
@@ -818,7 +821,7 @@ command_connect(struct channel *c, char *args)
 		if ((ret = io_cx(s->connection)))
 			server_error(s, "failed to connect: %s", io_err(ret));
 
-		channel_set_current(s->channel);
+		channel_set_current(s->channel, 0);
 	}
 }
 

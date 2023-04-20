@@ -111,7 +111,7 @@ test_command_close(void)
 	if (server_list_add(state_server_list(), s2))
 		test_abort("Failed to add server");
 
-	channel_set_current(c1);
+	channel_set_current(c1, 0);
 
 	INP_COMMAND(":close with args");
 
@@ -121,7 +121,7 @@ test_command_close(void)
 	INP_C(0x0A);
 
 	/* test closing last channel on server */
-	channel_set_current(c2);
+	channel_set_current(c2, 0);
 
 	INP_COMMAND(":close");
 
@@ -130,7 +130,7 @@ test_command_close(void)
 	assert_strcmp(current_channel()->name, "host2");
 
 	/* test closing server channel */
-	channel_set_current(s1->channel);
+	channel_set_current(s1->channel, 0);
 
 	INP_COMMAND(":close");
 
@@ -139,7 +139,7 @@ test_command_close(void)
 	assert_strcmp(current_channel()->name, "host2");
 
 	/* test closing middle channel*/
-	channel_set_current(c3);
+	channel_set_current(c3, 0);
 
 	INP_COMMAND(":close");
 
@@ -148,7 +148,7 @@ test_command_close(void)
 	assert_strcmp(current_channel()->name, "#c4");
 
 	/* test closing last channel*/
-	channel_set_current(c5);
+	channel_set_current(c5, 0);
 
 	INP_COMMAND(":close");
 
@@ -407,7 +407,7 @@ test_command_disconnect(void)
 	if (server_list_add(state_server_list(), s))
 		test_abort("Failed to add server");
 
-	channel_set_current(s->channel);
+	channel_set_current(s->channel, 0);
 
 	io_cx(NULL);
 

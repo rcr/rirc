@@ -423,7 +423,7 @@ rirc_parse_args(int argc, char **argv)
 				cli_servers[i].sasl_pass);
 		}
 
-		channel_set_current(cli_servers[i].s->channel);
+		channel_set_current(cli_servers[i].s->channel, 0);
 	}
 
 	for (size_t i = 0; i < n_servers; i++) {

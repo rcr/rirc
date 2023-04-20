@@ -1,16 +1,37 @@
 #include "src/handlers/irc_recv.h"
 
+// TODO: jump to buffer should set scrollback to head, add flag to channe_set_current, and only draw
+// if also not at head of buffer
+
+
+
+// FIXME: cut a ticket for this:
+//
+// update status bar:
+//
+// [nick user@host modes] [channel modes]
+
+// FIXME: cut a ticket for this:
+//
+//
+// realname, away message, etc, data can bleed attributes into other parts of a message.
+//
+// e.g. if a realname contains formatting characters, the rest of the message is printed with
+// that colour because the buffer doesn't know when to reset the foreground
+
+// FIXME: cut a ticket for this:
+//
+// output of /who command can store max width of previous iterations for certain fields to align
+// them, requires dynamically storing the widths in the line index and updating them as new lines
+// come in?
+
+
 // TODO: test these with the test-servers.sh script with/without privmsg buffer,
 // requires connecting with at least 3 instances
 
 
-// TODO: need explicit handling of:
-// * (352) RPL_WHOREPLY
-
-
 // TODO: ???
 // -??- ~ [309] [CTCPServ] is a Network Service
-
 
 
 // TODO:
@@ -29,6 +50,58 @@
 // ~   ...
 // ~ /who <nick> END
 
+
+// IRSSI examples of output, these replies can be cleaned up and made pleasant to read
+
+
+// TODO: it could even be possible to stash the numeric reply data and print it all at once
+// when the END is received, in a much cleaner way, a single function could exist to output
+// the values.
+//
+// a channel would have a list of numeric replies that it stashes values for, so a nick and network
+// buffer could each stash their own and print accordingly?
+//
+// Although... only one response from a server should be encountered at a time, e.g. sending
+//
+//   /who(is/was) foo
+//   /who(is/was) bar
+//
+// should get a complete foo before bar responses, and even if it didnt, bar would just overwrite
+// the foo responses and print when the END comes either way? it'll be broken still work, somewhat
+//
+// ticket this item
+
+
+#if 0
+08:26 -!-          * rirc-test H   0  ~u@7ts7bn7azdaug.oragono [rirc-test]
+08:26 -!- End of /WHO list
+08:27 -!- rirc-test- [~u@q23tfk77z59jq.oragono]
+08:27 -!-  was      : rirc-test
+08:27 -!- rirc-test- [~u@q23tfk77z59jq.oragono]
+08:27 -!-  was      : rirc-test
+08:27 -!- rirc-test- [~u@q23tfk77z59jq.oragono]
+08:27 -!-  was      : rirc-test
+08:27 -!- rirc-test- [~u@q23tfk77z59jq.oragono]
+08:27 -!-  was      : rirc-test
+08:27 -!- rirc-test- [~u@q23tfk77z59jq.oragono]
+08:27 -!-  was      : rirc-test
+08:27 -!- rirc-test- [~u@q23tfk77z59jq.oragono]
+08:27 -!-  was      : rirc-test
+08:27 -!- End of WHOWAS
+08:27 -!-          * rirc-test H   0  ~u@7ts7bn7azdaug.oragono [rirc-test]
+08:27 -!- End of /WHO list
+08:27 -!- rirc-test [~u@7ts7bn7azdaug.oragono]
+08:27 -!-  ircname  : rirc-test
+08:27 -!-           : is using a secure connection
+08:27 -!-  idle     : 0 days 0 hours 41 mins 53 secs [signon: Sat Apr 15 07:45:49 2023]
+08:27 -!- End of WHOIS
+08:28 -!- rcr [~u@7ts7bn7azdaug.oragono]
+08:28 -!-  ircname  : Unknown
+08:28 -!-  hostname : ~u@208.98.219.26 208.98.219.26
+08:28 -!-  modes    : +i
+08:28 -!-  idle     : 0 days 0 hours 2 mins 39 secs [signon: Sat Apr 15 08:25:38 2023]
+08:28 -!- End of WHOIS
+#endif
 
 // who/whois/whowas related numerics:
 #if 0
@@ -57,8 +130,6 @@
 	 * (461) ERR_NEEDMOREPARAMS */
 	 * (671) RPL_WHOISSECURE */
 #endif
-
-
 
 #include "config.h"
 #include "src/components/server.h"
@@ -1780,7 +1851,7 @@ recv_join(struct server *s, struct irc_message *m)
 			c = channel(chan, CHANNEL_T_CHANNEL);
 			c->server = s;
 			channel_list_add(&s->clist, c);
-			channel_set_current(c);
+			channel_set_current(c, 0);
 		}
 		c->joined = 1;
 		c->parted = 0;

@@ -32,7 +32,7 @@ struct channel* channel_get_next(struct channel*);
 struct channel* channel_get_prev(struct channel*);
 struct channel* current_channel(void);
 struct server_list* state_server_list(void);
-void channel_set_current(struct channel*);
+void channel_set_current(struct channel*, int);
 void newlinef(struct channel*, enum buffer_line_type, const char*, const char*, ...);
 
 #endif
