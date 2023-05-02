@@ -1898,14 +1898,11 @@ recv_nick(struct server *s, struct irc_message *m)
 static int
 recv_notice(struct server *s, struct irc_message *m)
 {
-	/* :nick!user@host NOTICE <target> :<message> */
+	/* [:nick[!user@host]] NOTICE <target> <:message> */
 
 	char *message;
 	char *target;
 	struct channel *c;
-
-	if (!m->from)
-		failf(s, "NOTICE: sender's nick is null");
 
 	if (!irc_message_param(m, &target))
 		failf(s, "NOTICE: target is null");
@@ -1916,10 +1913,15 @@ recv_notice(struct server *s, struct irc_message *m)
 	if (IS_CTCP(message))
 		return ctcp_response(s, m->from, target, message);
 
-	if (!(c = channel_list_get(&(s->clist), m->from, s->casemapping)))
-		c = s->channel;
+	if (m->from) {
+		if (!(c = channel_list_get(&(s->clist), m->from, s->casemapping)))
+			c = s->channel;
 
-	newlinef(c, BUFFER_LINE_CHAT, m->from, "%s", message);
+		newlinef(c, BUFFER_LINE_CHAT, m->from, "%s", message);
+
+	} else {
+		server_info(s, "%s", message);
+	}
 
 	return 0;
 }
