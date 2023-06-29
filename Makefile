@@ -10,6 +10,10 @@ ifneq ($(filter %BSD,$(shell uname -s)),)
 	CPPFLAGS += -D_BSD_SOURCE -D__BSD_VISIBLE
 endif
 
+ifneq ($(filter Darwin,$(shell uname -s)),)
+	CPPFLAGS += -D_DARWIN_C_SOURCE
+endif
+
 PREFIX   = /usr/local
 PATH_BIN = $(DESTDIR)$(PREFIX)/bin
 PATH_MAN = $(DESTDIR)$(PREFIX)/share/man/man1
