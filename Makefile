@@ -7,7 +7,7 @@ LDFLAGS  = -flto
 CPPFLAGS = -I. -D_POSIX_C_SOURCE=200809L -DVERSION=$(VERSION)
 
 ifneq ($(filter %BSD,$(shell uname -s)),)
-	CPPFLAGS += -D_BSD_SOURCE -D__BSD_VISIBLE
+	CPPFLAGS += -D_BSD_SOURCE -D__BSD_VISIBLE -D_XOPEN_SOURCE=600
 endif
 
 ifneq ($(filter Darwin,$(shell uname -s)),)
