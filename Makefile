@@ -49,13 +49,14 @@ rirc: config.h $(OBJ) $(MBEDTLS)
 	$(CC) $(LDFLAGS) -pthread $(OBJ) $(MBEDTLS) -o $@
 
 install: rirc
-	@sed -i "s/VERSION/$(VERSION)/g" rirc.1
+	@sed -i.bak "s/VERSION/$(VERSION)/g" rirc.1
 	mkdir -p $(PATH_BIN)
 	mkdir -p $(PATH_MAN)
 	cp -f rirc   $(PATH_BIN)
 	cp -f rirc.1 $(PATH_MAN)
 	chmod 755 $(PATH_BIN)/rirc
 	chmod 644 $(PATH_MAN)/rirc.1
+	rm -f rirc.1.bak
 
 uninstall:
 	rm -f $(PATH_BIN)/rirc
